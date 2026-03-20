@@ -1,0 +1,34 @@
+# Node
+node_modules/
+
+# Python / Backend
+venv/
+env/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Database
+laminar.db
+*.sqlite3
+
+# Large Model Weights
+*.pt
+*.onnx
+*.weights
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary directories
+tmp/
+logs/
+downloads/

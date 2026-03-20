@@ -1,0 +1,144 @@
+date,name,type
+2026-01-01,New Year's Day,Public
+2026-01-06,Epiphany,Religious
+2026-01-14,Pongal,Festival
+2026-01-15,Makar Sankranti,Festival
+2026-01-26,Republic Day,National
+2026-02-02,Groundhog Day,Cultural
+2026-02-10,Chinese New Year,Festival
+2026-02-14,Valentine's Day,Social
+2026-02-17,Mardi Gras,Festival
+2026-02-25,Ash Wednesday,Religious
+2026-03-03,Holi,Festival
+2026-03-08,International Women's Day,Awareness
+2026-03-17,St. Patrick's Day,Cultural
+2026-03-20,Spring Equinox,Seasonal
+2026-03-25,Ugadi,Festival
+2026-03-29,Daylight Saving Time Start,Seasonal
+2026-04-01,April Fools' Day,Cultural
+2026-04-02,Ramadan Begins,Religious
+2026-04-03,Good Friday,Religious
+2026-04-05,Easter Sunday,Religious
+2026-04-06,Easter Monday,Public
+2026-04-13,Baisakhi,Festival
+2026-04-22,Earth Day,Awareness
+2026-04-30,Queen's Day (Netherlands),National
+2026-05-01,International Workers' Day,Public
+2026-05-05,Cinco de Mayo,Festival
+2026-05-09,Mother's Day,Social
+2026-05-10,Eid al-Fitr,Religious
+2026-05-21,Buddha Purnima,Religious
+2026-05-25,Memorial Day (US),Public
+2026-06-01,International Children's Day,Awareness
+2026-06-16,Eid al-Adha,Religious
+2026-06-18,World Cup Final (if applicable),Sports
+2026-06-19,Juneteenth (US),National
+2026-06-20,Summer Solstice,Seasonal
+2026-06-21,Father's Day,Social
+2026-06-24,Midsummer Eve,Festival
+2026-07-01,Canada Day,National
+2026-07-04,Independence Day (US),National
+2026-07-07,Tanabata,Festival
+2026-07-09,Muharram (Islamic New Year),Religious
+2026-07-14,Bastille Day (France),National
+2026-07-17,World Emoji Day,Cultural
+2026-07-25,National Day (Spain),National
+2026-08-01,Friendship Day,Social
+2026-08-12,International Youth Day,Awareness
+2026-08-15,Independence Day (India),National
+2026-08-20,Raksha Bandhan,Festival
+2026-08-27,Janmashtami,Festival
+2026-09-07,Labor Day (US),Public
+2026-09-12,Oktoberfest Begins,Festival
+2026-09-16,Mexican Independence Day,National
+2026-09-19,International Talk Like a Pirate Day,Cultural
+2026-09-22,Autumn Equinox,Seasonal
+2026-09-27,World Tourism Day,Awareness
+2026-10-02,Gandhi Jayanti,National
+2026-10-15,Navratri Begins,Festival
+2026-10-20,Diwali,Festival
+2026-10-24,Dussehra,Festival
+2026-10-31,Halloween,Social
+2026-11-01,All Saints' Day,Religious
+2026-11-02,Day of the Dead,Cultural
+2026-11-05,Guy Fawkes Night,Cultural
+2026-11-11,Singles' Day (Shopping),Commercial
+2026-11-15,Diwali (if different date),Festival
+2026-11-19,International Men's Day,Awareness
+2026-11-26,Thanksgiving (US),Public
+2026-11-27,Black Friday,Commercial
+2026-11-30,Cyber Monday,Commercial
+2026-12-06,St. Nicholas Day,Cultural
+2026-12-08,Feast of the Immaculate Conception,Religious
+2026-12-12,Our Lady of Guadalupe,Religious
+2026-12-21,Winter Solstice,Seasonal
+2026-12-24,Christmas Eve,Public
+2026-12-25,Christmas Day,Public
+2026-12-26,Boxing Day,Public
+2026-12-31,New Year's Eve,Social
+2027-01-01,New Year's Day,Public
+2027-01-06,Epiphany,Religious
+2027-01-14,Pongal,Festival
+2027-01-15,Makar Sankranti,Festival
+2027-01-26,Republic Day (India),National
+2027-02-02,Groundhog Day,Cultural
+2027-02-06,Chinese New Year,Festival
+2027-02-14,Valentine's Day,Social
+2027-02-16,Mardi Gras,Festival
+2027-02-24,Ash Wednesday,Religious
+2027-03-08,International Women's Day,Awareness
+2027-03-17,St. Patrick's Day,Cultural
+2027-03-20,Spring Equinox,Seasonal
+2027-03-22,Holi,Festival
+2027-03-28,Daylight Saving Time Start,Seasonal
+2027-04-01,April Fools' Day,Cultural
+2027-04-02,Good Friday,Religious
+2027-04-04,Easter Sunday,Religious
+2027-04-05,Easter Monday,Public
+2027-04-13,Baisakhi,Festival
+2027-04-22,Earth Day,Awareness
+2027-04-30,Queen's Day (Netherlands),National
+2027-05-01,International Workers' Day,Public
+2027-05-05,Cinco de Mayo,Festival
+2027-05-09,Mother's Day,Social
+2027-05-25,Memorial Day (US),Public
+2027-06-01,International Children's Day,Awareness
+2027-06-16,World Cup Final (if applicable),Sports
+2027-06-19,Juneteenth (US),National
+2027-06-20,Father's Day,Social
+2027-06-21,Summer Solstice,Seasonal
+2027-06-24,Midsummer Eve,Festival
+2027-07-01,Canada Day,National
+2027-07-04,Independence Day (US),National
+2027-07-07,Tanabata,Festival
+2027-07-14,Bastille Day (France),National
+2027-07-17,World Emoji Day,Cultural
+2027-07-25,National Day (Spain),National
+2027-08-01,Friendship Day,Social
+2027-08-12,International Youth Day,Awareness
+2027-08-15,Independence Day (India),National
+2027-09-06,Labor Day (US),Public
+2027-09-12,Oktoberfest Begins,Festival
+2027-09-16,Mexican Independence Day,National
+2027-09-19,International Talk Like a Pirate Day,Cultural
+2027-09-22,Autumn Equinox,Seasonal
+2027-09-27,World Tourism Day,Awareness
+2027-10-02,Gandhi Jayanti,National
+2027-10-09,Diwali,Festival
+2027-10-31,Halloween,Social
+2027-11-01,All Saints' Day,Religious
+2027-11-02,Day of the Dead,Cultural
+2027-11-05,Guy Fawkes Night,Cultural
+2027-11-11,Singles' Day (Shopping),Commercial
+2027-11-19,International Men's Day,Awareness
+2027-11-25,Thanksgiving (US),Public
+2027-11-26,Black Friday,Commercial
+2027-11-29,Cyber Monday,Commercial
+2027-12-06,St. Nicholas Day,Cultural
+2027-12-08,Feast of the Immaculate Conception,Religious
+2027-12-12,Our Lady of Guadalupe,Religious
+2027-12-21,Winter Solstice,Seasonal
+2027-12-24,Christmas Eve,Public
+2027-12-25,Christmas Day,Public
+2027-12-26,Boxing Day,Public
+2027-12-31,New Year's Eve,Social

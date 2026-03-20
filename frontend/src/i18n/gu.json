@@ -1,0 +1,214 @@
+{
+  "nav": {
+    "core": "મુખ્ય", "intelligence": "બુદ્ધિ", "analytics": "વિશ્લેષણ", "config": "કૉન્ફિગ",
+    "commandCenter": "કમાન્ડ સેન્ટર", "venues": "સ્થળો", "cameras": "કૅમેરા",
+    "cameraHealth": "કૅમેરા આરોગ્ય",
+    "alerts": "チェતવણી", "prediction": "આગાહી", "liveWall": "લાઇવ વૉલ",
+    "surgeMonitor": "સર્જ મૉનિટર", "personWaitMonitor": "વ્યક્તિ પ્રતીક્ષા મૉનિટર", "reports": "અહેવાલ",
+    "systemHealth": "સિસ્ટમ આરોગ્ય", "settings": "સેટિંગ્સ",
+    "system": "સિસ્ટમ", "operational": "કાર્યરત"
+  },
+  "language": {
+    "label": "ભાષા",
+    "en": "અંગ્રેજી",
+    "hi": "હિન્દી",
+    "te": "તેલુગુ",
+    "gu": "ગુજરાતી",
+    "ta": "તમિળ"
+  },
+  "dashboard": {
+    "title": "ગ્લોબલ કમાન્ડ સેન્ટર",
+    "subtitle": "AI ભીડ ગુપ્ત માહિતી અવલોકન",
+    "systemOnline": "સિસ્ટમ ઑનલાઇન",
+    "activeVenues": "સક્રિય સ્થળો",
+    "liveTracking": "લાઇવ ટ્રૅકિંગ",
+    "realtimeOccupancy": "તમામ સ્થળોએ રીઅલ-ટાઇમ ઓક્યુપન્સી મૉનિટરિંગ.",
+    "criticalAlerts": "ગંભીર ચેતવણીઓ"
+  },
+  "stats": {
+    "activeVenues": "સક્રિય સ્થળો", "camerasOnline": "કૅમેરા ઑનલાઇન",
+    "activeAlerts": "સક્રિય ચેતવણીઓ", "systemStatus": "સિસ્ટમ સ્થિતિ",
+    "totalCapacity": "કુલ ક્ષમતા", "locationTracked": "સ્થળ ટ્રૅક",
+    "locationsTracked": "સ્થળો ટ્રૅક", "uptime": "અપટાઇમ",
+    "noCameras": "કોઈ કૅમેરા નહીં", "allClear": "બધું સ્પષ્ટ",
+    "pendingReview": "સમીક્ષા બાકી", "allServicesRunning": "બધી સેવાઓ ચાલુ",
+    "checkSystemHealth": "સિસ્ટમ આરોગ્ય તપાસો", "acrossAllVenues": "તમામ સ્થળોએ"
+  },
+  "queue": {
+    "queueEstimate": "કતાર અંદાજ", "live": "લાઇવ", "minWait": "મિનિટ રાહ",
+    "smoothFlow": "સ્મૂધ ફ્લો", "moderateQueue": "મધ્યમ કતાર", "heavyDelay": "ભારે વિલંબ",
+    "inQueue": "કતારમાં", "processRate": "પ્રક્રિયા દર", "perMin": "/મિનિટ",
+    "unavailable": "રાહ સમય અનુપલબ્ધ"
+  },
+  "alerts": {
+    "title": "ચેતવણી વ્યવસ્થાપન",
+    "subtitle": "તમામ સ્થળોએ રીઅલ-ટાઇમ સુરક્ષા ઇntelligence ની મૉનિટર, સ્વીકૃતિ અને ઉકેલ.",
+    "searchPlaceholder": "ચેતવણી શોધો...", "filter": "ફિલ્ટર",
+    "noAlerts": "કોઈ સક્રિય ચેતવણી નહીં", "allClear": "બધી સિસ્ટમ સામાન્ય.",
+    "critical": "ગંભીર", "high": "ઉચ્ચ", "medium": "મધ્યમ", "low": "નીચું",
+    "open": "ખુલ્લું", "acknowledged": "સ્વીકૃત", "resolved": "ઉકેલ",
+    "acknowledge": "સ્વીકારો", "resolve": "ઉકેલો",
+    "crowdDensity": "ભીડ ઘનતા", "overcrowding": "વધુ ભીડ",
+    "surgeDetected": "સર્જ મળ્યો", "riskLevel": "જોખમ સ્તર",
+    "severity": "ગંભીરતા", "venue": "સ્થળ", "camera": "કૅમેરા", "time": "સમય"
+  },
+  "venues": {
+    "title": "સ્થળ અવલોકન",
+    "subtitle": "તમામ સ્થળોએ ક્ષમતા, ભીડ જોખમ અને કૅમેરા ઇન્ફ્રાસ્ટ્રક્ચર મૉનિટર કરો.",
+    "searchPlaceholder": "સ્થળ શોધો...", "addVenue": "સ્થળ ઉમેરો",
+    "filter": "ફિલ્ટર", "allVenues": "બધા સ્થળ", "active": "સક્રિય",
+    "inactive": "નિષ્ક્રિય", "noVenues": "કોઈ સક્રિય સ્થળ નહીં",
+    "noVenuesHint": "મૉનિટરિંગ શરૂ કરવા પ્રથમ સ્થળ ઉમેરો.",
+    "noMatchSearch": "કોઈ સ્થળ ખોજ સાથે મળ્યું નહીં",
+    "clearFilters": "ફિલ્ટર સાફ", "failedToLoad": "સ્થળ લૉડ નિષ્ફળ. ફ્ ..",
+    "capacity": "ક્ષમતા", "crowdLevel": "ભીડ સ્તર",
+    "cameras": "કૅમેરા", "deleteVenue": "સ્થળ કાઢો"
+  },
+  "cameras": {
+    "title": "કૅમેરા નેટવર્ક",
+    "subtitle": "તમામ સર્વૈ. નોડ પાઇplanes. ., ..",
+    "searchPlaceholder": "ID અથવા નામ ...", "filter": "ફિલ્ટર",
+    "addNode": "નોડ ઉ.", "videoIngestionNodes": "વૉ. .",
+    "nodeFound": "નોડ મળ્.", "nodesFound": "નોડ. ..",
+    "streamOffline": "સ્ .. .", "online": "ઑ.", "offline": "ઑ", "fps": "FPS"
+  },
+  "system": {
+    "title": "સિસ્ટમ ક્લસ્ટર આ.", "subtitle": ".. ., AI .. ..",
+    "globalNominal": "ગ. .. ..", "cpuComputeArray": "CPU ..", "memoryAllocation": "...",
+    "networkThroughput": "ને. ..", "inboundVideoRx": "..Rx", "outboundStreamTx": "..Tx",
+    "coreAIServices": ".. AI ..", "serviceModule": ".. ..", "state": "..",
+    "latency": ".. / ..", "queueDepth": ".. ..", "stable": "..", "highLoad": ".. ..",
+    "online": "ઑ..", "offline": "ઑ...", "hitRate": ".. .:", "frames": ".. .",
+    "scanning": ".. ..."
+  },
+  "monitor": {
+    "title": "ગ. .. ..", "livemultiplex": ".. ..",
+    "subtitle": ".. .. .. .. ..", "gridMatrix": "ગ. ..",
+    "signalMissing": ".. ..", "streamOffline": ".. .."
+  },
+  "surge": {
+    "title": "સર્જ ઓવરસીઅર", "subtitle": "ઓpticl ફ્лоу એ. .",
+    "live": "લાઇવ", "gridStatus": "ગ્રિડ સ્થિતિ", "zoneLock": "ઝૉન લૉક",
+    "globalMatrix": "વૈ. ..", "activeSurgeVectors": "સ. ..",
+    "criticalSurge": "ગ. ..", "initializingFlow": "ફ.. .",
+    "zeroAbnormal": "ક.. ..", "velocity": "ઝ.",
+    "variance": "ભ.", "accel": "ઝ.", "engage": "ઉ.", "nominal": "સ.",
+    "autoDispatch": "ઓ-ડ.: સ.",
+    "dispatchDesc": "ગ. ઘ. Police ને Email/SMS.",
+    "flowMatrix": "ઓ. ફ. ..",
+    "monitoringVelocity": "સ. ..",
+    "accessDashboard": "Surge ડ. .",
+    "globalSecurityEvent": "વ. ..",
+    "activeSurgeAnomaly": ". ..",
+    "continuousMonitoring": ".. .."
+  },
+  "reports": {
+    "title": "ઘ. ..", "subtitle": ".. ..",
+    "generate": ".. ..", "download": "ડ..", "noReports": ".. .. .."
+  },
+  "prediction": {
+    "title": "ભ. ..", "subtitle": "AI .. ..",
+    "forecast": ".. ..", "nextHour": ".. ..", "next30Min": ".. 30 ..",
+    "next15Min": ".. 15 ..", "crowdLevel": ".. ..", "riskLevel": ".. .."
+  },
+  "settings": {
+    "title": "સ. ..", "subtitle": ".. ..",
+    "save": ".. ..", "notifications": ".. ..",
+    "alertThreshold": ".. ..", "language": "ભ. ..", "timezone": ".. .."
+  },
+  "auth": {
+    "signIn": "સ. ..", "signOut": "સ. ..", "getStarted": ".. ..",
+    "email": "ઇ..", "password": ".. ..", "confirmPassword": ".. ..",
+    "register": "ન. ..", "login": ".. ..", "forgotPassword": ".. ..?",
+    "noAccount": ".. ..?", "hasAccount": ".. ..?"
+  },
+  "landing": {
+    "badge": ".. .. .. ..",
+    "headline1": "AI-.. ..", "headline2": "ભ. ..", "headline3": "..",
+    "description": ".. .. CCTV .. ..",
+    "getStarted": ".. ..", "viewDemo": ".. ..",
+    "getStartedFree": ".. ..", "camerasConnected": ".. ..",
+    "peopleMonitored": ".. ..", "systemUptime": ".. ..",
+    "alertLatency": ".. ..", "featuresTitle": ".. ..", "featuresHighlight": "..",
+    "featuresSubtitle": ".. ..", "feature1Title": ".. ..", "feature1Desc": ".. ..",
+    "feature2Title": ".. ..", "feature2Desc": ".. ..", "feature3Title": "..",
+    "feature3Desc": ".. ..", "feature4Title": ".. ..", "feature4Desc": ".. ..",
+    "feature5Title": ".. ..", "feature5Desc": ".. ..", "feature6Title": ".. ..",
+    "feature6Desc": ".. ..", "archTitle": "..", "archHighlight": "..",
+    "archSubtitle": ".. ..", "arch1": ".. ..", "arch2": ".. ..",
+    "arch3": "YOLO ..", "arch4": ".. ..", "arch5": ".. ..", "arch6": ".. ..", "arch7": "..",
+    "ctaTitle": ".. .?", "ctaSubtitle": ".. ..", "footerTag": ".. .. .."
+  },
+  "common": {
+    "loading": ".. ...", "refresh": ".. .", "search": "..", "all": "..",
+    "edit": "..", "delete": "..", "cancel": "..", "confirm": "..", "close": "..",
+    "save": "..", "add": "..", "remove": "..", "status": "..", "name": "..",
+    "location": "..", "noData": ".. .."
+  },
+  "personWaitMonitor": {
+    "title": "વ્ ..",
+    "subtitle": "ઠ.-ઇ · IoU .; ઝ.ક.",
+    "trackedNow": "ટ. ..", "avgWait": "સ. ..", "maxWait": "મ. ..",
+    "totalRecords": "ક. (", "liveIntelligence": "ઇ. ..",
+    "dwellAnalytics": "ઠ. ..", "operationalAnalytics": "ઓ. ..",
+    "avgSystemDwell": "સ. ..", "peakObservedDwell": "પ. ..",
+    "throughput": "(", "effIndex": "ઇ. ..",
+    "latencyMatrix": "ઝ. ..", "virtualPerimeters": "ઇ. ..",
+    "newZone": "ન. ..", "noTrackingVectors": ".. ..",
+    "incidentLogs": "ઇ. ..", "aiCopilot": "AI ..",
+    "standby": "સ. ..", "dwellViolation": "ઠ. ..",
+    "waitingFor": "ર. ..", "in": ".", "limit": "..",
+    "streamOffline": ".. ..", "reconnecting": "ફ. ..",
+    "noCameraSelected": "ક. ..", "addZone": "ઝ. ..",
+    "zoneName": "ઝ. ..", "waitThreshold": ". (.)",
+    "cancelZone": "..", "createZone": "ઝ. ..", "deleteZone": "ઝ. ..",
+    "startStream": ".. ..", "stopStream": ".. ..",
+    "cameraTest": "ક. ..",    "individualDetected": ".. ..",
+    "zone": "ઝ._ID", "activeTracks": ".. ..", "streamsOk": ".. ..",
+    "queueHealth": "કતાર આરોગ્ય",
+    "congestionStatus": "ભીડની સ્થિતિ",
+    "throughputMin": "થ્રુપુટ/મિનિટ",
+    "healthScore": "હેલ્થ સ્કોર",
+    "inZone": "ઝોનમાં",
+    "avgZoneWait": "સરેરાશ ઝોન પ્રતીક્ષા",
+    "maxZoneWait": "મહત્તમ ઝોન પ્રતીક્ષા",
+    "liveTracks": "લાઇવ ટ્રેક્સ",
+    "updatesEvery3s": "દર 3 સેકન્ડે અપડેટ",
+    "noPersonsTracked": "કોઈ વ્યક્તિ ટ્રેક નથી",
+    "dwellRecords": "ડ્વેલ રેકોર્ડ્સ",
+    "history24h": "24-કલાક પ્રતીક્ષા ઇતિહાસ",
+    "queueVolume": "કલાક દીઠ કતાર વોલ્યુમ",
+    "noHistoricalData": "હજુ સુધી કોઈ ઇતિહાસ ડેટા નથી",
+    "noVolumeData": "વોલ્યુમ ડેટા નથી",
+    "noRecords": "કોઈ રેકોર્ડ નથી",
+    "noZoneData": "હજુ સુધી કોઈ ઝોન ડેટા નથી",
+    "waitScale": "પ્રતીક્ષા સ્કેલ",
+    "good": "સારું",
+    "slow": "ધીમું",
+    "critical": "ગંભીર",
+    "idle": "નિષ્ક્રિય"
+  },
+  "cameraHealth": {
+    "title": "ક. ..",
+    "subtitle": ".. ..",
+    "healthy": "સ. ..", "offline": "ઓ..", "blackScreen": "ક. ..",
+    "lensCovered": "ઇ. ..", "blurred": "ધ./ધ..",
+    "rotated": "ઘ. ..", "warning": "ચ. ..", "unknown": "અ. ..",
+    "noLocation": "ક. ..", "lastFrame": ".. .", "heartbeat": "..",
+    "issue": "..", "total": "..", "justNow": ".. ..", "never": "..",
+    "noCameras": "ક. ..", "refresh": "..",
+    "loading": "ક. .. ..",
+    "lensCoveredDesc": "ઇ. ..", "blackScreenDesc": ".. ..",
+    "blurredDesc": ".. ..", "rotatedDesc": ".. ..",
+    "idle": "નિષ્ક્રિય"
+  },
+  "notifications": {
+    "surgeIncident": "SURGE ..",
+    "criticalEscalation": "ગ. .!",
+    "alertUpdate": "ચ. ..!",
+    "autoDispatchMsg": "Police ને SMS & Email ..",
+    "activeAlerts": "..", "riskDetected": "..",
+    "viewAction": "..", "browserAlertTitle": "Laminar ..",
+    "newAlertGenerated": "ન. ..", "total": ".."
+  }
+}
