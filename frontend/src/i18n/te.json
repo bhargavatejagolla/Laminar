@@ -6,7 +6,8 @@
     "alerts": "హెచ్చరికలు", "prediction": "అంచనా", "liveWall": "లైవ్ వాల్",
     "surgeMonitor": "సర్జ్ మానిటర్", "personWaitMonitor": "వ్యక్తి వేచి మానిటర్", "reports": "నివేదికలు",
     "systemHealth": "సిస్టమ్ ఆరోగ్యం", "settings": "సెట్టింగ్‌లు",
-    "system": "సిస్టమ్", "operational": "పని చేస్తోంది"
+    "system": "సిస్టమ్", "operational": "పని చేస్తోంది",
+    "areaSurvey": "ప్రాంత సర్వే"
   },
   "language": {
     "label": "భాష", "en": "ఆంగ్లం", "hi": "హిందీ",
@@ -209,16 +210,25 @@
     "noCameras": "కెమెరాలు కనుగొనబడలేదు", "refresh": "రిఫ్రెష్",
     "loading": "కెమెరా ఆరోగ్య డేటా లోడ్ అవుతోంది...",
     "lensCoveredDesc": "లెన్స్ కప్పబడి ఉండవచ్చు", "blackScreenDesc": "ఫ్రేమ్ పూర్తిగా నల్లగా ఉంది",
-    "blurredDesc": "చిత్రం తీవ్రంగా మసకగా ఉంది", "rotatedDesc": "కెమెరా తిప్పబడినట్లు కనిపిస్తోంది",
-    "offlineDesc": "కెమెరా డిస్‌కనెక్ట్ అయింది"
+    "blurredDesc": "చిత్రం తీవ్రంగా మసకగా ఉంది",    "rotatedDesc": "కెమెరా తిరిగినట్లు లేదా తప్పుగా అమర్చబడినట్లు అనిపిస్తుంది",
+    "offlineDesc": "కెమెరా డిస్‌కనెక్ట్ చేయబడింది లేదా అందుబాటులో లేదు"
   },
   "notifications": {
-    "surgeIncident": "SURGE సంఘటన నమోదైంది",
-    "criticalEscalation": "క్లిష్టమైన పెరుగుదల!",
+    "surgeIncident": "సర్జ్ సంఘటన రికార్డ్ చేయబడింది",
+    "criticalEscalation": "క్లిష్టమైన ఎస్కలేషన్!",
     "alertUpdate": "హెచ్చరిక అప్‌డేట్ గుర్తించబడింది!",
-    "autoDispatchMsg": "Police మరియు నిర్వహణకు ఆటో SMS మరియు Email పంపబడింది.",
-    "activeAlerts": "చురుకైన హెచ్చరికలు", "riskDetected": "ప్రమాదం గుర్తించబడింది",
-    "viewAction": "చూడండి", "browserAlertTitle": "Laminar హెచ్చరిక",
-    "newAlertGenerated": "కొత్త హెచ్చరిక సృష్టించబడింది", "total": "మొత్తం"
+    "autoDispatchMsg": "పోలీసులకు మరియు మేనేజ్‌మెంట్‌కు ఆటోమేటెడ్ SMS & ఇమెయిల్ పంపబడింది.",
+    "activeAlerts": "చురుకైన హెచ్చరికలు",
+    "riskDetected": "ప్రమాదం గుర్తించబడింది",
+    "viewAction": "చూడండి",
+    "browserAlertTitle": "లామినార్ హెచ్చరిక",
+    "newAlertGenerated": "కొత్త హెచ్చరిక సృష్టించబడింది",
+    "total": "మొత్తం",
+    "surgeDescription": "వేగవంతమైన జనసమూహ కదలిక గుర్తించబడింది ({{velocity}}px/s) — ప్రమాదం: {{level}}",
+    "dwellDescription": "{{count}} మంది సభ్యులు వేచి ఉండే పరిమితిని మించిపోయారు.",
+    "stagnationDescription": "ట్రాఫిక్ ప్రవాహం నిలిచిపోయింది (స్కోర్: {{score}}%).",
+    "alertActiveCount": "{{count}} చురుకైన హెచ్చరికలు",
+    "dwellAlert": "⏳ వేచి ఉండే హెచ్చరిక",
+    "stagnationAlert": "🛑 నిలిచిపోయిన ట్రాఫిక్"
   }
 }

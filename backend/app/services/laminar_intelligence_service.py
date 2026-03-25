@@ -331,7 +331,7 @@ class LaminarIntelligenceService:
     # ─── Rule-Based Fallback Intelligence ────────────────────────────────────
 
     def _rule_based_intelligence(
-        self, context: Dict[str, Any], cross_camera: str, alert: Optional[CrowdAlert] = None
+        self, context: Dict[str, Any], cross_camera: str, alert: Optional[CrowdAlert] = None, lang: str = "en"
     ) -> OperationalIntelligence:
         """
         Generate structured intelligence without LLM.
@@ -357,14 +357,29 @@ class LaminarIntelligenceService:
         if len(trends) >= 3:
             older_avg = sum(t["count"] for t in trends[:max(len(trends)//2, 1)]) / max(len(trends)//2, 1)
             newer_avg = sum(t["count"] for t in trends[len(trends)//2:]) / max(len(trends)//2, 1)
+            
+            from app.services.translation_service import TranslationService as TS
+            t_svc = TS.t
+
             if newer_avg > older_avg * 1.2:
-                trend_desc = f"Crowd count is trending upward — recent average ({newer_avg:.0f}) exceeds earlier average ({older_avg:.0f}) by {((newer_avg/max(older_avg,1)-1)*100):.0f}%."
+                pct = ((newer_avg/max(older_avg,1)-1)*100)
+                trend_desc = t_svc(lang, "intel_trend_upward", 
+                    "Crowd count is trending upward — recent average ({newer:.0f}) exceeds earlier average ({older:.0f}) by {pct:.0f}%."
+                ).format(newer=newer_avg, older=older_avg, pct=pct)
             elif newer_avg < older_avg * 0.8:
-                trend_desc = f"Crowd count is declining — recent average ({newer_avg:.0f}) is lower than earlier average ({older_avg:.0f})."
+                trend_desc = t_svc(lang, "intel_trend_downward", 
+                    "Crowd count is declining — recent average ({newer:.0f}) is lower than earlier average ({older:.0f})."
+                ).format(newer=newer_avg, older=older_avg)
             else:
-                trend_desc = f"Crowd count is stable around {newer_avg:.0f} persons."
+                trend_desc = t_svc(lang, "intel_trend_stable", 
+                    "Crowd count is stable around {count:.0f} persons."
+                ).format(count=newer_avg)
         else:
-            trend_desc = f"Current crowd average: {total_avg:.0f} persons (peak: {total_peak:.0f})."
+            from app.services.translation_service import TranslationService as TS
+            t_svc = TS.t
+            trend_desc = t_svc(lang, "intel_trend_insufficient", 
+                "Current crowd average: {avg:.0f} persons (peak: {peak:.0f})."
+            ).format(avg=total_avg, peak=total_peak)
 
         # Alert prediction context
         predicted_level = None
@@ -379,96 +394,105 @@ class LaminarIntelligenceService:
         alert_risk = alert.risk_level if alert else dominant_risk
         severity = severity_map.get(alert_risk, "MODERATE")
 
-        # Build report sections
-        situation = (
-            f"Surveillance intelligence identified a {severity} crowd condition at {venue_name}. "
-            f"The venue capacity is {capacity} persons. "
-            f"Real-time monitoring across {len(cameras)} active camera{'s' if len(cameras) != 1 else ''} "
-            f"shows a current crowd average of {total_avg:.0f} with a peak of {total_peak:.0f} persons."
+        from app.services.translation_service import TranslationService
+        t = TranslationService.t
+        
+        situation = t(lang, "intel_situation", 
+            "Surveillance intelligence identified a {severity} crowd condition at {venue_name}. "
+            "The venue capacity is {capacity} persons. "
+            "Real-time monitoring across {cam_count} active camera(s) "
+            "shows a current crowd average of {avg:.0f} with a peak of {peak:.0f} persons."
+        ).format(
+            severity=severity, venue_name=venue_name, capacity=capacity, 
+            cam_count=len(cameras), avg=total_avg, peak=total_peak
         )
 
-        observed = (
-            f"{trend_desc} "
-            f"Risk scoring across sensor feeds indicates a dominant risk classification of {dominant_risk.upper()}. "
-            f"Dynamic risk score: {risk_score:.2f if isinstance(risk_score, float) else risk_score}."
+        observed = t(lang, "intel_observed",
+            "{trend_desc} "
+            "Risk scoring across sensor feeds indicates a dominant risk classification of {risk}. "
+            "Dynamic risk score: {score:.2f}."
+        ).format(
+            trend_desc=trend_desc, risk=dominant_risk.upper(), score=float(risk_score or 0)
         )
 
-        risk = (
-            f"{'Active alert is in effect. ' if alerts else ''}"
-            f"Current crowd conditions at {venue_name} are classified as {severity}. "
+        risk_text = t(lang, "intel_risk", 
+            "{alert_info}Current crowd conditions at {venue_name} are classified as {severity}. "
+        ).format(
+            alert_info=(t(lang, "active_alert_note", "Active alert is in effect. ") if alerts else ""),
+            venue_name=venue_name, severity=severity
         )
+        
         if predicted_level and esc_prob > 0:
-            risk += (
-                f"The prediction engine projects escalation to {predicted_level.upper()} "
-                f"with a probability of {int(esc_prob * 100)}%. "
-            )
+            risk_text += t(lang, "intel_prediction_addon", 
+                "The prediction engine projects escalation to {level} with a probability of {prob}%."
+            ).format(level=predicted_level.upper(), prob=int(esc_prob * 100))
+            
         if alert and alert.escalation_level > 0:
-            risk += f"Escalation level {alert.escalation_level} has been triggered."
+            risk_text += " " + t(lang, "intel_esc_note", "Escalation level {level} has been triggered.").format(level=alert.escalation_level)
 
         if predicted_level and esc_prob > 0.5:
-            prediction = (
-                f"High probability ({int(esc_prob*100)}%) of crowd conditions escalating to {predicted_level.upper()}. "
-                f"If current movement patterns persist, venue saturation may occur within the next 10-20 minutes."
-            )
+            prediction = t(lang, "intel_outcome_high",
+                "High probability ({prob}%) of crowd conditions escalating to {level}. "
+                "If current movement patterns persist, venue saturation may occur within the next 10-20 minutes."
+            ).format(prob=int(esc_prob*100), level=predicted_level.upper())
         elif dominant_risk in ["high", "critical"]:
-            prediction = (
-                f"Crowd dynamics suggest sustained high-risk conditions. If inflow continues at current rate, "
-                f"critical thresholds may be reached within the next 15-30 minutes."
+            prediction = t(lang, "intel_outcome_elevated",
+                "Crowd dynamics suggest sustained high-risk conditions. If inflow continues at current rate, "
+                "critical thresholds may be reached within the next 15-30 minutes."
             )
         else:
-            prediction = (
-                f"Based on current patterns, crowd levels are expected to remain at {dominant_risk.upper()} "
-                f"risk for the near term. Continue standard monitoring protocols."
-            )
+            prediction = t(lang, "intel_outcome_nominal",
+                "Based on current patterns, crowd levels are expected to remain at {risk} risk for the near term. Continue standard monitoring protocols."
+            ).format(risk=dominant_risk.upper())
 
         # Generate specific actions
         actions = []
         if alert_risk == "critical":
             actions = [
-                f"IMMEDIATE: Deploy full security response and crowd safety team to {venue_name}.",
-                "Issue public announcement to redirect crowd flow toward less congested exits.",
-                "Notify emergency services and establish incident command if not already active.",
-                "Freeze new entry at all access gates until crowd density normalizes.",
-                "Coordinate contingency staff for evacuation route management.",
+                t(lang, "action_critical_1", "IMMEDIATE: Deploy full security response and crowd safety team to {venue}.").format(venue=venue_name),
+                t(lang, "action_critical_2", "Issue public announcement to redirect crowd flow toward less congested exits."),
+                t(lang, "action_critical_3", "Notify emergency services and establish incident command if not already active."),
+                t(lang, "action_critical_4", "Freeze new entry at all access gates until crowd density normalizes."),
+                t(lang, "action_critical_5", "Coordinate contingency staff for evacuation route management."),
             ]
         elif alert_risk == "high":
             actions = [
-                f"Alert supervisors and activate crowd-control protocols at {venue_name}.",
-                "Deploy additional staff to high-density zones identified by camera feeds.",
-                "Consider opening additional gates or exit pathways to distribute crowd load.",
-                "Issue advisory announcements guiding visitors to alternate zones.",
+                t(lang, "action_high_1", "Alert supervisors and activate crowd-control protocols at {venue}.").format(venue=venue_name),
+                t(lang, "action_high_2", "Deploy additional staff to high-density zones identified by camera feeds."),
+                t(lang, "action_high_3", "Consider opening additional gates or exit pathways to distribute crowd load."),
+                t(lang, "action_high_4", "Issue advisory announcements guiding visitors to alternate zones."),
             ]
         elif alert_risk == "medium":
             actions = [
-                "Monitor all camera feeds at elevated frequency.",
-                "Pre-position contingency staff near high-density zones.",
-                "Prepare crowd-control equipment and communications for rapid deployment.",
+                t(lang, "action_medium_1", "Monitor all camera feeds at elevated frequency."),
+                t(lang, "action_medium_2", "Pre-position contingency staff near high-density zones."),
+                t(lang, "action_medium_3", "Prepare crowd-control equipment and communications for rapid deployment."),
             ]
         else:
             actions = [
-                "Continue standard monitoring and periodic safety sweeps.",
-                "Ensure all camera feeds are operational and reporting.",
-                "Log current crowd distribution for historical pattern analysis.",
+                t(lang, "action_low_1", "Continue standard monitoring and periodic safety sweeps."),
+                t(lang, "action_low_2", "Ensure all camera feeds are operational and reporting."),
+                t(lang, "action_low_3", "Log current crowd distribution for historical pattern analysis."),
             ]
 
-        confidence = "moderate" if not metrics else "high"
+        confidence = t(lang, "moderate", "moderate") if not metrics else t(lang, "high", "high")
         
         return OperationalIntelligence(
             situation_analysis=situation,
             observed_trends=observed,
-            risk_assessment=risk,
+            risk_assessment=risk_text,
             predicted_outcome=prediction,
             recommended_actions=actions,
             severity=severity,
             confidence=confidence,
-            generated_by="Laminar Rule-Based Intelligence Engine",
+            generated_by=t(lang, "intel_engine_name", "Laminar Rule-Based Intelligence Engine"),
             cross_camera_insights=cross_camera if cross_camera else None,
         )
 
     # ─── LLM-Powered Intelligence ─────────────────────────────────────────────
 
     async def _llm_intelligence(
-        self, model: str, context: Dict[str, Any], cross_camera: str, alert: Optional[CrowdAlert] = None, prev_intel: Optional[OperationalIntelligence] = None
+        self, model: str, context: Dict[str, Any], cross_camera: str, alert: Optional[CrowdAlert] = None, prev_intel: Optional[OperationalIntelligence] = None, lang: str = "en"
     ) -> Optional[OperationalIntelligence]:
         """
         Use Llama 3.2 to generate full structured operational intelligence.
@@ -525,6 +549,10 @@ ACTIVE ALERTS:
 Reason about patterns: crowd accumulation, convergence points, movement vectors, zone imbalances.
 Do NOT use generic statements. Use specific data points.
 
+LANGUAGE INSTRUCTION:
+Your entire response (all string values in the JSON) MUST be written in {lang.upper()} language. 
+Example: If lang is "te", respond in Telugu. If lang is "hi", respond in Hindi.
+
 Produce a JSON response with these exact fields:
 {{
   "situation_analysis": "2-3 sentences describing the current situation based on data",
@@ -570,7 +598,7 @@ Respond ONLY with valid JSON. No preamble, no explanation.
     # ─── Main Public API ──────────────────────────────────────────────────────
 
     async def analyze_venue(
-        self, session: AsyncSession, venue_id: UUID, alert: Optional[CrowdAlert] = None
+        self, session: AsyncSession, venue_id: UUID, alert: Optional[CrowdAlert] = None, lang: str = "en"
     ) -> OperationalIntelligence:
         """
         Main entry point — generate full operational intelligence for a venue.
@@ -623,7 +651,7 @@ Respond ONLY with valid JSON. No preamble, no explanation.
         if model:
             try:
                 intel = await asyncio.wait_for(
-                    self._llm_intelligence(model, context, cross_camera, alert, prev_intel),
+                    self._llm_intelligence(model, context, cross_camera, alert, prev_intel, lang=lang),
                     timeout=40.0
                 )
                 if intel and intel.situation_analysis:
@@ -637,7 +665,7 @@ Respond ONLY with valid JSON. No preamble, no explanation.
         # Fallback to rule-based engine
         if not final_intel:
             logger.info(f"Generating rule-based intelligence for venue {venue_id}")
-            final_intel = self._rule_based_intelligence(context, cross_camera, alert)
+            final_intel = self._rule_based_intelligence(context, cross_camera, alert, lang=lang)
 
         # Update cache
         self._insight_cache[venue_key] = {
@@ -650,7 +678,7 @@ Respond ONLY with valid JSON. No preamble, no explanation.
         return final_intel
 
     async def generate_notification_brief(
-        self, session: AsyncSession, alert: CrowdAlert, venue_name: str, location: str
+        self, session: AsyncSession, alert: CrowdAlert, venue_name: str, location: str, lang: str = "en"
     ) -> str:
         """
         Generate a concise AI intelligence brief for notifications/emails.
@@ -661,22 +689,36 @@ Respond ONLY with valid JSON. No preamble, no explanation.
         Returns a pre-formatted text suitable for inclusion in email notifications.
         """
         try:
-            intel = await self.analyze_venue(session, alert.venue_id, alert)
+            intel = await self.analyze_venue(session, alert.venue_id, alert, lang=lang)
+            
+            from app.services.translation_service import TranslationService
+            t = TranslationService.t
             
             # Format as a clean email-friendly brief
             actions_text = "\n".join(f"  • {a}" for a in intel.recommended_actions[:3])
             
+            # Localized headers
+            h_assessment = t(lang, "intel_assessment_header", "LAMINAR AI INTELLIGENCE ASSESSMENT")
+            h_situation = t(lang, "intel_situation_header", "SITUATION")
+            h_trends = t(lang, "intel_trend_header", "TREND ANALYSIS")
+            h_risk = t(lang, "intel_risk_header", "RISK ASSESSMENT")
+            h_outcome = t(lang, "intel_outcome_header", "PREDICTED OUTCOME")
+            h_actions = t(lang, "intel_actions_header", "IMMEDIATE ACTIONS REQUIRED")
+            h_correlation = t(lang, "intel_correlation_header", "MULTI-CAMERA CORRELATION")
+            h_gen_by = t(lang, "generated_by_label", "Generated by")
+
             brief = (
-                f"═══ LAMINAR AI INTELLIGENCE ASSESSMENT ═══\n\n"
-                f"📍 SITUATION\n{intel.situation_analysis}\n\n"
-                f"📊 TREND ANALYSIS\n{intel.observed_trends}\n\n"
-                f"⚠️ RISK ASSESSMENT [{intel.severity}]\n{intel.risk_assessment}\n\n"
-                f"🔮 PREDICTED OUTCOME\n{intel.predicted_outcome}\n\n"
-                f"🛡️ IMMEDIATE ACTIONS REQUIRED\n{actions_text}\n"
+                f"═══ {h_assessment} ═══\n\n"
+                f"📍 {h_situation}\n{intel.situation_analysis}\n\n"
+                f"📊 {h_trends}\n{intel.observed_trends}\n\n"
+                f"⚠️ {h_risk} [{intel.severity}]\n{intel.risk_assessment}\n\n"
+                f"🔮 {h_outcome}\n{intel.predicted_outcome}\n\n"
+                f"🛡️ {h_actions}\n{actions_text}\n"
             )
             if intel.cross_camera_insights:
-                brief += f"\n🎥 MULTI-CAMERA CORRELATION\n{intel.cross_camera_insights}\n"
-            brief += f"\n_Generated by: {intel.generated_by} | {intel.timestamp}_"
+                brief += f"\n🎥 {h_correlation}\n{intel.cross_camera_insights}\n"
+            
+            brief += f"\n_{h_gen_by}: {intel.generated_by} | {intel.timestamp}_"
             return brief
         except Exception as e:
             logger.error(f"Intelligence brief generation failed: {e}")

@@ -4,105 +4,139 @@ import { useState, useEffect, useRef } from "react";
 import { register, loginWithGoogle } from "@/services/auth";
 import { useRouter } from "next/navigation";
 import { GoogleLogin } from '@react-oauth/google';
-import { Network, ShieldCheck, ChevronLeft, Mail, Sparkles, Eye, EyeOff, UserPlus, Key, Lock, AlertCircle, CheckCircle } from "lucide-react";
+import { Network, ShieldCheck, ChevronLeft, Mail, Sparkles, Eye, EyeOff, UserPlus, Key, Lock, AlertCircle, CheckCircle, Globe, Orbit } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import PremiumBackground from "@/components/background/premium-background";
+import PremiumImageBackground from "@/components/background/premium-image-background";
+/* ─── Starfield Background ─── */
+function StarfieldBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-/* ─── Animated neural network SVG ─── */
-function NeuralNetwork() {
-  const nodes = [
-    { cx: 12, cy: 25 }, { cx: 12, cy: 55 }, { cx: 12, cy: 75 },
-    { cx: 35, cy: 15 }, { cx: 35, cy: 40 }, { cx: 35, cy: 65 }, { cx: 35, cy: 85 },
-    { cx: 60, cy: 30 }, { cx: 60, cy: 52 }, { cx: 60, cy: 72 },
-    { cx: 82, cy: 20 }, { cx: 82, cy: 45 }, { cx: 82, cy: 68 }, { cx: 82, cy: 85 },
-    { cx: 95, cy: 35 }, { cx: 95, cy: 60 }, { cx: 95, cy: 80 },
-  ];
-  const edges = [
-    [0,3],[0,4],[1,4],[1,5],[2,5],[2,6],
-    [3,7],[3,8],[4,7],[4,8],[4,9],[5,8],[5,9],[6,9],
-    [7,10],[7,11],[8,11],[8,12],[9,12],[9,13],
-    [10,14],[11,14],[11,15],[12,15],[12,16],[13,16],
-  ];
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let stars: { x: number; y: number; radius: number; alpha: number; twinkleSpeed: number; twinklePhase: number }[] = [];
+    let animationId: number;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initStars();
+    };
+
+    const initStars = () => {
+      stars = [];
+      const starCount = Math.floor((canvas.width * canvas.height) / 2500);
+      for (let i = 0; i < starCount; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 1.8 + 0.5,
+          alpha: Math.random() * 0.6 + 0.2,
+          twinkleSpeed: Math.random() * 0.02 + 0.005,
+          twinklePhase: Math.random() * Math.PI * 2,
+        });
+      }
+    };
+
+    const draw = () => {
+      if (!ctx || !canvas) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#020617');
+      gradient.addColorStop(0.5, '#0a0f1a');
+      gradient.addColorStop(1, '#03050a');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      stars.forEach(star => {
+        const time = Date.now() / 1000;
+        const twinkle = Math.sin(time * star.twinkleSpeed + star.twinklePhase) * 0.3 + 0.7;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha * twinkle})`;
+        ctx.fill();
+      });
+
+      animationId = requestAnimationFrame(draw);
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+    draw();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
+
   return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none"
-      style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', opacity: 0.12, zIndex: 1, pointerEvents: 'none' }}>
-      <defs>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="0.8" result="coloredBlur" />
-          <feMerge><feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-
-      {/* Edges */}
-      {edges.map(([a, b], i) => (
-        <motion.line
-          key={i}
-          x1={nodes[a].cx} y1={nodes[a].cy}
-          x2={nodes[b].cx} y2={nodes[b].cy}
-          stroke="#14b8a6"
-          strokeWidth="0.3"
-          animate={{ opacity: [0.2, 0.7, 0.2], strokeWidth: [0.2, 0.5, 0.2] }}
-          transition={{ duration: 3 + (i % 4), repeat: Number.POSITIVE_INFINITY, delay: (i % 7) * 0.4, ease: 'easeInOut' }}
-        />
-      ))}
-
-      {/* Nodes */}
-      {nodes.map((n, i) => (
-        <g key={i} filter="url(#glow)">
-          <motion.circle
-            cx={n.cx} cy={n.cy} r={1.2}
-            fill="#14b8a6"
-            animate={{ r: [0.8, 1.6, 0.8], opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 2 + (i % 3), repeat: Number.POSITIVE_INFINITY, delay: (i % 5) * 0.3, ease: 'easeInOut' }}
-          />
-          {/* Pulse ring */}
-          <motion.circle
-            cx={n.cx} cy={n.cy} r={2.5}
-            fill="none" stroke="#14b8a6" strokeWidth="0.3"
-            animate={{ r: [1.5, 4, 1.5], opacity: [0.5, 0, 0.5] }}
-            transition={{ duration: 2.5 + (i % 4), repeat: Number.POSITIVE_INFINITY, delay: (i % 6) * 0.35, ease: 'easeOut' }}
-          />
-        </g>
-      ))}
-
-      {/* Traveling pulse along edges */}
-      {[[0,3],[4,8],[8,12],[12,15]].map(([a, b], i) => (
-        <motion.circle key={`pulse-${i}`} r={0.6} fill="#2dd4bf"
-          animate={{
-            cx: [nodes[a].cx, nodes[b].cx],
-            cy: [nodes[a].cy, nodes[b].cy],
-            opacity: [0, 1, 0],
-          }}
-          transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, delay: i * 0.8, ease: 'easeInOut' }}
-        />
-      ))}
-    </svg>
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: -2,
+        pointerEvents: 'none',
+      }}
+    />
   );
 }
 
-/* ─── Orbiting rings decoration around card ─── */
-function OrbitRings() {
+/* ─── Orbiting Ring ─── */
+function OrbitingRing() {
   return (
-    <div style={{ position: 'absolute', inset: '-60px', zIndex: -1, pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: -1, overflow: 'hidden' }}>
       <motion.div
         animate={{ rotate: 360 }}
-        transition={{ duration: 30, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-        style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(20,184,166,0.08)' }}
+        transition={{ duration: 80, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: '800px',
+          height: '800px',
+          transform: 'translate(-50%, -50%)',
+          borderRadius: '50%',
+          border: '1px solid rgba(34,211,238,0.08)',
+        }}
       />
       <motion.div
         animate={{ rotate: -360 }}
-        transition={{ duration: 45, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-        style={{ position: 'absolute', inset: '20px', borderRadius: '50%', border: '1px dashed rgba(16,185,129,0.06)' }}
+        transition={{ duration: 60, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: '600px',
+          height: '600px',
+          transform: 'translate(-50%, -50%)',
+          borderRadius: '50%',
+          border: '1px dashed rgba(34,211,238,0.05)',
+        }}
       />
-      {/* Orbiting dot */}
       <motion.div
         animate={{ rotate: 360 }}
-        transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-        style={{ position: 'absolute', inset: 0 }}
-      >
-        <div style={{ position: 'absolute', top: '-3px', left: '50%', width: '6px', height: '6px', borderRadius: '50%', background: '#14b8a6', boxShadow: '0 0 12px rgba(20,184,166,0.8)', transform: 'translateX(-50%)' }} />
-      </motion.div>
+        transition={{ duration: 40, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          width: '400px',
+          height: '400px',
+          transform: 'translate(-50%, -50%)',
+          borderRadius: '50%',
+          border: '1px solid rgba(34,211,238,0.1)',
+        }}
+      />
     </div>
   );
 }
@@ -146,33 +180,20 @@ export default function RegisterPage() {
 
   const strengthColor = passwordStrength < 50 ? '#ef4444' : passwordStrength < 75 ? '#f59e0b' : '#10b981';
   const strengthLabel = passwordStrength < 50 ? 'Weak' : passwordStrength < 75 ? 'Medium' : 'Strong';
-  const strengthWidth = `${passwordStrength}%`;
   const hasMatch = confirmPassword.length > 0 && password === confirmPassword;
   const hasMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   const fieldStyle = (field: string, borderOverride?: string) => ({
     width: '100%', background: 'rgba(8,14,32,0.9)',
-    border: `1px solid ${borderOverride || (focusedField === field ? 'rgba(20,184,166,0.5)' : 'rgba(255,255,255,0.06)')}`,
+    border: `1px solid ${borderOverride || (focusedField === field ? 'rgba(20,184,166,0.5)' : 'rgba(34,211,238,0.15)')}`,
     borderRadius: '12px', color: '#fff', fontSize: '0.875rem',
-    padding: '13px 44px 13px 40px', outline: 'none', transition: 'border-color 0.3s',
+    padding: '13px 44px 13px 40px', outline: 'none', transition: 'all 0.3s',
     fontFamily: 'inherit',
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: '#020817', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', padding: '32px 20px' }}>
-      <PremiumBackground />
-      <NeuralNetwork />
-
-      {/* Diagonal scan lines */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none', overflow: 'hidden', opacity: 0.03 }}>
-        {Array.from({ length: 20 }, (_, i) => (
-          <div key={i} style={{
-            position: 'absolute', left: 0, right: 0, height: '1px',
-            background: 'rgba(20,184,166,1)',
-            top: `${i * 5.5}%`,
-          }} />
-        ))}
-      </div>
+    <div style={{ minHeight: '100vh', background: 'transparent', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', padding: '32px 20px' }}>
+      <PremiumImageBackground imageUrl="/register-bg.png" variant="register" />
 
       {/* ─── Card ─── */}
       <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '480px' }}>
@@ -182,7 +203,6 @@ export default function RegisterPage() {
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           style={{ position: 'relative' }}
         >
-          <OrbitRings />
 
           {/* Spinning border */}
           <motion.div
@@ -190,14 +210,14 @@ export default function RegisterPage() {
             transition={{ duration: 12, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
             style={{
               position: 'absolute', inset: '-1px', borderRadius: '24px',
-              background: 'conic-gradient(from 0deg, #14b8a6, #10b981, #059669, #0d9488, #14b8a6)',
+              background: 'conic-gradient(from 0deg, #14b8a6, #10b981, #22d3ee, #3b82f6, #14b8a6)',
               opacity: 0.4, zIndex: -1,
             }}
           />
 
           <div style={{
             background: 'rgba(5,10,22,0.96)',
-            border: '1px solid rgba(20,184,166,0.12)',
+            border: '1px solid rgba(20,184,166,0.2)',
             borderRadius: '24px', backdropFilter: 'blur(60px)',
             boxShadow: '0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.04)',
             padding: '40px 36px',
@@ -270,7 +290,7 @@ export default function RegisterPage() {
             </AnimatePresence>
 
             {/* Form */}
-            <form onSubmit={handleRegister} style={{ background: 'rgba(4,8,20,0.7)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleRegister} style={{ background: 'rgba(4,8,20,0.7)', border: '1px solid rgba(34,211,238,0.1)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
               {/* Email */}
               <div>
@@ -300,7 +320,7 @@ export default function RegisterPage() {
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ marginTop: '8px' }}>
                     <div style={{ height: '3px', background: 'rgba(255,255,255,0.07)', borderRadius: '999px', overflow: 'hidden' }}>
                       <motion.div
-                        animate={{ width: strengthWidth }}
+                        animate={{ width: `${passwordStrength}%` }}
                         transition={{ duration: 0.4 }}
                         style={{ height: '100%', borderRadius: '999px', background: strengthColor, boxShadow: `0 0 8px ${strengthColor}` }}
                       />
@@ -344,7 +364,7 @@ export default function RegisterPage() {
                   background: 'linear-gradient(135deg, #14b8a6, #10b981)',
                   color: '#000', fontWeight: 900, fontSize: '0.72rem', letterSpacing: '0.15em', textTransform: 'uppercase',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  boxShadow: '0 0 30px rgba(20,184,166,0.35)',
+                  boxShadow: '0 0 30px rgba(20,184,166,0.4)',
                   opacity: loading || !!successMsg ? 0.7 : 1, marginTop: '4px',
                 }}
               >
@@ -358,9 +378,9 @@ export default function RegisterPage() {
 
             {/* Divider */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'rgba(34,211,238,0.1)' }} />
               <span style={{ fontSize: '0.6rem', color: '#334155', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Fast Link</span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'rgba(34,211,238,0.1)' }} />
             </div>
 
             {/* Google */}
@@ -393,7 +413,7 @@ export default function RegisterPage() {
         initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 1, type: "spring", stiffness: 200 }}
         whileHover={{ scale: 1.08, y: -2 }} whileTap={{ scale: 0.94 }}
-        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(5,14,28,0.9)', border: '1px solid rgba(20,184,166,0.35)', borderRadius: '999px', padding: '12px 22px', color: '#14b8a6', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', backdropFilter: 'blur(20px)', boxShadow: '0 0 30px rgba(20,184,166,0.2)' }}
+        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(5,14,28,0.95)', border: '1px solid rgba(20,184,166,0.4)', borderRadius: '999px', padding: '12px 22px', color: '#14b8a6', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', backdropFilter: 'blur(20px)', boxShadow: '0 0 30px rgba(20,184,166,0.3)' }}
       >
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}>
           <Sparkles style={{ width: 15, height: 15 }} />

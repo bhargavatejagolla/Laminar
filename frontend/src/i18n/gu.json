@@ -6,7 +6,8 @@
     "alerts": "チェતવણી", "prediction": "આગાહી", "liveWall": "લાઇવ વૉલ",
     "surgeMonitor": "સર્જ મૉનિટર", "personWaitMonitor": "વ્યક્તિ પ્રતીક્ષા મૉનિટર", "reports": "અહેવાલ",
     "systemHealth": "સિસ્ટમ આરોગ્ય", "settings": "સેટિંગ્સ",
-    "system": "સિસ્ટમ", "operational": "કાર્યરત"
+    "system": "સિસ્ટમ", "operational": "કાર્યરત",
+    "areaSurvey": "વિસ્તાર સર્વેક્ષણ"
   },
   "language": {
     "label": "ભાષા",

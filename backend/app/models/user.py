@@ -166,6 +166,17 @@ class User(Base):
         nullable=False
     )
 
+    alert_email: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True
+    )
+
+    receive_email_alerts: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False
+    )
+
     language_preference: Mapped[str] = mapped_column(
         String(10),
         default="en",

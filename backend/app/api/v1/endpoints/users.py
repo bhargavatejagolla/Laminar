@@ -79,6 +79,12 @@ async def update_profile(
         if payload.language_preference is not None:
             user.language_preference = payload.language_preference
             
+        if payload.alert_email is not None:
+            user.alert_email = payload.alert_email
+            
+        if payload.receive_email_alerts is not None:
+            user.receive_email_alerts = payload.receive_email_alerts
+            
         await session.commit()
         await session.refresh(user)
         return user

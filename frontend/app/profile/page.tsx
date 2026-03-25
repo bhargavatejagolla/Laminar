@@ -29,6 +29,8 @@ interface ProfileData {
   name: string;
   phone_number: string;
   receive_sms_alerts: boolean;
+  alert_email?: string;
+  receive_email_alerts: boolean;
   profile_picture?: string;
   role?: string;
   email?: string;
@@ -69,7 +71,9 @@ export default function ProfilePage() {
   const [data, setData] = useState<ProfileData>({
     name: "",
     phone_number: "",
-    receive_sms_alerts: false
+    receive_sms_alerts: false,
+    alert_email: "",
+    receive_email_alerts: true
   });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -92,6 +96,8 @@ export default function ProfilePage() {
           name: d.name || "",
           phone_number: d.phone_number || "",
           receive_sms_alerts: d.receive_sms_alerts ?? false,
+          alert_email: d.alert_email || "",
+          receive_email_alerts: d.receive_email_alerts ?? true,
           profile_picture: d.profile_picture,
           role: d.role,
           email: d.email
@@ -133,7 +139,9 @@ export default function ProfilePage() {
         body: JSON.stringify({
           name: data.name || null,
           phone_number: normPhone || null,
-          receive_sms_alerts: data.receive_sms_alerts
+          receive_sms_alerts: data.receive_sms_alerts,
+          alert_email: data.alert_email || null,
+          receive_email_alerts: data.receive_email_alerts
         })
       });
 
@@ -148,7 +156,9 @@ export default function ProfilePage() {
         ...prev,
         name: updated.name || "",
         phone_number: updated.phone_number || "",
-        receive_sms_alerts: updated.receive_sms_alerts
+        receive_sms_alerts: updated.receive_sms_alerts,
+        alert_email: updated.alert_email || "",
+        receive_email_alerts: updated.receive_email_alerts
       }));
       setPhoneRaw(updated.phone_number || "");
       setStatus("success");
@@ -373,7 +383,7 @@ export default function ProfilePage() {
 
               {/* Email (read-only always) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-400">Email Address</label>
+                <label className="text-xs font-semibold text-slate-400">Login Email Address</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
@@ -383,7 +393,32 @@ export default function ProfilePage() {
                     className="w-full rounded-xl pl-10 pr-4 py-2.5 text-sm bg-transparent border border-transparent text-slate-500 cursor-default"
                   />
                 </div>
-                <p className="text-[10px] text-slate-600 ml-1">Email cannot be changed</p>
+                <p className="text-[10px] text-slate-600 ml-1">Login email cannot be changed</p>
+              </div>
+
+              {/* Alert Email */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-400">Critical Alerts Email (Optional)</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="email"
+                    value={data.alert_email || ""}
+                    readOnly={!editing}
+                    onChange={(e) => setData((p) => ({ ...p, alert_email: e.target.value }))}
+                    placeholder="e.g. your-gmail@gmail.com"
+                    className={`w-full rounded-xl pl-10 pr-4 py-2.5 text-sm transition-all
+                      ${editing
+                        ? "bg-[#0a1929] border border-[#1e3a5f] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40"
+                        : "bg-transparent border border-transparent text-slate-300 cursor-default"
+                      }`}
+                  />
+                </div>
+                {editing && (
+                  <p className="text-[10px] text-slate-500 ml-1">
+                    If set, system alerts will be sent here instead of your login email.
+                  </p>
+                )}
               </div>
 
               {/* Phone */}
@@ -450,7 +485,7 @@ export default function ProfilePage() {
                   )}
                 </div>
 
-                {/* Toggle */}
+                {/* Toggle SMS */}
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input
                     type="checkbox"
@@ -465,6 +500,48 @@ export default function ProfilePage() {
                     peer-checked:after:translate-x-6
                     ${editing ? "cursor-pointer" : "cursor-not-allowed opacity-60"}
                     ${data.receive_sms_alerts ? "bg-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.4)]" : "bg-slate-700"}
+                  `} />
+                </label>
+              </div>
+
+              <div
+                className={`flex items-center gap-4 p-4 mt-4 rounded-xl border transition-all duration-300 ${
+                  data.receive_email_alerts
+                    ? "border-cyan-500/30 bg-cyan-500/5"
+                    : "border-slate-700/40 bg-slate-900/20"
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  data.receive_email_alerts ? "bg-cyan-500/15" : "bg-slate-800"
+                }`}>
+                  {data.receive_email_alerts
+                    ? <Mail className="w-5 h-5 text-cyan-400" />
+                    : <BellOff className="w-5 h-5 text-slate-500" />
+                  }
+                </div>
+
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-slate-200">Email Alerts</h4>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    Receive rich HTML emails with embedded snapshots for critical crowd events.
+                  </p>
+                </div>
+
+                {/* Toggle Email */}
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={data.receive_email_alerts}
+                    disabled={!editing}
+                    onChange={(e) => setData((p) => ({ ...p, receive_email_alerts: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className={`w-12 h-6 rounded-full transition-colors duration-300 relative
+                    after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white 
+                    after:rounded-full after:h-5 after:w-5 after:transition-all
+                    peer-checked:after:translate-x-6
+                    ${editing ? "cursor-pointer" : "cursor-not-allowed opacity-60"}
+                    ${data.receive_email_alerts ? "bg-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.4)]" : "bg-slate-700"}
                   `} />
                 </label>
               </div>

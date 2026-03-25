@@ -83,6 +83,8 @@ class PanicDetectionService:
         if self.prev_gray is None or self.prev_pts is None or len(self.prev_pts) < 10:
             self.prev_gray = gray
             self.prev_pts = cv2.goodFeaturesToTrack(gray, mask=None, **self.feature_params)
+            if self.prev_pts is None:
+                self.prev_pts = np.array([], dtype=np.float32).reshape(0, 1, 2)
             return result
             
         # Calculate Optical Flow
@@ -143,6 +145,8 @@ class PanicDetectionService:
             self.prev_gray = gray.copy()
             if len(good_new) < 50:
                 self.prev_pts = cv2.goodFeaturesToTrack(gray, mask=None, **self.feature_params)
+                if self.prev_pts is None:
+                    self.prev_pts = np.array([], dtype=np.float32).reshape(0, 1, 2)
             else:
                 self.prev_pts = good_new.reshape(-1, 1, 2)
         else:

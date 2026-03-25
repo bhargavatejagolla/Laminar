@@ -80,22 +80,33 @@ class AIAssistantService:
     def _ensure_dir(self) -> None:
         os.makedirs(VECTOR_INDEX_DIR, exist_ok=True)
 
-    def _lazy_load_model(self) -> None:
+    async def _lazy_load_model_async(self) -> None:
         if self.model is None:
-            logger.info("Loading SentenceTransformer embedding model...")
+            logger.info("Loading SentenceTransformer embedding model in background thread...")
             try:
-                import torch
-                # ✅ PERFORMANCE FIX: Limit CPU threads to prevent system slowdown
-                # SentenceTransformer can hog all cores, affecting YOLO detection.
+                import asyncio
+                await asyncio.to_thread(self._do_load_model)
+            except Exception as e:
+                logger.error(f"Failed to load sentence_transformers async: {e}")
+                self.model = None
+
+    def _do_load_model(self) -> None:
+        try:
+            import torch
+            # ✅ PERFORMANCE FIX: Limit CPU threads to prevent system slowdown
+            # SentenceTransformer can hog all cores, affecting YOLO detection.
+            try:
                 if torch.get_num_threads() > 2:
                     torch.set_num_threads(2)
                     torch.set_num_interop_threads(1)
-                
-                from sentence_transformers import SentenceTransformer
-                self.model = SentenceTransformer("all-MiniLM-L6-v2")
-            except Exception as e:
-                logger.error(f"Failed to load sentence_transformers: {e}")
-                self.model = None
+            except RuntimeError as re:
+                logger.debug(f"Could not set torch threads (likely already initialized): {re}")
+            
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception as e:
+            logger.error(f"Failed to load sentence_transformers: {e}")
+            self.model = None
 
     def _lazy_load_index(self) -> None:
         if self.index is None and FAISS_AVAILABLE:
@@ -317,7 +328,7 @@ class AIAssistantService:
             logger.warning("No documents extracted for RAG index — database may be empty.")
             return
 
-        self._lazy_load_model()
+        await self._lazy_load_model_async()
         if self.model is None:
             logger.error("Embedding model could not be loaded. Indexing aborted.")
             return
@@ -398,7 +409,7 @@ class AIAssistantService:
         """
         # ── Load index & model ───────────────────────────────────────────────
         self._lazy_load_index()
-        self._lazy_load_model()
+        await self._lazy_load_model_async()
 
         # ── FAISS retrieval ──────────────────────────────────────────────────
         context_docs: List[str] = []

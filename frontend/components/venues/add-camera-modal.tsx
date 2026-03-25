@@ -89,10 +89,14 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
           )}
           
           <div className="space-y-1">
-            <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Stream URI (RTSP / Local ID)</label>
+            <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Stream URI (RTSP / HTTP / HLS / ID)</label>
             <input 
               type="text" 
-              placeholder={formData.stream_type === "device" ? "e.g., 0 for local webcam" : "e.g., rtsp://username:password@ip:port/stream"}
+              placeholder={
+                formData.stream_type === "device" ? "e.g., 0 for local webcam" : 
+                formData.stream_type === "http" ? "e.g., http://ip:port/mjpeg or https://..." :
+                "e.g., rtsp://username:password@ip:port/stream"
+              }
               value={formData.stream_url}
               onChange={(e) => setFormData({ ...formData, stream_url: e.target.value })}
               className="w-full bg-[#0b1325] border border-slate-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"

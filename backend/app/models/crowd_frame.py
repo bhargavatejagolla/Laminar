@@ -107,6 +107,28 @@ class CrowdFrame(BaseModel):
     )
 
     # ==========================================================
+    # 🔥 Movement Metrics (Surge Tracking)
+    # ==========================================================
+
+    velocity: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=0.0,
+    )
+
+    variance: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=0.0,
+    )
+
+    acceleration: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=0.0,
+    )
+
+    # ==========================================================
     # Model Info
     # ==========================================================
 

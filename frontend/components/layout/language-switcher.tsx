@@ -25,18 +25,26 @@ function normalizeCode(lng: string): string {
 export default function LanguageSwitcher() {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   /**
    * We keep a local `currentCode` state so we can control the active indicator
    * immediately on click without waiting for i18n's async languageChanged event.
-   * On mount, read from localStorage first (most reliable source of truth),
-   * then fall back to i18n.language.
    */
-  const [currentCode, setCurrentCode] = useState<string>(() => {
-    if (typeof window === "undefined") return "en";
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return normalizeCode(saved || i18n.language || "en");
-  });
+  const [currentCode, setCurrentCode] = useState<string>("en");
   const ref = useRef<HTMLDivElement>(null);
+
+  // Initial sync and mount detection
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const initialLang = normalizeCode(saved || i18n.language || "en");
+    setCurrentCode(initialLang);
+    
+    // Also ensure i18n is synced if it differs from saved
+    if (saved && normalizeCode(i18n.language) !== initialLang) {
+      i18n.changeLanguage(initialLang);
+    }
+  }, [i18n]);
 
   // Keep currentCode in sync when the i18n module changes language externally
   useEffect(() => {
@@ -44,8 +52,6 @@ export default function LanguageSwitcher() {
       setCurrentCode(normalizeCode(lng));
     };
     i18n.on("languageChanged", handleChange);
-    // Sync on mount in case i18n already resolved to a locale code
-    setCurrentCode(normalizeCode(i18n.language || "en"));
     return () => {
       i18n.off("languageChanged", handleChange);
     };
@@ -113,10 +119,10 @@ export default function LanguageSwitcher() {
 
         <div className="flex flex-col items-start leading-none mr-1">
           <span className={`text-[10px] font-bold uppercase tracking-widest ${open ? "text-cyan-300" : "text-slate-500"}`}>
-            {t("language.label") || "Language"}
+            {!mounted ? "Language" : (t("language.label") || "Language")}
           </span>
           <span className="text-xs font-semibold text-slate-200 mt-0.5">
-            {currentLang.nativeLabel}
+            {!mounted ? "English" : currentLang.nativeLabel}
           </span>
         </div>
 

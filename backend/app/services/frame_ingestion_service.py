@@ -265,6 +265,9 @@ class FrameIngestionService:
         processing_time_ms: Optional[float] = None,
         frame_hash: Optional[str] = None,
         image_reference: Optional[str] = None,
+        velocity: Optional[float] = None,
+        variance: Optional[float] = None,
+        acceleration: Optional[float] = None,
         tenant_id: Optional[UUID] = None,
     ) -> CrowdFrame:
         """
@@ -346,6 +349,9 @@ class FrameIngestionService:
             processing_time_ms=processing_time_ms,
             frame_hash=frame_hash,
             image_reference=image_reference,
+            velocity=velocity,
+            variance=variance,
+            acceleration=acceleration,
         )
 
         created_frame = await self.frame_repo.create(
@@ -445,6 +451,9 @@ class FrameIngestionService:
                         processing_time_ms=f.get("processing_time_ms"),
                         frame_hash=frame_hash,
                         image_reference=f.get("image_reference"),
+                        velocity=f.get("velocity", 0.0),
+                        variance=f.get("variance", 0.0),
+                        acceleration=f.get("acceleration", 0.0),
                     )
                 )
 

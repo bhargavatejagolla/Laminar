@@ -17,7 +17,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Clock,
-  Target
+  Target,
+  RotateCw
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useAlerts } from "@/hooks/useAlerts";
@@ -50,6 +51,7 @@ export default function Sidebar() {
         { nameKey: "nav.liveWall", href: "/monitor", icon: LayoutGrid },
         { nameKey: "nav.surgeMonitor", href: "/surge", icon: Activity },
         { nameKey: "nav.personWaitMonitor", href: "/person-wait-monitoring", icon: Clock },
+        { nameKey: "nav.areaSurvey", href: "/dashboard/area-survey", icon: RotateCw },
       ]
     },
     {

@@ -18,7 +18,8 @@
     "settings": "Settings",
     "profile": "Profile",
     "system": "System",
-    "operational": "OPERATIONAL"
+    "operational": "OPERATIONAL",
+    "areaSurvey": "Area Survey"
   },
   "language": {
     "label": "Language",
@@ -378,6 +379,12 @@
     "viewAction": "View",
     "browserAlertTitle": "Laminar Alert",
     "newAlertGenerated": "New alert generated",
-    "total": "total"
+    "total": "total",
+    "surgeDescription": "Rapid crowd movement detected ({{velocity}}px/s) — Risk: {{level}}",
+    "dwellDescription": "{{count}} members exceeding wait limit.",
+    "stagnationDescription": "Traffic flow stagnant (Score: {{score}}%).",
+    "alertActiveCount": "{{count}} active alerts",
+    "dwellAlert": "⏳ Dwell Alert",
+    "stagnationAlert": "🛑 Stagnation Detected"
   }
 }

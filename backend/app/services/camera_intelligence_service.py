@@ -49,6 +49,9 @@ class CameraIntelligenceService:
                     "person_count": count,           # primary field used by /cameras/{id} page
                     "latest_count": count,           # alias for backward compat
                     "latest_risk_score": risk,
+                    "velocity": m.avg_velocity or 0.0,
+                    "variance": m.avg_variance or 0.0,
+                    "acceleration": m.avg_acceleration or 0.0,
                     "timestamp": m.bucket_start,
                 }
 

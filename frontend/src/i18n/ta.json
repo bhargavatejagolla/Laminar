@@ -6,7 +6,8 @@
     "alerts": "எச்சரிக்கைகள்", "prediction": "முன்கணிப்பு", "liveWall": "நேரடி சுவர்",
     "surgeMonitor": "கூட்ட அலை கண்காணிப்பு", "personWaitMonitor": "நபர் காத்திருப்பு கண்காணிப்பு", "reports": "அறிக்கைகள்",
     "systemHealth": "கணினி ஆரோக்கியம்", "settings": "அமைப்புகள்",
-    "system": "கணினி", "operational": "செயல்பாட்டில்"
+    "system": "கணினி", "operational": "செயல்பாட்டில்",
+    "areaSurvey": "பகுதி கணக்கெடுப்பு"
   },
   "language": {
     "label": "மொழி", "en": "ஆங்கிலம்", "hi": "இந்தி",

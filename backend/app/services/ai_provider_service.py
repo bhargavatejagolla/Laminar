@@ -210,3 +210,7 @@ class AIFallbackProvider:
 
 # Singleton instance
 ai_provider = AIFallbackProvider()
+
+def get_ai_provider() -> AIFallbackProvider:
+    """Helper for other services to get the singleton ai_provider."""
+    return ai_provider

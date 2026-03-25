@@ -71,13 +71,23 @@ export default function SurgeMonitorPage() {
             const venueQuery = selectedVenueId ? selectedVenueId : (venues?.[0]?.id || "");
             if (!venueQuery) return;
 
-            const res = await fetch(`${API}/api/v1/camera-intelligence/metrics/${venueQuery}`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setCameraMetrics(data.cameras || {});
-
+            let data = null;
+            try {
+                const res = await fetch(`${API}/api/v1/camera-intelligence/metrics/${venueQuery}`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    data = await res.json();
+                    setCameraMetrics(data.cameras || {});
+                } else {
+                    console.error(`❌ [SurgeMonitor] Fetch failed with status ${res.status}:`, res.statusText);
+                }
+            } catch (err) {
+                console.error("❌ [SurgeMonitor] Failed to fetch metrics from:", `${API}/api/v1/camera-intelligence/metrics/${venueQuery}`);
+                console.error("Error details:", err);
+            }
+            
+            if (data) { // Only update history if data was successfully fetched
                 setHistory(prev => {
                    const now = new Date();
                    const timeLabel = now.toLocaleTimeString('en-US', {hour12:false, minute:'2-digit', second:'2-digit'});
@@ -371,9 +381,9 @@ export default function SurgeMonitorPage() {
                                 </div>
                                 
                                 <div className="grid grid-cols-3 gap-3 mb-5">
-                                    <MetricGauge label="Velocity" value={v} unit="px/s" percent={percentV} />
-                                    <MetricGauge label="Variance" value={d} unit="rad" percent={Math.min(100, Number(d)*100)} />
-                                    <MetricGauge label="Accel" value={a} unit="px/s²" percent={Math.min(100, Number(a)*15)} />
+                                    <MetricGauge label={t("surge.velocity") || "Velocity"} value={v} unit="px/s" percent={percentV} />
+                                    <MetricGauge label={t("surge.variance") || "Variance"} value={d} unit="rad" percent={Math.min(100, Number(d)*100)} />
+                                    <MetricGauge label={t("surge.accel") || "Accel"} value={a} unit="px/s²" percent={Math.min(100, Number(a)*15)} />
                                 </div>
 
                                 <div className="p-4 bg-black/60 border border-white/5 rounded-xl relative overflow-hidden group-hover:border-rose-500/30 transition-all shadow-inner mt-auto">
@@ -456,15 +466,15 @@ export default function SurgeMonitorPage() {
                                     <h4 className="text-2xl font-black text-white tracking-widest mt-1 truncate uppercase drop-shadow-md">CAM_{camId.substring(0,4)}</h4>
                                 </div>
                                 <div className="grid grid-cols-3 gap-3 relative z-10">
-                                    <MetricGauge label="Count" value={metric.person_count} unit="ppl" percent={Math.min(100, (metric.person_count / 50) * 100)} color="emerald" />
+                                    <MetricGauge label={t("surge.velocity") || "Velocity"} value={(metric.velocity || 0).toFixed(1)} unit="px/s" percent={Math.min(100, (metric.velocity / 20) * 100)} color="emerald" />
                                     <MetricGauge 
-                                        label="Risk" 
+                                        label={t("alerts.riskLevel") || "Risk"} 
                                         value={(metric.latest_risk_score || 0).toFixed(1)} 
                                         unit="idx" 
                                         percent={Math.min(100, metric.latest_risk_score)} 
                                         color={metric.latest_risk_score > 60 ? "rose" : "emerald"} 
                                     />
-                                    <MetricGauge label="Thermal" value={"N"} unit="°C" percent={0} color="slate" />
+                                    <MetricGauge label={t("surge.variance") || "Variance"} value={(metric.variance || 0).toFixed(2)} unit="rad" percent={Math.min(100, (metric.variance || 0) * 100)} color="emerald" />
                                 </div>
                             </motion.div>
                         ))

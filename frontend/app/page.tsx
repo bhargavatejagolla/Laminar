@@ -3,8 +3,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import PremiumBackground from "@/components/background/premium-background";
-import { Shield, ChevronRight, ArrowRight, Eye, Brain, Video, Activity, TrendingUp, ShieldAlert, Bell, ServerCrash, Sparkles } from "lucide-react";
+import { Shield, ChevronRight, ArrowRight, Eye, Brain, Video, Activity, TrendingUp, ShieldAlert, Bell, ServerCrash, Sparkles, Orbit, Satellite, Globe } from "lucide-react";
+import PremiumImageBackground from "@/components/background/premium-image-background";
+import Stardust3D from "@/components/background/stardust-3d";
+import ProceduralGalaxy from "@/components/background/procedural-galaxy";
 
 /* ─── Animated counter hook ─── */
 function useCounter(target: number, duration = 2000, delay = 0) {
@@ -120,6 +122,234 @@ function TiltCard({ children, style }: { children: React.ReactNode; style?: Reac
   );
 }
 
+/* ─── Starfield Background Component ─── */
+function StarfieldBackground() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!mounted) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let stars: { x: number; y: number; radius: number; alpha: number; twinkleSpeed: number; twinklePhase: number }[] = [];
+    let animationId: number;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initStars();
+    };
+
+    const initStars = () => {
+      stars = [];
+      const starCount = Math.floor((canvas.width * canvas.height) / 2500);
+      for (let i = 0; i < starCount; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 1.8 + 0.5,
+          alpha: Math.random() * 0.6 + 0.2,
+          twinkleSpeed: Math.random() * 0.02 + 0.005,
+          twinklePhase: Math.random() * Math.PI * 2,
+        });
+      }
+    };
+
+    const draw = () => {
+      if (!ctx || !canvas) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // REMOVED solid background fill safely to show PremiumBackground galaxy beneath
+
+      // Draw stars with twinkling effect
+      stars.forEach(star => {
+        const time = Date.now() / 1000;
+        const twinkle = Math.sin(time * star.twinkleSpeed + star.twinklePhase) * 0.3 + 0.7;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha * twinkle})`;
+        ctx.fill();
+      });
+
+      // Draw distant nebula clouds
+      const nebulaGradient = ctx.createRadialGradient(
+        canvas.width * 0.7, canvas.height * 0.2, 50,
+        canvas.width * 0.7, canvas.height * 0.2, 300
+      );
+      nebulaGradient.addColorStop(0, 'rgba(59, 130, 246, 0.03)');
+      nebulaGradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.02)');
+      nebulaGradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = nebulaGradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const nebulaGradient2 = ctx.createRadialGradient(
+        canvas.width * 0.2, canvas.height * 0.8, 50,
+        canvas.width * 0.2, canvas.height * 0.8, 400
+      );
+      nebulaGradient2.addColorStop(0, 'rgba(34, 211, 238, 0.02)');
+      nebulaGradient2.addColorStop(1, 'transparent');
+      ctx.fillStyle = nebulaGradient2;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      animationId = requestAnimationFrame(draw);
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+    draw();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: -2,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+/* ─── Orbiting Planets ─── */
+function OrbitingPlanets() {
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: -1, overflow: 'hidden' }}>
+      {/* Large glowing planet - top right */}
+      <motion.div
+        animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
+        transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute',
+          top: '5%',
+          right: '-5%',
+          width: '400px',
+          height: '400px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 30% 30%, rgba(59,130,246,0.15), rgba(34,211,238,0.05), transparent)',
+          filter: 'blur(50px)',
+        }}
+      />
+
+      {/* Ringed planet - bottom left */}
+      <motion.div
+        animate={{ y: [0, 15, 0], x: [0, -8, 0] }}
+        transition={{ duration: 25, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut', delay: 2 }}
+        style={{
+          position: 'absolute',
+          bottom: '-10%',
+          left: '-8%',
+          width: '450px',
+          height: '450px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 70% 70%, rgba(139,92,246,0.12), rgba(16,185,129,0.03), transparent)',
+          filter: 'blur(60px)',
+        }}
+      />
+
+      {/* Small orbiting moon */}
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 60, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+        style={{
+          position: 'absolute',
+          top: '20%',
+          left: '10%',
+          width: '100px',
+          height: '100px',
+        }}
+      >
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY }}
+          style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: '#22d3ee',
+            boxShadow: '0 0 20px rgba(34,211,238,0.8)',
+            position: 'absolute',
+            top: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        />
+      </motion.div>
+    </div>
+  );
+}
+
+/* ─── Floating Particles ─── */
+function FloatingParticles() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
+  const particles = Array.from({ length: 30 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    duration: 15 + Math.random() * 20,
+    delay: Math.random() * 10,
+    size: 1 + Math.random() * 3,
+    opacity: 0.1 + Math.random() * 0.3,
+  }));
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: -1, overflow: 'hidden' }}>
+      {particles.map(p => (
+        <motion.div
+          key={p.id}
+          animate={{
+            y: ['-10vh', '110vh'],
+            x: [`${p.x}vw`, `${p.x + (Math.random() - 0.5) * 20}vw`],
+            opacity: [0, p.opacity, 0],
+          }}
+          transition={{
+            duration: p.duration,
+            repeat: Number.POSITIVE_INFINITY,
+            delay: p.delay,
+            ease: 'linear',
+          }}
+          style={{
+            position: 'absolute',
+            left: `${p.x}vw`,
+            top: '-10vh',
+            width: p.size,
+            height: p.size,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, rgba(34,211,238,0.6), rgba(59,130,246,0.3))`,
+            filter: 'blur(1px)',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+const features = [
+  { icon: <Video className="w-6 h-6" />, title: "Agnostic Integration", description: "Seamlessly ingest feeds from IP, RTSP, USB, or legacy cameras with zero vendor lock-in.", color: "#22d3ee", rgb: "34,211,238" },
+  { icon: <Activity className="w-6 h-6" />, title: "Real-Time Detection", description: "Hardware-accelerated YOLO models performing counting and tracking with uncompromised precision.", color: "#10b981", rgb: "16,185,129" },
+  { icon: <TrendingUp className="w-6 h-6" />, title: "Predictive Forecasting", description: "Advanced LSTM pipelines modeling crowd dynamics to predict surges 60 minutes ahead.", color: "#a78bfa", rgb: "167,139,250" },
+  { icon: <ShieldAlert className="w-6 h-6" />, title: "Dynamic Risk Scoring", description: "Multivariate risk engine evaluating density, velocity, and environmental variables.", color: "#f59e0b", rgb: "245,158,11" },
+  { icon: <Bell className="w-6 h-6" />, title: "Omnichannel Alerts", description: "Low-latency WebSocket delivery, cascading SMS dispatch for immediate hazard response.", color: "#f43f5e", rgb: "244,63,94" },
+  { icon: <ServerCrash className="w-6 h-6" />, title: "Failsafe Topology", description: "Circuit breakers and auto-healing ensuring the intelligence platform never goes dark.", color: "#22d3ee", rgb: "34,211,238" },
+];
+
 /* ─── Stat item with counter ─── */
 function StatItem({ prefix = '', target, suffix = '', label, delay }: { prefix?: string; target: number; suffix?: string; label: string; delay: number }) {
   const [inView, setInView] = useState(false);
@@ -147,22 +377,13 @@ function StatItem({ prefix = '', target, suffix = '', label, delay }: { prefix?:
   );
 }
 
-const features = [
-  { icon: <Video className="w-6 h-6" />, title: "Agnostic Integration", description: "Seamlessly ingest feeds from IP, RTSP, USB, or legacy cameras with zero vendor lock-in.", color: "#22d3ee", rgb: "34,211,238" },
-  { icon: <Activity className="w-6 h-6" />, title: "Real-Time Detection", description: "Hardware-accelerated YOLO models performing counting and tracking with uncompromised precision.", color: "#10b981", rgb: "16,185,129" },
-  { icon: <TrendingUp className="w-6 h-6" />, title: "Predictive Forecasting", description: "Advanced LSTM pipelines modeling crowd dynamics to predict surges 60 minutes ahead.", color: "#a78bfa", rgb: "167,139,250" },
-  { icon: <ShieldAlert className="w-6 h-6" />, title: "Dynamic Risk Scoring", description: "Multivariate risk engine evaluating density, velocity, and environmental variables.", color: "#f59e0b", rgb: "245,158,11" },
-  { icon: <Bell className="w-6 h-6" />, title: "Omnichannel Alerts", description: "Low-latency WebSocket delivery, cascading SMS dispatch for immediate hazard response.", color: "#f43f5e", rgb: "244,63,94" },
-  { icon: <ServerCrash className="w-6 h-6" />, title: "Failsafe Topology", description: "Circuit breakers and auto-healing ensuring the intelligence platform never goes dark.", color: "#22d3ee", rgb: "34,211,238" },
-];
-
 export default function LandingPage() {
   const router = useRouter();
   const typeText = useTypewriter(["Crowd Risk", "Safety Systems", "Threat Detection", "Mass Surveillance"], 70, 2500);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#020817', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", overflowX: 'hidden' }}>
-      <PremiumBackground />
+    <div style={{ minHeight: '100vh', background: 'transparent', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", overflowX: 'hidden' }}>
+      <ProceduralGalaxy />
 
       <div style={{ position: 'relative', zIndex: 10 }}>
 
@@ -174,7 +395,8 @@ export default function LandingPage() {
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '20px 48px', maxWidth: '1400px', margin: '0 auto',
-            borderBottom: '1px solid rgba(255,255,255,0.04)',
+            borderBottom: '1px solid rgba(34,211,238,0.1)',
+            backdropFilter: 'blur(10px)',
           }}
         >
           <motion.div
@@ -182,8 +404,27 @@ export default function LandingPage() {
             whileHover={{ scale: 1.04 }}
             onClick={() => router.push("/")}
           >
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 15, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}>
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 15, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+              style={{ position: 'relative' }}
+            >
               <Shield style={{ width: 20, height: 20, color: '#22d3ee' }} />
+              <motion.div
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(34,211,238,0.3), transparent)',
+                  transform: 'translate(-50%, -50%)',
+                  pointerEvents: 'none',
+                }}
+              />
             </motion.div>
             <span style={{ color: '#fff', fontWeight: 900, letterSpacing: '0.25em', fontSize: '0.8rem' }}>LAMINAR</span>
           </motion.div>
@@ -192,14 +433,14 @@ export default function LandingPage() {
             {['Features', 'Architecture', 'Pricing'].map((item) => (
               <motion.span
                 key={item}
-                whileHover={{ color: '#fff' }}
-                style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}
+                whileHover={{ color: '#22d3ee' }}
+                style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer', transition: 'color 0.3s' }}
               >
                 {item}
               </motion.span>
             ))}
             <motion.button
-              whileHover={{ color: '#fff' }}
+              whileHover={{ color: '#22d3ee' }}
               onClick={() => router.push("/login")}
               style={{ background: 'none', border: 'none', color: '#94a3b8', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}
             >
@@ -239,7 +480,7 @@ export default function LandingPage() {
             <motion.span
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-              style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }}
+              style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 10px #22d3ee' }}
             />
             <span style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.2em', color: '#22d3ee', textTransform: 'uppercase' }}>
               Production Grade Intelligence
@@ -259,7 +500,7 @@ export default function LandingPage() {
               background: 'linear-gradient(135deg, #60a5fa 0%, #22d3ee 40%, #a78bfa 80%)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
               display: 'inline-block', minWidth: '4px',
-              filter: 'drop-shadow(0 0 50px rgba(34,211,238,0.4))',
+              filter: 'drop-shadow(0 0 30px rgba(34,211,238,0.5))',
             }}>
               {typeText}
               <motion.span
@@ -308,7 +549,7 @@ export default function LandingPage() {
               onClick={() => router.push("/dashboard")}
               style={{
                 background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: '1px solid rgba(34,211,238,0.2)',
                 color: '#94a3b8', fontWeight: 700, fontSize: '0.72rem',
                 letterSpacing: '0.12em', textTransform: 'uppercase',
                 padding: '16px 36px', borderRadius: '999px', cursor: 'pointer',
@@ -327,8 +568,10 @@ export default function LandingPage() {
             style={{
               display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
               gap: '1px', maxWidth: '680px', margin: '0 auto',
-              background: 'rgba(255,255,255,0.06)', borderRadius: '20px', overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(34,211,238,0.1)',
+              borderRadius: '20px', overflow: 'hidden',
+              border: '1px solid rgba(34,211,238,0.15)',
+              backdropFilter: 'blur(10px)',
             }}
           >
             <StatItem prefix="" target={999} suffix=".9%" label="Accuracy" delay={100} />
@@ -344,8 +587,8 @@ export default function LandingPage() {
             transition={{ delay: 1.2, duration: 1.2 }}
             style={{
               height: '1px', marginTop: '80px',
-              background: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.4), transparent)',
-              boxShadow: '0 0 16px rgba(34,211,238,0.2)',
+              background: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.6), rgba(59,130,246,0.6), transparent)',
+              boxShadow: '0 0 20px rgba(34,211,238,0.3)',
             }}
           />
         </main>
@@ -360,7 +603,7 @@ export default function LandingPage() {
             style={{ textAlign: 'center', marginBottom: '64px' }}
           >
             <h2 style={{ fontSize: 'clamp(28px, 4vw, 52px)', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: '16px' }}>
-              Architected for <span style={{ color: '#22d3ee' }}>Resilience</span>
+              Architected for <span style={{ color: '#22d3ee', textShadow: '0 0 20px rgba(34,211,238,0.5)' }}>Resilience</span>
             </h2>
             <p style={{ color: '#475569', maxWidth: '520px', margin: '0 auto', fontSize: '1rem', lineHeight: 1.65 }}>
               Mission-critical infrastructure demanding zero downtime and infinite scalability.
@@ -376,8 +619,8 @@ export default function LandingPage() {
                   viewport={{ once: true, margin: '-40px' }}
                   transition={{ delay: (i % 3) * 0.12, duration: 0.6 }}
                   style={{
-                    background: 'rgba(8,12,28,0.7)',
-                    border: `1px solid rgba(${f.rgb}, 0.12)`,
+                    background: 'rgba(8,12,28,0.8)',
+                    border: `1px solid rgba(${f.rgb}, 0.15)`,
                     borderRadius: '20px', padding: '32px',
                     backdropFilter: 'blur(20px)',
                     position: 'relative', overflow: 'hidden', height: '100%',
@@ -385,14 +628,14 @@ export default function LandingPage() {
                     transition: 'border-color 0.3s, box-shadow 0.3s',
                   }}
                   whileHover={{
-                    borderColor: `rgba(${f.rgb}, 0.35)`,
-                    boxShadow: `0 20px 60px rgba(${f.rgb}, 0.08), 0 0 0 1px rgba(${f.rgb}, 0.15)`,
+                    borderColor: `rgba(${f.rgb}, 0.5)`,
+                    boxShadow: `0 20px 60px rgba(${f.rgb}, 0.15), 0 0 0 1px rgba(${f.rgb}, 0.3)`,
                   }}
                 >
                   {/* Gradient corner glow */}
                   <div style={{
                     position: 'absolute', top: 0, right: 0, width: '120px', height: '120px',
-                    background: `radial-gradient(circle at top right, rgba(${f.rgb}, 0.1), transparent 70%)`,
+                    background: `radial-gradient(circle at top right, rgba(${f.rgb}, 0.15), transparent 70%)`,
                     pointerEvents: 'none',
                   }} />
 
@@ -402,10 +645,10 @@ export default function LandingPage() {
                     style={{
                       width: '52px', height: '52px', borderRadius: '14px',
                       background: `rgba(${f.rgb}, 0.1)`,
-                      border: `1px solid rgba(${f.rgb}, 0.25)`,
+                      border: `1px solid rgba(${f.rgb}, 0.3)`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       marginBottom: '20px', color: f.color,
-                      boxShadow: `0 0 20px rgba(${f.rgb}, 0.15)`,
+                      boxShadow: `0 0 20px rgba(${f.rgb}, 0.2)`,
                     }}
                   >
                     {f.icon}
@@ -454,10 +697,11 @@ export default function LandingPage() {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
             style={{
-              background: 'rgba(8,12,28,0.8)', border: '1px solid rgba(34,211,238,0.1)',
+              background: 'rgba(8,12,28,0.85)',
+              border: '1px solid rgba(34,211,238,0.2)',
               borderRadius: '28px', padding: '48px 40px',
               backdropFilter: 'blur(30px)',
-              boxShadow: '0 0 80px rgba(34,211,238,0.04)',
+              boxShadow: '0 0 80px rgba(34,211,238,0.08)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0', flexWrap: 'nowrap' }}>
@@ -471,7 +715,7 @@ export default function LandingPage() {
                 if (!item) {
                   const flowColor = i === 1 ? '#22d3ee' : '#a78bfa';
                   return (
-                    <div key={i} style={{ flex: 1, height: '2px', background: 'rgba(255,255,255,0.05)', position: 'relative', minWidth: '60px', overflow: 'hidden' }}>
+                    <div key={i} style={{ flex: 1, height: '2px', background: 'rgba(34,211,238,0.1)', position: 'relative', minWidth: '60px', overflow: 'hidden' }}>
                       {[0, 1, 2].map((j) => (
                         <motion.div
                           key={j}
@@ -501,7 +745,7 @@ export default function LandingPage() {
                         height: item.shape === 'circle' ? '80px' : '68px',
                         borderRadius: item.shape === 'circle' ? '50%' : '18px',
                         background: `rgba(${item.rgb}, 0.08)`,
-                        border: `1px solid rgba(${item.rgb}, 0.35)`,
+                        border: `1px solid rgba(${item.rgb}, 0.4)`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: item.color,
                       }}
@@ -528,7 +772,7 @@ export default function LandingPage() {
             transition={{ duration: 0.9 }}
             style={{
               maxWidth: '860px', margin: '0 auto', textAlign: 'center',
-              background: 'rgba(8,12,28,0.85)',
+              background: 'rgba(8,12,28,0.9)',
               border: '1px solid transparent',
               backgroundClip: 'padding-box',
               borderRadius: '40px', padding: '80px 48px',
@@ -538,17 +782,17 @@ export default function LandingPage() {
             {/* Animated conic border */}
             <div style={{
               position: 'absolute', inset: 0, borderRadius: '40px', padding: '1px', zIndex: -1,
-              background: 'conic-gradient(from 0deg, #22d3ee, #3b82f6, #a78bfa, #22d3ee)',
+              background: 'conic-gradient(from 0deg, #22d3ee, #3b82f6, #a78bfa, #f43f5e, #22d3ee)',
               WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
               WebkitMaskComposite: 'xor',
               maskComposite: 'exclude',
             }} />
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 5, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
+              transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
               style={{
                 position: 'absolute', inset: '-1px', borderRadius: '40px', padding: '1px', zIndex: 0,
-                background: 'conic-gradient(from var(--angle, 0deg), #22d3ee 0%, #3b82f6 25%, #a78bfa 50%, #f43f5e 75%, #22d3ee 100%)',
+                background: 'conic-gradient(from 0deg, #22d3ee, #3b82f6, #a78bfa, #f43f5e, #22d3ee)',
                 WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                 WebkitMaskComposite: 'xor',
                 maskComposite: 'exclude',
@@ -557,7 +801,7 @@ export default function LandingPage() {
             />
 
             {/* Inner glow */}
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '600px', height: '300px', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(34,211,238,0.05) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '600px', height: '300px', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(34,211,238,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
             <div style={{ position: 'relative', zIndex: 1 }}>
               <motion.span
@@ -584,7 +828,7 @@ export default function LandingPage() {
                 <MagneticButton onClick={() => router.push("/register")} style={{ background: 'linear-gradient(135deg, #22d3ee, #3b82f6)', color: '#000', fontWeight: 900, fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '16px 36px', borderRadius: '999px', border: 'none', cursor: 'pointer', boxShadow: '0 0 40px rgba(34,211,238,0.4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   Deploy System <ArrowRight style={{ width: 18, height: 18 }} />
                 </MagneticButton>
-                <MagneticButton onClick={() => router.push("/login")} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '16px 36px', borderRadius: '999px', cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
+                <MagneticButton onClick={() => router.push("/login")} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,211,238,0.2)', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '16px 36px', borderRadius: '999px', cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
                   Access Portal
                 </MagneticButton>
               </div>
@@ -593,7 +837,7 @@ export default function LandingPage() {
         </section>
 
         {/* ─── FOOTER ─── */}
-        <footer style={{ borderTop: '1px solid rgba(255,255,255,0.04)', padding: '28px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', maxWidth: '1400px', margin: '0 auto' }}>
+        <footer style={{ borderTop: '1px solid rgba(34,211,238,0.1)', padding: '28px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', maxWidth: '1400px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Shield style={{ width: 16, height: 16, color: '#22d3ee' }} />
             <span style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Laminar</span>
@@ -611,13 +855,13 @@ export default function LandingPage() {
           style={{
             position: 'fixed', bottom: '24px', right: '24px', zIndex: 50,
             display: 'flex', alignItems: 'center', gap: '8px',
-            background: 'rgba(8,16,36,0.9)',
-            border: '1px solid rgba(34,211,238,0.35)',
+            background: 'rgba(8,16,36,0.95)',
+            border: '1px solid rgba(34,211,238,0.4)',
             borderRadius: '999px', padding: '12px 22px',
             color: '#22d3ee', fontWeight: 700, fontSize: '0.7rem',
             letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer',
             backdropFilter: 'blur(20px)',
-            boxShadow: '0 0 30px rgba(34,211,238,0.2), 0 4px 20px rgba(0,0,0,0.4)',
+            boxShadow: '0 0 30px rgba(34,211,238,0.3), 0 4px 20px rgba(0,0,0,0.4)',
           }}
         >
           <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}>

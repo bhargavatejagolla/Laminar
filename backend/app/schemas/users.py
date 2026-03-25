@@ -13,6 +13,8 @@ class UserProfileUpdate(BaseModel):
     name: Optional[str] = None
     phone_number: Optional[str] = None
     receive_sms_alerts: Optional[bool] = None
+    alert_email: Optional[EmailStr] = None
+    receive_email_alerts: Optional[bool] = None
     language_preference: Optional[str] = None
 
     @field_validator('phone_number')
@@ -34,6 +36,8 @@ class UserProfileResponse(BaseModel):
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
     receive_sms_alerts: bool
+    alert_email: Optional[str] = None
+    receive_email_alerts: bool
     language_preference: str
 
     class Config:

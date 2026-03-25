@@ -323,6 +323,9 @@ class MetricAggregationService:
                 func.min(CrowdFrame.detected_count),
                 func.count(CrowdFrame.id),
                 func.avg(CrowdFrame.detection_confidence_avg),
+                func.avg(CrowdFrame.velocity),
+                func.avg(CrowdFrame.variance),
+                func.avg(CrowdFrame.acceleration),
             )
             .where(CrowdFrame.camera_id == camera_id)
             .where(CrowdFrame.captured_at >= minute_start)
@@ -330,7 +333,7 @@ class MetricAggregationService:
         )
 
         result = await session.execute(stmt)
-        avg_count, max_count, min_count, frame_count, avg_confidence = result.one()
+        avg_count, max_count, min_count, frame_count, avg_confidence, avg_velocity, avg_variance, avg_acceleration = result.one()
 
         # Convert Decimal values immediately
         avg_count = float(avg_count) if avg_count is not None else 0.0
@@ -372,6 +375,10 @@ class MetricAggregationService:
         min_count = int(min_count) if min_count is not None else 0
         avg_confidence = float(
             avg_confidence) if avg_confidence is not None else None
+        
+        avg_velocity = float(avg_velocity) if avg_velocity is not None else 0.0
+        avg_variance = float(avg_variance) if avg_variance is not None else 0.0
+        avg_acceleration = float(avg_acceleration) if avg_acceleration is not None else 0.0
 
         # --------------------------------------------------
         # Zero-only minute stabilization
@@ -483,6 +490,9 @@ class MetricAggregationService:
             anomaly_score=round(anomaly_score, 3),
             risk_level=risk_level,
             dynamic_risk_score=round(risk_score, 2),
+            avg_velocity=round(avg_velocity, 2),
+            avg_variance=round(avg_variance, 2),
+            avg_acceleration=round(avg_acceleration, 2),
         )
 
         # 🔥 Strong idempotency guard - handle duplicate inserts gracefully

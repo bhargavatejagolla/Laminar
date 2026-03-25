@@ -459,16 +459,18 @@ class WebcamSource(CameraSource):
 
 
 # ==========================================================
-# RTSP Camera (WiFi / CCTV / DVR)
+# Network Stream Camera (RTSP / HTTP / RTMP)
 # ==========================================================
 
-class RTSPSource(CameraSource):
+class NetworkStreamSource(CameraSource):
     """
-    RTSP-based IP camera with authentication support.
+    Generalized network-based camera supporting multiple protocols.
+    Uses a background thread to ensure zero-lag frame delivery.
     
     Examples:
-        rtsp://192.168.1.10:554/stream
         rtsp://username:password@192.168.1.10:554/stream
+        http://username:password@192.168.1.10/mjpeg.cgi
+        rtmp://server/live/stream
     """
 
     def __init__(
@@ -503,24 +505,25 @@ class RTSPSource(CameraSource):
         self._thread = None
 
     def get_type(self) -> str:
-        return "rtsp"
+        parsed = urlparse(str(self.source))
+        return parsed.scheme or "network"
 
     def _create_capture(self) -> cv2.VideoCapture:
         """Use FFMPEG backend with optimized parameters."""
         cap = cv2.VideoCapture(self.source, cv2.CAP_FFMPEG)
         if not cap.isOpened():
             cap.release()
-            raise ConnectionError(f"Cannot open RTSP stream: {self._mask_url(str(self.source))}")
+            raise ConnectionError(f"Cannot open network stream: {self._mask_url(str(self.source))}")
         return cap
 
     def start(self) -> None:
-        """Override with RTSP-specific optimizations."""
+        """Override with network-specific optimizations."""
         with self._lock:
             if self._running:
                 return
 
             logger.info(
-                "Starting RTSP camera (Threaded)",
+                f"Starting {self.get_type().upper()} camera (Threaded)",
                 extra_fields={
                     "url": self._mask_url(str(self.source)),
                     "resolution": f"{self.width}x{self.height}",
@@ -530,9 +533,11 @@ class RTSPSource(CameraSource):
             # _create_capture already raises ConnectionError if stream isn't reachable
             self._capture = self._create_capture()
 
-            # RTSP-specific optimizations
+            # Network-specific optimizations
             self._capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimal buffer
-            if hasattr(cv2, 'CAP_PROP_RTSP_TRANSPORT'):
+            
+            # RTSP-specific optimization: force TCP
+            if str(self.source).startswith("rtsp://") and hasattr(cv2, 'CAP_PROP_RTSP_TRANSPORT'):
                 self._capture.set(cv2.CAP_PROP_RTSP_TRANSPORT, 0)  # TCP
 
             self._configure_capture()
@@ -731,11 +736,15 @@ def create_camera_source(
             **kwargs
         )
 
-    elif source_type in ("rtsp", "cctv"):
-        return RTSPSource(str(source_identifier), **kwargs)
+    if source_type in ("rtsp", "cctv", "http", "https", "rtmp"):
+        return NetworkStreamSource(str(source_identifier), **kwargs)
 
     elif source_type == "video":
         return VideoFileSource(str(source_identifier), **kwargs)
 
     else:
+        # Fallback for any other string source_type (attempt generalized network source)
+        if isinstance(source_identifier, str) and ("://" in source_identifier):
+             return NetworkStreamSource(source_identifier, **kwargs)
+             
         raise ValueError(f"Unknown camera source type: {source_type}")

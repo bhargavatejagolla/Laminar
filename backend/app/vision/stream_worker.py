@@ -666,12 +666,34 @@ class StreamWorker:
             except Exception:
                 pass  # intelligence layer is non-critical
 
+            self._frames_processed += 1
+            self._last_frame_time = now
+
             # ==========================================================
-            # PRODUCTION EFFICIENT SAVE LOGIC
-            # Save only if:
-            # 1. First time
-            # 2. Count changed
-            # 3. Or periodic snapshot (30s)
+            # Step 4: Movement & Panic Detection ML Analysis
+            # ==========================================================
+            cur_velocity = 0.0
+            cur_variance = 0.0
+            cur_acceleration = 0.0
+            panic_result = {}
+
+            try:
+                # Run every frame to maintain accurate velocity tracking
+                panic_result = self.panic_detector.process_frame(
+                    frame=frame,
+                    current_crowd_count=detected_count,
+                    camera_id=self.camera_id
+                )
+                
+                # Extract movement metrics for ingestion
+                cur_velocity = panic_result.get("avg_velocity", 0.0)
+                cur_variance = panic_result.get("variance", 0.0)
+                cur_acceleration = panic_result.get("acceleration", 0.0)
+            except Exception as e:
+                logger.error(f"Movement analysis failed for camera {self.camera_id}: {e}")
+
+            # ==========================================================
+            # Step 5: PRODUCTION EFFICIENT SAVE LOGIC
             # ==========================================================
             should_save = False
 
@@ -689,11 +711,10 @@ class StreamWorker:
 
             if should_save:
                 # ==========================================================
-                # Step 2: Ingest frame count with retry
+                # Step 6: Ingest frame count with movement metrics
                 # ==========================================================
                 from app.core.database import db_manager
                 async with db_manager.session() as session:
-
                     await self._ingest_with_retry(
                         session=session,
                         camera_id=self.camera_id,
@@ -702,84 +723,55 @@ class StreamWorker:
                         captured_at=now,
                         processing_time_ms=detect_time,
                         model_name="yolo11s" if self.detector else None,
+                        velocity=cur_velocity,
+                        variance=cur_variance,
+                        acceleration=cur_acceleration,
                     )
 
                 # Update state after successful save
                 self._last_saved_count = detected_count
                 self._last_state_save_time = now
 
-                logger.debug(
-                    "Frame saved",
-                    extra={
-                        "camera_id": str(self.camera_id),
-                        "detected_count": detected_count,
-                        "confidence": round(avg_confidence, 2),
-                        "reason": self._get_save_reason(now, detected_count),
-                    }
-                )
-
-            # Step 3: Save detection batch if threshold reached
-            self._batch_frame_count += 1
-            if self._batch_frame_count >= self.batch_size:
-                await self._save_detection_batch()
-
-            # Update metrics
-            total_time = (time.time() - frame_start) * 1000
-            self._processing_times.append(total_time)
-            self._frames_processed += 1
-            self._last_frame_time = now
-
-            # ==========================================================
-            # Step 4: Panic Detection ML Analysis (Every 2 Frames)
-            # ==========================================================
-            self._panic_frame_counter += 1
-            if self._panic_frame_counter >= 2:
-                self._panic_frame_counter = 0
-                panic_result = self.panic_detector.process_frame(
-                    frame=frame,
-                    current_crowd_count=detected_count,
-                    camera_id=self.camera_id
-                )
+            # If panic triggered, dispatch critical alarm
+            if panic_result.get("panic_detected"):
+                import uuid
+                from app.services.alert_engine_service import AlertEngineService
+                from app.core.database import db_manager
                 
-                # If panic triggered, dispatch critical alarm
-                if panic_result.get("panic_detected"):
-                    import uuid
-                    from app.services.alert_engine_service import AlertEngineService
-                    from app.core.database import db_manager
-                    
-                    async def dispatch_panic_alarm():
-                        async with db_manager.session() as alert_session:
-                            from app.models.camera import Camera
-                            from sqlalchemy import select
-                            cam_res = await alert_session.execute(select(Camera).where(Camera.id == self.camera_id))
-                            cam = cam_res.scalar_one_or_none()
-                            
-                            if cam:
-                                decision = {
-                                    "venue_id": str(cam.venue_id),
-                                    "venue_name": cam.location_label or str(cam.venue_id),
-                                    "metric_id": str(uuid.uuid4()),
-                                    "metric_time": now.isoformat(),
-                                    "previous_level": "medium",
-                                    "current_level": "critical",
-                                    "transition": "escalated",
-                                    "trend": "rapidly_increasing",
-                                    "severity": 95,
-                                    "should_alert": True,
-                                    "recommended_action": panic_result.get("reason", "🚨 CROWD SURGE / PANIC DETECTED"),
-                                    "risk_score": 100.0,
-                                    "occupancy_percent": 100.0,
-                                    "early_warning_triggered": False,
-                                    "velocity": panic_result.get("avg_velocity", 0.0),
-                                    "direction_variance": panic_result.get("variance", 0.0),
-                                    "acceleration": panic_result.get("acceleration", 0.0),
-                                }
-                                alert_engine = AlertEngineService()
-                                await alert_engine.process_decision(alert_session, decision=decision)
-                    
-                    asyncio.create_task(dispatch_panic_alarm())
+                async def dispatch_panic_alarm():
+                    async with db_manager.session() as alert_session:
+                        from app.models.camera import Camera
+                        from sqlalchemy import select
+                        cam_res = await alert_session.execute(select(Camera).where(Camera.id == self.camera_id))
+                        cam = cam_res.scalar_one_or_none()
+                        
+                        if cam:
+                            decision = {
+                                "venue_id": str(cam.venue_id),
+                                "venue_name": cam.location_label or str(cam.venue_id),
+                                "metric_id": str(uuid.uuid4()),
+                                "metric_time": now.isoformat(),
+                                "previous_level": "medium",
+                                "current_level": "critical",
+                                "transition": "escalated",
+                                "trend": "rapidly_increasing",
+                                "severity": 95,
+                                "should_alert": True,
+                                "recommended_action": panic_result.get("reason", "🚨 CROWD SURGE / PANIC DETECTED"),
+                                "risk_score": 100.0,
+                                "occupancy_percent": 100.0,
+                                "early_warning_triggered": False,
+                                "velocity": cur_velocity,
+                                "direction_variance": cur_variance,
+                                "acceleration": cur_acceleration,
+                            }
+                            alert_engine = AlertEngineService()
+                            await alert_engine.process_decision(alert_session, decision=decision)
+                
+                asyncio.create_task(dispatch_panic_alarm())
 
             # Alert if processing too slow (moved to a higher threshold for unblocked 60FPS handling)
+            total_time = (time.time() - frame_start) * 1000
             if total_time > (self.max_processing_time_ms * 4):
                 logger.debug(
                     "Frame processing took longer than expected",

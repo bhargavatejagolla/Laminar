@@ -196,6 +196,28 @@ class CrowdMetric(BaseModel):
     )
 
     # ==========================================================
+    # 🔥 Crowd Movement Metrics (Surge Tracking)
+    # ==========================================================
+
+    avg_velocity: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=0.0,
+    )
+
+    avg_variance: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=0.0,
+    )
+
+    avg_acceleration: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        default=0.0,
+    )
+
+    # ==========================================================
     # Rolling & Derived Metrics
     # ==========================================================
 
@@ -323,6 +345,13 @@ class CrowdMetric(BaseModel):
         if self.dynamic_risk_score is not None:
             if self.dynamic_risk_score < 0 or self.dynamic_risk_score > 100:
                 errors.append("dynamic_risk_score must be between 0 and 100.")
+
+        # Movement metrics validation
+        if self.avg_velocity is not None and self.avg_velocity < 0:
+            errors.append("avg_velocity cannot be negative.")
+        
+        if self.avg_variance is not None and self.avg_variance < 0:
+            errors.append("avg_variance cannot be negative.")
 
         # Growth rate validation (prevent extreme values)
         if self.growth_rate_percent is not None:

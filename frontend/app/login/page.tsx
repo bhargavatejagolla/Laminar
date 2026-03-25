@@ -4,10 +4,104 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleLogin } from '@react-oauth/google';
 import { login, loginWithGoogle } from "@/services/auth";
-import { Activity, ShieldCheck, ChevronLeft, Mail, Sparkles, Eye, EyeOff, Key, AlertCircle, Fingerprint } from "lucide-react";
+import { Activity, ShieldCheck, ChevronLeft, Mail, Sparkles, Eye, EyeOff, Key, AlertCircle, Fingerprint, Globe } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
 import Link from "next/link";
-import PremiumBackground from "@/components/background/premium-background";
+import PremiumImageBackground from "@/components/background/premium-image-background";
+
+/* ─── Starfield Background ─── */
+function StarfieldBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let stars: { x: number; y: number; radius: number; alpha: number; twinkleSpeed: number; twinklePhase: number }[] = [];
+    let animationId: number;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      initStars();
+    };
+
+    const initStars = () => {
+      stars = [];
+      const starCount = Math.floor((canvas.width * canvas.height) / 2500);
+      for (let i = 0; i < starCount; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 1.8 + 0.5,
+          alpha: Math.random() * 0.6 + 0.2,
+          twinkleSpeed: Math.random() * 0.02 + 0.005,
+          twinklePhase: Math.random() * Math.PI * 2,
+        });
+      }
+    };
+
+    const draw = () => {
+      if (!ctx || !canvas) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#020617');
+      gradient.addColorStop(0.5, '#0a0f1a');
+      gradient.addColorStop(1, '#03050a');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      stars.forEach(star => {
+        const time = Date.now() / 1000;
+        const twinkle = Math.sin(time * star.twinkleSpeed + star.twinklePhase) * 0.3 + 0.7;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha * twinkle})`;
+        ctx.fill();
+      });
+
+      // Add a faint nebula effect on top
+      const nebulaGradient = ctx.createRadialGradient(
+        canvas.width * 0.8, canvas.height * 0.2, 50,
+        canvas.width * 0.8, canvas.height * 0.2, 350
+      );
+      nebulaGradient.addColorStop(0, 'rgba(34,211,238,0.03)');
+      nebulaGradient.addColorStop(0.5, 'rgba(59,130,246,0.02)');
+      nebulaGradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = nebulaGradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      animationId = requestAnimationFrame(draw);
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+    draw();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: -2,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
 
 /* ─── Radar sweep canvas ─── */
 function RadarSweep() {
@@ -48,7 +142,7 @@ function RadarSweep() {
       ctx.beginPath();
       ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
       ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
-      ctx.strokeStyle = 'rgba(34,211,238,0.06)';
+      ctx.strokeStyle = 'rgba(34,211,238,0.08)';
       ctx.lineWidth = 1;
       ctx.stroke();
 
@@ -64,7 +158,6 @@ function RadarSweep() {
         ctx.fillStyle = grad;
         ctx.fill();
       } else {
-        // Fallback: simple sweep wedge
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.arc(cx, cy, R, angle - 1.2, angle);
@@ -95,7 +188,6 @@ function RadarSweep() {
           ctx.arc(bx, by, b.r, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(34,211,238,${alpha * 0.9})`;
           ctx.fill();
-          // Halo
           ctx.beginPath();
           ctx.arc(bx, by, b.r + 4, 0, Math.PI * 2);
           ctx.strokeStyle = `rgba(34,211,238,${alpha * 0.3})`;
@@ -131,7 +223,7 @@ function HexGrid() {
     opacity: 0.04 + (i % 3) * 0.03,
   }));
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: -1 }}>
       {hexes.map((h, i) => (
         <motion.div
           key={i}
@@ -149,6 +241,50 @@ function HexGrid() {
       ))}
     </div>
   );
+}
+
+/* ─── Orbiting Planets ─── */
+function OrbitingPlanets() {
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: -1, overflow: 'hidden' }}>
+      <motion.div
+        animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
+        transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute',
+          top: '10%',
+          right: '-10%',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 30% 30%, rgba(34,211,238,0.12), rgba(59,130,246,0.04), transparent)',
+          filter: 'blur(45px)',
+        }}
+      />
+      <motion.div
+        animate={{ y: [0, 15, 0], x: [0, -8, 0] }}
+        transition={{ duration: 25, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut', delay: 2 }}
+        style={{
+          position: 'absolute',
+          bottom: '-5%',
+          left: '-8%',
+          width: '400px',
+          height: '400px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 70% 70%, rgba(139,92,246,0.1), rgba(16,185,129,0.02), transparent)',
+          filter: 'blur(50px)',
+        }}
+      />
+    </div>
+  );
+}
+
+function useTransformLocal(val: any, fn: (v: number) => number) {
+  const out = useMotionValue(0);
+  useEffect(() => {
+    return val.on('change', (v: number) => out.set(fn(v)));
+  }, [val, fn, out]);
+  return out;
 }
 
 export default function LoginPage() {
@@ -189,23 +325,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#020817', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-      <PremiumBackground />
-      <HexGrid />
+    <div style={{ minHeight: '100vh', background: 'transparent', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+      <PremiumImageBackground imageUrl="/login-bg.png" variant="login" />
 
       {/* Cursor spotlight */}
       <motion.div style={{
         position: 'fixed', zIndex: 1, pointerEvents: 'none', width: '500px', height: '500px',
         borderRadius: '50%',
         background: 'radial-gradient(circle, rgba(34,211,238,0.05) 0%, transparent 70%)',
-        x: useTransform(sX, v => v - 250),
-        y: useTransform(sY, v => v - 250),
+        x: useTransformLocal(sX, v => v - 250),
+        y: useTransformLocal(sY, v => v - 250),
       } as any} />
 
       {/* Radar background */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
-        <RadarSweep />
-      </div>
+      {/* Kept wrapper for cursor spotlight above, removed RadarSweep */}
 
       {/* ─── Card ─── */}
       <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '460px', margin: '0 20px' }}>
@@ -227,8 +360,8 @@ export default function LoginPage() {
           />
           {/* Static card body */}
           <div style={{
-            background: 'rgba(6,10,24,0.95)',
-            border: '1px solid rgba(34,211,238,0.12)',
+            background: 'rgba(6,10,24,0.96)',
+            border: '1px solid rgba(34,211,238,0.2)',
             borderRadius: '24px',
             backdropFilter: 'blur(60px)',
             boxShadow: '0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05)',
@@ -275,7 +408,6 @@ export default function LoginPage() {
             {/* Brand */}
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <motion.div
-                className="relative mx-auto mb-5"
                 style={{ width: '64px', height: '64px', position: 'relative', margin: '0 auto 20px' }}
               >
                 {/* Rotating rings */}
@@ -308,7 +440,7 @@ export default function LoginPage() {
             </AnimatePresence>
 
             {/* Form */}
-            <form onSubmit={handleStandardLogin} style={{ background: 'rgba(4,8,20,0.7)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <form onSubmit={handleStandardLogin} style={{ background: 'rgba(4,8,20,0.7)', border: '1px solid rgba(34,211,238,0.1)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
               {/* Email */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '8px', color: focusedField === 'email' ? '#22d3ee' : '#475569', transition: 'color 0.3s' }}>
@@ -323,9 +455,9 @@ export default function LoginPage() {
                     animate={{ boxShadow: focusedField === 'email' ? '0 0 0 1px rgba(34,211,238,0.5), 0 0 20px rgba(34,211,238,0.1)' : '0 0 0 0px rgba(34,211,238,0)' }}
                     style={{
                       width: '100%', background: 'rgba(8,14,32,0.9)',
-                      border: `1px solid ${focusedField === 'email' ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                      border: `1px solid ${focusedField === 'email' ? 'rgba(34,211,238,0.5)' : 'rgba(34,211,238,0.15)'}`,
                       borderRadius: '12px', color: '#fff', fontSize: '0.875rem',
-                      padding: '13px 14px 13px 40px', outline: 'none', transition: 'border-color 0.3s',
+                      padding: '13px 14px 13px 40px', outline: 'none', transition: 'all 0.3s',
                       fontFamily: 'inherit',
                     }}
                   />
@@ -346,9 +478,9 @@ export default function LoginPage() {
                     animate={{ boxShadow: focusedField === 'password' ? '0 0 0 1px rgba(34,211,238,0.5), 0 0 20px rgba(34,211,238,0.1)' : '0 0 0 0px rgba(34,211,238,0)' }}
                     style={{
                       width: '100%', background: 'rgba(8,14,32,0.9)',
-                      border: `1px solid ${focusedField === 'password' ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                      border: `1px solid ${focusedField === 'password' ? 'rgba(34,211,238,0.5)' : 'rgba(34,211,238,0.15)'}`,
                       borderRadius: '12px', color: '#fff', fontSize: '0.875rem',
-                      padding: '13px 44px 13px 40px', outline: 'none', transition: 'border-color 0.3s',
+                      padding: '13px 44px 13px 40px', outline: 'none', transition: 'all 0.3s',
                       fontFamily: 'inherit',
                     }}
                   />
@@ -370,7 +502,7 @@ export default function LoginPage() {
                   background: 'linear-gradient(135deg, #22d3ee, #3b82f6)',
                   color: '#000', fontWeight: 900, fontSize: '0.72rem', letterSpacing: '0.15em', textTransform: 'uppercase',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  boxShadow: '0 0 30px rgba(34,211,238,0.35)',
+                  boxShadow: '0 0 30px rgba(34,211,238,0.4)',
                   opacity: loading ? 0.7 : 1, marginTop: '4px',
                 }}
               >
@@ -388,9 +520,9 @@ export default function LoginPage() {
 
             {/* Divider */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'rgba(34,211,238,0.1)' }} />
               <span style={{ fontSize: '0.6rem', color: '#334155', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Secure Link</span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+              <div style={{ flex: 1, height: '1px', background: 'rgba(34,211,238,0.1)' }} />
             </div>
 
             {/* Google */}
@@ -423,7 +555,7 @@ export default function LoginPage() {
         initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 1, type: "spring", stiffness: 200 }}
         whileHover={{ scale: 1.08, y: -2 }} whileTap={{ scale: 0.94 }}
-        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(8,16,36,0.9)', border: '1px solid rgba(34,211,238,0.35)', borderRadius: '999px', padding: '12px 22px', color: '#22d3ee', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', backdropFilter: 'blur(20px)', boxShadow: '0 0 30px rgba(34,211,238,0.2)' }}
+        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(8,16,36,0.95)', border: '1px solid rgba(34,211,238,0.4)', borderRadius: '999px', padding: '12px 22px', color: '#22d3ee', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', backdropFilter: 'blur(20px)', boxShadow: '0 0 30px rgba(34,211,238,0.3)' }}
       >
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}>
           <Sparkles style={{ width: 15, height: 15 }} />
@@ -432,13 +564,4 @@ export default function LoginPage() {
       </motion.button>
     </div>
   );
-}
-
-/* workaround for missing useTransform import */
-function useTransform(val: any, fn: (v: number) => number) {
-  const out = useMotionValue(0);
-  useEffect(() => {
-    return val.on('change', (v: number) => out.set(fn(v)));
-  }, [val, fn, out]);
-  return out;
 }

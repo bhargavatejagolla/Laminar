@@ -35,6 +35,12 @@ export default function Navbar() {
 
   const userDisplayName = user?.email ? user.email.split("@")[0] : "Admin";
 
+  const handleLogout = () => {
+    if (window.confirm("Are you sure you want to sign out?")) {
+      logout();
+    }
+  };
+
   return (
     <header className="h-20 bg-[rgba(10,10,15,0.7)] backdrop-blur-3xl border-b border-white/5 flex items-center justify-between px-6 shrink-0 z-[100] sticky top-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
       
@@ -135,7 +141,7 @@ export default function Navbar() {
 
         {/* Logout */}
         <button 
-          onClick={logout}
+          onClick={handleLogout}
           className="p-2.5 ml-1 rounded-xl bg-white/5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-all duration-300 border border-transparent hover:border-rose-500/30"
           title="Sign out"
         >
