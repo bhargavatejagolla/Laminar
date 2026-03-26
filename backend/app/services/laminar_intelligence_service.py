@@ -142,10 +142,11 @@ class LaminarIntelligenceService:
         return "AIFallbackProvider"
 
     async def _call_llm(self, prompt: str, model: str, timeout: float = 30.0) -> Tuple[Optional[str], str]:
-        """Call AI Fallback Provider and return response text + provider name, or (None, 'None') on failure."""
+        """Call AI Router and return response text + provider name, or (None, 'None') on failure."""
         try:
-            from app.services.ai_provider_service import ai_provider
-            res, provider_name = await ai_provider.generate_response(prompt, timeout=timeout, return_provider_name=True)
+            from app.services.ai_service import get_ai_service
+            ai_service = get_ai_service()
+            res, provider_name = await ai_service.generate_raw(prompt, timeout=timeout, return_provider_name=True)
             return res, provider_name
         except Exception as e:
             logger.debug(f"LLM call failed: {e}")

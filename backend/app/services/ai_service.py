@@ -1,0 +1,381 @@
+"""
+Laminar - AI Intelligence Service
+----------------------------------
+Central routing service for all AI generations.
+Primary: Local Phi-2 (via llama-cpp-python)
+Fallback 1: Groq API
+Fallback 2: Google Gemini API
+"""
+
+import os
+import json
+import asyncio
+from typing import Dict, Any, List, Optional, Tuple
+from app.core.logging import get_logger
+from app.core.config import settings
+
+logger = get_logger(__name__)
+
+# Note: The model is expected in root/ai/models/phi2.gguf
+# Assuming the root is two directories up from `backend/app`
+LOCAL_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../ai/models/phi2.gguf"))
+
+BASE_SYSTEM_PROMPT = """YOU ARE LAMINAR AI — an expert operational intelligence analyst.
+You analyze real-time crowd data, multi-zone relationships, historical patterns, and contextual memory.
+You do not just react to thresholds; you anticipate and reason dynamically.
+Your internal reasoning must follow this chain before concluding:
+1. What is currently happening?
+2. Why is it happening? (cause-effect explanation)
+3. What could happen next? (predictive forecasting)
+4. What should be done proactively?
+
+You always provide rich, clear, and actionable intelligence.
+Be concise, structured, and operationally vital. Avoid generic repetitive phrases."""
+
+# In-memory LRU cache to avoid repeating exact queries within short windows
+import time
+_inference_cache: Dict[str, Tuple[float, Any]] = {}
+CACHE_TTL = 300 # 5 minutes
+
+class LaminarAIService:
+    """The unified AI Engine routing all requests in Laminar."""
+    
+    _llama = None
+    _llama_lock = asyncio.Lock()
+
+    def __init__(self):
+        self.gemini_key = settings.GEMINI_API_KEY
+        self.groq_key = settings.GROQ_API_KEY
+        self.groq_model = "llama-3.1-8b-instant"
+
+    async def _get_local_model(self):
+        """Lazy-load the local model into memory."""
+        if self._llama is None:
+            async with self._llama_lock:
+                if self._llama is None:
+                    if not os.path.exists(LOCAL_MODEL_PATH):
+                        logger.error(f"Local AI Model not found at {LOCAL_MODEL_PATH}.")
+                        return None
+                    try:
+                        from llama_cpp import Llama
+                        logger.info(f"Loading local model from {LOCAL_MODEL_PATH}...")
+                        # Run blocking model load in a thread
+                        self._llama = await asyncio.to_thread(
+                            Llama,
+                            model_path=LOCAL_MODEL_PATH,
+                            n_ctx=2048, # Context window
+                            n_threads=max(1, os.cpu_count() - 2),
+                            verbose=False
+                        )
+                        logger.info("Local model loaded successfully.")
+                    except Exception as e:
+                        logger.error(f"Failed to load local model: {e}")
+                        return None
+        return self._llama
+
+    async def _try_local_phi2(self, prompt: str, is_json: bool = False, max_tokens: int = 500) -> Optional[str]:
+        """Attempt local inference using Phi-2."""
+        llm = await self._get_local_model()
+        if not llm:
+            return None
+        
+        try:
+            # We run the blocking inference in a separate thread
+            def _infer():
+                # For Phi-2, it's a completions model unless it's an instruct fine-tune
+                # We will just pass the prompt directly.
+                return llm(
+                    prompt,
+                    max_tokens=max_tokens,
+                    temperature=0.2,
+                    echo=False,
+                    stop=["User:", "Laminar:", "\n\n\n"]
+                )
+
+            res = await asyncio.to_thread(_infer)
+            if res and "choices" in res and len(res["choices"]) > 0:
+                text = res["choices"][0]["text"].strip()
+                if is_json:
+                    # Best-effort extract JSON
+                    start = text.find("{")
+                    end = text.rfind("}") + 1
+                    if start != -1 and end != 0:
+                        text = text[start:end]
+                return text
+        except Exception as e:
+            logger.error(f"Local Phi-2 inference failed: {e}")
+            
+        return None
+
+    async def _try_groq(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 10.0) -> Optional[str]:
+        """Attempt inference via Groq API."""
+        if not self.groq_key:
+            return None
+
+        import httpx
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.groq_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.groq_model,
+            "messages": messages,
+            "temperature": 0.2,
+            "max_tokens": 500
+        }
+        
+        if is_json:
+            payload["response_format"] = {"type": "json_object"}
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        return choices[0].get("message", {}).get("content", "").strip()
+                logger.debug(f"Groq failed with {resp.status_code}: {resp.text}")
+        except Exception as e:
+            logger.debug(f"Groq Exception: {e}")
+        return None
+
+    async def _try_gemini(self, prompt: str, timeout: float = 10.0) -> Optional[str]:
+        """Attempt inference via Google Gemini API."""
+        if not self.gemini_key:
+            return None
+
+        import httpx
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }],
+            "generationConfig": {
+                "temperature": 0.2,
+                "topP": 0.8,
+                "topK": 40,
+                "maxOutputTokens": 500
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(url, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        content = candidates[0].get("content", {})
+                        parts = content.get("parts", [])
+                        if parts:
+                            return parts[0].get("text", "").strip()
+                logger.debug(f"Gemini failed with {resp.status_code}: {resp.text}")
+        except Exception as e:
+            logger.debug(f"Gemini Exception: {e}")
+        return None
+
+    async def _execute_chain(self, prompt: str, messages: List[Dict[str, str]], is_json: bool = False, return_provider_name: bool = False, max_tokens: int = 500) -> Any:
+        """Route request through the fallback chain."""
+        logger.info("Executing AI Request Chain: [Local Phi-2] -> [Groq] -> [Gemini]")
+        
+        # 1. Local Phi-2
+        res = await self._try_local_phi2(prompt, is_json=is_json, max_tokens=max_tokens)
+        if res:
+            logger.info("Generated AI response locally via Phi-2")
+            return (res, "Local Phi-2") if return_provider_name else res
+
+        # 2. Groq
+        res = await self._try_groq(messages, is_json=is_json)
+        if res:
+            logger.info("Generated AI response via Groq")
+            return (res, "Groq") if return_provider_name else res
+
+        # 3. Gemini
+        res = await self._try_gemini(prompt)
+        if res:
+            logger.info("Generated AI response via Gemini")
+            return (res, "Gemini") if return_provider_name else res
+
+        logger.warning("All AI providers in fallback chain failed.")
+        return (None, "None") if return_provider_name else None
+
+    async def generate_insight(self, data: dict, return_provider_name: bool = False) -> Any:
+        """
+        Insight Mode (Predictive RAG Enhanced)
+        Input: structured data
+        Output Expectation: JSON Dictionary with prediction
+        """
+        # 1. Caching logic
+        import hashlib
+        data_str = json.dumps(data, sort_keys=True)
+        cache_key = hashlib.md5(data_str.encode()).hexdigest()
+        
+        now = time.time()
+        if cache_key in _inference_cache:
+            timestamp, cached_res = _inference_cache[cache_key]
+            if now - timestamp < CACHE_TTL:
+                logger.info("Serving insight from cache (reduced latency).")
+                return (cached_res, "Cache") if return_provider_name else cached_res
+
+        # 2. Fetch relevant past operational memory context
+        try:
+            from app.services.ai_memory_service import get_ai_memory
+            past_context = await get_ai_memory().retrieve_similar_context(data)
+            memory_str = ""
+            if past_context:
+                memory_str = "\n\nRELEVANT PAST PATTERNS (MEMORY):\n" + "\n".join(
+                    f"- {ctx.get('scenario_text')} -> Predicted/Actioned: {json.dumps(ctx.get('insight'))}" 
+                    for ctx in past_context
+                )
+        except Exception as e:
+            logger.warning(f"Failed to fetch AI memory context: {e}")
+            memory_str = ""
+
+        # 3. Build predictive prompt
+        data_str_pretty = json.dumps(data, indent=2)
+        prompt = f'''{BASE_SYSTEM_PROMPT}{memory_str}
+
+You are generating a predictive insight report for the following surveillance data:
+{data_str_pretty}
+
+Please generate a JSON object ONLY with the following exactly lowercase keys: "summary", "risk_level", "insight", "prediction", "recommendation".
+"risk_level" must be one of: "low", "medium", "high", "critical".
+"prediction" should outline the expected development.
+No markdown blocks, just raw JSON.'''
+
+        messages = [
+            {"role": "system", "content": BASE_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Generate JSON predictive insight for data:\n{data_str_pretty}{memory_str}\n\nKeys: summary, risk_level, insight, prediction, recommendation."}
+        ]
+        
+        res = await self._execute_chain(prompt, messages, is_json=True, return_provider_name=return_provider_name)
+        text = res[0] if return_provider_name else res
+        
+        if not text:
+            # Safest fallback
+            fallback_dict = {
+                "summary": "AI generation failed.",
+                "risk_level": data.get("current_level", "medium"),
+                "insight": "Could not generate insight due to system failure.",
+                "prediction": "Unknown trajectory.",
+                "recommendation": "Monitor situation manually."
+            }
+            return (fallback_dict, "Fallback") if return_provider_name else fallback_dict
+
+        try:
+            parsed = json.loads(text)
+            
+            # 4. Store successful insight into long-term memory
+            try:
+                from app.services.ai_memory_service import get_ai_memory
+                asyncio.create_task(get_ai_memory().store_event(data, parsed))
+            except Exception as e:
+                logger.debug(f"Async memory storage failed: {e}")
+                
+            # Update cache
+            _inference_cache[cache_key] = (now, parsed)
+            
+            return (parsed, res[1]) if return_provider_name else parsed
+        except json.JSONDecodeError:
+            # If AI didn't output valid json, wrap it
+            fallback_dict = {
+                "summary": text[:200],
+                "risk_level": "medium",
+                "insight": text,
+                "prediction": "AI output structural failure.",
+                "recommendation": "Review raw insight."
+            }
+            return (fallback_dict, res[1]) if return_provider_name else fallback_dict
+
+    async def generate_chat_response(self, query: str, context: list, return_provider_name: bool = False) -> Any:
+        """
+        Chat Mode
+        Input: User query string and historical context
+        Output Expectation: Natural language response string
+        """
+        # Format history string for local model / gemini
+        history_str = ""
+        messages = [{"role": "system", "content": BASE_SYSTEM_PROMPT}]
+        
+        for msg in context[-5:]: # Keep last 5 messages for brevity
+            role = msg.get("role", "user").capitalize()
+            content = msg.get("content", "")
+            history_str += f"{role}: {content}\n"
+            messages.append({"role": msg.get("role", "user"), "content": content})
+            
+        history_str += f"User: {query}\nLaminar:"
+        messages.append({"role": "user", "content": query})
+
+        prompt = f'''{BASE_SYSTEM_PROMPT}
+
+CONVERSATION HISTORY:
+{history_str}'''
+
+        res = await self._execute_chain(prompt, messages, is_json=False, return_provider_name=return_provider_name)
+        text = res[0] if return_provider_name else res
+        if not text:
+            msg = "I'm currently unable to generate a response. Please check network connections or AI models readiness."
+            return (msg, "Fallback") if return_provider_name else msg
+
+        return res
+
+    async def generate_alert(self, data: dict, return_provider_name: bool = False) -> Any:
+        """
+        Alert Mode
+        Input: Alert data context
+        Output Expectation: JSON Dictionary
+        """
+        data_str = json.dumps(data, indent=2)
+        prompt = f'''{BASE_SYSTEM_PROMPT}
+
+You are explaining an alert event based on the following data:
+{data_str}
+
+Please generate a JSON object ONLY with the following exactly lowercase keys: "alert", "reason", "action".
+"alert" is a 1-sentence description. "reason" is why it triggered. "action" is what to do next.
+No markdown blocks, just raw JSON.'''
+
+        messages = [
+            {"role": "system", "content": BASE_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Explain this alert in JSON format:\n{data_str}\n\nKeys: alert, reason, action."}
+        ]
+
+        res = await self._execute_chain(prompt, messages, is_json=True, return_provider_name=return_provider_name)
+        text = res[0] if return_provider_name else res
+        
+        if not text:
+            # Safest fallback
+            fallback_dict = {
+                "alert": "Crowd alert detected.",
+                "reason": "Thresholds or AI heuristics were met.",
+                "action": "Investigate immediately."
+            }
+            return (fallback_dict, "Fallback") if return_provider_name else fallback_dict
+
+        try:
+            parsed = json.loads(text)
+            return (parsed, res[1]) if return_provider_name else parsed
+        except json.JSONDecodeError:
+            fallback_dict = {
+                "alert": "Alert triggered.",
+                "reason": text[:200],
+                "action": text[-200:]
+            }
+            return (fallback_dict, res[1]) if return_provider_name else fallback_dict
+    
+    async def generate_raw(self, prompt: str, timeout: float = 20.0, return_provider_name: bool = False) -> Any:
+        """Raw generation fallback for backward compatibility."""
+        messages = [
+            {"role": "system", "content": BASE_SYSTEM_PROMPT},
+            {"role": "user", "content": prompt}
+        ]
+        return await self._execute_chain(prompt, messages, is_json=False, return_provider_name=return_provider_name, max_tokens=1000)
+
+ai_service = LaminarAIService()
+
+def get_ai_service() -> LaminarAIService:
+    return ai_service

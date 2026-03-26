@@ -461,11 +461,12 @@ STRICT RULES:
             
         full_prompt += f"USER: {question}\nASSISTANT: "
 
-        # ── Call AI Fallback Provider ──────────────────────────────────────────────────
-        from app.services.ai_provider_service import ai_provider
-        logger.info(f"Querying AI Fallback Provider with history ({len(history)} msgs)...")
+        # ── Call AI Service ──────────────────────────────────────────────────
+        from app.services.ai_service import get_ai_service
+        ai_service = get_ai_service()
+        logger.info(f"Querying AI Service with history ({len(history)} msgs)...")
         try:
-            answer = await ai_provider.generate_response(full_prompt, timeout=60.0)
+            answer = await ai_service.generate_raw(full_prompt, timeout=60.0)
             if answer:
                 return answer
             else:

@@ -169,44 +169,12 @@ class AIFallbackProvider:
         """
         Execute the fallback chain to generate a response.
         Strict Chain: Google Gemini -> Groq -> Local Ollama
+        
+        Note: This is now securely proxied to LaminarAIService.
         """
-        if not fallback_chain:
-            # ✅ DIRECTED FIX: Ensure strict provider order as per user request
-            fallback_chain = ["gemini", "groq", "ollama"]
-
-        for provider in fallback_chain:
-            logger.info(f"Attempting AI generation with provider: {provider}")
-            
-            # ✅ OPTIMIZATION: Shorten cloud timeouts to failover faster to local Ollama
-            # This prevents the system from hanging if the internet is slow.
-            pt_timeout = min(10.0, timeout) if provider in ["gemini", "groq"] else timeout
-            
-            if provider == "gemini":
-                res = await self._try_gemini(prompt, timeout=pt_timeout)
-                if res:
-                    logger.info("Successfully generated AI response via Google Gemini.")
-                    if return_provider_name:
-                        return res, "Google Gemini 1.5"
-                    return res
-            elif provider == "groq":
-                res = await self._try_groq(prompt, timeout=pt_timeout)
-                if res:
-                    logger.info("Successfully generated AI response via Groq.")
-                    if return_provider_name:
-                        return res, f"Groq ({self.groq_model})"
-                    return res
-            elif provider == "ollama":
-                res = await self._try_ollama(prompt, timeout=timeout)
-                if res:
-                    logger.info("Successfully generated AI response via Local Ollama.")
-                    if return_provider_name:
-                        return res, f"Local Ollama"
-                    return res
-
-        logger.warning("All AI providers in fallback chain failed. Returning None.")
-        if return_provider_name:
-            return None, "None"
-        return None
+        from app.services.ai_service import get_ai_service
+        logger.info("Proxying legacy generate_response to new centralized LaminarAIService")
+        return await get_ai_service().generate_raw(prompt, timeout=timeout, return_provider_name=return_provider_name)
 
 # Singleton instance
 ai_provider = AIFallbackProvider()

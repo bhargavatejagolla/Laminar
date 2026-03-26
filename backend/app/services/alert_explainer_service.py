@@ -206,14 +206,27 @@ Alert Explanation:"""
     ) -> None:
         """Try to get AI-enhanced explanation and write it back."""
         try:
-            from app.services.ai_provider_service import ai_provider
+            from app.services.ai_service import get_ai_service
             from app.core.database import db_manager
 
-            prompt = self._build_ai_prompt(decision, venue)
-            ai_expl = await asyncio.wait_for(
-                ai_provider.generate_response(prompt, timeout=20.0),
-                timeout=22.0,  # outer safety timeout
+            ai_service = get_ai_service()
+            decision_with_context = decision.copy()
+            if venue:
+                decision_with_context["venue_name"] = venue.name
+                decision_with_context["capacity"] = venue.capacity
+            
+            # Send the structured dictionary to our router instead of raw string
+            ai_resp_tuple = await asyncio.wait_for(
+                ai_service.generate_alert(decision_with_context, return_provider_name=True),
+                timeout=22.0,
             )
+            
+            # Unpack response if return_provider_name enabled
+            ai_data = ai_resp_tuple[0] if isinstance(ai_resp_tuple, tuple) else ai_resp_tuple
+            
+            # Format JSON response into a strong explanation string
+            if ai_data and isinstance(ai_data, dict):
+                ai_expl = f"🚨 {ai_data.get('alert', '')} Reason: {ai_data.get('reason', '')} Action: {ai_data.get('action', '')}".strip()
 
             if ai_expl and len(ai_expl.strip()) > 20:
                 # Cache the AI result
