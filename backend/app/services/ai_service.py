@@ -16,19 +16,23 @@ from app.core.config import settings
 
 logger = get_logger(__name__)
 
-# Note: The model is expected in root/ai/models/phi2.gguf
-# Assuming the root is two directories up from `backend/app`
-LOCAL_MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../ai/models/phi2.gguf"))
+# Safely resolve model path relative to project root
+try:
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    LOCAL_MODEL_PATH = os.environ.get("LOCAL_MODEL_PATH", os.path.join(PROJECT_ROOT, "ai", "models", "phi-2.Q4_K_M.gguf"))
+except Exception:
+    # Fallback if path resolution fails, though it should be robust
+    LOCAL_MODEL_PATH = "/tmp/phi-2.Q4_K_M.gguf" # A placeholder, actual path should be resolved
 
-BASE_SYSTEM_PROMPT = """YOU ARE LAMINAR AI — an expert operational intelligence analyst.
-You analyze real-time crowd data, multi-zone relationships, historical patterns, and contextual memory.
-You do not just react to thresholds; you anticipate and reason dynamically.
-Your internal reasoning must follow this chain before concluding:
-1. What is currently happening?
-2. Why is it happening? (cause-effect explanation)
-3. What could happen next? (predictive forecasting)
-4. What should be done proactively?
+BASE_SYSTEM_PROMPT = """You are Laminar AI, an elite predictive intelligence and operations assistant.
+You possess a continuous memory of operational incidents. Think analytically, deeply, and predict future states.
 
+CRITICAL INSTRUCTIONS:
+1. Always write cohesively and naturally as a human operations expert.
+2. DO NOT use markdown bolding (asterisks) like **CONTEXT:** or **ANALYSIS:**. Speak organically.
+3. Incorporate dwell times, flow movement, and historical context organically into your sentences.
+4. Keep answers concise but insightful, always weaving your analysis into a fluid paragraph.
+5. Do NOT list your reasoning steps out loud. Just deliver the final holistic insight.
 You always provide rich, clear, and actionable intelligence.
 Be concise, structured, and operationally vital. Avoid generic repetitive phrases."""
 
@@ -54,7 +58,7 @@ class LaminarAIService:
             async with self._llama_lock:
                 if self._llama is None:
                     if not os.path.exists(LOCAL_MODEL_PATH):
-                        logger.error(f"Local AI Model not found at {LOCAL_MODEL_PATH}.")
+                        logger.warning(f"Local AI Model not found at {LOCAL_MODEL_PATH}. Falling back to Cloud AI.")
                         return None
                     try:
                         from llama_cpp import Llama
@@ -65,11 +69,12 @@ class LaminarAIService:
                             model_path=LOCAL_MODEL_PATH,
                             n_ctx=2048, # Context window
                             n_threads=max(1, os.cpu_count() - 2),
+                            n_gpu_layers=0,
                             verbose=False
                         )
                         logger.info("Local model loaded successfully.")
                     except Exception as e:
-                        logger.error(f"Failed to load local model: {e}")
+                        logger.warning(f"Failed to load local model (llama-cpp-python may be missing): {e}. Falling back to Cloud AI.")
                         return None
         return self._llama
 
@@ -332,16 +337,16 @@ CONVERSATION HISTORY:
         data_str = json.dumps(data, indent=2)
         prompt = f'''{BASE_SYSTEM_PROMPT}
 
-You are explaining an alert event based on the following data:
+You are explaining an operational alert based on the following data:
 {data_str}
 
-Please generate a JSON object ONLY with the following exactly lowercase keys: "alert", "reason", "action".
-"alert" is a 1-sentence description. "reason" is why it triggered. "action" is what to do next.
-No markdown blocks, just raw JSON.'''
+Please generate a JSON object ONLY with the following exactly lowercase key: "explanation".
+"explanation" (string): A cohesive, detailed 3-4 sentence natural language paragraph explaining exactly what the alert is, WHY the threshold was breached (analyzing dwell times, flow direction, and crowd density), and what specific action the staff must take to resolve it.
+CRITICAL: The value for "explanation" MUST be a single cohesive paragraph string. Do NOT use nested objects, bullets, arrays, or sub-keys. No markdown blocks, just raw JSON.'''
 
         messages = [
             {"role": "system", "content": BASE_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Explain this alert in JSON format:\n{data_str}\n\nKeys: alert, reason, action."}
+            {"role": "user", "content": f"Explain this alert in JSON format:\n{data_str}\n\nKey: explanation. Must be a flat string paragraph analyzing dwell and flow!"}
         ]
 
         res = await self._execute_chain(prompt, messages, is_json=True, return_provider_name=return_provider_name)

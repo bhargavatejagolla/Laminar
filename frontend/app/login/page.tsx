@@ -358,14 +358,12 @@ export default function LoginPage() {
               opacity: 0.5, zIndex: -1,
             }}
           />
-          {/* Static card body */}
-          <div style={{
+          <div className="p-6 sm:p-10" style={{
             background: 'rgba(6,10,24,0.96)',
             border: '1px solid rgba(34,211,238,0.2)',
             borderRadius: '24px',
             backdropFilter: 'blur(60px)',
             boxShadow: '0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05)',
-            padding: '40px 36px 36px',
             position: 'relative', overflow: 'hidden',
           }}>
             {/* Biometric scan overlay */}

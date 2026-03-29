@@ -42,6 +42,7 @@ async def get_db() -> AsyncSession:
 # ==========================================================
 
 @router.get("/", response_model=List[AlertResponse])
+@router.get("", response_model=List[AlertResponse])  # Accept without trailing slash too
 async def list_alerts(
     status_filter: Optional[str] = None,
     skip: int = Query(0, ge=0),

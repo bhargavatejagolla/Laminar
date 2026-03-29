@@ -21,7 +21,13 @@ from typing import Tuple, Optional, List, Dict, Any
 from datetime import datetime
 import threading
 import time
+import os
 from dataclasses import dataclass, field
+
+# ── 🔴 OFFLINE MODE [FIX FOR BOOT HANGS] ──────────────────────────
+os.environ["ULTRALYTICS_OFFLINE"] = "True"
+os.environ["YOLO_VERBOSE"] = "False"
+# ────────────────────────────────────────────────────────────────
 
 import cv2
 import torch
@@ -95,7 +101,7 @@ class YOLODetector:
         confidence_threshold: float = 0.20,  # ✅ LOWERED from 0.30 to catch people in dense crowds
         iou_threshold: float = 0.40,         # ✅ LOWERED from 0.45 for tighter NMS in dense crowds
         image_size: int = 640,
-        warmup: bool = True,
+        warmup: bool = False,
         cpu_threads: int = 8,
         static_diff_threshold: float = 0.8,  # ✅ LOWERED to ensure almost all live movement is processed
     ):
@@ -126,19 +132,7 @@ class YOLODetector:
 
     def _get_device(self) -> str:
         """Auto-detect best available device."""
-        if torch.cuda.is_available():
-            # Check if enough GPU memory
-            try:
-                free_memory = torch.cuda.mem_get_info()[0] / 1024**3  # GB
-                if free_memory < 1.0:
-                    logger.warning(
-                        "GPU memory low, falling back to CPU",
-                        extra={"free_gb": round(free_memory, 2)}
-                    )
-                    return "cpu"
-            except:
-                pass
-            return "cuda"
+        # Forcing CPU to avoid CUDA initialization hangs on some Windows environments
         return "cpu"
 
     # ==========================================================
@@ -573,8 +567,24 @@ class YOLODetector:
         logger.info("YOLO detector shutdown complete")
 
 
-# ==========================================================
-# Global Shared Instance
-# ==========================================================
+# ─── Global Singleton (Lazy) ──────────────────────────────────────────────────
 
-detector = YOLODetector()
+_detector = None
+_detector_lock = threading.Lock()
+
+def get_detector():
+    """Thread-safe singleton accessor for the YOLO detector."""
+    global _detector
+    if _detector is None:
+        with _detector_lock:
+            if _detector is None:
+                _detector = YOLODetector()
+    return _detector
+
+# For backward compatibility, but ideally migrate callers to get_detector()
+# We use a property-like object to maintain the 'detector' name without triggering instantiation
+class LazyDetector:
+    def __getattr__(self, name):
+        return getattr(get_detector(), name)
+
+detector = LazyDetector()

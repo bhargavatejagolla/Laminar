@@ -15,7 +15,6 @@ from app.core.logging import setup_logging, RequestIdMiddleware, get_logger
 from app.core.database import db_manager
 from app.api.v1.router import router as api_v1_router
 from app.scheduler.scheduler import laminar_scheduler  # Fixed import
-from app.api.v1.router import router as api_v1_router
 
 # ----------------------------------------------------------
 # Initialize Logging First
@@ -34,6 +33,7 @@ app = FastAPI(
     docs_url=settings.DOCS_URL,
     redoc_url=settings.REDOC_URL,
     openapi_url=settings.OPENAPI_URL,
+    redirect_slashes=False,  # Prevent 307 redirects on trailing slash differences
 )
 
 # ----------------------------------------------------------
@@ -44,11 +44,15 @@ app.add_middleware(RequestIdMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for public tunnel access (ngrok, localtunnel, etc.)
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Multi-Tenant Middleware (opt-in via MULTI_TENANT_ENABLED=true in .env) ─────────
+from app.core.tenant_middleware import TenantMiddleware
+app.add_middleware(TenantMiddleware)
 
 # ----------------------------------------------------------
 # Include API Routers
@@ -77,6 +81,12 @@ os.makedirs(_downloads_clips, exist_ok=True)
 app.mount("/api/v1/storage/clips",
           StaticFiles(directory=_downloads_clips),
           name="evidence_clips")
+
+# Semantic Snapshots
+os.makedirs("storage/semantic_snapshots", exist_ok=True)
+app.mount("/api/v1/storage/semantic_snapshots",
+          StaticFiles(directory="storage/semantic_snapshots"),
+          name="semantic_snapshots")
 
 # ----------------------------------------------------------
 # Startup / Shutdown Events
@@ -120,6 +130,21 @@ async def startup_event():
                 logger.warning(f"SMS Gateway unreachable: {sms_health.get('error')}. Will fallback to SIMULATION.")
         except Exception as e:
             logger.warning(f"SMS Gateway probe failed: {e}")
+
+    # ── Advanced AI Feature Storage Directories ───────────────────────────────────
+    os.makedirs("storage/retrain_candidates", exist_ok=True)  # AutoML retraining
+    os.makedirs("storage/geofence_breach_logs", exist_ok=True)  # Geofence events
+    logger.info("Advanced AI feature storage directories initialized")
+
+
+
+    # ── Initialize Semantic Vector Store ────────────────────────────────────────
+    try:
+        from app.vision.vector_store import vector_store
+        await vector_store.initialize()
+        logger.info("Semantic Vector Store initialized for VQA")
+    except Exception as e:
+        logger.error(f"Failed to initialize Semantic Vector Store: {e}")
 
     logger.info(
         "Application started",

@@ -1,12 +1,16 @@
 "use client";
 
 import { Camera } from "@/hooks/useCameras";
+import { useState } from "react";
 import { Video, WifiOff, MapPin, Activity, ArrowRight, Trash2, Power, PowerOff } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { api } from "@/services/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { HeatmapOverlay } from "@/components/advanced/HeatmapOverlay";
+import EditCameraModal from "./edit-camera-modal";
+import { Edit } from "lucide-react";
 
 interface Props {
   cameras: Camera[];
@@ -28,6 +32,7 @@ const itemVariants = {
 
 export default function CameraGrid({ cameras, isLoading }: Props) {
   const queryClient = useQueryClient();
+  const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
@@ -95,6 +100,13 @@ export default function CameraGrid({ cameras, isLoading }: Props) {
            
            {/* Scanline Effect */}
            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/[0.02] to-transparent scan-line pointer-events-none mix-blend-overlay z-10"></div>
+           
+           {/* 🗺️ Heatmap Overlay (Live density visualization) */}
+           {camera.is_active && (
+             <div className="absolute inset-0 z-0 opacity-40 pointer-events-none overflow-hidden rounded-2xl">
+               <HeatmapOverlay zones={[]} />
+             </div>
+           )}
 
            <div className="relative z-20 flex flex-col h-full">
              {/* Header */}
@@ -165,10 +177,22 @@ export default function CameraGrid({ cameras, isLoading }: Props) {
                 >
                    <Trash2 className="w-4 h-4" />
                 </button>
+                <button 
+                  onClick={() => setEditingCamera(camera)}
+                  className="flex items-center justify-center p-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-500 hover:bg-cyan-500/20 hover:border-cyan-500/40 hover:text-cyan-400 transition-all"
+                  title="Edit Node settings"
+                >
+                   <Edit className="w-4 h-4" />
+                </button>
              </div>
            </div>
         </motion.div>
       ))}
+      <EditCameraModal 
+        camera={editingCamera}
+        isOpen={!!editingCamera}
+        onClose={() => setEditingCamera(null)}
+      />
     </motion.div>
   );
 }

@@ -174,14 +174,14 @@ export default function VenueDetailPage({ params }: { params: Promise<{ id: stri
             </h3>
             <div className="mb-2 flex justify-between text-sm font-medium text-slate-400">
               <span>Current Usage vs Total Capacity</span>
-              <span className="font-mono text-white">{Math.round((venue.capacity > 0 ? (stats?.current_occupancy ?? 0) / venue.capacity : 0) * 100)}% Complete</span>
+              <span className="font-mono text-white">{venue.capacity && venue.capacity > 0 ? Math.round((currentCount / venue.capacity) * 100) : 0}% Utilized</span>
             </div>
             <div className="h-4">
                <VenueCapacityBar 
-                 capacity={venue.capacity}
-                 occupancyPercent={venue.capacity > 0 ? ((stats?.current_occupancy ?? 0) / venue.capacity) * 100 : 0}
-                 warningThreshold={venue.capacity > 0 ? (venue.warning_threshold / venue.capacity) * 100 : 70}
-                 criticalThreshold={venue.capacity > 0 ? (venue.critical_threshold / venue.capacity) * 100 : 90}
+                 capacity={venue.capacity || 100}
+                 occupancyPercent={venue.capacity && venue.capacity > 0 ? (currentCount / venue.capacity) * 100 : 0}
+                 warningThreshold={venue.capacity && venue.capacity > 0 ? Math.min((venue.warning_threshold / venue.capacity) * 100, 70) : 70}
+                 criticalThreshold={venue.capacity && venue.capacity > 0 ? Math.min((venue.critical_threshold / venue.capacity) * 100, 90) : 90}
                />
             </div>
           </section>

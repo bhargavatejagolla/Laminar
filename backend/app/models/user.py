@@ -50,6 +50,7 @@ class UserRole(enum.Enum):
     MANAGER = "manager"    # Can manage venues and cameras
     OPERATOR = "operator"  # Can view and acknowledge alerts
     VIEWER = "viewer"      # Read-only access
+    AUDITOR = "auditor"    # Read-only: reports, alerts, SLA data (compliance)
 
 
 # ==========================================================

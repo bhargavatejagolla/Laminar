@@ -513,7 +513,13 @@ class NetworkStreamSource(CameraSource):
         cap = cv2.VideoCapture(self.source, cv2.CAP_FFMPEG)
         if not cap.isOpened():
             cap.release()
-            raise ConnectionError(f"Cannot open network stream: {self._mask_url(str(self.source))}")
+            mask_url = self._mask_url(str(self.source))
+            error_msg = (
+                f"Cannot open network stream: {mask_url}. "
+                "Check if the device is online and the IP/Port is correct. "
+                "For HTTP/MJPEG streams (like IP Webcam), ensure the server is running."
+            )
+            raise ConnectionError(error_msg)
         return cap
 
     def start(self) -> None:

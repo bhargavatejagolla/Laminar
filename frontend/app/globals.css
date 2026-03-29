@@ -22,30 +22,51 @@
   --nebula-purple: rgba(139, 92, 246, 0.1);
 }
 
+.light {
+  --bg-base: #f8fafc;
+  --bg-deep: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --accent-cyan: #0891b2;
+  --accent-blue: #2563eb;
+  --accent-purple: #7c3aed;
+  --nebula-cyan: rgba(8, 145, 178, 0.15);
+  --nebula-blue: rgba(37, 99, 235, 0.15);
+  --nebula-purple: rgba(124, 58, 237, 0.15);
+}
+
+.high-contrast {
+  --bg-base: #000000;
+  --bg-deep: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #ffffff;
+  --accent-cyan: #00ffff;
+  --accent-blue: #0000ff;
+  --accent-purple: #ff00ff;
+  --accent-emerald: #00ff00;
+  --accent-rose: #ff0000;
+}
+
 * {
   box-sizing: border-box;
 }
 
 html {
   /* Rich deep-space base — FIXED so it never scrolls away from view */
-  background-color: #040010;
+  background-color: var(--bg-base);
   background-image:
     /* Top-left corner — dark area fill */
-    radial-gradient(ellipse 40% 35% at 3% 3%, rgba(120, 40, 190, 0.40) 0%, rgba(60,15,120,0.22) 50%, transparent 80%),
+    radial-gradient(ellipse 40% 35% at 3% 3%, var(--nebula-purple) 0%, transparent 80%),
     /* Top-right corner — dark area fill */
-    radial-gradient(ellipse 35% 32% at 97% 4%, rgba(25, 45, 180, 0.32) 0%, rgba(12,22,130,0.18) 50%, transparent 80%),
+    radial-gradient(ellipse 35% 32% at 97% 4%, var(--nebula-blue) 0%, transparent 80%),
     /* Left edge purple nebula */
-    radial-gradient(ellipse 55% 70% at 0% 45%, rgba(100, 30, 180, 0.38) 0%, rgba(50,10,100,0.22) 50%, transparent 80%),
+    radial-gradient(ellipse 55% 70% at 0% 45%, var(--nebula-purple) 0%, transparent 80%),
     /* Right edge blue nebula */
-    radial-gradient(ellipse 50% 65% at 100% 50%, rgba(20, 40, 200, 0.32) 0%, rgba(10,20,120,0.18) 50%, transparent 80%),
+    radial-gradient(ellipse 50% 65% at 100% 50%, var(--nebula-blue) 0%, transparent 80%),
     /* Bottom fill — eliminates black on scroll */
-    radial-gradient(ellipse 110% 55% at 50% 100%, rgba(65, 12, 140, 0.55) 0%, rgba(22,6,65,0.38) 55%, transparent 100%),
-    /* Top-left planet area */
-    radial-gradient(ellipse 30% 25% at 8% 10%, rgba(140, 50, 200, 0.28) 0%, transparent 70%),
-    /* Bottom-right planet area */
-    radial-gradient(ellipse 35% 30% at 92% 88%, rgba(30, 60, 220, 0.25) 0%, transparent 70%),
+    radial-gradient(ellipse 110% 55% at 50% 100%, var(--nebula-purple) 0%, transparent 100%),
     /* Overall space base gradient */
-    linear-gradient(160deg, #07002a 0%, #040010 30%, #050018 65%, #030010 100%);
+    linear-gradient(160deg, var(--bg-deep) 0%, var(--bg-base) 100%);
   /* CRITICAL: fixed attachment means the gradient stays put as user scrolls */
   background-attachment: fixed;
   scroll-behavior: smooth;

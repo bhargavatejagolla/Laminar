@@ -550,9 +550,7 @@ ACTIVE ALERTS:
 Reason about patterns: crowd accumulation, convergence points, movement vectors, zone imbalances.
 Do NOT use generic statements. Use specific data points.
 
-LANGUAGE INSTRUCTION:
-Your entire response (all string values in the JSON) MUST be written in {lang.upper()} language. 
-Example: If lang is "te", respond in Telugu. If lang is "hi", respond in Hindi.
+LANGUAGE INSTRUCTION: Please generate your response entirely in English. It will be natively translated downstream.
 
 Produce a JSON response with these exact fields:
 {{
@@ -580,6 +578,23 @@ Respond ONLY with valid JSON. No preamble, no explanation.
             if start == -1 or end == 0:
                 return None
             data = json.loads(raw[start:end])
+            
+            # Post-process for perfect Native Script if not English
+            if lang != "en":
+                try:
+                    from deep_translator import GoogleTranslator
+                    translator = GoogleTranslator(source='en', target=lang)
+                    
+                    data["situation_analysis"] = translator.translate(data.get("situation_analysis", ""))
+                    data["observed_trends"] = translator.translate(data.get("observed_trends", ""))
+                    data["risk_assessment"] = translator.translate(data.get("risk_assessment", ""))
+                    data["predicted_outcome"] = translator.translate(data.get("predicted_outcome", ""))
+                    data["recommended_actions"] = [translator.translate(a) for a in data.get("recommended_actions", [])]
+                    
+                    if cross_camera:
+                        cross_camera = translator.translate(cross_camera)
+                except Exception as e:
+                    logger.error(f"Translation failed: {e}")
 
             return OperationalIntelligence(
                 situation_analysis=data.get("situation_analysis", ""),

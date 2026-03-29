@@ -22,7 +22,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 // ───────────────────────────────────────────────────
 // Types
@@ -267,7 +267,8 @@ export default function CameraHealthPage() {
 
   useEffect(() => {
     fetchHealth();
-    const id = setInterval(fetchHealth, 15_000);
+    // Advanced technique: Poll every 5 seconds for a true live feel
+    const id = setInterval(fetchHealth, 5_000);
     return () => clearInterval(id);
   }, [fetchHealth]);
 
@@ -313,7 +314,10 @@ export default function CameraHealthPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 glass-panel px-4 py-2 rounded-xl">
+        <div className="flex items-center gap-4 glass-panel px-4 py-2 rounded-xl relative overflow-hidden">
+          {/* Animated background progress bar to indicate live polling */}
+          <div className="absolute left-0 bottom-0 h-[2px] bg-cyan-500/50 animate-[scan_5s_linear_infinite]" />
+          
           <span className="text-[10px] uppercase font-black text-slate-500 tracking-[0.2em]" suppressHydrationWarning>
             SYNC: {lastRefresh ? lastRefresh.toLocaleTimeString() : "--:--:--"}
           </span>
@@ -323,7 +327,7 @@ export default function CameraHealthPage() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/50 border border-white/10 hover:bg-cyan-900/40 hover:border-cyan-500/40 text-cyan-500 text-[10px] font-black uppercase tracking-widest transition-all shadow-[inset_0_0_10px_rgba(34,211,238,0.05)] disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            {t("cameraHealth.refresh") || "Refresh"}
+            LIVE
           </button>
         </div>
       </div>

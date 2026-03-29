@@ -7,6 +7,13 @@ import { Toaster } from "sonner";
 import AIAssistantChat from "@/components/dashboard/ai-assistant-chat";
 import I18nProvider from "@/components/providers/i18n-provider";
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata = {
   title: "Laminar — AI Crowd Intelligence",
   description: "AI powered crowd risk prediction and safety monitoring system",

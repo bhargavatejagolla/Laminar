@@ -20,11 +20,23 @@ export default function VenueCard({ venue }: Props) {
   const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const riskScore = stats?.current_risk ?? venue.dynamic_risk_score ?? 0;
-  const riskLevel = stats?.risk_level ?? venue.risk_level ?? undefined;
   const cap = Number(venue.capacity) || 0;
-  const currentPeople = Number(stats?.current_occupancy) || 0;
+  const currentPeople = Math.round(Number(stats?.current_occupancy) || 0);
   const occupancyPercent = cap > 0 ? Math.min((currentPeople / cap) * 100, 100) : 0;
+
+  // Derive risk level from occupancy vs thresholds so badge matches capacity bar
+  const warnPct = cap > 0 ? (venue.warning_threshold / cap) * 100 : 70;
+  const critPct = cap > 0 ? (venue.critical_threshold / cap) * 100 : 90;
+  const computedRiskLevel =
+    occupancyPercent >= critPct ? "critical" :
+    occupancyPercent >= warnPct ? "high" :
+    occupancyPercent >= warnPct * 0.5 ? "medium" : "low";
+
+  // Use computed risk (from live occupancy) – always matches the capacity bar
+  const riskScore = stats?.current_risk ?? venue.dynamic_risk_score ?? 0;
+  const riskLevel = computedRiskLevel;
+
+
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/venues/${venue.id}`),

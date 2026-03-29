@@ -34,6 +34,18 @@ from app.api.v1.endpoints.users import router as users_router
 from app.api.v1.endpoints.dwell_monitor import router as dwell_monitor_router
 from app.api.v1.endpoints.intelligence import router as intelligence_router
 from app.api.v1.endpoints.zone_intelligence import router as zone_intelligence_router
+
+# ── New Advanced AI Feature Routers ──────────────────────────────────────────
+from app.api.v1.endpoints.websocket import router as ws_router
+from app.api.v1.endpoints.anomaly import router as anomaly_router
+from app.api.v1.endpoints.sla import router as sla_router
+from app.api.v1.endpoints.behavior import router as behavior_router
+from app.api.v1.endpoints.synthetic import router as synthetic_router
+from app.api.v1.endpoints.search import router as search_router
+from app.api.v1.endpoints.actions import router as actions_router
+from app.api.v1.endpoints.journeys import router as journeys_router
+from app.api.v1.endpoints.edge_sync import router as edge_sync_router
+
 # Create main v1 router with prefix
 router = APIRouter(prefix=settings.API_V1_PREFIX)
 
@@ -62,3 +74,14 @@ router.include_router(users_router)
 router.include_router(dwell_monitor_router, prefix="/dwell", tags=["Dwell Monitor"])
 router.include_router(intelligence_router, prefix="/intelligence", tags=["AI Intelligence Engine"])
 router.include_router(zone_intelligence_router)
+
+# ── New Advanced AI Feature Routes ───────────────────────────────────────────
+router.include_router(ws_router, tags=["WebSocket"])
+router.include_router(anomaly_router, tags=["Anomaly Detection"])
+router.include_router(sla_router, tags=["SLA Monitoring"])
+router.include_router(behavior_router, tags=["Behavior Detection"])
+router.include_router(synthetic_router, tags=["Synthetic Data"])
+router.include_router(search_router, prefix="/search", tags=["Semantic VQA Search"])
+router.include_router(actions_router, prefix="/actions", tags=["Automated Actions"])
+router.include_router(journeys_router, prefix="/journeys", tags=["Cross-Camera ReID"])
+router.include_router(edge_sync_router, prefix="/edge", tags=["Edge-Federated Learning"])

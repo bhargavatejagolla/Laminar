@@ -91,3 +91,16 @@ def require_role(*allowed_roles: UserRole):
         return user
 
     return role_checker
+
+
+def require_auditor_or_above():
+    """
+    Returns a dependency that allows Auditor, Operator, Manager, and Admin.
+    """
+    return require_role(
+        UserRole.ADMIN,
+        UserRole.MANAGER,
+        UserRole.OPERATOR,
+        UserRole.AUDITOR
+    )
+

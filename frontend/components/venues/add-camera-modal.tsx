@@ -28,6 +28,7 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
     is_active: true,
     monitoring_enabled: true,
     tracking_enabled: true,
+    location_description: "",
   });
 
   const mutation = useMutation({
@@ -68,6 +69,17 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
               placeholder="e.g. Main Lobby Cam"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full bg-[#0b1325] border border-slate-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          
+          <div className="space-y-1">
+            <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Location Description (Optional)</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Near the main entrance, North side"
+              value={formData.location_description}
+              onChange={(e) => setFormData({ ...formData, location_description: e.target.value })}
               className="w-full bg-[#0b1325] border border-slate-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
             />
           </div>
@@ -129,9 +141,12 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
               <input 
                 type="number" 
                 value={formData.fps}
-                onChange={(e) => setFormData({ ...formData, fps: parseInt(e.target.value) || 15 })}
+                min="1"
+                max="120"
+                onChange={(e) => setFormData({ ...formData, fps: Math.min(120, parseInt(e.target.value) || 15) })}
                 className="w-full bg-[#0b1325] border border-slate-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
               />
+              <p className="text-[10px] text-cyan-500/50 mt-1 uppercase font-bold tracking-tighter">Supports high-speed 120 FPS ingestion</p>
             </div>
           </div>
           

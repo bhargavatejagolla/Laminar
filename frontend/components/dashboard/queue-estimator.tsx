@@ -17,7 +17,7 @@ export default function QueueWaitTimeCard() {
   useEffect(() => {
     const fetchEstimate = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/v1/venues/${VENUE_ID}/queue-estimate`)
+        const res = await fetch(`/api/v1/venues/${VENUE_ID}/queue-estimate`)
         if (res.ok) {
           const json = await res.json()
           setData(json)

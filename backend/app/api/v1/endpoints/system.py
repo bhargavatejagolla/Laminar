@@ -257,13 +257,21 @@ async def dashboard_stats():
         active_minutes = dwell_result.scalar_one() or 0
         avg_dwell = f"{active_minutes} min" if active_minutes > 0 else "0 min"
 
+        sys_health = "Healthy"
+        try:
+            from app.scheduler.scheduler import laminar_scheduler
+            if hasattr(laminar_scheduler, "scheduler") and not getattr(laminar_scheduler.scheduler, "running", True):
+                sys_health = "Degraded"
+        except Exception:
+            pass
+
     return {
         "venues": venues_count,
         "cameras": cameras_count,
         "active_cameras": active_cameras_count,
         "alerts": alerts_count,
         "totalCapacity": live_total_people, # Use live/synthesized total instead of static venue capacity
-        "systemHealth": "Healthy",
+        "systemHealth": sys_health,
         "ai_insights": {
             "peak_time": peak_time,
             "most_crowded": most_crowded,

@@ -486,7 +486,7 @@ class VisionManager:
             # On GPU: skip_factor=1 since inference is fast enough.
             from app.vision.detector import detector as _det
             cpu_mode = getattr(_det, 'device', 'cpu') == 'cpu'
-            effective_skip = 2 if cpu_mode else 1
+            effective_skip = 1  # Force full real-time FPS even on CPU based on user request
             # Allow camera-level override if the model has a skip_factor attribute
             effective_skip = getattr(camera, 'skip_factor', effective_skip)
 

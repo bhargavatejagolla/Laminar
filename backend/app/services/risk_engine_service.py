@@ -46,8 +46,8 @@ class RiskEngineService:
     should be triggered, without actually sending them.
     """
 
-    STABILITY_WINDOW_MINUTES = 5  # Increased for stability (Module 4)
-    CONSECUTIVE_THRESHOLD = 3  # Increased for sustained risk checks
+    STABILITY_WINDOW_MINUTES = 0  # Reduced to 0 for instant alerts
+    CONSECUTIVE_THRESHOLD = 0    # Trigger on first detection for maximum speed
 
     def __init__(self):
         self.metric_repo = Repository[CrowdMetric](CrowdMetric)
@@ -297,16 +297,25 @@ class RiskEngineService:
         warn_count = thresholds["warning"]
         crit_count = thresholds["critical"]
 
-        # Hard gate: count must physically reach the threshold
+        # ── Intelligence Gate: Allow alerts if we are approaching thresholds ──
+        # or if the AI model has flagged a high/critical risk situation.
+        
         if avg_count >= crit_count:
-            # Count is truly at critical level
             return True
-        if avg_count >= warn_count:
-            # Count is at warning level — only alert for medium/high/critical risk
-            return current_level in ["medium", "high", "critical"]
+            
+        near_warn = warn_count * 0.75
+        near_crit = crit_count * 0.75
+        
+        if avg_count >= near_crit and current_level == "critical":
+            return True
+            
+        if avg_count >= near_warn and current_level in ["high", "critical"]:
+            return True
 
-        # Count is BELOW warning threshold → no alert regardless of risk_level
-        # (prevents false positives from optical flow / model noise)
+        # Instant trigger for AI-detected critical situations
+        if current_level in ["critical", "high"]:
+            return True
+
         return False
 
         # ──────────────────────────────────────────────────────────────────────
@@ -539,6 +548,7 @@ class RiskEngineService:
             "venue_id": str(metric.venue_id),
             "venue_name": venue.name,
             "metric_id": str(metric.id),
+            "camera_id": str(metric.camera_id), # Essential for per-camera alerts
             "metric_time": metric.bucket_start.isoformat(),
             "previous_level": previous_level,
             "current_level": current_level,
@@ -560,6 +570,45 @@ class RiskEngineService:
             "momentum_score": prediction.get("momentum_score", 0.0),
         }
 
+        # ── XAI: Add "Why?" explanation to every decision ────────────────────
+        # Non-blocking — if XAI fails, decision still proceeds normally
+        try:
+            from app.services.xai_service import XAIService
+            xai = XAIService()
+            xai_result = xai.explain(
+                risk_level=current_level,
+                occupancy_percent=metric.occupancy_percent or 0.0,
+                growth_rate=metric.growth_rate_percent or 0.0,
+                trend=trend,
+                time_factor=time_factor,
+                severity=severity,
+                early_warning=early_warning,
+                predicted_level=predicted_level,
+            )
+            decision["xai_explanation"] = xai_result.get("explanation", "")
+            decision["xai_factors"] = xai_result.get("factors", [])
+            decision["xai_confidence"] = xai_result.get("confidence", 0.0)
+        except Exception:
+            decision["xai_explanation"] = ""
+            decision["xai_factors"] = []
+
+        # ── Anomaly Score: Parallel async anomaly check ───────────────────────
+        # Attaches anomaly_score and is_anomaly to decision for the alert payload
+        try:
+            from app.services.anomaly_service import AnomalyService
+            _anomaly_svc = AnomalyService()
+            _anomaly_result = await _anomaly_svc.score_single(
+                venue_id=metric.venue_id,
+                occupancy_pct=metric.occupancy_percent or 0.0,
+                growth_rate=metric.growth_rate_percent or 0.0,
+                risk_score=metric.dynamic_risk_score or 0.0,
+            )
+            decision["anomaly_score"] = _anomaly_result.get("anomaly_score", 0.0)
+            decision["is_anomaly"] = _anomaly_result.get("is_anomaly", False)
+        except Exception:
+            decision["anomaly_score"] = None
+            decision["is_anomaly"] = False
+
         # Log decision
         if should_alert:
             logger.warning(
@@ -572,6 +621,7 @@ class RiskEngineService:
                     "transition": transition,
                     "severity": severity,
                     "should_alert": should_alert,
+                    "xai_explanation": decision.get("xai_explanation", "")[:120],
                 },
             )
 
@@ -589,6 +639,14 @@ class RiskEngineService:
                     "should_alert": should_alert,
                 },
             )
+
+        # 🔥 REAL-TIME BROADCAST: Ensure dashboard sees metric update instantly
+        try:
+            from app.core.plugin_registry import plugin_registry
+            import asyncio
+            asyncio.create_task(plugin_registry.dispatch_metric(decision))
+        except Exception:
+            pass
 
         return decision
 

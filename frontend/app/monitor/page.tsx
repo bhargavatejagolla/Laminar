@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCameras } from "@/hooks/useCameras";
 import { LayoutGrid, Activity, Video, AlertTriangle, Maximize2, ShieldAlert, Search, X } from "lucide-react";
@@ -128,7 +128,7 @@ export default function MonitorWallPage() {
                        {/* Try to load the stream, fallback to icon if it fails */}
                        {cam.is_active && cam.is_online ? (
                          <img 
-                            src={`http://127.0.0.1:8000/api/v1/vision/feed/${cam.id}?token=${encodeURIComponent(getToken() || "")}`}
+                            src={`/api/v1/vision/feed/${cam.id}?token=${encodeURIComponent(getToken() || "")}`}
                             alt={`Camera ${cam.name} Feed`}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover/feed:scale-105"
                             onError={(e) => {
@@ -260,7 +260,7 @@ export default function MonitorWallPage() {
                 <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent scan-line pointer-events-none z-20"></div>
                 {fullscreenCamera.is_active && fullscreenCamera.is_online ? (
                   <img 
-                     src={`http://127.0.0.1:8000/api/v1/vision/feed/${fullscreenCamera.id}?token=${encodeURIComponent(getToken() || "")}&_t=${Date.now()}`}
+                     src={`/api/v1/vision/feed/${fullscreenCamera.id}?token=${encodeURIComponent(getToken() || "")}&_t=${Date.now()}`}
                      alt={`Camera ${fullscreenCamera.name} Fullscreen`}
                      className="w-full h-full object-contain"
                      onError={(e) => {

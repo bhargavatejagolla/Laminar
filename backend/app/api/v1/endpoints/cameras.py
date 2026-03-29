@@ -32,9 +32,12 @@ from app.vision.manager import vision_manager
 from app.core.dependencies import require_role, get_current_active_user
 from app.models.user import UserRole
 from app.core.database import db_manager
+from app.services.camera_service import CameraService
 from app.models.evidence_clip import EvidenceClip
+
 logger = get_logger(__name__)
 router = APIRouter(tags=["Cameras"])
+camera_service = CameraService()
 
 
 # ==========================================================
@@ -268,39 +271,29 @@ async def update_camera(
     Only provided fields will be updated.
     Requires ADMIN or MANAGER role.
     """
-    # Get existing camera
-    camera = await db.get(Camera, camera_id)
-
-    if not camera:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Camera {camera_id} not found"
+    try:
+        # Use camera_service for consistent validation and logic
+        camera = await camera_service.update_camera(
+            db,
+            camera_id,
+            updated_by=user.id if hasattr(user, 'id') else None,
+            **camera_data.dict(exclude_unset=True)
         )
+        
+        logger.info(f"Camera updated via service: {camera_id}")
+        return camera
 
-    # Update fields
-    update_data = camera_data.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        if hasattr(camera, field):
-            setattr(camera, field, value)
-
-    # Update timestamp
-    camera.updated_at = datetime.now(timezone.utc)
-
-    # Validate
-    errors = camera.validate()
-    if errors:
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"errors": errors}
+            detail=str(e)
         )
-
-    # Save
-    await db.commit()
-    await db.refresh(camera)
-
-    logger.info(f"Camera updated: {camera_id}")
-
-    return camera
+    except Exception as e:
+        logger.error(f"Error updating camera {camera_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during camera update"
+        )
 
 
 # ==========================================================

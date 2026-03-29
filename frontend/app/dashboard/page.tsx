@@ -8,10 +8,12 @@ import {
 } from "lucide-react"
 import DashboardStats from "@/components/dashboard/dashboard-stats"
 import AlertPanel from "@/components/alerts/alert-panel"
+import { SlaDashboardCard } from "@/components/dashboard/SlaDashboardCard"
 import IntelligenceGraphs from "@/components/analytics/intelligence-graphs"
 import { useTranslation } from "react-i18next"
 import { motion, AnimatePresence } from "framer-motion"
 import { useZoneIntelligenceSummary } from "@/hooks/useZoneIntelligence"
+import { SemanticSearch } from "@/components/intelligence/SemanticSearch"
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -263,32 +265,33 @@ export default function DashboardPage() {
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="relative z-10">
 
-        {/* Header */}
-        <motion.div variants={itemVariants} className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10 mt-4">
-          <div className="flex items-center gap-5">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-2xl border border-cyan-500/30 radar-sweep" />
-              <div className="p-3.5 bg-cyan-950/40 backdrop-blur-md border border-cyan-500/40 rounded-2xl shadow-[0_0_25px_rgba(34,211,238,0.2)] relative z-10">
-                <BarChart3 className="w-8 h-8 text-cyan-400" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-4xl font-black tracking-[0.1em] text-white mb-2 font-heading uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-                {t("dashboard.title") || "Command Center"}
-              </h1>
-              <p className="text-sm font-bold text-slate-400 flex items-center gap-2 tracking-widest uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 pulse-glow" />
-                {t("dashboard.subtitle") || "Global Operations Network"}
-              </p>
+        {/* Header - Repositioned to Center for Impact */}
+        <motion.div variants={itemVariants} className="flex flex-col items-center justify-center text-center gap-6 mb-12 mt-6">
+          <div className="relative group">
+            <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-cyan-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000 animate-spin-slow" />
+            <div className="relative p-5 bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-full shadow-[0_0_40px_rgba(34,211,238,0.15)] ring-1 ring-white/10">
+              <BarChart3 className="w-10 h-10 text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
             </div>
           </div>
-
-          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-[rgba(16,185,129,0.1)] border border-emerald-500/30 text-sm font-black text-emerald-400 tracking-widest uppercase shadow-[inset_0_0_15px_rgba(16,185,129,0.1)]">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" />
-            </span>
-            Live · Refreshing every 3s
+          
+          <div className="max-w-2xl">
+            <h1 className="text-5xl md:text-6xl font-black tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/60 mb-4 font-heading uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+              {t("dashboard.title") || "Command Center"}
+            </h1>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <p className="text-sm md:text-base font-bold text-cyan-400/80 tracking-[0.2em] uppercase flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 pulse-glow" />
+                {t("dashboard.subtitle") || "Global Operations Network"}
+              </p>
+              <div className="hidden sm:block w-px h-4 bg-white/20" />
+              <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-black text-emerald-400 tracking-widest uppercase">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                Live Sync
+              </div>
+            </div>
           </div>
         </motion.div>
 
@@ -322,6 +325,7 @@ export default function DashboardPage() {
               <LiveIntelligencePanel />
             </div>
 
+
             {/* Trend Chart */}
             <div className="glass-panel rounded-2xl border border-white/5 overflow-hidden">
               <IntelligenceGraphs />
@@ -352,9 +356,10 @@ export default function DashboardPage() {
                   {t("dashboard.criticalAlerts") || "Smart Alerts"}
                 </h2>
               </div>
-              <div className="h-[calc(100vh-380px)] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="h-[calc(100vh-500px)] overflow-y-auto pr-2 custom-scrollbar mb-4">
                 <AlertPanel />
               </div>
+              <SlaDashboardCard />
             </div>
           </div>
 

@@ -185,6 +185,20 @@ export default function AlertCard({ alert }: Props) {
                   </span>
                   {alert.extra_data?.reason || alert.explanation || alert.extra_data?.explanation}
                 </p>
+                {alert.extra_data?.xai_factors && alert.extra_data.xai_factors.length > 0 && (
+                  <div className="mt-2 bg-[#020c1a]/50 p-2 rounded-md border border-cyan-500/10">
+                    <details className="group/xai text-[9px]">
+                      <summary className="cursor-pointer text-cyan-500/80 font-bold uppercase tracking-widest flex items-center gap-1 hover:text-cyan-400 transition-colors select-none">
+                        <Eye className="w-3 h-3 group-open/xai:text-cyan-400" /> Explainable AI (Why?)
+                      </summary>
+                      <ul className="mt-2 space-y-1.5 list-disc pl-4 text-slate-400 opacity-80 border-t border-white/5 pt-2">
+                        {alert.extra_data.xai_factors.map((factor: string, i: number) => (
+                           <li key={i}>{factor}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  </div>
+                )}
                 {alert.extra_data?.recommended_action && (
                   <p className="text-[10px] text-emerald-300 leading-snug bg-emerald-950/30 p-2 mt-1 rounded-md border border-emerald-900/50">
                     <strong className="text-emerald-400 block mb-0.5 uppercase tracking-wider text-[9px]">Recommended Action:</strong>
@@ -207,7 +221,7 @@ export default function AlertCard({ alert }: Props) {
             {alert.snapshot_url && (
               <div className="relative group/snap mb-2">
                 <img
-                  src={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'}${alert.snapshot_url}`}
+                  src={`${process.env.NEXT_PUBLIC_API_URL || ""}${alert.snapshot_url}`}
                   alt="Alert Snapshot"
                   className="w-full rounded-md border border-slate-700/60 object-cover max-h-36 transition-all duration-300 group-hover/snap:max-h-full"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -220,7 +234,7 @@ export default function AlertCard({ alert }: Props) {
 
             {alert.clip_url && (
               <a
-                href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'}${alert.download_url || alert.clip_url}`}
+                href={`${process.env.NEXT_PUBLIC_API_URL || ""}${alert.download_url || alert.clip_url}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider rounded border border-violet-600/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 hover:border-violet-500/50 transition-all w-fit"

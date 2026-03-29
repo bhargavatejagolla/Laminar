@@ -72,6 +72,11 @@ class Venue(BaseModel):
         nullable=True,
     )
     
+    tenant_id: Mapped[Optional[UUID]] = mapped_column(
+        nullable=True,
+        index=True,
+    )
+    
     # ==========================================================
     # Capacity & Risk
     # ==========================================================

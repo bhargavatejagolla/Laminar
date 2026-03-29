@@ -34,3 +34,9 @@ aiosmtplib==3.0.1
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 python-multipart==0.0.9
+
+# ── New Advanced AI Features ──────────────────────────────────────────────────
+reportlab>=4.2.0        # AI-powered PDF reports
+shapely>=2.0.0          # Geofence zone containment checks
+scikit-learn>=1.4.0     # Isolation Forest anomaly detection
+prophet>=1.1.5        # Predictive surge forecasting

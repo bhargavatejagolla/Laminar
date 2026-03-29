@@ -13,6 +13,7 @@ import {
   Zap,
   Brain,
 } from "lucide-react";
+import { VoiceCommandButton } from "@/components/advanced/VoiceCommandButton";
 
 interface Message {
   role: "assistant" | "user";
@@ -28,20 +29,17 @@ const SUGGESTED_PROMPTS = [
   "Show me the most recent critical alerts",
 ];
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
+import { api } from "@/services/api";
 
 async function queryAssistant(question: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/v1/assistant/query`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API error ${res.status}: ${err}`);
+  try {
+    const { data } = await api.post('/assistant/query', { question });
+    return data.answer ?? "No response from AI engine.";
+  } catch (err: any) {
+    throw new Error(`API error: ${err?.response?.data?.detail || err.message}`);
   }
-  const data = await res.json();
-  return data.answer ?? "No response from AI engine.";
 }
 
 interface IndexStatus {
@@ -340,6 +338,10 @@ export default function AIAssistantChat() {
                   className="flex-1 bg-transparent py-2.5 pl-3.5 pr-2 text-sm text-white placeholder:text-slate-600 focus:outline-none disabled:opacity-50"
                 />
               </div>
+              <VoiceCommandButton 
+                onSpeechResult={setInput} 
+                disabled={isTyping} 
+              />
               <button
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || isTyping}

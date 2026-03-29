@@ -23,6 +23,7 @@ RiskEngineService → AlertEngineService → NotificationService
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
+from app.core.action_engine import action_engine
 from app.services.notification_service import NotificationService
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -45,9 +46,9 @@ class EscalationPolicy:
 
     def __init__(
         self,
-        first_level_minutes: int = 10,
-        second_level_minutes: int = 30,
-        third_level_minutes: int = 60,
+        first_level_minutes: int = 2,
+        second_level_minutes: int = 10,
+        third_level_minutes: int = 20,
     ):
         self.first_level_minutes = first_level_minutes
         self.second_level_minutes = second_level_minutes
@@ -75,8 +76,8 @@ class AlertEngineService:
     escalated, and resolved without duplication.
     """
 
-    DUPLICATE_WINDOW_MINUTES = 5
-    AUTO_RESOLVE_MINUTES = 45  # Extended to prevent flickering auto-resolves
+    DUPLICATE_WINDOW_MINUTES = 0.5
+    AUTO_RESOLVE_MINUTES = 10  # Faster auto-resolve for more dynamic feedback
 
     # ==========================================================
     # Risk Classification Mapping (Production Standard)
@@ -153,13 +154,11 @@ class AlertEngineService:
         Returns:
             Created/updated alert or None if no alert needed
         """
+        venue_id = UUID(decision["venue_id"])
+
         # Skip if decision doesn't require alert
         if not decision.get("should_alert"):
             return None
-
-        venue_id = UUID(decision["venue_id"])
-
-        # Validate venue and tenant
         venue = await self.venue_repo.get_by_id(session, venue_id)
         if not venue:
             raise ValueError("Venue not found.")
@@ -167,8 +166,9 @@ class AlertEngineService:
         if tenant_id and venue.tenant_id != tenant_id:
             raise ValueError("Venue not in tenant.")
 
-        # Prevent duplicate active alerts for same venue
-        existing = await self._get_active_alert(session, venue_id)
+        # Prevent duplicate active alerts for same venue/camera
+        camera_id = decision.get("camera_id")
+        existing = await self._get_active_alert(session, venue_id, camera_id=camera_id)
 
         # Scale RiskEngine's 1-10 score to 10-100 for legacy compatibility
         dynamic_severity = int((decision.get("severity", 5) * 10))
@@ -181,6 +181,10 @@ class AlertEngineService:
             )
             is_escalation = new_classification["severity_score"] > existing.severity
             
+            # If it's already critical (severity >= 95), don't treat this tick as a new early_warning
+            if is_early_warning and existing.severity >= 95:
+                is_early_warning = False
+
             # cool down check (Module 4) - only apply cooldown to NON-ESCALATING updates
             if not is_escalation and not is_early_warning:
                 if existing.last_notified_at:
@@ -236,9 +240,49 @@ class AlertEngineService:
                         "early_warning": is_early_warning
                     },
                 )
-                
+
                 # 🔥 Send notification for the escalated alert
                 await self.notification_service.notify(session, existing)
+
+                # ── ⚡ Real-Time WebSocket Push (Escalation) ───────────────────
+                try:
+                    from app.core.plugin_registry import plugin_registry
+                    await plugin_registry.dispatch_alert({
+                        "id": str(existing.id),
+                        "venue_id": str(existing.venue_id),
+                        "risk_level": existing.risk_level,
+                        "status": existing.status,
+                        "severity": existing.severity,
+                        "explanation": existing.explanation,
+                    })
+                except Exception as e:
+                    logger.warning(f"WS dispatch failed on escalation: {e}")
+
+                # ── ⚡ Automated Actions (Escalation) ───────────────────────────
+                # Trigger ActionEngine for rules matching 'alert_created' or 'alert_escalated'
+                await action_engine.process_event("alert_created", {
+                    "id": str(existing.id),
+                    "venue_id": str(existing.venue_id),
+                    "risk_level": existing.risk_level,
+                    "severity": existing.severity,
+                    "status": existing.status,
+                    "explanation": existing.explanation,
+                })
+
+                # ── 🔴 WebSocket Live Broadcast (escalation) ──────────────────
+                try:
+                    from app.core.plugin_registry import plugin_registry
+                    import asyncio
+                    asyncio.create_task(plugin_registry.dispatch("alert_escalated", {
+                        "id": str(existing.id),
+                        "venue_id": str(existing.venue_id),
+                        "risk_level": existing.risk_level,
+                        "severity": existing.severity,
+                        "status": existing.status,
+                        "escalated": True,
+                    }))
+                except Exception:
+                    pass
 
                 # 🔥 Re-capture evidence on escalation
                 try:
@@ -303,9 +347,9 @@ class AlertEngineService:
             escalation_probability=decision.get("escalation_probability"),
         )
 
-        # Attach structured metadata (temporary until DB expansion)
-        # Using extra_data field which exists in your model
+        # Attach structured metadata
         alert.extra_data = {
+            "camera_id": decision.get("camera_id"), # Store for per-camera tracking
             "risk_color": classification["color"],
             "requires_police": classification["requires_police"],
             "recommended_action": decision.get("recommended_action"),
@@ -329,6 +373,45 @@ class AlertEngineService:
 
         created = await self.alert_repo.create(session, alert, commit=True)
         await self.notification_service.notify(session, created)
+
+        # ── ⚡ Automated Actions (New Alert) ──────────────────────────────────
+        # Fire events to trigger defined automation rules (Webhooks, IoT, etc.)
+        await action_engine.process_event("alert_created", {
+            "id": str(created.id),
+            "venue_id": str(created.venue_id),
+            "risk_level": created.risk_level,
+            "severity": created.severity,
+            "status": created.status,
+            "explanation": created.explanation,
+        })
+        
+        # If the new alert is critical, also fire the specific surge trigger
+        if created.risk_level == "critical":
+            await action_engine.process_event("critical_surge", {
+                "id": str(created.id),
+                "venue_id": str(created.venue_id),
+                "risk_level": "critical",
+                "severity": created.severity,
+            })
+
+        # ── 🔴 WebSocket Live Broadcast ────────────────────────────────────────
+        # Broadcast alert to ALL connected WebSocket clients in real-time
+        try:
+            from app.core.plugin_registry import plugin_registry
+            import asyncio
+            asyncio.create_task(plugin_registry.dispatch_alert({
+                "id": str(created.id),
+                "venue_id": str(created.venue_id),
+                "camera_id": decision.get("camera_id"),
+                "risk_level": created.risk_level,
+                "severity": created.severity,
+                "status": created.status,
+                "created_at": created.created_at.isoformat(),
+                "explanation": created.explanation,
+                "extra_data": created.extra_data,
+            }))
+        except Exception as e:
+            logger.debug(f"Alert WS broadcast failed: {e}")
 
         # 🔥 Evidence capture: snapshot + 10s clip (non-blocking background task)
         try:
@@ -372,6 +455,9 @@ class AlertEngineService:
                 "recommended_action": decision.get("recommended_action"),
             },
         )
+
+        # Automated Actions triggers are handled above via async process_event tasks
+        return created
 
         return created
 
@@ -475,7 +561,7 @@ class AlertEngineService:
             update_data["notes"] = f"{existing_notes}\n{resolution_note}" if existing_notes else resolution_note
 
         # Store resolution time in extra_data for analytics
-        extra_data = alert.extra_data or {}
+        extra_data = dict(alert.extra_data) if alert.extra_data else {}
         extra_data["resolution_seconds"] = resolution_seconds
         update_data["extra_data"] = extra_data
 
@@ -626,15 +712,20 @@ class AlertEngineService:
         self,
         session: AsyncSession,
         venue_id: UUID,
+        camera_id: Optional[str] = None
     ) -> Optional[CrowdAlert]:
-        """Get most recent active alert for a venue."""
+        """Get most recent active alert for a venue/camera."""
         stmt = (
             select(CrowdAlert)
             .where(CrowdAlert.venue_id == venue_id)
             .where(CrowdAlert.status.in_(["open", "acknowledged"]))
-            .order_by(CrowdAlert.created_at.desc())
-            .limit(1)
         )
+
+        if camera_id:
+            # Filter by specific camera in JSON extra_data
+            stmt = stmt.where(CrowdAlert.extra_data["camera_id"].astext == camera_id)
+
+        stmt = stmt.order_by(CrowdAlert.created_at.desc()).limit(1)
 
         result = await session.execute(stmt)
         return result.scalar_one_or_none()

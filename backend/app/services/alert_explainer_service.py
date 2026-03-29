@@ -224,9 +224,18 @@ Alert Explanation:"""
             # Unpack response if return_provider_name enabled
             ai_data = ai_resp_tuple[0] if isinstance(ai_resp_tuple, tuple) else ai_resp_tuple
             
-            # Format JSON response into a strong explanation string
+            # Format JSON response into a strong cohesive explanation string
+            ai_expl = ""
             if ai_data and isinstance(ai_data, dict):
-                ai_expl = f"🚨 {ai_data.get('alert', '')} Reason: {ai_data.get('reason', '')} Action: {ai_data.get('action', '')}".strip()
+                def _ext(v):
+                    if isinstance(v, dict):
+                        return " ".join([str(val) for val in v.values() if val])
+                    elif isinstance(v, list):
+                        return ", ".join([str(item) for item in v])
+                    return str(v).strip()
+
+                explanation = _ext(ai_data.get('explanation', str(ai_data)))
+                ai_expl = f"🚨 {explanation}".strip()
 
             if ai_expl and len(ai_expl.strip()) > 20:
                 # Cache the AI result

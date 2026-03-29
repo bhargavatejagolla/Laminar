@@ -199,20 +199,20 @@ class Alert(Base):
 
     venue: Mapped[Optional["Venue"]] = relationship(
         "Venue",
-        back_populates="alerts",
-        foreign_keys=[venue_id]
+        foreign_keys=[venue_id],
+        lazy="noload"
     )
 
     camera: Mapped[Optional["Camera"]] = relationship(
         "Camera",
-        back_populates="alerts",
-        foreign_keys=[camera_id]
+        foreign_keys=[camera_id],
+        lazy="noload"
     )
 
     assigned_to: Mapped[Optional["User"]] = relationship(
         "User",
-        back_populates="assigned_alerts",
-        foreign_keys=[assigned_to_id]
+        foreign_keys=[assigned_to_id],
+        lazy="noload"
     )
 
     # ==========================================================

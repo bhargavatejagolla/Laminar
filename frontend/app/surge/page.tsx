@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 // A dynamic wave background component
 const WaveBackground = () => (
@@ -59,12 +59,15 @@ export default function SurgeMonitorPage() {
   const { data: venues, isLoading: venuesLoading } = useVenues();
   const [selectedVenueId, setSelectedVenueId] = useState("");
   const [simulatedTime, setSimulatedTime] = useState<Date>(new Date());
+  const [mounted, setMounted] = useState(false);
   const [cameraMetrics, setCameraMetrics] = useState<Record<string, any>>({});
   const [history, setHistory] = useState<any[]>([]);
   const { t } = useTranslation();
 
-  // Real-time metrics polling
+  // Real-time metrics via WebSocket + Initial Polling Fallback
   useEffect(() => {
+    let ws: WebSocket | null = null;
+    
     const fetchMetrics = async () => {
         try {
             const token = localStorage.getItem("access_token");
@@ -104,12 +107,42 @@ export default function SurgeMonitorPage() {
     };
     
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 2000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchMetrics, 5000); // Reduced polling frequency to favor WS
+    
+    // Connect to WebSocket for live kinetics
+    const connectWS = () => {
+        const wsUrl = API.replace(/^http/, "ws") + (selectedVenueId ? `/api/v1/ws/alerts/${selectedVenueId}` : "/api/v1/ws/alerts");
+        ws = new WebSocket(wsUrl);
+        ws.onmessage = (event) => {
+            try {
+                const payload = JSON.parse(event.data);
+                if (payload.type === "live_metrics" && payload.data) {
+                    setCameraMetrics(prev => {
+                        const updated = { ...prev };
+                        const cam = payload.data.camera_id;
+                        if (!updated[cam]) updated[cam] = {};
+                        // Inject live stream updates
+                        updated[cam].velocity = payload.data.velocity;
+                        updated[cam].direction_variance = payload.data.variance;
+                        updated[cam].person_count = payload.data.count;
+                        return updated;
+                    });
+                }
+            } catch (e) {}
+        };
+    };
+    
+    connectWS();
+
+    return () => {
+        clearInterval(interval);
+        if (ws) ws.close();
+    };
   }, [selectedVenueId, venues]);
 
   // Real-time clock for the dashboard
   useEffect(() => {
+    setMounted(true);
     const timer = setInterval(() => {
         setSimulatedTime(new Date());
     }, 1000);
@@ -170,7 +203,7 @@ export default function SurgeMonitorPage() {
                 </p>
                 <div className="font-mono text-[10px] text-rose-500 font-bold uppercase mt-2 flex items-center gap-2 tracking-widest bg-rose-500/5 px-2 py-1 rounded border border-rose-500/20 w-fit">
                     <Activity className="w-3 h-3" />
-                    <span>SYS_TIME: <span className="text-white ml-1">{simulatedTime.toISOString().split('T')[1].split('.')[0]}Z</span></span>
+                    <span>SYS_TIME: <span className="text-white ml-1">{mounted ? simulatedTime.toISOString().split('T')[1].split('.')[0] : "--:--:--"}Z</span></span>
                 </div>
               </div>
             </div>
@@ -261,7 +294,7 @@ export default function SurgeMonitorPage() {
                     <div className="pt-4 border-t border-white/5 space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Execution Path</span>
-                            <span className="text-[8px] font-mono text-sky-400">T-0: {simulatedTime.toISOString().split('T')[1].split('.')[0]}Z</span>
+                            <span className="text-[8px] font-mono text-sky-400">T-0: {mounted ? simulatedTime.toISOString().split('T')[1].split('.')[0] : "--:--:--"}Z</span>
                         </div>
                         <div className="flex gap-2">
                             <div className="flex-1 flex flex-col gap-1">
@@ -283,17 +316,25 @@ export default function SurgeMonitorPage() {
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center justify-between text-[11px] font-mono">
                         <span className="text-slate-500">ZONE_DENSITY</span>
-                        <span className="text-sky-400 font-bold">0.84/m²</span>
+                        {history.length > 0 ? (
+                           <span className="text-sky-400 font-bold">{(history[history.length-1].people / 100).toFixed(2)}/m²</span>
+                        ) : (
+                           <span className="text-sky-400 font-bold">0.00/m²</span>
+                        )}
                     </div>
                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: "84%" }} className="h-full bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.6)]" />
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${history.length > 0 ? Math.min(100, history[history.length-1].people) : 0}%` }} className="h-full bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.6)]" />
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-mono">
                         <span className="text-slate-500">RISK_PROBABILITY</span>
-                        <span className="text-rose-400 font-bold">{totalActiveSurges > 0 ? "72%" : "4%"}</span>
+                        {history.length > 0 ? (
+                           <span className="text-rose-400 font-bold">{Math.round(history[history.length-1].risk)}%</span>
+                        ) : (
+                           <span className="text-rose-400 font-bold">0%</span>
+                        )}
                     </div>
                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: totalActiveSurges > 0 ? "72%" : "4%" }} className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]" />
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${history.length > 0 ? Math.min(100, Math.round(history[history.length-1].risk)) : 0}%` }} className="h-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]" />
                     </div>
                   </div>
                </div>

@@ -92,6 +92,7 @@ class CameraUpdate(BaseModel):
     """Schema for updating an existing camera."""
     model_config = ConfigDict(protected_namespaces=())
 
+    venue_id: Optional[UUID] = Field(None, description="ID of the venue this camera belongs to")
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     stream_url: Optional[str] = Field(None, min_length=1, max_length=1000)
     stream_type: Optional[str] = Field(None)
@@ -148,7 +149,10 @@ class CameraListResponse(BaseModel):
     stream_type: str
     last_heartbeat_at: Optional[datetime]
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        protected_namespaces=()
+    )
 
 
 class CameraHealthResponse(BaseModel):
@@ -165,7 +169,10 @@ class CameraHealthResponse(BaseModel):
     health_status: str  # healthy, degraded, offline, inactive, unknown
     message: str
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        protected_namespaces=()
+    )
 
 
 class CameraAIConfig(BaseModel):
@@ -210,4 +217,7 @@ class CameraStatsResponse(BaseModel):
     last_frame_at: Optional[datetime]
     health_status: str
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        protected_namespaces=()
+    )

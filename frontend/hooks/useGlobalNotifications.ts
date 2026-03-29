@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { useAlerts } from "./useAlerts";
 import { useZoneIntelligenceSummary } from "./useZoneIntelligence";
+import { useAlertStream } from "@/src/hooks/useAlertStream";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import i18n from "i18next";
 import { Alert } from "@/types/alert";
@@ -14,10 +16,24 @@ import { Alert } from "@/types/alert";
 export function useGlobalNotifications() {
   const { data: alertsData } = useAlerts();
   const { data: summary } = useZoneIntelligenceSummary(3000);
+  const queryClient = useQueryClient();
   
   const prevAlertIdKey = useRef<string | null>(null);
   const prevDwellMetrics = useRef<Record<string, { dwell: number; stagnation: number }>>({});
   const isInitialized = useRef(false);
+
+  // ── WebSocket Integration ────────────────────────────────────────────────
+  // Bridge the live WebSocket stream to the React Query cache
+  useAlertStream({
+    onAlert: () => {
+      // Instant invalidation on new alert
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+    },
+    onCrossCamera: () => {
+      // Refresh journeys if a cross-camera event occurs
+      queryClient.invalidateQueries({ queryKey: ["journeys"] });
+    }
+  });
 
   // 1. Alert Notifications
   useEffect(() => {

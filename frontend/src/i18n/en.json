@@ -19,7 +19,11 @@
     "profile": "Profile",
     "system": "System",
     "operational": "OPERATIONAL",
-    "areaSurvey": "Area Survey"
+    "areaSurvey": "Area Survey",
+    "enterpriseAI": "Enterprise AI",
+    "automations": "Automations",
+    "journeyMap": "Journey Map",
+    "fleetHealth": "Fleet Health"
   },
   "language": {
     "label": "Language",

@@ -55,6 +55,32 @@ export default function ReportsPage() {
     }
   };
 
+  const handleGeneratePDF = async () => {
+    if (!selectedVenueId) {
+       alert("Please select a target locale to compile the PDF report.");
+       return;
+    }
+    setIsGenerating(true);
+    try {
+       const days = reportType === 'daily' ? 1 : reportType === 'weekly' ? 7 : 30;
+       const response = await api.get(`/reports/pdf/${selectedVenueId}?days=${days}`, {
+          responseType: 'blob'
+       });
+       const url = window.URL.createObjectURL(new Blob([response.data]));
+       const link = document.createElement('a');
+       link.href = url;
+       link.setAttribute('download', `intel_report_${selectedVenueId}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+       document.body.appendChild(link);
+       link.click();
+       link.remove();
+    } catch (err) {
+       console.error("PDF Generation Failed", err);
+       alert("Failed to compile AI PDF Report.");
+    } finally {
+       setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-transparent text-white pb-12">
       
@@ -156,21 +182,30 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <button
-               onClick={handleGenerateReport}
-               disabled={isGenerating}
-               className="w-full flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.2)] hover:shadow-[0_0_30px_rgba(34,211,238,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-               {isGenerating ? (
-                 <>
-                   <Loader2 className="w-5 h-5 animate-spin" /> Compiling Report Matrix...
-                 </>
-               ) : (
-                 <>
-                   <Download className="w-5 h-5" /> Execute Download Sequence
-                 </>
-               )}
-            </button>
+            <div className="flex gap-4">
+              <button
+                 onClick={handleGenerateReport}
+                 disabled={isGenerating}
+                 className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-slate-700 to-slate-600 hover:from-slate-600 hover:to-slate-500 text-white font-semibold rounded-xl transition-all shadow-[0_0_20px_rgba(0,0,0,0.2)] hover:shadow-[0_0_30px_rgba(0,0,0,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                 {isGenerating ? (
+                   <><Loader2 className="w-5 h-5 animate-spin" /> Compiling CSV...</>
+                 ) : (
+                   <><FileText className="w-5 h-5" /> Export Data CSV</>
+                 )}
+              </button>
+              <button
+                 onClick={handleGeneratePDF}
+                 disabled={isGenerating}
+                 className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all shadow-[0_0_20px_rgba(34,211,238,0.2)] hover:shadow-[0_0_30px_rgba(34,211,238,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                 {isGenerating ? (
+                   <><Loader2 className="w-5 h-5 animate-spin" /> Compiling AI PDF...</>
+                 ) : (
+                   <><Download className="w-5 h-5" /> Execute AI PDF Export</>
+                 )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -216,6 +251,18 @@ export default function ReportsPage() {
                        <span className="text-slate-500">Predicted Risk</span>
                        <span className="font-mono text-amber-400 capitalize">{managementReport.prediction?.predicted_level || "Nominal"}</span>
                      </div>
+                     {managementReport.prediction?.weather_context && (
+                         <div className="bg-[#0f172a] p-2 rounded border border-slate-800 col-span-2 flex justify-between items-center">
+                           <span className="text-slate-500">Weather Context</span>
+                           <span className="font-mono text-cyan-400 capitalize">{managementReport.prediction.weather_context.condition} ({managementReport.prediction.weather_context.temperature_c}°C)</span>
+                         </div>
+                     )}
+                     {managementReport.prediction?.holiday_context && (
+                         <div className="bg-[#0f172a] p-2 rounded border border-slate-800 col-span-2 flex justify-between items-center">
+                           <span className="text-slate-500">Holiday Context</span>
+                           <span className="font-mono text-rose-400 capitalize">{managementReport.prediction.holiday_context.name}</span>
+                         </div>
+                     )}
                   </div>
                 </div>
               ) : (

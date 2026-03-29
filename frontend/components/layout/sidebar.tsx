@@ -18,7 +18,11 @@ import {
   ShieldCheck,
   Clock,
   Target,
-  RotateCw
+  RotateCw,
+  CircuitBoard,
+  Footprints,
+  Webhook,
+  Search
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useAlerts } from "@/hooks/useAlerts";
@@ -55,6 +59,12 @@ export default function Sidebar() {
       ]
     },
     {
+      labelKey: "nav.aiSearch",
+      items: [
+        { nameKey: "nav.videoSearch", href: "/ai-search", icon: Search },
+      ]
+    },
+    {
       labelKey: "nav.analytics",
       items: [
         { nameKey: "nav.reports", href: "/reports", icon: FileBarChart },
@@ -66,6 +76,14 @@ export default function Sidebar() {
       items: [
         { nameKey: "nav.profile", href: "/profile", icon: Settings },
         { nameKey: "nav.settings", href: "/settings", icon: Settings },
+      ]
+    },
+    {
+      labelKey: "nav.enterpriseAI",
+      items: [
+        { nameKey: "nav.automations", href: "/system/actions", icon: Webhook },
+        { nameKey: "nav.journeyMap", href: "/system/journeys", icon: Footprints },
+        { nameKey: "nav.fleetHealth", href: "/system/fleet", icon: CircuitBoard },
       ]
     }
   ];
@@ -85,9 +103,8 @@ export default function Sidebar() {
         bg-[#000000]
         border-r border-white/5
         transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
-        lg:static lg:translate-x-0
         flex flex-col shrink-0 overflow-hidden
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:flex"}
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
 
         {/* ── Brand Header ─────────────────────────── */}

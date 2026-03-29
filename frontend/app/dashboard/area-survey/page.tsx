@@ -14,6 +14,8 @@ import {
   Target,
   RefreshCw,
 } from "lucide-react";
+import { SurveyScene3D } from "@/components/SurveyScene3D";
+import { HeatmapOverlay } from "@/components/advanced/HeatmapOverlay";
 
 export default function AreaSurveyPage() {
   const { 
@@ -162,8 +164,28 @@ export default function AreaSurveyPage() {
         </div>
       </div>
 
+ 
+
+      {/* ── 3D Digital Twin Command Center ───────── */}
+      <div className="w-full relative">
+        <SurveyScene3D activeCameras={activeCameras} cameraMemory={cameraMemory} />
+      </div>
+
+      {/* ── 2D Heatmap Density Overlay ───────────── */}
+      <div className="mt-12 space-y-4">
+        <h2 className="text-xl font-black text-white uppercase tracking-tight">Zone Density Heatmap</h2>
+        <HeatmapOverlay 
+          zones={activeCameras.map(cam => ({
+            id: cam.camera_id,
+            name: cam.camera_name || `Zone ${cam.camera_id.substring(0, 4)}`,
+            current_count: cam.snapshot?.density?.current || 0,
+            capacity: 100
+          }))} 
+        />
+      </div>
+
       {/* ── Camera Ingestion Grid ────────────────── */}
-      <div className="space-y-6">
+      <div className="space-y-6 mt-12">
         <div className="flex items-center justify-between border-b border-white/5 pb-4">
           <h2 className="text-xl font-black text-white uppercase tracking-tight">Camera Contributions</h2>
           <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-slate-500 uppercase tracking-widest">

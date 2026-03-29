@@ -3,10 +3,12 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useAppStore } from "@/store/useAppStore";
 import { useAlerts } from "@/hooks/useAlerts";
-import { Menu, Bell, LogOut, Shield, Wifi, Zap } from "lucide-react";
+import { Menu, Bell, LogOut, Shield, Wifi, Zap, X, AlertOctagon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import LanguageSwitcher from "./language-switcher";
+import { AnimatePresence, motion } from "framer-motion";
+import { createPortal } from "react-dom";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -35,10 +37,19 @@ export default function Navbar() {
 
   const userDisplayName = user?.email ? user.email.split("@")[0] : "Admin";
 
-  const handleLogout = () => {
-    if (window.confirm("Are you sure you want to sign out?")) {
-      logout();
-    }
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+
+  const handleLogoutClick = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutModalOpen(false);
+    logout();
+  };
+
+  const cancelLogout = () => {
+    setIsLogoutModalOpen(false);
   };
 
   return (
@@ -84,7 +95,7 @@ export default function Navbar() {
       <div className="flex items-center gap-4">
 
         {/* 🌐 Language Switcher */}
-        <div className="relative z-[110]">
+        <div className="relative z-[110] flex items-center gap-2">
           <LanguageSwitcher />
         </div>
 
@@ -115,7 +126,7 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.4)] group-hover:scale-105 transition-transform border-2 border-cyan-500/30">
             {user?.profile_picture ? (
               <img
-                src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${user.profile_picture}`}
+                src={`${process.env.NEXT_PUBLIC_API_URL || ""}${user.profile_picture}`}
                 alt="Profile"
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -141,13 +152,72 @@ export default function Navbar() {
 
         {/* Logout */}
         <button 
-          onClick={handleLogout}
+          onClick={handleLogoutClick}
           className="p-2.5 ml-1 rounded-xl bg-white/5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-all duration-300 border border-transparent hover:border-rose-500/30"
           title="Sign out"
         >
           <LogOut className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Premium Centered Logout Modal */}
+      {mounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isLogoutModalOpen && (
+            <>
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9998] pointer-events-auto"
+                onClick={cancelLogout}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.90, x: "-50%", y: "-40%" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.90, x: "-50%", y: "-40%" }}
+                transition={{ type: "spring", duration: 0.5, bounce: 0.4 }}
+                className="fixed top-1/2 left-1/2 w-[90%] max-w-md bg-gradient-to-b from-[#11111a] to-[#0a0a0f] border-2 border-white/10 rounded-3xl shadow-[0_0_80px_rgba(244,63,94,0.15)] overflow-hidden z-[9999] pointer-events-auto flex flex-col items-center justify-center p-8 text-center"
+              >
+                <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+                
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] bg-[radial-gradient(circle,rgba(244,63,94,0.08)_0%,transparent_70%)] pointer-events-none" />
+                
+                <div className="relative z-10 flex flex-col items-center w-full">
+                  <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(244,63,94,0.2)]">
+                    <AlertOctagon className="w-8 h-8 text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.8)]" />
+                  </div>
+                  
+                  <h3 className="text-2xl font-black text-white uppercase tracking-[0.2em] font-heading mb-3 drop-shadow-md">
+                    Terminate Session
+                  </h3>
+                  
+                  <p className="text-sm font-medium text-slate-300 leading-relaxed mb-8 max-w-[280px]">
+                    Securely disconnect from the Laminar AI Platform? Active monitoring alerts will pause.
+                  </p>
+                  
+                  <div className="flex w-full gap-4 mt-2">
+                    <button
+                      onClick={cancelLogout}
+                      className="flex-1 py-3.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-sm font-bold uppercase tracking-[0.15em] transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] focus:ring-2 ring-white/20 outline-none"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmLogout}
+                      className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 border border-rose-400/50 text-white text-sm font-black uppercase tracking-[0.15em] shadow-[0_0_20px_rgba(244,63,94,0.5)] hover:shadow-[0_0_30px_rgba(244,63,94,0.8)] transition-all flex items-center justify-center gap-2 focus:ring-2 ring-rose-500/50 outline-none"
+                    >
+                      <LogOut className="w-5 h-5 drop-shadow-md" />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>, 
+        document.body
+      )}
     </header>
   );
 }

@@ -20,7 +20,10 @@ from app.scheduler.jobs import (
     hourly_aggregation_job,
     system_health_job,
     refresh_vector_index_job,
+    refresh_vector_index_job,
     recurrent_health_notification_job,
+    predictive_surge_job,
+    automl_retrain_report_job,
 )
 from app.scheduler.registry import JobRegistry
 
@@ -55,19 +58,19 @@ class LaminarScheduler:
         self._add_job_with_tracking(
             "minute_pipeline",
             minute_pipeline_job,
-            IntervalTrigger(minutes=1),
+            IntervalTrigger(seconds=30), # Increased frequency for "fast" alerts
         )
 
         self._add_job_with_tracking(
             "escalation_check",
             escalation_job,
-            IntervalTrigger(minutes=5),
+            IntervalTrigger(minutes=1), # Faster escalation response
         )
 
         self._add_job_with_tracking(
             "auto_resolve",
             auto_resolve_job,
-            IntervalTrigger(minutes=10),
+            IntervalTrigger(minutes=5), # Faster cleanup
         )
 
         self._add_job_with_tracking(
@@ -78,7 +81,7 @@ class LaminarScheduler:
         self._add_job_with_tracking(
             "system_health",
             system_health_job,
-            CronTrigger(minute ="*/15"),
+            IntervalTrigger(minutes=2),
         )
         
         self._add_job_with_tracking(
@@ -91,6 +94,18 @@ class LaminarScheduler:
             "recurrent_health_notification",
             recurrent_health_notification_job,
             IntervalTrigger(minutes=5),
+        )
+
+        self._add_job_with_tracking(
+            "predictive_surge",
+            predictive_surge_job,
+            IntervalTrigger(minutes=5),
+        )
+
+        self._add_job_with_tracking(
+            "automl_retrain_report",
+            automl_retrain_report_job,
+            CronTrigger(hour=6, minute=0),  # Daily at 6 AM UTC
         )
 
         self._configured = True

@@ -20,7 +20,7 @@ export function useAuth() {
 
     setAuthenticated(true)
     
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
     try {
       const res = await fetch(`${API_BASE}/api/v1/users/profile`, {
         headers: { Authorization: `Bearer ${token}` }

@@ -1,7 +1,8 @@
 import axios from "axios"
 import axiosRetry from "axios-retry"
 
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1"
+const isBrowser = typeof window !== "undefined";
+const API_BASE_URL = isBrowser ? "/api/v1" : "http://127.0.0.1:8000/api/v1";
 
 /*
 Central API Client for Laminar

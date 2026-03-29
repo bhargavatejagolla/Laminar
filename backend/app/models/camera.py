@@ -55,6 +55,11 @@ class Camera(BaseModel):
         index=True,
     )
 
+    tenant_id: Mapped[Optional[UUID]] = mapped_column(
+        nullable=True,
+        index=True,
+    )
+
     venue: Mapped["Venue"] = relationship(
         "Venue",
         back_populates="cameras",

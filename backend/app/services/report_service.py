@@ -158,6 +158,9 @@ class ReportService:
                 "predicted_risk_score": prediction.get("predicted_risk_score"),
                 "confidence": prediction.get("confidence"),
                 "model_used": prediction.get("model_used"),
+                "holiday_context": prediction.get("holiday_context"),
+                "weather_context": prediction.get("weather_context"),
+                "event_type": prediction.get("event_type"),
             },
         }
 

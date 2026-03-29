@@ -6,7 +6,7 @@ Orchestrates periodic system tasks with batching and performance tracking.
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy import select
@@ -14,19 +14,35 @@ from app.core.database import db_manager
 from app.core.logging import get_logger
 from app.models.camera import Camera
 from app.models.venue import Venue
-from app.services.metric_aggregation_service import MetricAggregationService
-from app.services.risk_engine_service import RiskEngineService
-from app.services.alert_engine_service import AlertEngineService
-from app.services.camera_health_service import CameraHealthService
-from datetime import timedelta,timezone
-from app.models.crowd_alert import CrowdAlert
-from app.services.ai_assistant_service import AIAssistantService
 
 logger = get_logger(__name__)
 
-metric_service = MetricAggregationService()
-risk_engine = RiskEngineService()
-alert_engine = AlertEngineService()
+# ─── Lazy Service Accessors ──────────────────────────────────────────────────
+
+_metric_service = None
+_risk_engine = None
+_alert_engine = None
+
+def get_metric_service():
+    global _metric_service
+    if _metric_service is None:
+        from app.services.metric_aggregation_service import MetricAggregationService
+        _metric_service = MetricAggregationService()
+    return _metric_service
+
+def get_risk_engine():
+    global _risk_engine
+    if _risk_engine is None:
+        from app.services.risk_engine_service import RiskEngineService
+        _risk_engine = RiskEngineService()
+    return _risk_engine
+
+def get_alert_engine():
+    global _alert_engine
+    if _alert_engine is None:
+        from app.services.alert_engine_service import AlertEngineService
+        _alert_engine = AlertEngineService()
+    return _alert_engine
 
 
 class BatchProcessor:
@@ -49,22 +65,17 @@ class BatchProcessor:
 
 
 # ==========================================================
-# Minute Pipeline Job (Enhanced)
-# ==========================================================
-
 async def minute_pipeline_job():
     """
     Every minute:
     - Aggregate minute metrics for active cameras
     - Evaluate risk for each metric
     - Process alert decisions
-    
-    Enhanced with:
-    - Batch processing
-    - Performance tracking
-    - Detailed metrics
-    
     """
+    metric_service = get_metric_service()
+    risk_engine = get_risk_engine()
+    alert_engine = get_alert_engine()
+    
     logger.warning("🔥MINUTE JOB TRIGGERED🔥")
     start_time = datetime.now(timezone.utc)
     logger.info("Starting minute pipeline job")
@@ -195,7 +206,7 @@ async def escalation_job():
     start_time = datetime.now(timezone.utc)
     logger.info("Starting escalation check job")
 
-    from app.core.database import db_manager
+    alert_engine = get_alert_engine()
     async with db_manager.session() as session:
         try:
             escalation_counts = await alert_engine.check_escalations(session)
@@ -234,7 +245,7 @@ async def auto_resolve_job():
     start_time = datetime.now(timezone.utc)
     logger.info("Starting auto-resolve job")
 
-    from app.core.database import db_manager
+    alert_engine = get_alert_engine()
     async with db_manager.session() as session:
         try:
             resolved_count = await alert_engine.auto_resolve_low_risk(session)
@@ -270,7 +281,7 @@ async def hourly_aggregation_job():
     start_time = datetime.now(timezone.utc)
     logger.info("Starting hourly aggregation job")
 
-    from app.core.database import db_manager
+    metric_service = get_metric_service()
     async with db_manager.session() as session:
         try:
             # Get all venues
@@ -345,7 +356,7 @@ async def system_health_job():
     start_time = datetime.now(timezone.utc)
     logger.info("Starting system health check")
 
-    from app.core.database import db_manager
+    from app.services.camera_health_service import CameraHealthService
     async with db_manager.session() as session:
         try:
             # Check for cameras with no recent frames
@@ -373,6 +384,7 @@ async def system_health_job():
                 )
 
             # Check for stuck alerts
+            from app.models.crowd_alert import CrowdAlert
             result = await session.execute(
                 select(CrowdAlert)
                 .where(
@@ -423,7 +435,7 @@ async def refresh_vector_index_job():
     start_time = datetime.now(timezone.utc)
     logger.info("Starting AI Vector Index Refresh job")
 
-    from app.core.database import db_manager
+    from app.services.ai_assistant_service import AIAssistantService
     async with db_manager.session() as session:
         try:
             ai_service = AIAssistantService()
@@ -467,6 +479,7 @@ async def recurrent_health_notification_job():
     async with db_manager.session() as session:
         try:
             # Query open camera issue alerts that haven't been notified recently
+            from app.models.crowd_alert import CrowdAlert
             stmt = select(CrowdAlert).where(
                 CrowdAlert.status.in_(["new", "open"]),
                 CrowdAlert.extra_data.contains({"type": "camera_issue"}),
@@ -505,3 +518,124 @@ async def recurrent_health_notification_job():
                 exc_info=True,
             )
 
+
+# ==========================================================
+# Proactive AI Predictive Surge Job (Added via Enahancement)
+# ==========================================================
+
+async def predictive_surge_job():
+    """
+    Every 5 minutes:
+    - Analyzes statistical trends in sqlite using PredictionService
+    - Generates proactive 'Predictive Surge' alerts if critical bottleneck forecasted
+    """
+    start_time = datetime.now(timezone.utc)
+    logger.info("Starting AI Predictive Surge scanning job")
+
+    from app.core.database import db_manager
+    from app.services.prediction_service import PredictionService
+    
+    prediction_service = PredictionService()
+
+    async with db_manager.session() as session:
+        try:
+            # Check for active venues
+            result = await session.execute(
+                select(Venue).where(Venue.deleted_at.is_(None))
+            )
+            venues = result.scalars().all()
+
+            if not venues:
+                logger.info("No venues found for predictive scanning")
+                return
+
+            stats = {"scanned": 0, "predictive_alerts_fired": 0, "failed": 0}
+
+            for venue in venues:
+                try:
+                    stats["scanned"] += 1
+                    
+                    # Generate forecast
+                    forecast = await prediction_service.forecast_risk(session, venue.id)
+                    
+                    if not forecast:
+                        continue
+                        
+                    predicted_level = forecast.get("predicted_level")
+                    escalation_prob = forecast.get("escalation_probability", 0.0)
+                    
+                    # If AI predicts a critical or high event with strong probability
+                    if predicted_level in ["critical", "high"] and escalation_prob > 0.4:
+                        
+                        logger.warning(
+                            f"🔮 PREDICTIVE AI: Upcoming surge forecasted at venue {venue.name}",
+                            extra_fields={"predicted_level": predicted_level, "prob": escalation_prob}
+                        )
+
+                        # We format it as a decision to be consumed by alert engine
+                        decision = {
+                            "should_alert": True,
+                            "venue_id": str(venue.id),
+                            "venue_name": venue.name,
+                            "camera_id": None, # Venue-wide
+                            "metric_id": "00000000-0000-0000-0000-000000000000", # System-level
+                            "current_level": predicted_level,
+                            "severity": 95 if predicted_level == "critical" else 75,
+                            "early_warning_triggered": True,
+                            "reason": forecast.get("forecast_explanation", "AI predicted upcoming surge based on compounding spatial trends."),
+                            "alert_type": "AI Predictive Surge Warning",
+                            "recommended_action": "Proactively assign staff to gates to disperse crowding before it forms.",
+                            "predicted_level": predicted_level,
+                            "predicted_risk_score": forecast.get("predicted_risk_score"),
+                            "escalation_probability": escalation_prob
+                        }
+                        
+                        alert_engine = get_alert_engine()
+                        await alert_engine.process_decision(session, decision=decision)
+                        stats["predictive_alerts_fired"] += 1
+
+                except Exception as e:
+                    stats["failed"] += 1
+                    logger.error(
+                        f"Predictive scan failed for venue {venue.id}",
+                        extra_fields={"error": str(e)}
+                    )
+
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            logger.info(
+                "AI Predictive Surge Scan completed",
+                extra_fields={"duration_seconds": round(duration, 2), "stats": stats}
+            )
+
+        except Exception as e:
+            logger.error(
+                "AI Predictive Surge job failed fatally",
+                extra_fields={"error": str(e)},
+                exc_info=True,
+            )
+
+
+# ==========================================================
+# AutoML Retraining Report Job (New Feature)
+# ==========================================================
+
+async def automl_retrain_report_job():
+    """
+    Daily at 6 AM:
+    - Analyze low-confidence YOLO detection frames from the past 24 hours
+    - Generate a retrain_report.json in storage/retrain_candidates/
+    - Log recommendation to operators
+    """
+    try:
+        from app.services.retraining_service import retraining_service
+        report = retraining_service.generate_retrain_report()
+        logger.info(
+            "AutoML Retrain Report generated",
+            extra_fields={
+                "candidates": report.get("total_candidates", 0),
+                "ready": report.get("ready_for_retraining", False),
+                "recommendation": report.get("recommendation", ""),
+            }
+        )
+    except Exception as e:
+        logger.error(f"AutoML retrain report job failed: {e}", exc_info=True)

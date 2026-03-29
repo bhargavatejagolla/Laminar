@@ -23,7 +23,8 @@ import { api } from "@/services/api";
 import { getToken } from "@/services/auth";
 import { toast } from "sonner";
 
-const BACKEND_BASE = "http://127.0.0.1:8000/api/v1";
+const BACKEND_BASE = "/api/v1";
+const BACKEND_ROOT = ""; // relative root for static assets (clips)
 
 export default function CameraStreamPage() {
   const { id } = useParams() as { id: string };
@@ -303,8 +304,8 @@ export default function CameraStreamPage() {
                     <img
                       src={heatmapUrl}
                       alt="Crowd Density Heatmap"
-                      className="w-full h-full object-contain"
-                      style={{ opacity: 0.75 }}
+                      className="w-full h-full object-contain mix-blend-screen"
+                      style={{ opacity: 0.4 }}
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -442,7 +443,7 @@ export default function CameraStreamPage() {
                     </div>
                     <div className="p-2 border-t border-slate-800 bg-slate-900/90 flex justify-between items-center text-xs">
                       <span className="text-slate-400 font-mono truncate">{clip.filename.split('_')[2]}</span>
-                      <a href={`${BACKEND_BASE.replace('/api/v1', '')}${clip.download_url || clip.url}`} download target="_blank" rel="noreferrer" className="text-cyan-400 hover:text-cyan-300 p-1 bg-cyan-900/20 rounded">
+                      <a href={`${BACKEND_ROOT}${clip.download_url || clip.url}`} download target="_blank" rel="noreferrer" className="text-cyan-400 hover:text-cyan-300 p-1 bg-cyan-900/20 rounded">
                         <Download className="w-3 h-3" />
                       </a>
                     </div>

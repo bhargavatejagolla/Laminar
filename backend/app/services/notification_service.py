@@ -99,6 +99,9 @@ class NotificationService:
         
         # Generate AI explanation for the camera issue
         from app.services.ai_provider_service import get_ai_provider
+        from app.services.translation_service import TranslationService
+        
+        t = TranslationService.t
         ai_provider = get_ai_provider()
         
         prompt = (
@@ -178,12 +181,12 @@ class NotificationService:
         a SEPARATE email so coordinators only get relevant messages.
         """
 
-        # Cooldown protection
+        # Cooldown protection - Reduced from 300s to 10s for "fast" alerts
         if alert.last_notified_at:
             diff = datetime.now(timezone.utc) - alert.last_notified_at
-            if diff.total_seconds() < 300:  # 5 minutes
+            if diff.total_seconds() < 10:  # 10 seconds instead of 5 minutes
                 logger.info(
-                    "Notification skipped due to cooldown",
+                    "Notification skipped due to cooldown (10s)",
                     extra={"alert_id": str(alert.id)},
                 )
                 return
@@ -895,11 +898,16 @@ class NotificationService:
 
         message["To"] = ", ".join(recipients)
 
-        await aiosmtplib.send(
-            message,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER,
-            password=settings.SMTP_PASSWORD,
-            start_tls=settings.SMTP_USE_TLS,
-        )
+        try:
+            await aiosmtplib.send(
+                message,
+                hostname=settings.SMTP_HOST,
+                port=settings.SMTP_PORT,
+                username=settings.SMTP_USER,
+                password=settings.SMTP_PASSWORD,
+                start_tls=settings.SMTP_USE_TLS,
+            )
+        except aiosmtplib.SMTPRecipientsRefused as e:
+            logger.error(f"Email bounce (550 5.1.1): Recipients refused {recipients}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to send email to {recipients}: {e}")

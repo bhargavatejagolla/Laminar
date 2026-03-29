@@ -88,6 +88,7 @@ class StreamWorker:
             enable_detection: Whether to run YOLO detection
         """
         self.camera_id = camera_id
+        self._camera_name: str = ""  # Resolved from DB on first heartbeat
         self.source = source
         self.target_fps = target_fps
         self.skip_factor = skip_factor
@@ -204,6 +205,7 @@ class StreamWorker:
 
         # Frame-diff counters (also reset in start())
         self._frame_count_for_forced: int = 0
+        self._metrics_broadcast_counter: int = 0
 
     # ==========================================================
     # Lifecycle
@@ -462,13 +464,15 @@ class StreamWorker:
             # Health check (rate-limited — only every N frames)
             # ==========================================================
             self._health_check_counter += 1
-            if self._health_check_counter >= self.health_check_interval:
-                self._health_check_counter = 0
+            if self._health_check_counter >= self.health_check_interval or (not self._camera_name and self._health_check_counter == 1):
+                if self._health_check_counter >= self.health_check_interval:
+                    self._health_check_counter = 0
+                
                 health_issue = self.health_service.analyze_frame(str(self.camera_id), frame)
-                if not hasattr(self, "_last_health_status") or self._last_health_status != health_issue:
+                if not hasattr(self, "_last_health_status") or self._last_health_status != health_issue or not self._camera_name:
                     self._last_health_status = health_issue
 
-                    async def update_health_in_bg(status: str):
+                    async def update_health_and_meta(status: str):
                         from app.core.database import db_manager
                         from app.models.camera import Camera
                         from sqlalchemy import select
@@ -476,9 +480,12 @@ class StreamWorker:
                             cam_res = await health_session.execute(select(Camera).where(Camera.id == self.camera_id))
                             cam = cam_res.scalar_one_or_none()
                             if cam:
+                                if not self._camera_name and cam.name:
+                                    self._camera_name = cam.name  # Cache for ReID insights
+                                    logger.info(f"Resolved camera name: {self._camera_name}", extra={"camera_id": str(self.camera_id)})
                                 await self.health_service.update_camera_health(health_session, cam, status)
 
-                    asyncio.create_task(update_health_in_bg(health_issue))
+                    asyncio.create_task(update_health_and_meta(health_issue))
 
             # Manual Clip Recording Logic
             if self._is_recording:
@@ -594,8 +601,53 @@ class StreamWorker:
                     cv2.rectangle(annotated_frame, (x1, label_y - th - 3), (x1 + tw + 6, label_y + 3), (0, 0, 0), -1)
                     cv2.putText(annotated_frame, label, (x1 + 3, label_y), font, font_scale, (0, 255, 80), 1, cv2.LINE_AA)
 
+                    # ── 🔴 [LIVE INTELLIGENCE] ReID & Journey Tracking ──────────────────
+                    from app.services.reid_service import reid_service
+                    from app.services.journey_manager_service import journey_manager
+                    
+                    try:
+                        embedding = reid_service.extract_embedding(frame, [x1, y1, x2, y2])
+                        global_id, insight_msg = journey_manager.process_detection(
+                            str(self.camera_id), embedding, self._camera_name
+                        )
+                        
+                        if insight_msg:
+                            # ── 🔴 Broadcast Live Cross-Camera Notification ──
+                            from app.api.v1.endpoints.websocket import ws_manager
+                            asyncio.create_task(ws_manager.broadcast({
+                                "type": "journey_cross_camera",
+                                "data": {
+                                    "global_id": global_id,
+                                    "insight": insight_msg,
+                                    "camera_id": str(self.camera_id),
+                                    "camera_name": self._camera_name
+                                }
+                            }))
+                            # Also dispatch as a UI alert
+                            asyncio.create_task(ws_manager.broadcast({
+                                "type": "alert",
+                                "data": {
+                                    "id": f"trk-{global_id[:8]}-{int(now.timestamp())}",
+                                    "type": "cross_camera_tracking",
+                                    "risk_level": "medium",
+                                    "severity": 40,
+                                    "explanation": insight_msg,
+                                    "created_at": now.isoformat(),
+                                    "extra_data": {
+                                        "risk_color": "violet",
+                                        "camera_id": str(self.camera_id),
+                                        "camera_name": self._camera_name,
+                                        "target_id": global_id
+                                    }
+                                }
+                            }))
+                    except Exception as e:
+                        global_id = None
+                        logger.error(f"ReID/Journey logic failed for cam {self.camera_id}: {e}")
+
                     scaled_boxes.append({
                         "id": obj.get("id", 0),
+                        "global_id": global_id,
                         "confidence": conf,
                         "bbox": [float(x1), float(y1), float(x2), float(y2)]
                     })
@@ -691,6 +743,25 @@ class StreamWorker:
                 cur_acceleration = panic_result.get("acceleration", 0.0)
             except Exception as e:
                 logger.error(f"Movement analysis failed for camera {self.camera_id}: {e}")
+
+            # ── 🔴 [LIVE BROADCAST] Push kinetics to WebSocket ──────────────────
+            self._metrics_broadcast_counter += 1
+            if self._metrics_broadcast_counter % 5 == 0: # Every ~5 frames for smoothness
+                try:
+                    from app.api.v1.endpoints.websocket import ws_manager
+                    asyncio.create_task(ws_manager.broadcast({
+                        "type": "live_metrics",
+                        "data": {
+                            "camera_id": str(self.camera_id),
+                            "velocity": round(float(cur_velocity), 2),
+                            "variance": round(float(cur_variance), 3),
+                            "acceleration": round(float(cur_acceleration), 2),
+                            "count": detected_count,
+                            "timestamp": now.isoformat()
+                        }
+                    }))
+                except Exception as eval_err:
+                    pass # Non-critical
 
             # ==========================================================
             # Step 5: PRODUCTION EFFICIENT SAVE LOGIC

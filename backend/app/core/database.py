@@ -257,8 +257,13 @@ class DatabaseManager:
             # Set up pool event listeners for metrics
             self._setup_pool_listeners()
 
-            # Validate connections
-            await self._validate_connections()
+            # Validate connections and create tables
+            async with self._engines[DatabaseRole.WRITER].begin() as conn:
+                # This ensures all tables (including new ones like action_rules) exist
+                await conn.run_sync(Base.metadata.create_all)
+                await conn.execute(text("SELECT 1"))
+            
+            logger.info("Database connections and tables validated")
 
             self._initialized = True
             logger.info("Database connections initialized successfully")
