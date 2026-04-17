@@ -19,7 +19,7 @@ import {
   X
 } from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/services/api";
 
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -84,14 +84,9 @@ export default function ProfilePage() {
   // ── Fetch profile ──
   useEffect(() => {
     if (!user) return;
-    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-    if (!token) return;
-
-    fetch(`${API_BASE}/api/v1/users/profile`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then((r) => r.json())
-      .then((d) => {
+    api.get("/users/profile")
+      .then((r) => {
+        const d = r.data;
         setData({
           name: d.name || "",
           phone_number: d.phone_number || "",
@@ -103,12 +98,11 @@ export default function ProfilePage() {
           email: d.email
         });
         setPhoneRaw(d.phone_number || "");
-        // Prefix with backend URL so the image actually loads
         if (d.profile_picture) {
           setAvatarUrl(
             d.profile_picture.startsWith("http")
               ? d.profile_picture
-              : `${API_BASE}${d.profile_picture}`
+              : `${api.defaults.baseURL?.replace('/api/v1', '')}${d.profile_picture}`
           );
         }
       })
@@ -129,29 +123,15 @@ export default function ProfilePage() {
     setErrorMsg("");
 
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API_BASE}/api/v1/users/profile/update`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: data.name || null,
-          phone_number: normPhone || null,
-          receive_sms_alerts: data.receive_sms_alerts,
-          alert_email: data.alert_email || null,
-          receive_email_alerts: data.receive_email_alerts
-        })
+      const res = await api.put("/users/profile/update", {
+        name: data.name || null,
+        phone_number: normPhone || null,
+        receive_sms_alerts: data.receive_sms_alerts,
+        alert_email: data.alert_email || null,
+        receive_email_alerts: data.receive_email_alerts
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        const detail = Array.isArray(err.detail) ? err.detail[0]?.msg : err.detail;
-        throw new Error(detail || "Update failed");
-      }
-
-      const updated = await res.json();
+      const updated = res.data;
       setData((prev) => ({
         ...prev,
         name: updated.name || "",
@@ -190,25 +170,22 @@ export default function ProfilePage() {
     const form = new FormData();
     form.append("file", file);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API_BASE}/api/v1/users/profile/picture`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form
+      const res = await api.post("/users/profile/picture", form, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
-      if (res.ok) {
-        const updated = await res.json();
-        // Set the actual server URL (so it persists after page reload)
-        if (updated.profile_picture) {
-          const picUrl = updated.profile_picture.startsWith("http")
-            ? updated.profile_picture
-            : `${API_BASE}${updated.profile_picture}`;
+      const updated = res.data;
+      // Set the actual server URL (so it persists after page reload)
+      if (updated.profile_picture) {
+        const picUrl = updated.profile_picture.startsWith("http")
+          ? updated.profile_picture
+          : `${api.defaults.baseURL?.replace('/api/v1', '')}${updated.profile_picture}`;
           setAvatarUrl(picUrl);
           setData(prev => ({ ...prev, profile_picture: updated.profile_picture }));
         }
         // Refresh global auth state so navbar updates immediately
         await refreshProfile();
-      }
       setStatus("success");
       setTimeout(() => setStatus("idle"), 3000);
     } catch {

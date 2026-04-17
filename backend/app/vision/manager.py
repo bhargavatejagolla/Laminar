@@ -143,7 +143,7 @@ class VisionManager:
         sync_interval: int = 10,
         health_check_interval: int = 15,
         max_restarts_per_hour: int = 5,
-        max_fps: int = 60,  # Unlocked max FPS for high-performance streams
+        max_fps: int = 240,  # Unlocked max FPS for high-performance streams
     ):
         """
         Initialize vision manager.
@@ -373,8 +373,8 @@ class VisionManager:
             except (ValueError, TypeError):
                 source_identifier = 0
 
-        # Use specific camera FPS or default to high performance 30
-        target_fps = camera.fps or 30
+        # Use specific camera FPS or default to high performance 120
+        target_fps = camera.fps or 120
         if target_fps > self.max_fps:
             logger.info(
                 f"Reducing FPS from {target_fps} to {self.max_fps} for camera {camera.id} (Hardware limits)",
@@ -496,7 +496,7 @@ class VisionManager:
                 target_fps=config["target_fps"],
                 skip_factor=effective_skip,
                 static_diff_threshold=0.4,   # ✅ SUPER SENSITIVE: Skip YOLO only when scene is truly static
-                health_check_interval=30,    # Only health-check every 30th frame
+                health_check_interval=10,    # Health-check every 10th frame (faster response)
             )
 
             await worker.start()
@@ -598,13 +598,25 @@ class VisionManager:
                     self._restart_attempts[camera_id].append(
                         datetime.now(timezone.utc))
 
+                    # 🚨 PROACTIVE HEALTH SYNC: Mark offline in DB immediately
+                    try:
+                        from app.services.camera_health_service import CameraHealthService
+                        health_service = CameraHealthService()
+                        async with db_manager.session() as health_session:
+                            camera = await health_session.get(Camera, camera_id)
+                            if camera:
+                                await health_service.update_camera_health(health_session, camera, "offline")
+                                await health_session.commit()
+                                logger.info(f"Camera {camera_id} proactive health sync: OFFLINE")
+                    except Exception as health_err:
+                        logger.warning(f"Failed to sync offline health for {camera_id}: {health_err}")
+
                     # Restart worker
                     await worker.stop()
                     del self._workers[camera_id]
 
                     # Re-fetch camera from DB and restart
                     await asyncio.sleep(2.0)  # Grace period to release hardware/sockets
-                    from app.core.database import db_manager
                     async with db_manager.session() as session:
                         camera = await session.get(Camera, camera_id)
                         if camera and camera.is_active and camera.monitoring_enabled:
@@ -615,11 +627,11 @@ class VisionManager:
                     from app.core.database import db_manager
                     async with db_manager.session() as session:
                         camera = await session.get(Camera, camera_id)
-                        if camera and not camera.is_online:
-                            camera.mark_online()
-                            session.add(camera)
-                            await session.commit()
-                            logger.info(f"Camera {camera_id} marked online via health loop")
+                        if camera and (not camera.is_online or camera.health_status == "offline"):
+                            from app.services.camera_health_service import CameraHealthService
+                            health_service = CameraHealthService()
+                            await health_service.update_camera_health(session, camera, "healthy")
+                            logger.info(f"Camera {camera_id} marked online and healthy via health loop")
 
             except Exception as e:
                 logger.debug(
@@ -946,7 +958,7 @@ class VisionManager:
             
         if camera.is_active and camera.monitoring_enabled:
             logger.info(f"Instant start triggered for new camera {camera.id}")
-            await self._start_worker(camera)
+            asyncio.create_task(self._start_worker(camera))
 
     async def notify_camera_deleted(self, camera_id: UUID) -> None:
         """Called by API before camera deletion for instant cleanup."""

@@ -14,17 +14,8 @@ def main():
     frontend_dir = os.path.join(root_dir, "frontend")
 
     print("[SYSTEM] Starting Laminar Backend (FastAPI)...")
-    
-    venv_python = os.path.join(backend_dir, "venv", "Scripts", "python.exe") if os.name == "nt" else os.path.join(backend_dir, "venv", "bin", "python")
-    python_exe = venv_python if os.path.exists(venv_python) else sys.executable
-    
-    if os.path.exists(venv_python):
-        print(f"[SYSTEM] Using Backend Virtual Environment: {venv_python}")
-    else:
-        print(f"[SYSTEM] Virtual environment not found. Using global Python: {python_exe}")
-
     backend_process = subprocess.Popen(
-        [python_exe, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
+        [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"],
         cwd=backend_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT

@@ -1,13 +1,14 @@
 "use client";
 
 import AlertPanel from "@/components/alerts/alert-panel";
-import { ShieldAlert, Search, Filter } from "lucide-react";
+import { ShieldAlert, Search, Filter, History, Activity } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 
 export default function AlertsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"live" | "history">("live");
   const { t } = useTranslation();
 
   return (
@@ -42,6 +43,18 @@ export default function AlertsPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <div className="flex bg-white/5 border border-white/10 rounded-xl p-1 backdrop-blur-md mr-1">
+            <button 
+              onClick={() => setActiveTab("live")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${activeTab === "live" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400 hover:text-white"}`}>
+              <Activity className="w-4 h-4" /> Live
+            </button>
+            <button 
+              onClick={() => setActiveTab("history")}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${activeTab === "history" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400 hover:text-white"}`}>
+              <History className="w-4 h-4" /> History
+            </button>
+          </div>
           <div className="relative">
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -64,7 +77,7 @@ export default function AlertsPage() {
         transition={{ delay: 0.1 }}
         className="glass-panel border-white/10 rounded-3xl p-5 shadow-[inset_0_0_30px_rgba(255,255,255,0.01)]"
       >
-        <AlertPanel />
+        <AlertPanel filter={activeTab} />
       </motion.div>
     </div>
   );

@@ -398,15 +398,21 @@ class LaminarIntelligenceService:
         from app.services.translation_service import TranslationService
         t = TranslationService.t
         
-        situation = t(lang, "intel_situation", 
-            "Surveillance intelligence identified a {severity} crowd condition at {venue_name}. "
-            "The venue capacity is {capacity} persons. "
-            "Real-time monitoring across {cam_count} active camera(s) "
-            "shows a current crowd average of {avg:.0f} with a peak of {peak:.0f} persons."
-        ).format(
-            severity=severity, venue_name=venue_name, capacity=capacity, 
-            cam_count=len(cameras), avg=total_avg, peak=total_peak
-        )
+        if not metrics:
+            situation = t(lang, "intel_no_data", 
+                "Intelligence engine is active for {venue_name}, but no live crowd metrics have been ingested in the last 10 minutes. "
+                "The system is standing by for vision stream data."
+            ).format(venue_name=venue_name)
+        else:
+            situation = t(lang, "intel_situation", 
+                "Surveillance intelligence identified a {severity} crowd condition at {venue_name}. "
+                "The venue capacity is {capacity} persons. "
+                "Real-time monitoring across {cam_count} active camera(s) "
+                "shows a current crowd average of {avg:.0f} with a peak of {peak:.0f} persons."
+            ).format(
+                severity=severity, venue_name=venue_name, capacity=capacity, 
+                cam_count=len(cameras), avg=total_avg, peak=total_peak
+            )
 
         observed = t(lang, "intel_observed",
             "{trend_desc} "

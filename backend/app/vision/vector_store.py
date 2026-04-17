@@ -61,8 +61,9 @@ class SemanticVectorStore:
                     if self.metadata:
                         self._current_id = max(self.metadata.keys()) + 1
                         
-        await asyncio.to_thread(_load)
-        logger.info(f"Semantic Vector Store initialized with {self._current_id} items.")
+        self._loading_task = asyncio.create_task(asyncio.to_thread(_load))
+        # Do not block here! The model will be usable once _loading_task completes.
+        logger.info("Semantic Vector Store load started in background.")
         
     async def add_event(self, description: str, camera_id: str, timestamp: str, image_url: str = None, bbox: list = None):
         """Add a semantic description of a frame/event to the index."""

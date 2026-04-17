@@ -23,7 +23,9 @@
     "enterpriseAI": "Enterprise AI",
     "automations": "Automations",
     "journeyMap": "Journey Map",
-    "fleetHealth": "Fleet Health"
+    "fleetHealth": "Fleet Health",
+    "videoSearch": "Video Search",
+    "accessControl": "Access Control"
   },
   "language": {
     "label": "Language",

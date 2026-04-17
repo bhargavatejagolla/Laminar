@@ -46,6 +46,7 @@ class LaminarAIService:
     
     _llama = None
     _llama_lock = asyncio.Lock()
+    _llama_unavailable: bool = False  # Set to True once a load failure occurs — prevents repeated warnings
 
     def __init__(self):
         self.gemini_key = settings.GEMINI_API_KEY
@@ -54,11 +55,15 @@ class LaminarAIService:
 
     async def _get_local_model(self):
         """Lazy-load the local model into memory."""
+        # Short-circuit immediately if a previous load attempt permanently failed
+        if LaminarAIService._llama_unavailable:
+            return None
         if self._llama is None:
             async with self._llama_lock:
                 if self._llama is None:
                     if not os.path.exists(LOCAL_MODEL_PATH):
-                        logger.warning(f"Local AI Model not found at {LOCAL_MODEL_PATH}. Falling back to Cloud AI.")
+                        logger.warning(f"Local AI Model not found at {LOCAL_MODEL_PATH}. Falling back to Cloud AI. (This warning won't repeat.)")
+                        LaminarAIService._llama_unavailable = True
                         return None
                     try:
                         from llama_cpp import Llama
@@ -73,8 +78,13 @@ class LaminarAIService:
                             verbose=False
                         )
                         logger.info("Local model loaded successfully.")
+                    except ImportError:
+                        logger.warning("llama-cpp-python is not installed — local model disabled. Falling back to Cloud AI. (This warning won't repeat.)")
+                        LaminarAIService._llama_unavailable = True
+                        return None
                     except Exception as e:
-                        logger.warning(f"Failed to load local model (llama-cpp-python may be missing): {e}. Falling back to Cloud AI.")
+                        logger.warning(f"Failed to load local model: {e}. Falling back to Cloud AI. (This warning won't repeat.)")
+                        LaminarAIService._llama_unavailable = True
                         return None
         return self._llama
 
@@ -153,7 +163,7 @@ class LaminarAIService:
             return None
 
         import httpx
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={self.gemini_key}"
         
         payload = {
             "contents": [{

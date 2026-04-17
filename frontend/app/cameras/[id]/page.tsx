@@ -22,9 +22,9 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { getToken } from "@/services/auth";
 import { toast } from "sonner";
+import { useAlertStream } from "@/src/hooks/useAlertStream";
 
 const BACKEND_BASE = "/api/v1";
-const BACKEND_ROOT = ""; // relative root for static assets (clips)
 
 export default function CameraStreamPage() {
   const { id } = useParams() as { id: string };
@@ -57,17 +57,13 @@ export default function CameraStreamPage() {
     retry: false,
   });
 
-  // Fetch real detection metrics — polls every 2 seconds
+  // Fetch real live intelligence snapshot — polls every 2 seconds
   const { data: metrics } = useQuery({
-    queryKey: ["cameraMetrics", camera?.venue_id],
+    queryKey: ["cameraIntelligence", id],
     queryFn: async () => {
-      if (!camera?.venue_id) return null;
-      const res = await api.get(
-        `/camera-intelligence/metrics/${camera.venue_id}`
-      );
-      return res.data?.cameras;
+      const res = await api.get(`/intelligence/camera/${id}`);
+      return res.data;
     },
-    enabled: !!camera?.venue_id,
     refetchInterval: 2000,
   });
 
@@ -86,12 +82,33 @@ export default function CameraStreamPage() {
     ? `${BACKEND_BASE}/vision/feed/${id}?token=${encodeURIComponent(token)}`
     : null;
 
-  // Real metrics from camera intelligence
-  const nodeMetrics = metrics ? metrics[id] : null;
-  const peopleCount = nodeMetrics?.person_count ?? nodeMetrics?.latest_count ?? 0;
-  const riskScore = nodeMetrics?.latest_risk_score ?? 0;
+  // Real metrics from camera intelligence snapshot
+  const snapshot = metrics?.snapshot;
+  const peopleCount = snapshot?.density?.current ?? 0;
+  const riskLevel = snapshot?.intelligence?.overall_risk_level ?? "low";
+  const riskScore = riskLevel === "critical" ? 95 : riskLevel === "high" ? 75 : riskLevel === "medium" ? 50 : 25;
   const frameRate = health?.fps_configured ?? camera?.fps ?? 0;
   const isStreamActive = health?.health_status === "healthy" || health?.health_status === "degraded";
+
+  // WebSocket Live Analytics Mapping
+  const [liveMetric, setLiveMetric] = useState<any>(null);
+  
+  useAlertStream({
+    enabled: true,
+    onMetricUpdate: (metric) => {
+      if (metric.camera_id === id) {
+        setLiveMetric(metric);
+      }
+    }
+  });
+  
+  const entries = liveMetric?.entries ?? 0;
+  const exits = liveMetric?.exits ?? 0;
+  const actSitting = liveMetric?.activity?.sitting ?? 0;
+  const actStanding = liveMetric?.activity?.standing ?? 0;
+  const actNormal = liveMetric?.activity?.normal ?? 0;
+  const actWalking = liveMetric?.activity?.walking ?? 0;
+  const liveVelocity = liveMetric?.velocity ?? null;
 
   const toggleFullscreen = async () => {
     try {
@@ -443,7 +460,13 @@ export default function CameraStreamPage() {
                     </div>
                     <div className="p-2 border-t border-slate-800 bg-slate-900/90 flex justify-between items-center text-xs">
                       <span className="text-slate-400 font-mono truncate">{clip.filename.split('_')[2]}</span>
-                      <a href={`${BACKEND_ROOT}${clip.download_url || clip.url}`} download target="_blank" rel="noreferrer" className="text-cyan-400 hover:text-cyan-300 p-1 bg-cyan-900/20 rounded">
+                      <a
+                        href={`http://localhost:8000${clip.download_url || clip.url}?token=${encodeURIComponent(token || '')}`}
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-400 hover:text-cyan-300 p-1 bg-cyan-900/20 rounded"
+                      >
                         <Download className="w-3 h-3" />
                       </a>
                     </div>
@@ -532,6 +555,95 @@ export default function CameraStreamPage() {
                   />
                 </div>
               </div>
+              
+            </div>
+          </div>
+
+          {/* New Live Traffic Analytics Card */}
+          <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 rounded-xl p-5">
+            <h3 className="text-xs font-semibold text-cyan-500 uppercase tracking-widest mb-4 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2"><Map className="w-4 h-4" /> Live Traffic Analytics</span>
+              <span className="text-[9px] text-cyan-400 font-mono bg-cyan-400/10 px-1.5 py-0.5 rounded border border-cyan-400/20 animate-pulse">STREAM</span>
+            </h3>
+
+            {/* Live Velocity Badge */}
+            {liveVelocity !== null && (
+              <div className="mb-4 flex items-center justify-between bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Crowd Velocity</span>
+                <span className={`font-mono text-sm font-black ${
+                  liveVelocity > 20 ? 'text-rose-400' : liveVelocity > 8 ? 'text-amber-400' : 'text-emerald-400'
+                }`}>
+                  {liveVelocity.toFixed(1)} <span className="text-[9px] font-normal text-slate-500">px/s</span>
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-5">
+              {/* Entry / Exit Gates */}
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                    Flow Gates
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-900/50 rounded-lg p-2.5 border border-emerald-500/10 shadow-[inset_0_0_10px_rgba(16,185,129,0.05)]">
+                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider uppercase">Entries</p>
+                    <p className="text-2xl font-black font-mono text-emerald-400">{entries}</p>
+                  </div>
+                  <div className="bg-slate-900/50 rounded-lg p-2.5 border border-rose-500/10 shadow-[inset_0_0_10px_rgba(244,63,94,0.02)]">
+                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider uppercase">Exits</p>
+                    <p className="text-2xl font-black font-mono text-rose-400">{exits}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Behavior Kinetics */}
+              <div className="pt-4 border-t border-slate-800/80">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                    Live Kinetics
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-[11px] mb-1.5 font-mono font-medium">
+                      <span className="text-cyan-400">Sitting / Resting</span>
+                      <span className="text-cyan-300">{actSitting}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                      <div className="bg-cyan-500 h-1.5 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.6)] transition-all duration-300" style={{ width: `${actSitting}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] mb-1.5 font-mono font-medium">
+                      <span className="text-blue-400">Standing / Idle</span>
+                      <span className="text-blue-300">{actStanding}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                      <div className="bg-blue-500 h-1.5 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.6)] transition-all duration-300" style={{ width: `${actStanding}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] mb-1.5 font-mono font-medium">
+                      <span className="text-emerald-400">Normal Moving</span>
+                      <span className="text-emerald-300">{actNormal}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                      <div className="bg-emerald-500 h-1.5 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.6)] transition-all duration-300" style={{ width: `${actNormal}%` }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] mb-1.5 font-mono font-medium">
+                      <span className="text-orange-400">Walking / Fast</span>
+                      <span className="text-orange-300">{actWalking}%</span>
+                    </div>
+                    <div className="w-full bg-slate-800 rounded-full h-1.5">
+                      <div className="bg-orange-500 h-1.5 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.6)] transition-all duration-300" style={{ width: `${actWalking}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -585,6 +697,25 @@ export default function CameraStreamPage() {
               </p>
             )}
           </div>
+
+          {/* AI Explanation / Context Panel */}
+          {snapshot?.intelligence?.summary && (
+             <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)] rounded-xl p-5">
+              <h3 className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Activity className="w-4 h-4" /> Live AI Context
+              </h3>
+              <p className="text-sm font-mono text-slate-300 leading-relaxed mb-4">
+                {snapshot.intelligence.summary}
+              </p>
+              
+              {snapshot.intelligence.recommended_action && (
+                <div className="bg-indigo-950/30 border border-indigo-500/20 p-3 rounded-lg">
+                  <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider mb-1">Recommended Action</p>
+                  <p className="text-xs text-indigo-200">{snapshot.intelligence.recommended_action}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Controls */}
           <button

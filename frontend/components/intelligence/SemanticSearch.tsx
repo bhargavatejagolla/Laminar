@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Search, Loader2, Camera, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { api } from '@/services/api';
 
 // Replace with actual API URL or proxy path
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -30,18 +31,13 @@ export function SemanticSearch() {
     setError(null);
     
     try {
-      const res = await fetch(`${API_URL}/api/v1/search/semantic`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query.trim(), top_k: 5 }),
+      const { data } = await api.post('/search/semantic', { 
+        query: query.trim(), 
+        top_k: 5 
       });
-
-      if (!res.ok) throw new Error('Search failed. Please ensure the backend VQA system is online.');
-
-      const data = await res.json();
       setResults(data);
     } catch (err: any) {
-      setError(err.message || 'An error occurred during search.');
+      setError(err?.response?.data?.detail || err.message || 'An error occurred during search.');
     } finally {
       setLoading(false);
     }
@@ -128,7 +124,7 @@ export function SemanticSearch() {
               {result.image_url && (
                 <div className="w-full bg-black border-t border-neutral-800 overflow-hidden relative group">
                   <img 
-                    src={`${API_URL}${result.image_url}`} 
+                    src={result.image_url.startsWith('http') ? result.image_url : `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '')}${result.image_url}`} 
                     alt="Event Snapshot" 
                     className="w-full h-auto block opacity-80 group-hover:opacity-100 transition-opacity"
                     onError={(e) => {

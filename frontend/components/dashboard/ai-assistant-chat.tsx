@@ -85,21 +85,15 @@ export default function AIAssistantChat() {
 
   const fetchStatus = async () => {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${API_BASE}/api/v1/assistant/status`, {
-        signal: controller.signal,
-      }).catch(() => null);
-      clearTimeout(timeout);
-      if (res && res.ok) {
-        const data = await res.json();
-        setIndexStatus(data);
+      const res = await api.get('/assistant/status', { timeout: 3000 });
+      if (res && res.data) {
+        setIndexStatus(res.data);
         setBackendOnline(true);
       } else {
         setBackendOnline(false);
       }
     } catch {
-      // Backend unreachable — show graceful offline state, never throw
+      // Backend unreachable — show graceful offline state
       setBackendOnline(false);
       setIndexStatus(null);
     }
@@ -108,7 +102,7 @@ export default function AIAssistantChat() {
   const reindex = async () => {
     setIsIndexing(true);
     try {
-      await fetch(`${API_BASE}/api/v1/assistant/index`, { method: "POST" });
+      await api.post('/assistant/index');
       setTimeout(fetchStatus, 3000);
     } catch (e) {
       console.error("Failed to reindex:", e);

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAlertStream } from "@/src/hooks/useAlertStream";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/services/api";
 
 interface JourneyStep {
   camera_id: string;
@@ -59,9 +59,8 @@ export default function JourneysPage() {
 
   const fetchJourneys = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/journeys/`);
-      const data = await res.json();
-      setJourneys(data.journeys || []);
+      const res = await api.get('/journeys/');
+      setJourneys(res.data.journeys || []);
     } catch (e) {
       console.error(e);
     } finally {

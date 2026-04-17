@@ -62,7 +62,9 @@ export default function AnalyticsCharts({ venueId }: { venueId: string }) {
       return res.data;
     },
     enabled: !!venueId,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
+    staleTime: 55000,
+    retry: false,
   });
 
   if (!venueId) {

@@ -18,6 +18,7 @@ in the metadata. This is critical for:
 
 from app.models.venue import Venue
 from app.models.user import User
+from app.models.user_venue_access import UserVenueAccess
 from app.models.camera import Camera
 
 from app.models.detection import Detection

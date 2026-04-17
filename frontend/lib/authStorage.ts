@@ -3,7 +3,7 @@
  * Handles storing JWT token safely
  */
 
-const TOKEN_KEY = "laminar_token";
+const TOKEN_KEY = "access_token";
 
 export const authStorage = {
   getToken: (): string | null => {

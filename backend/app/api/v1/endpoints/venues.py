@@ -40,7 +40,7 @@ from app.schemas.venue import (
 )
 from app.schemas.camera import CameraCreate, CameraResponse
 
-from app.core.dependencies import require_role, get_current_active_user
+from app.core.dependencies import require_role, get_current_active_user, verify_venue_access
 from app.models.user import UserRole
 from app.models.crowd_metric import CrowdMetric
 from app.services.geocoding_service import GeocodingService
@@ -93,8 +93,8 @@ async def create_venue(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Super Admin only for complete location creation
+    user=Depends(require_role(UserRole.SUPER_ADMIN)),
 ):
     """
     Create a new venue.
@@ -201,6 +201,9 @@ async def list_venues(
         skip=skip,
         limit=limit,
     )
+    if not user.is_super_admin:
+        allowed_ids = {str(v.id) for v in user.venues}
+        venues = [v for v in venues if str(v.id) in allowed_ids]
     return venues
 
 
@@ -255,14 +258,14 @@ async def bulk_delete_venues(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    user=Depends(require_role(UserRole.ADMIN)),  # ✅ RBAC: Admin only
+    user=Depends(require_role(UserRole.SUPER_ADMIN)),  # ✅ RBAC: Super Admin only
 ):
     """
     Soft delete multiple venues.
     
     - Continues on error (skips invalid IDs)
     - Returns count of deleted venues in response
-    - Requires ADMIN role
+    - Requires SUPER ADMIN role
     """
     count = await venue_service.bulk_delete_venues(
         db,
@@ -289,7 +292,7 @@ async def get_venue(
     venue_id: UUID,
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
-    user=Depends(get_current_active_user),  # ✅ RBAC: Any authenticated user
+    _=Depends(verify_venue_access)
 ):
     """
     Get venue by ID.
@@ -326,8 +329,9 @@ async def update_venue(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Admin only bounded by Location Matrix
+    _=Depends(verify_venue_access),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Update venue details.
@@ -374,8 +378,9 @@ async def activate_venue(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Admin only bounded by Location config
+    _=Depends(verify_venue_access),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Activate a venue.
@@ -407,8 +412,9 @@ async def deactivate_venue(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Admin only
+    _=Depends(verify_venue_access),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Deactivate a venue.
@@ -440,8 +446,9 @@ async def enable_monitoring(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Admin only
+    _=Depends(verify_venue_access),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Enable monitoring for a venue.
@@ -473,8 +480,9 @@ async def disable_monitoring(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Admin only
+    _=Depends(verify_venue_access),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Disable monitoring for a venue.
@@ -509,7 +517,7 @@ async def delete_venue(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    user=Depends(require_role(UserRole.ADMIN)),  # ✅ RBAC: Admin only
+    user=Depends(require_role(UserRole.SUPER_ADMIN)),  # ✅ RBAC: Super Admin only
 ):
     """
     Soft delete a venue.
@@ -546,7 +554,7 @@ async def get_venue_stats(
     venue_id: UUID,
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
-    user=Depends(get_current_active_user),  # ✅ RBAC: Any authenticated user
+    _=Depends(verify_venue_access),
 ):
     """
     Get venue statistics for dashboard.
@@ -586,7 +594,7 @@ async def get_capacity_status(
     request: CapacityStatusRequest,
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
-    user=Depends(get_current_active_user),  # ✅ RBAC: Any authenticated user
+    _=Depends(verify_venue_access),
 ):
     """
     Get capacity status for current crowd count.
@@ -627,8 +635,8 @@ async def add_camera_to_venue(
     db: AsyncSession = Depends(get_db),
     tenant_id: Optional[UUID] = Depends(get_current_tenant_id),
     user_id: Optional[UUID] = Depends(get_current_user_id),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    _=Depends(verify_venue_access),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Add a new camera to this specific venue.

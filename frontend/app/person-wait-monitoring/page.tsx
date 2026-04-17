@@ -16,24 +16,11 @@ import {
   ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell
 } from "recharts";
 import { useTranslation } from "react-i18next";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/services/api";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("access_token");
-}
-
-async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const token = getToken();
-  return fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -196,18 +183,18 @@ export default function PersonWaitMonitoringPage() {
   useEffect(() => {
     if (!cameraId) return;
     // Notify backend queue page is active
-    authFetch(`${API}/api/v1/dwell/activate/${cameraId}`, { method: "POST" }).catch(() => {});
+    api.post(`/dwell/activate/${cameraId}`).catch(() => {});
     return () => {
       // Notify backend queue page closed
-      authFetch(`${API}/api/v1/dwell/deactivate/${cameraId}`, { method: "POST" }).catch(() => {});
+      api.post(`/dwell/deactivate/${cameraId}`).catch(() => {});
     };
   }, [cameraId]);
 
   // Load cameras
   useEffect(() => {
-    authFetch(`${API}/api/v1/cameras`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => {
+    api.get(`/cameras`)
+      .then(r => {
+        const data = r.data;
         const arr = Array.isArray(data) ? data : (data.cameras || data.items || []);
         setCameras(arr);
         if (arr.length > 0) setSelectedCamera(arr[0]);
@@ -247,10 +234,9 @@ export default function PersonWaitMonitoringPage() {
 
   const loadStats = async (id: string) => {
     try {
-      const r = await authFetch(`${API}/api/v1/dwell/stats/${id}`);
-      if (r.ok) {
-        const data: LiveStats = await r.json();
-        setStats(data);
+      const r = await api.get(`/dwell/stats/${id}`);
+      const data: LiveStats = r.data;
+      setStats(data);
         setConnected(true);
         data.tracks.forEach(track => {
           const matchedZone = zones.find(z => z.zone_name === track.zone);
@@ -265,46 +251,42 @@ export default function PersonWaitMonitoringPage() {
           }
         });
         const currentIds = new Set(data.tracks.map(t => t.track_id));
-        alertedTracksRef.current.forEach(id => { if (!currentIds.has(id)) alertedTracksRef.current.delete(id); });
-      } else setConnected(false);
+      setConnected(true);
     } catch { setConnected(false); }
   };
 
   const loadMetrics = async (id: string) => {
     try {
-      const r = await authFetch(`${API}/api/v1/dwell/metrics/${id}`);
-      if (r.ok) setMetrics(await r.json());
+      const r = await api.get(`/dwell/metrics/${id}`);
+      setMetrics(r.data);
     } catch {}
   };
 
   const loadAnalytics = async (id: string) => {
     try {
-      const r = await authFetch(`${API}/api/v1/dwell/analytics/wait-times?camera_id=${id}`);
-      if (r.ok) setAnalytics(await r.json());
+      const r = await api.get(`/dwell/analytics/wait-times?camera_id=${id}`);
+      setAnalytics(r.data);
     } catch {}
   };
 
   const loadHourlyHistory = async (id: string) => {
     try {
-      const r = await authFetch(`${API}/api/v1/dwell/history/hourly?camera_id=${id}&hours=24`);
-      if (r.ok) {
-        const data = await r.json();
-        setHourlyData(data.buckets || []);
-      }
+      const r = await api.get(`/dwell/history/hourly?camera_id=${id}&hours=24`);
+      setHourlyData(r.data.buckets || []);
     } catch {}
   };
 
   const loadRecords = async (id: string) => {
     try {
-      const r = await authFetch(`${API}/api/v1/dwell/records?camera_id=${id}&limit=30`);
-      if (r.ok) setRecords(await r.json());
+      const r = await api.get(`/dwell/records?camera_id=${id}&limit=30`);
+      setRecords(r.data);
     } catch {}
   };
 
   const loadZones = async (id: string) => {
     try {
-      const r = await authFetch(`${API}/api/v1/dwell/zones/${id}`);
-      if (r.ok) setZones(await r.json());
+      const r = await api.get(`/dwell/zones/${id}`);
+      setZones(r.data);
     } catch {}
   };
 
@@ -312,31 +294,26 @@ export default function PersonWaitMonitoringPage() {
     if (!cameraId || !newZoneName.trim()) return;
     setLoading(true);
     try {
-      const r = await authFetch(`${API}/api/v1/dwell/zones`, {
-        method: "POST",
-        body: JSON.stringify({
-          camera_id: cameraId,
-          zone_name: newZoneName.trim(),
-          polygon_coordinates: [[0,0],[640,0],[640,480],[0,480]],
-          long_wait_threshold_seconds: newZoneThreshold,
-        }),
+      await api.post(`/dwell/zones`, {
+        camera_id: cameraId,
+        zone_name: newZoneName.trim(),
+        polygon_coordinates: [[0,0],[640,0],[640,480],[0,480]],
+        long_wait_threshold_seconds: newZoneThreshold,
       });
-      if (r.ok) {
-        toast.success(`Zone "${newZoneName}" created`);
-        setNewZoneName(""); setShowAddZone(false); loadZones(cameraId);
-      }
+      toast.success(`Zone "${newZoneName}" created`);
+      setNewZoneName(""); setShowAddZone(false); loadZones(cameraId);
     } finally { setLoading(false); }
   };
 
   const deleteZone = async (zoneId: string, name: string) => {
     if (!cameraId) return;
-    await authFetch(`${API}/api/v1/dwell/zones/${zoneId}`, { method: "DELETE" });
+    await api.delete(`/dwell/zones/${zoneId}`);
     toast.info(`Zone "${name}" removed`);
     loadZones(cameraId);
   };
 
   const streamSrc = cameraId && streaming
-    ? `${API}/api/v1/dwell/stream/${cameraId}${getToken() ? `?token=${getToken()}` : "?anon=1"}&retry=${streamRetryCount}`
+    ? `${api.defaults.baseURL?.replace('/api/v1', '')}/api/v1/dwell/stream/${cameraId}${getToken() ? `?token=${getToken()}` : "?anon=1"}&retry=${streamRetryCount}`
     : undefined;
 
   const cameraLabel = (c: Camera) => c.location_label || c.name || c.id.slice(0, 8);

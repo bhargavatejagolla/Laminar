@@ -29,7 +29,7 @@ async def generate_synthetic_data(
 
     WARNING: This writes to the database. Use only on staging/demo environments.
     """
-    if user.role not in (UserRole.ADMIN,):
+    if user.role not in (UserRole.SUPER_ADMIN, UserRole.ADMIN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Synthetic data generation requires admin role",

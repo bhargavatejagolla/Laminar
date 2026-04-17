@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useEffect, useState } from "react"
 
 interface Props {
   capacity: number
@@ -19,6 +19,13 @@ export default function VenueCapacityBar({
   const percent = useMemo(() => {
     return Math.min(Math.round(occupancyPercent ?? 0), 100)
   }, [occupancyPercent])
+
+  // Skip animation on first mount so the bar fills instantly (not slowly from 0%)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 50)
+    return () => clearTimeout(timer)
+  }, [])
 
   const { barColor, bgGlow, statusLabel, statusColor } = useMemo(() => {
     if (percent >= criticalThreshold) return {
@@ -70,9 +77,8 @@ export default function VenueCapacityBar({
             style={{ left: `min(${criticalThreshold}%, calc(100% - 2px))` }}
           />
         )}
-        {/* Animated Bar */}
         <div
-          className={`h-full rounded-md ${barColor} ${bgGlow} transition-all duration-700`}
+          className={`h-full rounded-md ${barColor} ${bgGlow} ${mounted ? "transition-[width] duration-300 ease-out" : ""}`}
           style={{ width: `${percent}%` }}
         />
       </div>

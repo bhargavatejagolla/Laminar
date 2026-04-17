@@ -46,7 +46,7 @@ logger = get_logger(__name__)
 # Alert trigger thresholds
 # ─────────────────────────────────────────────────────────────────────────────
 
-_ALERT_COOLDOWN_SECS = 60      # minimum seconds between alerts per camera
+_ALERT_COOLDOWN_SECS = 30      # minimum seconds between alerts per camera
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -327,6 +327,10 @@ class ZoneIntelligenceOrchestrator:
                     self._dispatch_alert(snap, venue_id, venue_name or "Unknown Venue",
                                          metric_id or "")
                 )
+        elif snap.overall_risk_level in ("low", "medium") and venue_id:
+            if now_ts - getattr(self, "_last_auto_resolve_time", 0) > 120.0:
+                self._last_auto_resolve_time = now_ts
+                asyncio.ensure_future(self._dispatch_auto_resolve(venue_id))
 
         self._latest = snap
 
@@ -423,13 +427,15 @@ class ZoneIntelligenceOrchestrator:
                 "current_level": snap.overall_risk_level,
                 "transition": "escalated",
                 "trend": snap.trend,
-                "severity": None, # Will be calculated dynamically by AlertEngineService
                 "should_alert": True,
                 "recommended_action": snap.recommended_action or snap.intelligence_summary,
                 "reason": snap.alert_reason or snap.intelligence_summary,
+                "xai_explanation": snap.intelligence_summary,
+                "xai_factors": snap.contributing_factors,
+                "predicted_level": "critical" if snap.time_to_critical_min and snap.time_to_critical_min < 15 else "high" if snap.predicted_trend in ["explosive", "rising"] else snap.overall_risk_level,
+                "predicted_risk_score": 90.0 if snap.predicted_trend == "explosive" else 75.0 if snap.predicted_trend == "rising" else 50.0,
+                "escalation_probability": snap.prediction_confidence if snap.predicted_trend in ["explosive", "rising"] else 0.05,
                 "alert_type": snap.alert_type,
-                "risk_score": None, # Managed dynamically
-                "occupancy_percent": None,
                 "early_warning_triggered": snap.overall_risk_level == "critical",
                 "velocity": snap.avg_speed_px_per_frame,
                 "direction_variance": 1.0 - snap.stationary_ratio,
@@ -453,8 +459,28 @@ class ZoneIntelligenceOrchestrator:
                 },
             )
         except Exception as exc:
-            logger.warning(
+            logger.exception(
                 "Intelligence alert dispatch failed (non-critical)",
+                extra={"camera_id": self.camera_id},
+            )
+
+    async def _dispatch_auto_resolve(self, venue_id: str) -> None:
+        """Tell the alert engine the scene is safe to automatically clear alerts."""
+        try:
+            import uuid as _uuid
+            from app.core.database import db_manager
+            from app.services.alert_engine_service import AlertEngineService
+
+            async with db_manager.session() as session:
+                engine = AlertEngineService()
+                await engine.live_feed_auto_resolve(
+                    session,
+                    venue_id=_uuid.UUID(venue_id),
+                    camera_id=self.camera_id,
+                )
+        except Exception as exc:
+            logger.warning(
+                "Auto-resolve dispatch failed",
                 extra={"camera_id": self.camera_id, "error": str(exc)},
             )
 
@@ -482,7 +508,31 @@ class ZoneIntelligenceOrchestrator:
 
     # ── API helper ────────────────────────────────────────────────────────────
 
+    _SNAP_TTL_SECONDS = 15.0  # Snapshots older than this are considered stale
+
     def get_latest(self) -> Optional[ZoneIntelligenceSnapshot]:
+        """
+        Return the latest snapshot, but ONLY if it's fresh (<15s).
+        This prevents the dashboard from showing stale counts when a camera goes offline.
+        """
+        if not self._latest:
+            return None
+            
+        # Check if snapshot is stale
+        try:
+            from datetime import datetime, timezone
+            snap_time = datetime.fromisoformat(self._latest.timestamp)
+            # Ensure snap_time is timezone-aware
+            if snap_time.tzinfo is None:
+                snap_time = snap_time.replace(tzinfo=timezone.utc)
+            
+            age = (datetime.now(timezone.utc) - snap_time).total_seconds()
+            if age > self._SNAP_TTL_SECONDS:
+                logger.debug(f"Orchestrator {self.camera_id}: Invaliding stale snapshot (age: {age}s)")
+                return None
+        except Exception:
+            return None
+
         return self._latest
 
 

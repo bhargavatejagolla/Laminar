@@ -50,7 +50,8 @@ export function useVenueIntelligence(venueId?: string) {
       return data;
     },
     enabled: !!venueId,
-    refetchInterval: 30_000, // Refresh every 30 seconds for live intelligence
+    staleTime: 5000,
+    refetchInterval: 30000, // Reduced from 30s
     retry: 1,
   });
 }
@@ -65,7 +66,8 @@ export function useSystemIntelligence() {
       const { data } = await api.get("/intelligence/system");
       return data;
     },
-    refetchInterval: 15_000, // Refresh every 15 seconds
+    staleTime: 5000,
+    refetchInterval: 15000, // Refresh every 15 seconds
     retry: 1,
   });
 }

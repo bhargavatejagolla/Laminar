@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 from uuid import UUID
 
 from jose import jwt, JWTError
-from passlib.context import CryptContext
+import bcrypt
 
 from app.core.config import settings
 
@@ -22,20 +22,22 @@ from app.core.config import settings
 # Password Hashing
 # ==========================================================
 
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-)
-
 
 def hash_password(password: str) -> str:
     """Hash plain password."""
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
     """Verify password against hash."""
-    return pwd_context.verify(plain_password, password_hash)
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"), 
+            password_hash.encode("utf-8")
+        )
+    except Exception:
+        return False
 
 
 # ==========================================================

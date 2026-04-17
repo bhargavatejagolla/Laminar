@@ -43,3 +43,15 @@ class UserProfileResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class UserRoleUpdate(BaseModel):
+    role: str
+
+class UserVenueUpdate(BaseModel):
+    venue_ids: list[UUID]
+
+class UserAdminResponse(UserProfileResponse):
+    venues_mapped: list[UUID] = []
+
+    class Config:
+        from_attributes = True
+

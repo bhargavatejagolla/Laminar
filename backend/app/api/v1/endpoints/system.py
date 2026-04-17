@@ -11,6 +11,7 @@ except ImportError:
     psutil = None
 from datetime import datetime, timezone
 
+from uuid import UUID
 from fastapi import APIRouter
 from sqlalchemy import select, func
 
@@ -22,6 +23,10 @@ from app.models.crowd_metric import CrowdMetric
 from app.models.venue import Venue
 from app.models.crowd_alert import CrowdAlert
 
+
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/system", tags=["System"])
 
@@ -130,68 +135,37 @@ async def dashboard_stats():
     live_risk_cams = 0
     processed_camera_ids = set()
 
-    # 1. Start with live orchestrators
-    for cam_id, orch in all_orch.items():
-        snap_obj = orch.get_latest()
-        if snap_obj:
-            snap = snap_obj.to_dict()
-            live_total_people += snap.get("density", {}).get("current", 0)
-            if snap.get("intelligence", {}).get("overall_risk_level") in ["high", "critical"]:
-                live_risk_cams += 1
-            processed_camera_ids.add(cam_id)
-
-    # 2. Add cameras from DB that aren't in live_orch (fallback)
+    # 1. Start with live orchestrators ONLY — and ONLY if they are genuinely online in DB
     async with db_manager.session() as session:
-        # Get all active cameras to check for snapshots/history
-        from app.models.crowd_frame import CrowdFrame
-        from app.models.venue import Venue
-
-        # We'll use a slightly simplified version of the logic in zone_intelligence summary
-        # to keep this endpoint fast but accurate.
-        stmt = select(Camera.id, Camera.last_snapshot, Camera.venue_id).where(
-            Camera.is_active.is_(True),
-            Camera.is_deleted.isnot(True)
-        )
-        res = await session.execute(stmt)
-        for r in res.all():
-            cid = str(r.id)
-            if cid in processed_camera_ids:
-                continue
-                
-            # Fallback 1: DB Cache
-            snap = r.last_snapshot
-            if snap:
-                live_total_people += snap.get("density", {}).get("current", 0)
-                if snap.get("intelligence", {}).get("overall_risk_level") in ["high", "critical"]:
-                    live_risk_cams += 1
-                continue
-                
-            # Fallback 2: Synthesis (Frames)
-            frame_res = await session.execute(
-                select(CrowdFrame.detected_count)
-                .where(CrowdFrame.camera_id == cid)
-                .order_by(CrowdFrame.captured_at.desc())
-                .limit(1)
-            )
-            count = frame_res.scalar_one_or_none() or 0
-            live_total_people += count
+        for cam_id, orch in all_orch.items():
+            # Check camera online status in DB for ground truth
+            cam_uuid = UUID(cam_id) if isinstance(cam_id, str) else cam_id
+            camera = await session.get(Camera, cam_uuid)
             
-            # Fallback 3: Synthesis (Alerts for the venue)
-            alert_res = await session.execute(
-                select(CrowdAlert.risk_level)
-                .where(CrowdAlert.venue_id == r.venue_id)
-                .order_by(CrowdAlert.created_at.desc())
-                .limit(1)
-            )
-            risk = alert_res.scalar_one_or_none() or "low"
-            if risk in ["high", "critical"]:
-                live_risk_cams += 1
+            if camera and camera.is_online:
+                snap_obj = orch.get_latest()
+                if snap_obj:
+                    snap = snap_obj.to_dict()
+                    live_total_people += snap.get("density", {}).get("current", 0)
+                    if snap.get("intelligence", {}).get("overall_risk_level") in ["high", "critical"]:
+                        live_risk_cams += 1
+                    processed_camera_ids.add(cam_id)
+            else:
+                logger.debug(f"Dashboard Stats: Skipping camera {cam_id} because it's OFFLINE")
+
+    # 2. Aggregations from DB
+    async with db_manager.session() as session:
 
         # Original counts
         venues_result = await session.execute(
             select(func.count(Venue.id)).where(Venue.is_deleted.isnot(True))
         )
         venues_count = venues_result.scalar_one() or 0
+
+        capacity_result = await session.execute(
+            select(func.sum(Venue.capacity)).where(Venue.is_deleted.isnot(True))
+        )
+        total_venue_capacity = capacity_result.scalar_one() or 0
 
         cameras_result = await session.execute(
             select(func.count(Camera.id)).where(Camera.is_deleted.isnot(True))
@@ -201,7 +175,6 @@ async def dashboard_stats():
         active_cameras_result = await session.execute(
             select(func.count(Camera.id)).where(
                 Camera.is_active.is_(True),
-                Camera.monitoring_enabled.is_(True),
                 Camera.is_deleted.isnot(True)
             )
         )
@@ -270,7 +243,7 @@ async def dashboard_stats():
         "cameras": cameras_count,
         "active_cameras": active_cameras_count,
         "alerts": alerts_count,
-        "totalCapacity": live_total_people, # Use live/synthesized total instead of static venue capacity
+        "totalCapacity": total_venue_capacity, # Use actual venue capacity from DB
         "systemHealth": sys_health,
         "ai_insights": {
             "peak_time": peak_time,

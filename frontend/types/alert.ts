@@ -4,7 +4,7 @@ export interface Alert {
   metric_id?: string;
   risk_level: "low" | "medium" | "high" | "critical";
   severity: number;
-  status: "new" | "acknowledged" | "resolved";
+  status: "new" | "open" | "acknowledged" | "resolved";
   escalation_level: string;
   extra_data?: any;
   last_notified_at?: string;
@@ -12,4 +12,6 @@ export interface Alert {
   created_at: string;
   updated_at: string;
   explanation?: string;
+  predicted_level?: string;
+  escalation_probability?: number;
 }

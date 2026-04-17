@@ -11,8 +11,8 @@ logger = get_logger(__name__)
 
 class PanicDetectionService:
     """
-    Core ML Service for detecting crowd surges and panic via Optical Flow.
-    Uses Lucas-Kanade to track movement vectors across consecutive frames.
+    Core ML Service for detecting crowd surges and panic.
+    Replaced Optical Flow with MediaPipe Pose to compute velocity logic based on authentic human keypoints!
     """
     
     def __init__(
@@ -25,24 +25,17 @@ class PanicDetectionService:
         self.density_threshold = density_threshold
         self.trigger_cooldown = trigger_cooldown
         
-        # State tracking per instance (one per camera)
-        self.prev_gray: Optional[np.ndarray] = None
-        self.prev_pts: Optional[np.ndarray] = None
-        
-        # Lucas-Kanade parameters
-        self.lk_params = dict(
-            winSize=(15, 15),
-            maxLevel=2,
-            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
+        # Initialize the MediaPipe Pose Estimator for full-body tracking kinetics
+        from mediapipe.python.solutions import pose as mp_pose
+        self.mp_pose = mp_pose
+        self.pose = self.mp_pose.Pose(
+            static_image_mode=False,
+            min_detection_confidence=0.5,
+            model_complexity=0   # Fast processing mode!
         )
         
-        # ShiTomasi corner detection parameters
-        self.feature_params = dict(
-            maxCorners=200,
-            qualityLevel=0.3,
-            minDistance=7,
-            blockSize=7
-        )
+        # Track 33 keypoints over consecutive frames to extract vector magnitudes
+        self.prev_landmarks = None
         
         self.last_trigger_time: Optional[datetime] = None
         self.avg_velocity = 0.0
@@ -58,7 +51,7 @@ class PanicDetectionService:
         config: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Process a single frame to calculate motion and evaluate panic rules.
+        Process a single frame to calculate motion and evaluate panic rules using precise human joint displacement.
         """
         result = {
             "avg_velocity": 0.0,
@@ -76,80 +69,73 @@ class PanicDetectionService:
         d_thresh = config.get("density_threshold", self.density_threshold) if config else self.density_threshold
         c_window = config.get("trigger_cooldown", self.trigger_cooldown) if config else self.trigger_cooldown
 
-        # Convert to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        
-        # Initialization / Reset if lost tracking
-        if self.prev_gray is None or self.prev_pts is None or len(self.prev_pts) < 10:
-            self.prev_gray = gray
-            self.prev_pts = cv2.goodFeaturesToTrack(gray, mask=None, **self.feature_params)
-            if self.prev_pts is None:
-                self.prev_pts = np.array([], dtype=np.float32).reshape(0, 1, 2)
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        try:
+            pose_results = self.pose.process(rgb_frame)
+        except Exception as e:
             return result
-            
-        # Calculate Optical Flow
-        next_pts, status, err = cv2.calcOpticalFlowPyrLK(
-            self.prev_gray, gray, self.prev_pts, None, **self.lk_params
-        )
         
-        # Ensure we have valid points
-        if next_pts is not None and status is not None:
-            # Select good points
-            good_new = next_pts[status == 1]
-            good_old = self.prev_pts[status == 1]
-            
-            if len(good_new) > 0:
-                # Calculate movement vectors
-                movements = good_new - good_old
-                # Calculate magnitude (velocity)
-                magnitudes = np.sqrt(np.sum(movements**2, axis=1))
+        valid_magnitudes = []
+        
+        if pose_results and pose_results.pose_landmarks:
+            curr_landmarks = pose_results.pose_landmarks.landmark
+            if self.prev_landmarks is not None:
+                h, w = frame.shape[:2]
                 
-                # Filter out pure noise and extreme anomalies (Relative to threshold)
-                valid_magnitudes = magnitudes[(magnitudes > 0.5) & (magnitudes < (v_thresh * 5))]
-                
-                if len(valid_magnitudes) > 0:
-                    self.avg_velocity = float(np.mean(valid_magnitudes))
-                    self.avg_variance = float(np.var(valid_magnitudes))
-                    if np.isnan(self.avg_variance):
-                        self.avg_variance = 0.0
-                        
-                    self.acceleration = float(self.avg_velocity - self.last_velocity)
-                    self.last_velocity = self.avg_velocity
+                # Iterate precisely through all 33 intrinsic joint keypoints
+                for i in range(33):
+                    curr = curr_landmarks[i]
+                    prev = self.prev_landmarks[i]
                     
-                    result["avg_velocity"] = self.avg_velocity
-                    result["variance"] = self.avg_variance
-                    result["acceleration"] = self.acceleration
-                    
-                    # Evaluate Panic Logic
-                    if (self.avg_velocity > v_thresh and 
-                        current_crowd_count >= d_thresh):
+                    if curr.visibility > 0.5 and prev.visibility > 0.5:
+                        dx = (curr.x - prev.x) * w
+                        dy = (curr.y - prev.y) * h
+                        mag = np.hypot(dx, dy)
                         
-                        now = datetime.now(timezone.utc)
-                        # Check cooldown
-                        if (self.last_trigger_time is None or 
-                           (now - self.last_trigger_time).total_seconds() >= c_window):
+                        # Filter micromovement noise and extremely unstable edge jumps
+                        if 0.5 < mag < (v_thresh * 5.0):
+                            valid_magnitudes.append(mag)
                             
-                            result["panic_detected"] = True
-                            result["reason"] = f"Sudden velocity spike ({self.avg_velocity:.1f}px/s) in dense crowd ({current_crowd_count} people)."
-                            self.last_trigger_time = now
-                            
-                            logger.warning(
-                                f"🚨 CROWD SURGE/PANIC DETECTED on camera {camera_id}",
-                                extra={
-                                    "velocity": self.avg_velocity,
-                                    "count": current_crowd_count
-                                }
-                            )
-                        
-            # Update previous frame and points for next cycle
-            self.prev_gray = gray.copy()
-            if len(good_new) < 50:
-                self.prev_pts = cv2.goodFeaturesToTrack(gray, mask=None, **self.feature_params)
-                if self.prev_pts is None:
-                    self.prev_pts = np.array([], dtype=np.float32).reshape(0, 1, 2)
-            else:
-                self.prev_pts = good_new.reshape(-1, 1, 2)
+            self.prev_landmarks = curr_landmarks
         else:
-            self.prev_pts = None
+            self.prev_landmarks = None
             
+        if len(valid_magnitudes) > 0:
+            # Scale from px/frame to approximate px/second (assume ~15 fps effective processing timeline)
+            avg_vel = float(np.mean(valid_magnitudes)) * 15.0
+            variance = float(np.var(valid_magnitudes)) * 15.0
+            
+            if np.isnan(variance):
+                variance = 0.0
+                
+            self.avg_velocity = avg_vel
+            self.avg_variance = variance
+            self.acceleration = float(avg_vel - self.last_velocity)
+            self.last_velocity = avg_vel
+            
+            result["avg_velocity"] = self.avg_velocity
+            result["variance"] = self.avg_variance
+            result["acceleration"] = self.acceleration
+            
+            # Evaluate Surge matrix logic based on verified keypoint velocities
+            if (self.avg_velocity > v_thresh and 
+                current_crowd_count >= d_thresh):
+                
+                now = datetime.now(timezone.utc)
+                # Ensure alerts don't spam endlessly
+                if (self.last_trigger_time is None or 
+                   (now - self.last_trigger_time).total_seconds() >= c_window):
+                    
+                    result["panic_detected"] = True
+                    result["reason"] = f"Unusual keypoint acceleration surge ({self.avg_velocity:.1f}px/s) tracked against a dense crowd ({current_crowd_count} instances)."
+                    self.last_trigger_time = now
+                    
+                    logger.warning(
+                        f"🚨 CROWD SURGE/PANIC DETECTED on camera {camera_id}",
+                        extra={
+                            "velocity": self.avg_velocity,
+                            "count": current_crowd_count
+                        }
+                    )
+                    
         return result

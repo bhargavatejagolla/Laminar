@@ -28,8 +28,7 @@ export default function CamerasPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.role === "manager";
+  const { user, isAdmin } = useAuth();
 
   const safeCameras = Array.isArray(cameras) ? cameras : [];
   const filteredCameras = safeCameras.filter((c: any) => 

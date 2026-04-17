@@ -77,7 +77,7 @@ class AlertEngineService:
     """
 
     DUPLICATE_WINDOW_MINUTES = 0.5
-    AUTO_RESOLVE_MINUTES = 10  # Faster auto-resolve for more dynamic feedback
+    AUTO_RESOLVE_MINUTES = 5  # Fallback; live-feed resolves instantly now
 
     # ==========================================================
     # Risk Classification Mapping (Production Standard)
@@ -185,7 +185,18 @@ class AlertEngineService:
             if is_early_warning and existing.severity >= 95:
                 is_early_warning = False
 
+            # Instantly resolve if risk drops to low/medium
+            if new_classification["severity_score"] <= 40:
+                await self.resolve_alert(
+                    session,
+                    existing.id,
+                    user_id=None,
+                    notes=f"Auto-resolved by real-time intelligence feed (Risk levels decreased to {decision['current_level']}.)"
+                )
+                return existing
+
             # cool down check (Module 4) - only apply cooldown to NON-ESCALATING updates
+            cooldown_passed = False
             if not is_escalation and not is_early_warning:
                 if existing.last_notified_at:
                     cooldown_cutoff = datetime.now(timezone.utc) - timedelta(
@@ -197,11 +208,15 @@ class AlertEngineService:
                             extra={"alert_id": str(existing.id)},
                         )
                         return existing
+                    else:
+                        cooldown_passed = True
+                else:
+                    cooldown_passed = True
         if existing:
-            # Update existing alert with latest info if severity increased
+            # Update existing alert with latest info if severity increased OR if we need to re-notify
             # 🔥 Step 1.4: Use classification for severity comparison
 
-            if is_escalation or is_early_warning:
+            if is_escalation or is_early_warning or cooldown_passed:
                 # If it's an early warning, bump severity to critical mapping (95) to ensure it triggers
                 new_severity = 95 if is_early_warning else new_classification["severity_score"]
                 new_level = "critical" if is_early_warning else decision["current_level"]
@@ -212,7 +227,7 @@ class AlertEngineService:
                     "metric_id": UUID(decision["metric_id"]),
                     "last_notified_at": None,  # Will trigger re-notification
                     "early_warning_triggered": True if is_early_warning else existing.early_warning_triggered,
-                    "explanation": decision.get("reason"),
+                    "explanation": decision.get("xai_explanation") or decision.get("reason"),
                 }
                 
                 # Phase 2 Smart Alerts
@@ -222,7 +237,17 @@ class AlertEngineService:
                     existing.extra_data["alert_type"] = decision.get("alert_type")
                 if "recommended_action" in decision:
                     existing.extra_data["recommended_action"] = decision.get("recommended_action")
+                if "velocity" in decision:
+                    existing.extra_data["velocity"] = decision.get("velocity")
+                if "xai_factors" in decision:
+                    existing.extra_data["xai_factors"] = decision.get("xai_factors")
+                    
                 update_data["extra_data"] = existing.extra_data
+                update_data["predicted_level"] = decision.get("predicted_level")
+                if decision.get("predicted_risk_score") is not None:
+                    update_data["predicted_risk_score"] = decision.get("predicted_risk_score")
+                if decision.get("escalation_probability") is not None:
+                    update_data["escalation_probability"] = decision.get("escalation_probability")
 
                 existing = await self.alert_repo.update(
                     session,
@@ -254,6 +279,8 @@ class AlertEngineService:
                         "status": existing.status,
                         "severity": existing.severity,
                         "explanation": existing.explanation,
+                        "extra_data": existing.extra_data,
+                        "predicted_level": existing.predicted_level,
                     })
                 except Exception as e:
                     logger.warning(f"WS dispatch failed on escalation: {e}")
@@ -311,65 +338,47 @@ class AlertEngineService:
         risk_level = decision["current_level"]
         classification = self._classify_risk(risk_level, severity_score=dynamic_severity)
 
-        extra_data = {}
-        if "alert_type" in decision:
-            extra_data["alert_type"] = decision.get("alert_type")
-        if "recommended_action" in decision:
-            extra_data["recommended_action"] = decision.get("recommended_action")
-            
-        is_early_warning = decision.get("early_warning_triggered") is True
-        new_severity = 95 if is_early_warning else classification["severity_score"]
-        
-        # Determine initial escalation level
-        init_level = 0
-        if new_severity >= 90:
-            init_level = 3
-        elif new_severity >= 70:
-            init_level = 2
-        elif new_severity >= 40:
-            init_level = 1
+        # 🔥 Populate structured metadata from decision signals
+        combined_extra_data = {
+            "type": decision.get("alert_type", "crowd_anomaly"), # Backward compatibility
+            "alert_type": decision.get("alert_type", "crowd_anomaly"),
+            "recommended_action": decision.get("recommended_action"),
+            "risk_color": classification["color"],
+            "requires_police": classification["requires_police"],
+            "velocity": decision.get("velocity", 0.0),
+            "momentum_score": decision.get("momentum_score", 0.0),
+            "direction_variance": decision.get("direction_variance", 0.0),
+            "acceleration": decision.get("acceleration", 0.0),
+            "predicted_level": decision.get("predicted_level"),
+            "predicted_risk_score": decision.get("predicted_risk_score"),
+            "escalation_probability": decision.get("escalation_probability", 0.0),
+            "holiday_context": decision.get("holiday_context"),
+            "weather_context": decision.get("weather_context"),
+            "camera_id": decision.get("camera_id"),
+            "camera_location": decision.get("camera_location"),
+            "xai_factors": decision.get("xai_factors", []),
+            "reason": decision.get("xai_explanation"), # Fallback for detailed view
+        }
 
-        # Create new alert
+        # Create new alert with all intelligence signals
         alert = CrowdAlert(
             venue_id=venue_id,
+            tenant_id=venue.tenant_id,
             metric_id=UUID(decision["metric_id"]),
             risk_level=risk_level,
-            severity=new_severity,
+            severity=classification["severity_score"],
             status="open",
+            escalation_level=0,
+            explanation=decision.get("xai_explanation") or decision.get("reason"), # Use XAI if available
             early_warning_triggered=is_early_warning,
-            escalation_level=init_level,
-            explanation=decision.get("reason"),
+            extra_data=combined_extra_data,
+            predicted_level=decision.get("predicted_level"),
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
             last_notified_at=None,
-            predicted_level=decision.get("predicted_level"),
             predicted_risk_score=decision.get("predicted_risk_score"),
             escalation_probability=decision.get("escalation_probability"),
         )
-
-        # Attach structured metadata
-        alert.extra_data = {
-            "camera_id": decision.get("camera_id"), # Store for per-camera tracking
-            "risk_color": classification["color"],
-            "requires_police": classification["requires_police"],
-            "recommended_action": decision.get("recommended_action"),
-            # Keep original for reference
-            "original_severity": decision.get("severity"),
-            "holiday_context": decision.get("holiday_context"),
-            "weather_context": decision.get("weather_context"),
-            "momentum_score": decision.get("momentum_score", 0.0),
-            "velocity": decision.get("velocity"),
-            "direction_variance": decision.get("direction_variance"),
-            "acceleration": decision.get("acceleration"),
-            # ── Prediction intelligence stored in extra_data so notification ──
-            # ── service can read them after DB round-trip (getattr not reliable) ──
-            "predicted_level": decision.get("predicted_level"),
-            "predicted_risk_score": decision.get("predicted_risk_score"),
-            "escalation_probability": decision.get("escalation_probability") or 0.0,
-            "event_type": decision.get("event_type"),
-            "camera_id": decision.get("camera_id"),
-            "camera_location": decision.get("camera_location"),
-        }
 
         created = await self.alert_repo.create(session, alert, commit=True)
         await self.notification_service.notify(session, created)
@@ -409,6 +418,7 @@ class AlertEngineService:
                 "created_at": created.created_at.isoformat(),
                 "explanation": created.explanation,
                 "extra_data": created.extra_data,
+                "predicted_level": created.predicted_level,
             }))
         except Exception as e:
             logger.debug(f"Alert WS broadcast failed: {e}")
@@ -457,8 +467,6 @@ class AlertEngineService:
         )
 
         # Automated Actions triggers are handled above via async process_event tasks
-        return created
-
         return created
 
     # ==========================================================
@@ -510,6 +518,20 @@ class AlertEngineService:
         from app.services.notification_service import NotificationService
         notifier = NotificationService()
         await notifier.notify_status_change(session, updated, "acknowledged")
+
+        # ── ⚡ WS broadcast so frontend reacts instantly ───────────────────────
+        try:
+            import asyncio
+            from app.core.plugin_registry import plugin_registry
+            asyncio.create_task(plugin_registry.dispatch_alert_status({
+                "id": str(updated.id),
+                "venue_id": str(updated.venue_id),
+                "status": "acknowledged",
+                "risk_level": updated.risk_level,
+                "auto": user_id is None,
+            }))
+        except Exception:
+            pass
 
         logger.info(
             "Alert acknowledged",
@@ -576,7 +598,22 @@ class AlertEngineService:
         notifier = NotificationService()
         await notifier.notify_status_change(session, updated, "resolved")
 
-        log_level = "INFO" if user_id else "DEBUG"
+        # ── ⚡ WS broadcast so frontend reacts instantly ───────────────────────
+        try:
+            import asyncio
+            from app.core.plugin_registry import plugin_registry
+            asyncio.create_task(plugin_registry.dispatch_alert_status({
+                "id": str(updated.id),
+                "venue_id": str(updated.venue_id),
+                "status": "resolved",
+                "risk_level": updated.risk_level,
+                "auto": user_id is None,
+            }))
+        except Exception:
+            pass
+
+        import logging as _logging
+        log_level = _logging.INFO if user_id else _logging.DEBUG
         logger.log(
             log_level,
             "Alert resolved",
@@ -669,37 +706,168 @@ class AlertEngineService:
         minutes: Optional[int] = None,
     ) -> int:
         """
-        Automatically resolve low/medium risk alerts after they've been open for a while.
-        Prevents alert fatigue.
+        Automatically resolve alerts after they've been open for a while.
+        - low/medium: auto-resolve after AUTO_RESOLVE_MINUTES (10 min)
+        - high: auto-resolve after 15 min
+        - critical: auto-resolve after 20 min
+        Prevents alert fatigue and ensures all alerts self-rectify.
         """
-        threshold_minutes = minutes or self.AUTO_RESOLVE_MINUTES
-        cutoff = datetime.now(timezone.utc) - \
-            timedelta(minutes=threshold_minutes)
+        now = datetime.now(timezone.utc)
+        count = 0
+
+        resolve_policies = [
+            # (risk_levels, minutes_threshold) — live-feed handles instant resolution;
+            # these are fallback safety-net times only.
+            (["low", "medium"], minutes or self.AUTO_RESOLVE_MINUTES),
+            (["high"], 10),     # Was 15 — reduced since live-feed is primary resolver
+            (["critical"], 12), # Was 20 — AI monitors continuously; 12m is plenty
+        ]
+
+        for risk_levels, threshold_minutes in resolve_policies:
+            cutoff = now - timedelta(minutes=threshold_minutes)
+            stmt = (
+                select(CrowdAlert)
+                .where(CrowdAlert.status.in_(["open", "acknowledged"]))
+                .where(CrowdAlert.risk_level.in_(risk_levels))
+                .where(CrowdAlert.created_at <= cutoff)
+            )
+            result = await session.execute(stmt)
+            alerts = result.scalars().all()
+
+            for alert in alerts:
+                await self.resolve_alert(
+                    session,
+                    alert.id,
+                    user_id=None,  # System auto-resolution
+                    notes=f"Auto-resolved: {alert.risk_level} risk alert open > {threshold_minutes} minutes without manual action"
+                )
+                count += 1
+
+        if count > 0:
+            logger.info(
+                "Auto-resolved alerts",
+                extra={"count": count}
+            )
+
+        return count
+
+    async def auto_acknowledge_open(
+        self,
+        session: AsyncSession,
+        minutes: int = 3,
+    ) -> int:
+        """
+        Automatically acknowledge alerts that have been open (but not acknowledged)
+        for more than `minutes` minutes. This removes the manual step for operators.
+        Alerts still remain active until auto-resolved.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
 
         stmt = (
             select(CrowdAlert)
-            .where(CrowdAlert.status.in_(["open", "acknowledged"]))
-            .where(CrowdAlert.risk_level.in_(["low", "medium"]))
+            .where(CrowdAlert.status == "open")
             .where(CrowdAlert.created_at <= cutoff)
         )
+        result = await session.execute(stmt)
+        alerts = result.scalars().all()
+
+        count = 0
+        for alert in alerts:
+            update_data = {
+                "status": "acknowledged",
+                "acknowledged_at": datetime.now(timezone.utc),
+                "acknowledged_by": None,  # System auto-ack
+            }
+            notes_suffix = "[AUTO-ACK] System auto-acknowledged after no manual action."
+            existing_notes = alert.notes or ""
+            update_data["notes"] = f"{existing_notes}\n{notes_suffix}" if existing_notes else notes_suffix
+
+            await self.alert_repo.update(session, alert, update_data, commit=True)
+            count += 1
+
+            # WS broadcast for instant frontend update
+            try:
+                import asyncio
+                from app.core.plugin_registry import plugin_registry
+                asyncio.create_task(plugin_registry.dispatch_alert_status({
+                    "id": str(alert.id),
+                    "venue_id": str(alert.venue_id),
+                    "status": "acknowledged",
+                    "risk_level": alert.risk_level,
+                    "auto": True,
+                }))
+            except Exception:
+                pass
+
+        if count > 0:
+            logger.info(
+                "Auto-acknowledged open alerts",
+                extra={"count": count, "open_minutes": minutes}
+            )
+
+        return count
+
+    # ==========================================================
+    # Live-Feed Auto-Resolution (Instant, Condition-Based)
+    # ==========================================================
+
+    async def live_feed_auto_resolve(
+        self,
+        session: AsyncSession,
+        venue_id: UUID,
+        camera_id: Optional[str] = None,
+        reason: str = "AI live-feed confirms crowd density has returned to safe levels.",
+    ) -> int:
+        """
+        Instantly resolve open/acknowledged alerts when the AI live-feed
+        detects that conditions are safe — triggered directly from the
+        minute_pipeline_job every ~30 seconds, not waiting for a timer.
+
+        This is the PRIMARY resolution path. The scheduled auto_resolve job
+        is only a fallback safety net for edge cases.
+
+        Args:
+            venue_id:  Venue to check for active alerts.
+            camera_id: Optional camera scope (None = venue-wide).
+            reason:    Human-readable explanation for the resolution note.
+
+        Returns:
+            Number of alerts resolved.
+        """
+        stmt = (
+            select(CrowdAlert)
+            .where(CrowdAlert.venue_id == venue_id)
+            .where(CrowdAlert.status.in_(["open", "acknowledged"]))
+        )
+        if camera_id:
+            stmt = stmt.where(
+                CrowdAlert.extra_data["camera_id"].astext == camera_id
+            )
 
         result = await session.execute(stmt)
         alerts = result.scalars().all()
+
+        if not alerts:
+            return 0
 
         count = 0
         for alert in alerts:
             await self.resolve_alert(
                 session,
                 alert.id,
-                user_id=None,  # System auto-resolution
-                notes=f"Auto-resolved due to low risk and age > {threshold_minutes} minutes"
+                user_id=None,
+                notes=f"[AI AUTO-RESOLVE] {reason}",
             )
             count += 1
 
-        if count > 0:
-            logger.info(
-                "Auto-resolved low risk alerts",
-                extra={"count": count}
+            logger.warning(
+                "🟢 LIVE FEED AUTO-RESOLVE: AI confirmed safe conditions",
+                extra={
+                    "alert_id": str(alert.id),
+                    "venue_id": str(venue_id),
+                    "risk_level": alert.risk_level,
+                    "resolution_reason": reason,
+                },
             )
 
         return count

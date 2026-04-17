@@ -139,6 +139,14 @@ class PluginRegistry:
         """Dispatch a behavior detection event to all plugins."""
         await self._dispatch_all("on_behavior_detected", behavior_data)
 
+    async def dispatch(self, event_name: str, data: Dict[str, Any]) -> None:
+        """Generic event dispatch. Calls on_<event_name> on all plugins that implement it."""
+        await self._dispatch_all(f"on_{event_name}", data)
+
+    async def dispatch_alert_status(self, status_data: Dict[str, Any]) -> None:
+        """Dispatch an alert status change event (resolved, acknowledged) to all plugins."""
+        await self._dispatch_all("on_alert_status_change", status_data)
+
     async def _dispatch_all(self, event_name: str, data: Dict[str, Any]) -> None:
         """
         Call event_name on all enabled plugins concurrently.
@@ -173,7 +181,7 @@ class WebSocketBroadcastPlugin(PluginBase):
     This replaces the need to manually call ws_manager in every service.
     """
     name = "websocket_broadcaster"
-    version = "1.0.0"
+    version = "1.1.0"
 
     async def on_alert(self, alert_data: Dict[str, Any]) -> None:
         try:
@@ -189,22 +197,51 @@ class WebSocketBroadcastPlugin(PluginBase):
         except Exception as e:
             logger.debug(f"WebSocketBroadcastPlugin: Could not broadcast alert: {e}")
 
-    async def on_crowd_metric(self, metric_data: Dict[str, Any]) -> None:
+    async def on_alert_status_change(self, status_data: Dict[str, Any]) -> None:
+        """Broadcast alert status changes (resolve/acknowledge) instantly via WS."""
         try:
             from app.api.v1.endpoints.websocket import ws_manager
-            # Only broadcast significant metric updates (not every second)
-            risk_level = metric_data.get("risk_level", "low")
-            if risk_level in ("medium", "high", "critical"):
-                await ws_manager.broadcast(
-                    {
-                        "type": "metric_update",
-                        "data": metric_data,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                    venue_id=metric_data.get("venue_id"),
-                )
+            await ws_manager.broadcast(
+                {
+                    "type": "alert_status_change",
+                    "data": status_data,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+                venue_id=status_data.get("venue_id"),
+            )
+        except Exception as e:
+            logger.debug(f"WebSocketBroadcastPlugin: Could not broadcast status change: {e}")
+
+    async def on_crowd_metric(self, metric_data: Dict[str, Any]) -> None:
+        """Broadcast ALL crowd metric updates to the surge monitor and live dashboards."""
+        try:
+            from app.api.v1.endpoints.websocket import ws_manager
+            # Broadcast for ALL risk levels so surge monitor always gets live data
+            await ws_manager.broadcast(
+                {
+                    "type": "metric_update",
+                    "data": metric_data,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+                venue_id=metric_data.get("venue_id"),
+            )
         except Exception as e:
             logger.debug(f"WebSocketBroadcastPlugin: Could not broadcast metric: {e}")
+
+    async def on_alert_escalated(self, escalation_data: Dict[str, Any]) -> None:
+        """Broadcast escalated alerts."""
+        try:
+            from app.api.v1.endpoints.websocket import ws_manager
+            await ws_manager.broadcast(
+                {
+                    "type": "alert_escalated",
+                    "data": escalation_data,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+                venue_id=escalation_data.get("venue_id"),
+            )
+        except Exception as e:
+            logger.debug(f"WebSocketBroadcastPlugin: Could not broadcast escalation: {e}")
 
 
 # Register the built-in WebSocket broadcaster plugin on import

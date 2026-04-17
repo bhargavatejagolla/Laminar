@@ -13,6 +13,7 @@ import IntelligenceGraphs from "@/components/analytics/intelligence-graphs"
 import { useTranslation } from "react-i18next"
 import { motion, AnimatePresence } from "framer-motion"
 import { useZoneIntelligenceSummary } from "@/hooks/useZoneIntelligence"
+import { useDashboardStats } from "@/hooks/useDashboardStats"
 import { SemanticSearch } from "@/components/intelligence/SemanticSearch"
 
 const containerVariants = {
@@ -47,6 +48,7 @@ function TrendIcon({ trend }: { trend?: string }) {
 // ─────────────────────────────────────────────────────────────────
 function CameraIntelCard({ cam }: { cam: any }) {
   const snap = cam.snapshot
+  const isLive = snap?.is_live === true
   const risk = snap?.intelligence?.overall_risk_level ?? "low"
   const rs = riskStyle(risk)
   const density = snap?.density?.current ?? 0
@@ -55,13 +57,12 @@ function CameraIntelCard({ cam }: { cam: any }) {
   const flowDir = snap?.flow?.dominant_direction ?? "—"
   const flowIntensity = snap?.flow?.flow_intensity ?? "still"
   const trend = snap?.density?.trend ?? "stable"
-  const summary = snap?.intelligence?.summary ?? (cam.status === "offline" ? "Camera offline. No data available." : "Warming up stream...")
+  const summary = snap?.intelligence?.summary ?? (cam.status === "offline" ? "Camera offline. No data available." : "Awaiting vision stream...")
   const alertTriggered = snap?.intelligence?.alert_triggered ?? false
   const recommendedAction = snap?.intelligence?.recommended_action
   const factors = snap?.intelligence?.contributing_factors ?? []
   const isOffline = cam.status === "offline"
   const isWarming = cam.status === "warming_up"
-  const isSynthesized = snap?.is_synthesized === true
 
   return (
     <motion.div
@@ -85,10 +86,10 @@ function CameraIntelCard({ cam }: { cam: any }) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {alertTriggered && <Zap className="w-3.5 h-3.5 text-rose-400 animate-pulse" />}
-          {isSynthesized && (
-            <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-              <History className="w-2.5 h-2.5" />
-              Historical
+          {isLive && (
+             <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+              Live
             </span>
           )}
           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${rs.badge}`}>
@@ -102,13 +103,13 @@ function CameraIntelCard({ cam }: { cam: any }) {
         {summary}
       </p>
 
-      {isOffline || isWarming ? (
+      {isOffline || isWarming || !isLive ? (
         <div className="flex items-center gap-3 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-          <Activity className={`w-3 h-3 ${isWarming ? "animate-spin" : ""}`} />
-          {isWarming ? (
+          <Activity className={`w-3 h-3 ${isWarming || !isLive ? "animate-spin" : ""}`} />
+          {isWarming || !isLive ? (
             <div className="flex flex-col gap-0.5">
-              <span>Initializing stream...</span>
-              <span className="text-[8px] opacity-60 font-medium">Retrieving history fallback...</span>
+              <span>Awaiting Stream Sync</span>
+              <span className="text-[8px] opacity-60 font-medium">Listening for frames...</span>
             </div>
           ) : "Stream offline"}
         </div>
@@ -176,15 +177,17 @@ function CameraIntelCard({ cam }: { cam: any }) {
 // Multi-camera live intelligence section
 // ─────────────────────────────────────────────────────────────────
 function LiveIntelligencePanel() {
-  const { data, isLoading } = useZoneIntelligenceSummary(3000)
+  const { data, isLoading, isError, refetch } = useZoneIntelligenceSummary(3000)
+  const { data: dashboardData } = useDashboardStats()
 
   const cameras = data?.cameras ?? []
-  const activeCams = cameras.filter((c: any) => c.status === "active")
+  // STRICT LIVE FILTER: Only include cameras with a live snapshot
+  const activeCams = cameras.filter((c: any) => c.status === "active" && c.snapshot?.is_live)
   const totalPeople = activeCams.reduce((s: number, c: any) => s + (c.snapshot?.density?.current ?? 0), 0)
   const totalPred5m = activeCams.reduce((s: number, c: any) => s + (c.snapshot?.prediction?.density_5m ?? 0), 0)
   const criticalCount = data?.risk_breakdown?.critical ?? 0
   const highCount = data?.risk_breakdown?.high ?? 0
-  const recentAlerts = data?.recent_alerts ?? 0
+  const recentAlerts = dashboardData?.alerts ?? 0
 
   const overallRisk = criticalCount > 0 ? "critical" : highCount > 0 ? "high" : "low"
   const rs = riskStyle(overallRisk)
@@ -193,6 +196,22 @@ function LiveIntelligencePanel() {
     return (
       <div className="glass-panel rounded-2xl border border-white/5 p-6 space-y-3">
         {[1, 2].map(i => <div key={i} className="h-24 rounded-xl bg-white/3 animate-pulse" />)}
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="glass-panel rounded-2xl border border-rose-500/20 p-8 flex flex-col items-center justify-center text-center">
+        <AlertTriangle className="w-10 h-10 text-rose-500 mb-3" />
+        <h3 className="text-slate-300 font-semibold mb-1">Intelligence Link Interrupted</h3>
+        <p className="text-slate-500 text-sm mb-4">The live data stream was disconnected.</p>
+        <button 
+          onClick={() => refetch()}
+          className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all"
+        >
+          Reconnect Stream
+        </button>
       </div>
     )
   }

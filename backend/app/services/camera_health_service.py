@@ -35,11 +35,11 @@ logger = get_logger(__name__)
 # ─────────────────────────────────────────────────────────
 # Thresholds
 # ─────────────────────────────────────────────────────────
-BRIGHTNESS_THRESHOLD = 8        # mean pixel value below this → BLACK_SCREEN (production: real dark rooms can be 10-15)
-VARIANCE_THRESHOLD   = 80       # frame variance below this  → LENS_COVERED (production: static scenes ~30-80)
-BLUR_THRESHOLD       = 200      # Laplacian variance below this → BLURRED (industry standard: 100-300)
+BRIGHTNESS_THRESHOLD = 5        # mean pixel value below this → BLACK_SCREEN
+VARIANCE_THRESHOLD   = 15       # frame variance below this  → LENS_COVERED
+BLUR_THRESHOLD       = 50       # Laplacian variance below this → BLURRED
 ROTATION_MIN_LINES   = 5        # min structural lines needed to decide rotation
-CONSECUTIVE_FRAMES   = 30       # frames required to confirm issue (higher = fewer false positives)
+CONSECUTIVE_FRAMES   = 90       # frames required to confirm issue (higher = fewer false positives)
 OFFLINE_MINUTES      = 5        # minutes without heartbeat → OFFLINE
 
 # Per-camera sliding window: camera_id → list of recent status strings
@@ -274,7 +274,7 @@ class CameraHealthService:
     # ─────────────────────────────────────────────────────
 
     async def get_all_camera_health(self, session: AsyncSession) -> list[dict]:
-        """Return health summary for every active camera."""
+        """Return health summary for every active camera, including live buffer diagnostics."""
         result = await session.execute(
             select(Camera).where(Camera.deleted_at.is_(None))
         )
@@ -292,18 +292,42 @@ class CameraHealthService:
             "warning":      "Camera showing intermittent issues",
         }
 
-        return [
-            {
-                "camera_id":         str(c.id),
-                "name":              c.name,
-                "venue_id":          str(c.venue_id),
-                "location":          c.get_display_location(),
-                "health_status":     "offline" if not c.is_online else (c.health_status or "unknown"),
-                "is_online":         c.is_online,
-                "is_active":         c.is_active,
-                "issue":             ISSUE_MESSAGES.get("offline" if not c.is_online else (c.health_status or "unknown"), "Unknown status"),
-                "last_frame_at":     c.last_frame_at.isoformat() if c.last_frame_at else None,
-                "last_heartbeat_at": c.last_heartbeat_at.isoformat() if c.last_heartbeat_at else None,
-            }
-            for c in cameras
-        ]
+        rows = []
+        for c in cameras:
+            cam_key = str(c.id)
+            effective_status = "offline" if not c.is_online else (c.health_status or "unknown")
+
+            # ── Live buffer diagnostics ────────────────────────────────────────
+            buf: list[str] = _frame_issue_buffer.get(cam_key, [])
+            monitoring_active = len(buf) > 0  # worker has seen at least one frame
+
+            # Count non-healthy frames in the rolling buffer
+            frame_issue_count = sum(1 for s in buf if s != "healthy")
+
+            # Confidence = fraction of buffer showing current status
+            if buf and effective_status not in ("unknown", "offline"):
+                issue_confidence = round(
+                    sum(1 for s in buf if s == effective_status) / len(buf), 2
+                )
+            else:
+                issue_confidence = None
+
+            rows.append({
+                "camera_id":          cam_key,
+                "name":               c.name,
+                "venue_id":           str(c.venue_id),
+                "location":           c.get_display_location(),
+                "health_status":      effective_status,
+                "is_online":          c.is_online,
+                "is_active":          c.is_active,
+                "monitoring_active":  monitoring_active,
+                "frame_issue_count":  frame_issue_count,
+                "frame_buffer_size":  len(buf),
+                "issue_confidence":   issue_confidence,
+                "issue":              ISSUE_MESSAGES.get(effective_status, "Unknown status"),
+                "last_frame_at":      c.last_frame_at.isoformat() if c.last_frame_at else None,
+                "last_heartbeat_at":  c.last_heartbeat_at.isoformat() if c.last_heartbeat_at else None,
+            })
+
+        return rows
+

@@ -560,6 +560,7 @@ class RiskEngineService:
             "risk_score": round(metric.dynamic_risk_score, 2) if metric.dynamic_risk_score else None,
             "occupancy_percent": round(metric.occupancy_percent, 2) if metric.occupancy_percent else None,
             "growth_rate": round(metric.growth_rate_percent, 2) if metric.growth_rate_percent else None,
+            "velocity": round(metric.velocity, 2) if getattr(metric, "velocity", None) is not None else 0.0,
             "time_factor": round(time_factor, 2),
             "evaluated_at": datetime.now(timezone.utc).isoformat(),
             "predicted_level": predicted_level,
@@ -568,6 +569,8 @@ class RiskEngineService:
             "escalation_probability": escalation_probability,
             "early_warning_triggered": early_warning,
             "momentum_score": prediction.get("momentum_score", 0.0),
+            "avg_count": metric.avg_count or 0,
+            "person_count": metric.avg_count or 0, # Alias for frontend consistency
         }
 
         # ── XAI: Add "Why?" explanation to every decision ────────────────────

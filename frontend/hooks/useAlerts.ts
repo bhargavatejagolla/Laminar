@@ -4,19 +4,22 @@ import { Alert } from "@/types/alert"
 
 /**
  * Hook to fetch and filter alerts.
- * Notification side-effects (sounds, toasts) are handled globally by useGlobalNotifications.
+ * Alerts are primarily driven by WebSocket invalidations (via useGlobalNotifications).
+ * Polling is a 30s fallback only -- should not be the primary update mechanism.
  */
 export function useAlerts() {
   const query = useQuery({
     queryKey: ["alerts"],
     queryFn: getAlerts,
-    refetchInterval: 5000,
+    refetchInterval: 30_000,    // 30s fallback; WS pushes handle instant updates
+    refetchOnWindowFocus: true, // Refresh when user tabs back
+    staleTime: 5_000,           // Consider data fresh for 5s to reduce redundant fetches
   });
 
   return {
     ...query,
-    crowdAlerts: query.data?.filter((a: Alert) => a.status !== "resolved" && (!a.extra_data || a.extra_data.type !== "camera_issue")) || [],
-    cameraAlerts: query.data?.filter((a: Alert) => a.status !== "resolved" && a.extra_data?.type === "camera_issue") || []
+    crowdAlerts: query.data?.filter((a: Alert) => (!a.extra_data || a.extra_data.type !== "camera_issue")) || [],
+    cameraAlerts: query.data?.filter((a: Alert) => a.extra_data?.type === "camera_issue") || []
   };
 }
 

@@ -133,13 +133,22 @@ export default function PredictionPage() {
               </div>
               <div>
                 <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">Atmospheric Mod</p>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
                   <h4 className="text-lg font-bold text-white uppercase tracking-wider">
-                    {predictionData?.weather_context?.condition ? predictionData.weather_context.condition.replace(/_/g, ' ') : 'Nominal'}
+                    {predictionData?.weather_context?.condition
+                      ? predictionData.weather_context.condition.replace(/_/g, ' ')
+                      : predictionData && !predictionData.weather_context
+                        ? 'Location Not Set'
+                        : 'Nominal'}
                   </h4>
                   {predictionData?.weather_context && (
                     <span className="text-xs font-black text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/30 capitalize">
                       {predictionData.weather_context.temperature}°C
+                    </span>
+                  )}
+                  {predictionData && !predictionData.weather_context && (
+                    <span className="text-[10px] font-black text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/30 uppercase tracking-widest">
+                      Add Lat/Lng in Venue Settings
                     </span>
                   )}
                 </div>

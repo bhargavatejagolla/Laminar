@@ -36,8 +36,8 @@ logger = get_logger(__name__)
 
 
 # Health thresholds
-OFFLINE_THRESHOLD_MINUTES = 5
-DEGRADED_THRESHOLD_MINUTES = 2
+OFFLINE_THRESHOLD_MINUTES = 1
+DEGRADED_THRESHOLD_MINUTES = 0.5
 
 
 class CameraService:

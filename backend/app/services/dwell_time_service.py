@@ -377,6 +377,9 @@ class DwellTimeService:
                 decision = {
                     "venue_id": str(cam.venue_id),
                     "venue_name": cam.location_label or str(cam.venue_id),
+                    "camera_id": str(self.camera_id),
+                    "camera_location": cam.get_display_location(),
+                    "alert_type": "dwell_time",
                     "metric_id": str(uuid.uuid4()),
                     "metric_time": datetime.now(timezone.utc).isoformat(),
                     "previous_level": "medium",

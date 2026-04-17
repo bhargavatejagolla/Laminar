@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getToken, logout } from "@/services/auth"
+import { api } from "@/services/api"
 
 export function useAuth() {
   const [isAuthenticated, setAuthenticated] = useState(false)
@@ -20,14 +21,10 @@ export function useAuth() {
 
     setAuthenticated(true)
     
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
     try {
-      const res = await fetch(`${API_BASE}/api/v1/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await res.json()
-      setUser(data)
-      setProfilePicture(data.profile_picture || null)
+      const res = await api.get("/users/profile")
+      setUser(res.data)
+      setProfilePicture(res.data.profile_picture || null)
     } catch (error) {
       console.error("Failed to fetch profile:", error)
       setUser({ email: "admin@laminar.ai" }) // Fallback
@@ -39,10 +36,17 @@ export function useAuth() {
     refreshProfile()
   }, [])
 
+  const isSuperAdmin = user?.role === "super_admin"
+  const isAdmin = user?.role === "super_admin" || user?.role === "admin"
+  const isUser = user?.role === "user"
+
   return {
     isAuthenticated,
     user,
     profilePicture,
+    isSuperAdmin,
+    isAdmin,
+    isUser,
     logout,
     refreshProfile
   }

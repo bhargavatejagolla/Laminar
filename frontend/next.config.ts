@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactStrictMode: false, // Disabled: Strict Mode double-mounts effects in dev, creating duplicate WS connections
   async rewrites() {
     return [
       {
@@ -10,7 +11,7 @@ const nextConfig: NextConfig = {
       {
         source: "/profile_pictures/:path*",
         destination: "http://127.0.0.1:8000/profile_pictures/:path*",
-      }
+      },
     ];
   },
 };

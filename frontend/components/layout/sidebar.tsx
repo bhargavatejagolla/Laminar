@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { 
   LayoutDashboard, 
   MapPin, 
@@ -22,76 +23,84 @@ import {
   CircuitBoard,
   Footprints,
   Webhook,
-  Search
+  Search,
+  Users
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useAlerts } from "@/hooks/useAlerts";
+import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen } = useAppStore();
-  const { data: alerts } = useAlerts();
+  const { data: alerts, crowdAlerts } = useAlerts();
+  const { isAdmin, isSuperAdmin } = useAuth();
   const { t } = useTranslation();
+  const [mounted, setMounted] = useState(false);
 
-  const safeAlerts = Array.isArray(alerts) ? alerts : [];
-  const activeAlertsCount = safeAlerts.filter((a: any) => a.status !== "resolved").length;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const activeAlertsCount = (crowdAlerts || []).filter((a: any) => a.status !== "resolved").length;
 
   const NAV_SECTIONS = [
     {
       labelKey: "nav.core",
       items: [
-        { nameKey: "nav.commandCenter", href: "/dashboard", icon: LayoutDashboard },
-        { nameKey: "nav.venues", href: "/venues", icon: MapPin },
-        { nameKey: "nav.cameras", href: "/cameras", icon: Video },
-        { nameKey: "nav.cameraHealth", href: "/cameras/health", icon: ShieldCheck },
-      ]
+        { nameKey: "nav.commandCenter", href: "/dashboard", icon: LayoutDashboard, show: true },
+        { nameKey: "nav.venues", href: "/venues", icon: MapPin, show: isAdmin },
+        { nameKey: "nav.cameras", href: "/cameras", icon: Video, show: isAdmin },
+        { nameKey: "nav.cameraHealth", href: "/cameras/health", icon: ShieldCheck, show: isAdmin },
+      ].filter(i => i.show)
     },
     {
       labelKey: "nav.intelligence",
       items: [
-        { nameKey: "nav.alerts", href: "/alerts", icon: BellRing, badgeKey: "alerts" },
-        { nameKey: "nav.prediction", href: "/prediction", icon: BrainCircuit },
-        { nameKey: "nav.liveWall", href: "/monitor", icon: LayoutGrid },
-        { nameKey: "nav.surgeMonitor", href: "/surge", icon: Activity },
-        { nameKey: "nav.personWaitMonitor", href: "/person-wait-monitoring", icon: Clock },
-        { nameKey: "nav.areaSurvey", href: "/dashboard/area-survey", icon: RotateCw },
-      ]
+        { nameKey: "nav.alerts", href: "/alerts", icon: BellRing, badgeKey: "alerts", show: true },
+        { nameKey: "nav.prediction", href: "/prediction", icon: BrainCircuit, show: true },
+        { nameKey: "nav.liveWall", href: "/monitor", icon: LayoutGrid, show: true },
+        { nameKey: "nav.surgeMonitor", href: "/surge", icon: Activity, show: true },
+        { nameKey: "nav.personWaitMonitor", href: "/person-wait-monitoring", icon: Clock, show: true },
+        { nameKey: "nav.areaSurvey", href: "/dashboard/area-survey", icon: RotateCw, show: true },
+      ].filter(i => i.show)
     },
     {
       labelKey: "nav.aiSearch",
       items: [
-        { nameKey: "nav.videoSearch", href: "/ai-search", icon: Search },
-      ]
+        { nameKey: "nav.videoSearch", href: "/ai-search", icon: Search, show: isAdmin },
+      ].filter(i => i.show)
     },
     {
       labelKey: "nav.analytics",
       items: [
-        { nameKey: "nav.reports", href: "/reports", icon: FileBarChart },
-        { nameKey: "nav.systemHealth", href: "/system", icon: Activity },
-      ]
+        { nameKey: "nav.reports", href: "/reports", icon: FileBarChart, show: true },
+        { nameKey: "nav.systemHealth", href: "/system", icon: Activity, show: isSuperAdmin },
+      ].filter(i => i.show)
     },
     {
       labelKey: "nav.config",
       items: [
-        { nameKey: "nav.profile", href: "/profile", icon: Settings },
-        { nameKey: "nav.settings", href: "/settings", icon: Settings },
-      ]
+        { nameKey: "nav.profile", href: "/profile", icon: Settings, show: true },
+        { nameKey: "nav.settings", href: "/settings", icon: Settings, show: isAdmin },
+        { nameKey: "nav.accessControl", href: "/settings/access-control", icon: Users, show: isSuperAdmin },
+      ].filter(i => i.show)
     },
     {
       labelKey: "nav.enterpriseAI",
       items: [
-        { nameKey: "nav.automations", href: "/system/actions", icon: Webhook },
-        { nameKey: "nav.journeyMap", href: "/system/journeys", icon: Footprints },
-        { nameKey: "nav.fleetHealth", href: "/system/fleet", icon: CircuitBoard },
-      ]
+        { nameKey: "nav.automations", href: "/system/actions", icon: Webhook, show: isSuperAdmin },
+        { nameKey: "nav.journeyMap", href: "/system/journeys", icon: Footprints, show: isSuperAdmin },
+        { nameKey: "nav.fleetHealth", href: "/system/fleet", icon: CircuitBoard, show: isSuperAdmin },
+      ].filter(i => i.show)
     }
-  ];
+  ].filter(section => section.items.length > 0);
 
   return (
     <>
       {/* Mobile Backdrop */}
-      {sidebarOpen && (
+      {mounted && sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/80 z-20 lg:hidden backdrop-blur-md"
           onClick={() => setSidebarOpen(false)}
@@ -99,12 +108,12 @@ export default function Sidebar() {
       )}
 
       <aside className={`
-        fixed inset-y-0 left-0 z-30 w-64
+        fixed lg:relative inset-y-0 left-0 z-30 w-64 h-screen
         bg-[#000000]
         border-r border-white/5
         transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
         flex flex-col shrink-0 overflow-hidden
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:hidden"}
       `}>
 
         {/* ── Brand Header ─────────────────────────── */}
@@ -147,7 +156,7 @@ export default function Sidebar() {
               <div className="space-y-1">
                 {section.items.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                  const badge = item.badgeKey === "alerts" ? activeAlertsCount : 0;
+                  const badge = (item as any).badgeKey === "alerts" ? activeAlertsCount : 0;
 
                   return (
                     <Link

@@ -92,6 +92,7 @@ class AlertResponse(BaseModel):
 
     explanation: Optional[str] = None
     extra_data: Optional[Dict[str, Any]] = None
+    predicted_level: Optional[str] = None
 
     # Evidence fields — populated from extra_data
     snapshot_url: Optional[str] = None
@@ -102,6 +103,13 @@ class AlertResponse(BaseModel):
     def _populate_evidence_urls(self) -> "AlertResponse":
         """Build serving URLs from extra_data paths."""
         ed = self.extra_data or {}
+
+        # Fallback to extract camera_id from unstructured JSON since it's not a top-level DB column
+        if self.camera_id is None and "camera_id" in ed:
+            try:
+                self.camera_id = UUID(str(ed["camera_id"]))
+            except Exception:
+                pass
 
         if self.snapshot_url is None:
             snap = ed.get("snapshot_path")

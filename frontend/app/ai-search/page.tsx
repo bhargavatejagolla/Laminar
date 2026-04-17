@@ -239,7 +239,7 @@ export default function AISearchPage() {
                   {result.image_url ? (
                     <>
                       <img 
-                        src={`${API_URL}${result.image_url}`} 
+                        src={result.image_url.startsWith('http') ? result.image_url : `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '')}${result.image_url}`} 
                         alt="Search Match" 
                         className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
                         onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}

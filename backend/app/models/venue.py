@@ -226,6 +226,13 @@ class Venue(BaseModel):
         lazy="selectin",
     )
 
+    users: Mapped[List["User"]] = relationship(
+        "User",
+        secondary="user_venue_access",
+        back_populates="venues",
+        lazy="selectin"
+    )
+
     # ==========================================================
     # Business Logic Methods
     # ==========================================================

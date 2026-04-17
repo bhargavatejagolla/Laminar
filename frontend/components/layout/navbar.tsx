@@ -32,8 +32,8 @@ export default function Navbar() {
     return () => clearInterval(id);
   }, []);
 
-  const activeAlertsCount = (crowdAlerts || []).length;
-  const criticalCount = (crowdAlerts || []).filter((a: any) => a.risk_level === "critical").length;
+  const activeAlertsCount = (crowdAlerts || []).filter((a: any) => a.status !== "resolved").length;
+  const criticalCount = (crowdAlerts || []).filter((a: any) => a.risk_level === "critical" && a.status !== "resolved").length;
 
   const userDisplayName = user?.email ? user.email.split("@")[0] : "Admin";
 
@@ -69,7 +69,7 @@ export default function Navbar() {
         </button>
 
         {/* System clock / Status */}
-        <div className="hidden md:flex items-center gap-3 font-mono text-xs font-bold px-4 py-2 rounded-xl bg-black/50 border border-white/5 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
+        <div className="hidden lg:flex items-center gap-3 font-mono text-xs font-bold px-4 py-2 rounded-xl bg-black/50 border border-white/5 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
           <div className="relative flex h-3 w-3 items-center justify-center">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]"></span>
@@ -126,7 +126,7 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.4)] group-hover:scale-105 transition-transform border-2 border-cyan-500/30">
             {user?.profile_picture ? (
               <img
-                src={`${process.env.NEXT_PUBLIC_API_URL || ""}${user.profile_picture}`}
+                src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '')}${user.profile_picture}`}
                 alt="Profile"
                 className="w-full h-full object-cover"
                 onError={(e) => {

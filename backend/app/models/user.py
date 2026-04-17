@@ -44,13 +44,11 @@ from app.core.database import Base
 # Enums
 # ==========================================================
 
-class UserRole(enum.Enum):
+class UserRole(str, enum.Enum):
     """User roles for authorization."""
-    ADMIN = "admin"        # Full system access
-    MANAGER = "manager"    # Can manage venues and cameras
-    OPERATOR = "operator"  # Can view and acknowledge alerts
-    VIEWER = "viewer"      # Read-only access
-    AUDITOR = "auditor"    # Read-only: reports, alerts, SLA data (compliance)
+    SUPER_ADMIN = "super_admin"  # Root access
+    ADMIN = "admin"              # Location-based manage access
+    USER = "user"                # Location-based view access
 
 
 # ==========================================================
@@ -129,9 +127,9 @@ class User(Base):
     # ==========================================================
 
     role: Mapped[UserRole] = mapped_column(
-        SQLEnum(UserRole),
+        SQLEnum(UserRole, values_callable=lambda x: [e.value for e in x], native_enum=False),
         nullable=False,
-        default=UserRole.VIEWER,
+        default=UserRole.USER,
         index=True,
     )
 
@@ -215,6 +213,13 @@ class User(Base):
     # Alerts acknowledged by this user
     # Can be added later when needed: acknowledged_alerts: Mapped[List["CrowdAlert"]] = relationship(...)
 
+    venues: Mapped[List["Venue"]] = relationship(
+        "Venue",
+        secondary="user_venue_access",
+        back_populates="users",
+        lazy="selectin"
+    )
+
     # ==========================================================
     # Indexes for Performance
     # ==========================================================
@@ -236,19 +241,14 @@ class User(Base):
         self.last_login_at = datetime.utcnow()
 
     @property
+    def is_super_admin(self) -> bool:
+        """Check if user has super admin absolute role."""
+        return self.role == UserRole.SUPER_ADMIN
+
+    @property
     def is_admin(self) -> bool:
-        """Check if user has admin role."""
-        return self.role == UserRole.ADMIN
-
-    @property
-    def is_manager(self) -> bool:
-        """Check if user has manager role or higher."""
-        return self.role in (UserRole.ADMIN, UserRole.MANAGER)
-
-    @property
-    def is_operator(self) -> bool:
-        """Check if user has operator role or higher."""
-        return self.role in (UserRole.ADMIN, UserRole.MANAGER, UserRole.OPERATOR)
+        """Check if user has admin role or higher."""
+        return self.role in (UserRole.SUPER_ADMIN, UserRole.ADMIN)
 
 
 # ==========================================================

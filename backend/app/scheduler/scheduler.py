@@ -70,7 +70,7 @@ class LaminarScheduler:
         self._add_job_with_tracking(
             "auto_resolve",
             auto_resolve_job,
-            IntervalTrigger(minutes=5), # Faster cleanup
+            IntervalTrigger(minutes=2), # Safety-net fallback; live-feed handles instant resolution
         )
 
         self._add_job_with_tracking(

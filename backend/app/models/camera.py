@@ -360,15 +360,14 @@ class Camera(BaseModel):
         if bool(self.username) != bool(self.password):
             errors.append(
                 "Both username and password must be provided together.")
-        valid_health_status = {"unknown", "healthy", "warning", "offline", "error"}
-
-        # Ensure default health status before validation
-        if not self.health_status:
-            self.health_status = "unknown"
-
-        valid_health_status = {"unknown", "healthy", "warning", "offline", "error"}
+        valid_health_status = {
+            "unknown", "healthy", "warning", "offline", "error", 
+            "black_screen", "lens_covered", "blurred", "rotated"
+        }
         if self.health_status not in valid_health_status:
             errors.append(f"health_status must be one of {valid_health_status}")
+
+        return errors
 
 
 # ==========================================================

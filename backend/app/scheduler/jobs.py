@@ -109,6 +109,7 @@ async def minute_pipeline_job():
 
             # Process each camera
             for camera in cameras:
+                camera_id_str = str(camera.id)
                 try:
                     # Step 1: Aggregate minute metric
                     metric = await metric_service.aggregate_minute(
@@ -118,7 +119,7 @@ async def minute_pipeline_job():
                     if not metric:
                         logger.warning(
                             "No metric generated for camera",
-                            extra={"camera_id": str(camera.id)}
+                            extra={"camera_id": camera_id_str}
                         )
                         continue
 
@@ -130,13 +131,36 @@ async def minute_pipeline_job():
                         metric_id=metric.id,
                     )
 
-                    # Step 3: Process alert
-                    alert = await alert_engine.process_decision(
-                        session,
-                        decision=decision,
-                    )
-                    if alert:
-                        stats["alerts_created"] += 1
+                    # ── Step 3: AI Live-Feed Auto-Resolution ───────────────────
+                    # If the AI says crowd is safe, instantly resolve any active
+                    # alert for this venue/camera — no scheduler delay needed.
+                    if not decision.get("should_alert"):
+                        from uuid import UUID as _UUID
+                        _venue_id = decision.get("venue_id")
+                        _camera_id = decision.get("camera_id")
+                        if _venue_id:
+                            resolved = await alert_engine.live_feed_auto_resolve(
+                                session,
+                                venue_id=_UUID(_venue_id),
+                                camera_id=_camera_id,
+                                reason=(
+                                    f"Live AI feed: crowd risk dropped to "
+                                    f"'{decision.get('current_level', 'safe')}' — "
+                                    "conditions are within safe thresholds."
+                                ),
+                            )
+                            if resolved:
+                                logger.info(
+                                    f"🟢 Live-feed resolved {resolved} alert(s) for venue {_venue_id}",
+                                )
+                    else:
+                        # Step 3: Process alert (open or escalate)
+                        alert = await alert_engine.process_decision(
+                            session,
+                            decision=decision,
+                        )
+                        if alert:
+                            stats["alerts_created"] += 1
 
                     stats["processed"] += 1
 
@@ -149,7 +173,7 @@ async def minute_pipeline_job():
                         logger.error(
                             "Minute pipeline failed for camera",
                             extra_fields={
-                                "camera_id": str(camera.id),
+                                "camera_id": camera_id_str,
                                 "error": str(e),
                             },
                             exc_info=True,
@@ -238,24 +262,31 @@ async def escalation_job():
 
 async def auto_resolve_job():
     """
-    Every 10 minutes:
-    - Auto-resolve low/medium risk old alerts
-    - Log resolution statistics
+    Every 5 minutes:
+    - Auto-acknowledge open alerts that haven't been manually acted on in 3 min
+    - Auto-resolve stale alerts (low/medium: 10min, high: 15min, critical: 20min)
+    - Log statistics
     """
     start_time = datetime.now(timezone.utc)
-    logger.info("Starting auto-resolve job")
+    logger.info("Starting auto-resolve + auto-acknowledge job")
 
     alert_engine = get_alert_engine()
     async with db_manager.session() as session:
         try:
+            # Step 1: Auto-acknowledge stale open alerts (removes need for manual ACK)
+            # 1 minute — aggressive since live-feed auto-resolves most alerts instantly anyway
+            acked_count = await alert_engine.auto_acknowledge_open(session, minutes=5)
+
+            # Step 2: Auto-resolve all risk levels based on their policies (safety net)
             resolved_count = await alert_engine.auto_resolve_low_risk(session)
 
             duration = (datetime.now(timezone.utc) -
                         start_time).total_seconds()
             logger.info(
-                "Auto-resolve completed",
+                "Auto-lifecycle job completed",
                 extra_fields={
                     "duration_seconds": round(duration, 2),
+                    "auto_acknowledged": acked_count,
                     "resolved_count": resolved_count,
                 },
             )

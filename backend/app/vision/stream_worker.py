@@ -142,6 +142,15 @@ class StreamWorker:
         self.health_service = CameraHealthService()
         self._panic_frame_counter = 0
 
+        # Mediapipe integration for accurate Sitting/Standing
+        from mediapipe.python.solutions import pose as mp_pose
+        self.mp_pose = mp_pose
+        self.pose_estimator = self.mp_pose.Pose(
+            static_image_mode=False, 
+            min_detection_confidence=0.5,
+            model_complexity=0
+        )
+
         # Dwell time tracking (separate frame, non-breaking)
         self.dwell_service = get_dwell_service(camera_id)
         self._latest_dwell_frame: Optional[np.ndarray] = None
@@ -159,6 +168,16 @@ class StreamWorker:
         self._intel_capacity: Optional[int] = None
         self._intel_warning_threshold: Optional[int] = None
         self._intel_critical_threshold: Optional[int] = None
+        
+        # --- Analytics Tracker ---
+        from app.vision.tracker import CentroidTracker
+        self.tracker = CentroidTracker(max_disappeared=5, max_distance=50)
+        self.entry_count = 0
+        self.exit_count = 0
+        self.line_crossed = set()
+        self.act_standing = 0.0
+        self.act_normal = 0.0
+        self.act_walking = 0.0
 
         # State
         self._running = False
@@ -394,6 +413,18 @@ class StreamWorker:
                     await asyncio.sleep(backoff)
                     continue
                 else:
+                    if self._last_health_status == "offline":
+                        self._last_health_status = "healthy" # Temporary until analyze_frame runs
+                        async def set_online():
+                            from app.core.database import db_manager
+                            from app.models.camera import Camera
+                            from sqlalchemy import select
+                            async with db_manager.session() as s:
+                                cam_res = await s.execute(select(Camera).where(Camera.id == self.camera_id))
+                                cam = cam_res.scalar_one_or_none()
+                                if cam:
+                                    await self.health_service.update_camera_health(s, cam, "healthy")
+                        asyncio.create_task(set_online())
                     self._unhealthy_since = None
 
                 # Read frame
@@ -483,6 +514,8 @@ class StreamWorker:
                                 if not self._camera_name and cam.name:
                                     self._camera_name = cam.name  # Cache for ReID insights
                                     logger.info(f"Resolved camera name: {self._camera_name}", extra={"camera_id": str(self.camera_id)})
+                                if not hasattr(self, "_intel_venue_id") and cam.venue_id:
+                                    self._intel_venue_id = str(cam.venue_id)
                                 await self.health_service.update_camera_health(health_session, cam, status)
 
                     asyncio.create_task(update_health_and_meta(health_issue))
@@ -561,45 +594,205 @@ class StreamWorker:
             scaled_boxes = []
             orig_h, orig_w = frame.shape[:2]
             
+            # --- Tracker and Analytics ---
+            rects = []
+            orig_h, orig_w = frame.shape[:2]
+            
+            # Format boxes for the tracker
             for obj in boxes:
                 box = obj.get("bbox")
-                conf = obj.get("confidence", 0.0)
                 if box and len(box) == 4:
-                    # ✅ ACCURACY FIX: Coordinates from detector.detect_people are ALREADY 
-                    # in original frame space (un-letterboxed). Do NOT scale them again.
                     x1, y1, x2, y2 = map(int, box)
-
-                    # Keep in bounds
                     x1 = max(0, min(orig_w - 1, x1))
                     y1 = max(0, min(orig_h - 1, y1))
                     x2 = max(0, min(orig_w - 1, x2))
                     y2 = max(0, min(orig_h - 1, y2))
+                    if (x2 - x1) < 4 or (y2 - y1) < 4: continue
+                    rects.append((x1, y1, x2, y2))
+            
+            # Update Tracker
+            objects = self.tracker.update(rects)
+            
+            # Map centroids to bounding boxes to compute kinetics/aspect ratios
+            centroid_to_box = {
+                (int((x1 + x2) / 2.0), int((y1 + y2) / 2.0)): (x1, y1, x2, y2)
+                for (x1, y1, x2, y2) in rects
+            }
+            
+            # Mid-line threshold (Lowered to 75% to avoid faces)
+            mid_y = int(orig_h * 0.75)
+            
+            # Compute analytical statuses
+            sitting_count = 0
+            standing_count = 0
+            normal_count = 0
+            walking_count = 0
+            
+            # Per-box posture lookup: maps (x1,y1,x2,y2) → (label, bgr_color)
+            box_posture_map: dict = {}
+            
+            import math
+            for object_id, centroid in objects.items():
+                cx, cy = centroid
+                history = self.tracker.history.get(object_id, [])
+                
+                # Check Entry/Exit crossing
+                if len(history) >= 2:
+                    y_prev = history[-2][1]
+                    # crossed from top to bottom
+                    if y_prev < mid_y and cy >= mid_y:
+                        if object_id not in self.line_crossed:
+                            self.entry_count += 1
+                            self.line_crossed.add(object_id)
+                    # crossed from bottom to top
+                    elif y_prev > mid_y and cy <= mid_y:
+                        if object_id not in self.line_crossed:
+                            self.exit_count += 1
+                            self.line_crossed.add(object_id)
+                
+                # Assess Movement Speed
+                if len(history) >= 3:
+                    dx = centroid[0] - history[0][0]
+                    dy = centroid[1] - history[0][1]
+                    dist = math.hypot(dx, dy)
+                    speed_per_frame = dist / len(history)
+                else:
+                    speed_per_frame = 0
+                    
+                # Calculate true speed in px/s 
+                current_fps = self.target_fps if self.target_fps and self.target_fps > 0 else 15.0
+                true_speed_px_s = speed_per_frame * current_fps
+                    
+                # Assess Posture via Mediapipe Pose Estimation
+                is_sitting = False
+                bbox = centroid_to_box.get((cx, cy))
+                w = h = 0
+                if bbox:
+                    x1, y1, x2, y2 = bbox
+                    w = x2 - x1
+                    h = y2 - y1
+                    # Basic fallback and validation
+                    if h > 0 and (w / float(h)) > 1.2:
+                        is_sitting = True
+                
+                if true_speed_px_s < 15.0:
+                    if bbox and w > 15 and h > 30 and not is_sitting:
+                        try:
+                            crop = frame[y1:y2, x1:x2]
+                            if crop.size > 0:
+                                crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                                results = self.pose_estimator.process(crop_rgb)
+                                
+                                if results.pose_landmarks:
+                                    landmarks = results.pose_landmarks.landmark
+                                    if landmarks[24].visibility > 0.4 and landmarks[26].visibility > 0.4:
+                                        a = np.array([landmarks[24].x, landmarks[24].y])
+                                        b = np.array([landmarks[26].x, landmarks[26].y])
+                                        c = np.array([landmarks[28].x, landmarks[28].y])
+                                        
+                                        radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
+                                        angle = np.abs(radians * 180.0 / np.pi)
+                                        if angle > 180.0:
+                                            angle = 360 - angle
+                                            
+                                        is_sitting = (angle < 135)
+                        except Exception:
+                            pass
 
+                    if is_sitting:
+                        sitting_count += 1
+                        status = "Sitting"
+                        color = (0, 255, 255)  # Yellow-Cyan
+                    else:
+                        standing_count += 1
+                        status = "Standing"
+                        color = (255, 100, 0)  # Blue
+                elif true_speed_px_s < 45.0:
+                    normal_count += 1
+                    status = "Normal"
+                    color = (0, 220, 80)  # Green
+                else:
+                    walking_count += 1
+                    status = "Walking"
+                    color = (0, 165, 255)  # Orange
+                
+                # Centroid dot
+                cv2.circle(annotated_frame, (cx, cy), 4, color, -1)
+                
+                # Store for bounding-box annotation pass
+                if bbox:
+                    box_posture_map[bbox] = (status, color)
+            
+            # Compute tracker-based average velocity (px/frame → px/s)
+            # Used as fallback if mediapipe pose detection returns 0 (e.g. only 1 person)
+            tracker_speeds = []
+            for _oid, _cent in objects.items():
+                _hist = self.tracker.history.get(_oid, [])
+                if len(_hist) >= 3:
+                    _dx = _cent[0] - _hist[0][0]
+                    _dy = _cent[1] - _hist[0][1]
+                    _spf = math.hypot(_dx, _dy) / len(_hist)
+                    tracker_speeds.append(_spf)
+            tracker_avg_velocity = float(np.mean(tracker_speeds)) * 15.0 if tracker_speeds else 0.0
+            
+            total_active = sitting_count + standing_count + normal_count + walking_count
+            if total_active > 0:
+                self.act_sitting = round((sitting_count / total_active) * 100, 2)
+                self.act_standing = round((standing_count / total_active) * 100, 2)
+                self.act_normal = round((normal_count / total_active) * 100, 2)
+                self.act_walking = round((walking_count / total_active) * 100, 2)
+            else:
+                self.act_sitting = self.act_standing = self.act_normal = self.act_walking = 0.0
+                
+            # Draw HUD Analytics panel on Video Frame
+            cv2.rectangle(annotated_frame, (orig_w - 255, 10), (orig_w - 5, 150), (0, 0, 0), -1)
+            cv2.rectangle(annotated_frame, (orig_w - 255, 10), (orig_w - 5, 150), (40, 40, 40), 1)
+            cv2.putText(annotated_frame, f"Walking : {self.act_walking:.1f}%", (orig_w - 248, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 165, 255), 1)
+            cv2.putText(annotated_frame, f"Normal  : {self.act_normal:.1f}%",  (orig_w - 248, 68), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 220, 80),  1)
+            cv2.putText(annotated_frame, f"Standing: {self.act_standing:.1f}%", (orig_w - 248, 96), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 100, 0), 1)
+            cv2.putText(annotated_frame, f"Sitting : {self.act_sitting:.1f}%",  (orig_w - 248, 124), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1)
+            cv2.putText(annotated_frame, f"Count: {detected_count}",            (orig_w - 248, 145), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (160, 160, 160), 1)
+            
+            # Draw Entry/Exit HUD
+            cv2.putText(annotated_frame, f"Entry: {self.entry_count}  Exit: {self.exit_count}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+            # Draw standard boxes with per-person posture colour and label
+            for obj in boxes:
+                box = obj.get("bbox")
+                conf = obj.get("confidence", 0.0)
+                if box and len(box) == 4:
+                    x1, y1, x2, y2 = map(int, box)
+                    x1 = max(0, min(orig_w - 1, x1))
+                    y1 = max(0, min(orig_h - 1, y1))
+                    x2 = max(0, min(orig_w - 1, x2))
+                    y2 = max(0, min(orig_h - 1, y2))
                     bw = x2 - x1
                     bh = y2 - y1
                     if bw < 4 or bh < 4: continue
-
-                    # Visuals
-                    color = (0, 255, 80)
-                    thickness = 2
+                    
+                    # Lookup posture status for this specific box
+                    posture_key = (x1, y1, x2, y2)
+                    posture_label, box_color = box_posture_map.get(posture_key, ("Person", (0, 220, 60)))
+                    
+                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, 1)
                     corner_len = max(12, min(bw, bh) // 5)
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 200, 60), 1)
-                    cv2.line(annotated_frame, (x1, y1), (x1 + corner_len, y1), color, thickness)
-                    cv2.line(annotated_frame, (x1, y1), (x1, y1 + corner_len), color, thickness)
-                    cv2.line(annotated_frame, (x2, y1), (x2 - corner_len, y1), color, thickness)
-                    cv2.line(annotated_frame, (x2, y1), (x2, y1 + corner_len), color, thickness)
-                    cv2.line(annotated_frame, (x1, y2), (x1 + corner_len, y2), color, thickness)
-                    cv2.line(annotated_frame, (x1, y2), (x1, y2 - corner_len), color, thickness)
-                    cv2.line(annotated_frame, (x2, y2), (x2 - corner_len, y2), color, thickness)
-                    cv2.line(annotated_frame, (x2, y2), (x2, y2 - corner_len), color, thickness)
+                    thickness = 2
+                    cv2.line(annotated_frame, (x1, y1), (x1 + corner_len, y1), box_color, thickness)
+                    cv2.line(annotated_frame, (x1, y1), (x1, y1 + corner_len), box_color, thickness)
+                    cv2.line(annotated_frame, (x2, y1), (x2 - corner_len, y1), box_color, thickness)
+                    cv2.line(annotated_frame, (x2, y1), (x2, y1 + corner_len), box_color, thickness)
+                    cv2.line(annotated_frame, (x1, y2), (x1 + corner_len, y2), box_color, thickness)
+                    cv2.line(annotated_frame, (x1, y2), (x1, y2 - corner_len), box_color, thickness)
+                    cv2.line(annotated_frame, (x2, y2), (x2 - corner_len, y2), box_color, thickness)
+                    cv2.line(annotated_frame, (x2, y2), (x2, y2 - corner_len), box_color, thickness)
 
-                    label = f"person {conf:.2f}"
+                    label = f"{posture_label} {conf:.2f}"
                     font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = max(0.35, min(0.55, bw / 200))
+                    font_scale = max(0.32, min(0.52, bw / 200))
                     (tw, th), _ = cv2.getTextSize(label, font, font_scale, 1)
                     label_y = y1 - 6 if y1 > th + 8 else y2 + th + 6
                     cv2.rectangle(annotated_frame, (x1, label_y - th - 3), (x1 + tw + 6, label_y + 3), (0, 0, 0), -1)
-                    cv2.putText(annotated_frame, label, (x1 + 3, label_y), font, font_scale, (0, 255, 80), 1, cv2.LINE_AA)
+                    cv2.putText(annotated_frame, label, (x1 + 3, label_y), font, font_scale, box_color, 1, cv2.LINE_AA)
 
                     # ── 🔴 [LIVE INTELLIGENCE] ReID & Journey Tracking ──────────────────
                     from app.services.reid_service import reid_service
@@ -739,6 +932,9 @@ class StreamWorker:
                 
                 # Extract movement metrics for ingestion
                 cur_velocity = panic_result.get("avg_velocity", 0.0)
+                # Fallback: use centroid-tracker speed when mediapipe finds no pose
+                if cur_velocity < 0.5 and tracker_avg_velocity > 0.5:
+                    cur_velocity = tracker_avg_velocity
                 cur_variance = panic_result.get("variance", 0.0)
                 cur_acceleration = panic_result.get("acceleration", 0.0)
             except Exception as e:
@@ -748,15 +944,34 @@ class StreamWorker:
             self._metrics_broadcast_counter += 1
             if self._metrics_broadcast_counter % 5 == 0: # Every ~5 frames for smoothness
                 try:
+                    # Calculate live risk_score from latest intelligence snapshot
+                    live_risk_score = 10
+                    live_risk_level = "low"
+                    if getattr(self, '_latest_intelligence', None) and self._latest_intelligence:
+                        live_risk_level = self._latest_intelligence.overall_risk_level
+                        risk_map = {"low": 10, "medium": 40, "high": 75, "critical": 95}
+                        live_risk_score = risk_map.get(live_risk_level, 10)
+
                     from app.api.v1.endpoints.websocket import ws_manager
                     asyncio.create_task(ws_manager.broadcast({
                         "type": "live_metrics",
                         "data": {
                             "camera_id": str(self.camera_id),
+                            "venue_id": getattr(self, "_intel_venue_id", ""),
                             "velocity": round(float(cur_velocity), 2),
                             "variance": round(float(cur_variance), 3),
                             "acceleration": round(float(cur_acceleration), 2),
                             "count": detected_count,
+                            "entries": self.entry_count,
+                            "exits": self.exit_count,
+                            "risk_score": live_risk_score,
+                            "risk_level": live_risk_level,
+                            "activity": {
+                                "sitting": getattr(self, 'act_sitting', 0.0),
+                                "standing": getattr(self, 'act_standing', 0.0),
+                                "normal": getattr(self, 'act_normal', 0.0),
+                                "walking": getattr(self, 'act_walking', 0.0)
+                            },
                             "timestamp": now.isoformat()
                         }
                     }))
@@ -828,7 +1043,9 @@ class StreamWorker:
                                 "trend": "rapidly_increasing",
                                 "severity": 95,
                                 "should_alert": True,
-                                "recommended_action": panic_result.get("reason", "🚨 CROWD SURGE / PANIC DETECTED"),
+                                "reason": panic_result.get("reason", "🚨 CROWD SURGE / PANIC DETECTED"),
+                                "recommended_action": "HIGH RISK: Increase monitoring, prepare crowd control staff, and ensure exits are clear.",
+                                "predicted_level": "CRITICAL",
                                 "risk_score": 100.0,
                                 "occupancy_percent": 100.0,
                                 "early_warning_triggered": False,
@@ -1066,19 +1283,39 @@ class StreamWorker:
                     },
                 )
 
-                # Flush evicted dwell tracks to PostgreSQL
+                # Flush evicted dwell tracks to PostgreSQL and update Heartbeat
                 try:
-                    if self.dwell_service._evicted:
-                        async with db_manager.session() as session:
-                            flushed = await self.dwell_service.flush_evicted_to_db(session)
-                            if flushed:
-                                logger.info(
-                                    "Flushed dwell records to DB",
-                                    extra={"camera_id": str(self.camera_id), "count": flushed},
-                                )
+                    from app.core.database import db_manager
+                    from sqlalchemy import update
+                    from app.models.camera import Camera
+                    
+                    async with db_manager.session() as session:
+                        # 1. Dwell track flush
+                        try:
+                            if hasattr(self.dwell_service, '_evicted') and self.dwell_service._evicted:
+                                flushed = await self.dwell_service.flush_evicted_to_db(session)
+                                if flushed:
+                                    logger.info(
+                                        "Flushed dwell records to DB",
+                                        extra={"camera_id": str(self.camera_id), "count": flushed},
+                                    )
+                        except Exception as e:
+                            logger.warning(f"Dwell time DB flush failed: {str(e)}")
+                        
+                        # 2. Heartbeat update to prevent OFFLINE false positives
+                        try:
+                            await session.execute(
+                                update(Camera)
+                                .where(Camera.id == self.camera_id)
+                                .values(last_heartbeat_at=datetime.now(timezone.utc), is_online=True)
+                            )
+                            await session.commit()
+                        except Exception as e:
+                            logger.error(f"Heartbeat camera DB update failed: {str(e)}")
+                            
                 except Exception as e:
                     logger.warning(
-                        "Dwell flush failed",
+                        "Heartbeat overall loop failed entirely",
                         extra={"camera_id": str(self.camera_id), "error": str(e)},
                     )
 

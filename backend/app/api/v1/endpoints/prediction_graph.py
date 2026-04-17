@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from sqlalchemy import select
 from datetime import datetime, timedelta, timezone
+import asyncio
 
 from app.core.database import get_db
 from app.models.crowd_metric import CrowdMetric
@@ -55,9 +56,24 @@ async def prediction_graph(
                 historical_occupancy_percents.append(round(m.occupancy_percent or 0, 1))
 
         # -----------------------------------------
-        # 2. Run prediction engine
+        # 2. Run prediction engine — with 12s timeout to prevent blocking
         # -----------------------------------------
-        prediction = await prediction_service.forecast_risk(session, venue_id)
+        try:
+            prediction = await asyncio.wait_for(
+                prediction_service.forecast_risk(session, venue_id),
+                timeout=12.0
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"Prediction engine timed out for venue {venue_id} — returning historical-only data.")
+            prediction = {
+                "forecast_curve": [],
+                "forecast_upper_band": [],
+                "forecast_lower_band": [],
+                "escalation_probability": 0.0,
+                "model_used": "timeout_fallback",
+                "confidence": 0.0,
+                "horizon_minutes": 30,
+            }
 
         forecast_curve = prediction.get("forecast_curve", [])
         upper_band = prediction.get("forecast_upper_band", [])

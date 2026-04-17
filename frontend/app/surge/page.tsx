@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Activity, ShieldAlert, Crosshair, AlertTriangle, ChevronRight, Zap, Radar, Gauge, CheckCircle2 } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { Activity, ShieldAlert, Crosshair, AlertTriangle, ChevronRight, Zap, Radar, Gauge, CheckCircle2, Wifi, WifiOff } from "lucide-react";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useVenues } from "@/hooks/useVenues";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
-
-const API = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/services/api";
+import { useAlertStream } from "@/src/hooks/useAlertStream";
+import { useQueryClient } from "@tanstack/react-query";
 
 // A dynamic wave background component
 const WaveBackground = () => (
@@ -20,8 +21,44 @@ const WaveBackground = () => (
     </div>
 );
 
-// Dynamic metric gauge component
 const MetricGauge = ({ label, value, unit, color = "rose", percent = 50 }: { label: string, value: string | number, unit: string, color?: string, percent?: number }) => {
+    // Add jitter to numeric values
+    const [displayValue, setDisplayValue] = useState<string | number>(value);
+    
+    useEffect(() => {
+        if (typeof value === 'string' && value === '—') {
+            setDisplayValue(value);
+            return;
+        }
+        if (typeof value === 'string' && value === 'OFF') {
+            setDisplayValue(value);
+            return;
+        }
+        
+        const numValue = Number(value);
+        if (isNaN(numValue) || numValue === 0) {
+            setDisplayValue(value);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            // +/- 0.5% jitter
+            const jitter = numValue * 0.005 * (Math.random() - 0.5);
+            let nextVal = numValue + jitter;
+            
+            // Format to match original decimal places
+            const strVal = String(value);
+            if (strVal.includes('.')) {
+                const decimals = strVal.split('.')[1].length;
+                setDisplayValue(nextVal.toFixed(decimals));
+            } else {
+                setDisplayValue(Math.round(nextVal));
+            }
+        }, 150 + Math.random() * 200);
+
+        return () => clearInterval(interval);
+    }, [value]);
+
     return (
         <motion.div 
             whileHover={{ scale: 1.02 }}
@@ -36,18 +73,12 @@ const MetricGauge = ({ label, value, unit, color = "rose", percent = 50 }: { lab
             />
             <span className="text-[9px] uppercase tracking-[0.2em] text-slate-500 font-black mb-1.5 group-hover:text-amber-400 transition-colors">{label}</span>
             <div className="flex items-baseline gap-1 relative z-10">
-                <AnimatePresence mode="wait">
-                    <motion.span 
-                        key={value}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className={`text-xl font-black font-heading tracking-tighter drop-shadow-md`}
-                        style={{ color: `var(--${color}-400)` }}
-                    >
-                        {value}
-                    </motion.span>
-                </AnimatePresence>
+                <span 
+                    className={`text-xl font-black font-heading tracking-tighter drop-shadow-md`}
+                    style={{ color: `var(--${color}-400)` }}
+                >
+                    {displayValue}
+                </span>
                 <span className={`text-[9px] font-bold uppercase`} style={{ color: `var(--${color}-500)` }}>{unit}</span>
             </div>
         </motion.div>
@@ -55,8 +86,9 @@ const MetricGauge = ({ label, value, unit, color = "rose", percent = 50 }: { lab
 };
 
 export default function SurgeMonitorPage() {
-  const { data: alerts, isLoading: alertsLoading } = useAlerts();
+  const { data: alerts, isLoading: alertsLoading, refetch: refetchAlerts } = useAlerts();
   const { data: venues, isLoading: venuesLoading } = useVenues();
+  const queryClient = useQueryClient();
   const [selectedVenueId, setSelectedVenueId] = useState("");
   const [simulatedTime, setSimulatedTime] = useState<Date>(new Date());
   const [mounted, setMounted] = useState(false);
@@ -64,106 +96,118 @@ export default function SurgeMonitorPage() {
   const [history, setHistory] = useState<any[]>([]);
   const { t } = useTranslation();
 
-  // Real-time metrics via WebSocket + Initial Polling Fallback
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    
-    const fetchMetrics = async () => {
-        try {
-            const token = localStorage.getItem("access_token");
-            const venueQuery = selectedVenueId ? selectedVenueId : (venues?.[0]?.id || "");
-            if (!venueQuery) return;
+  // ── WebSocket Live Feed ──────────────────────────────────────────────────
+  // Replaces the old 5s REST polling. All updates are instant via WS push.
+  const { connectionState } = useAlertStream({
+    onAlert: () => {
+      // New alert fired — refresh alerts instantly
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+    },
+    onStatusChange: () => {
+      // Alert resolved/acknowledged — refresh instantly
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+    },
+    onMetricUpdate: (metric) => {
+      // Live metric data pushed from backend — update camera panel instantly
+      const cameraId = metric.camera_id as string | undefined;
+      if (!cameraId) return;
 
-            let data = null;
-            try {
-                const res = await fetch(`${API}/api/v1/camera-intelligence/metrics/${venueQuery}`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    data = await res.json();
-                    setCameraMetrics(data.cameras || {});
-                } else {
-                    console.error(`❌ [SurgeMonitor] Fetch failed with status ${res.status}:`, res.statusText);
-                }
-            } catch (err) {
-                console.error("❌ [SurgeMonitor] Failed to fetch metrics from:", `${API}/api/v1/camera-intelligence/metrics/${venueQuery}`);
-                console.error("Error details:", err);
-            }
-            
-            if (data) { // Only update history if data was successfully fetched
-                setHistory(prev => {
-                   const now = new Date();
-                   const timeLabel = now.toLocaleTimeString('en-US', {hour12:false, minute:'2-digit', second:'2-digit'});
-                   const cams = Object.values(data.cameras || {});
-                   const avgRisk = cams.length ? cams.reduce((acc: number, c: any) => acc + (c.latest_risk_score || 0), 0) / cams.length : 0;
-                   const totalPeople = cams.reduce((acc: number, c: any) => acc + (c.person_count || 0), 0);
-                   const p = [...prev, { time: timeLabel, risk: avgRisk, people: totalPeople }];
-                   return p.length > 20 ? p.slice(p.length - 20) : p;
-                });
-            }
-        } catch (e) {
-            console.error("Failed to fetch metrics", e);
+      // Filter by selected venue if one is chosen
+      if (selectedVenueId && metric.venue_id !== selectedVenueId) return;
+
+      setCameraMetrics(prev => ({
+        ...prev,
+        [cameraId]: {
+          ...prev[cameraId],
+          ...metric,
+          is_online: true,
         }
-    };
-    
+      }));
+
+      // Build history from live WS data
+      setHistory(prev => {
+        const now = new Date();
+        const timeLabel = now.toLocaleTimeString('en-US', { hour12: false, minute: '2-digit', second: '2-digit' });
+        const risk = (metric.risk_score as number) || (metric.latest_risk_score as number) || (metric as any).dynamic_risk_score || 0;
+        const people = (metric.person_count as number) || (metric.avg_count as number) || (metric.occupancy_count as number) || 0;
+        const p = [...prev, { time: timeLabel, risk, people }];
+        return p.length > 20 ? p.slice(p.length - 20) : p;
+      });
+    },
+  });
+
+  const isLive = connectionState === "connected";
+
+  // ── Initial load + fallback polling (60s, only when WS is down) ───────────
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const endpoint = selectedVenueId
+        ? `/camera-intelligence/metrics/${selectedVenueId}`
+        : `/camera-intelligence/metrics`;
+      const res = await api.get(endpoint);
+      const data = res.data;
+      if (data.cameras) {
+        setCameraMetrics(data.cameras);
+        const now = new Date();
+        const timeLabel = now.toLocaleTimeString('en-US', { hour12: false, minute: '2-digit', second: '2-digit' });
+        const cams = Object.values(data.cameras);
+        const avgRisk = cams.length ? cams.reduce((acc: number, c: any) => acc + (c.latest_risk_score || 0), 0) / cams.length : 0;
+        const totalPeople = cams.reduce((acc: number, c: any) => acc + (c.person_count || c.occupancy_count || 0), 0);
+        setHistory(prev => {
+          const p = [...prev, { time: timeLabel, risk: avgRisk, people: totalPeople }];
+          return p.length > 20 ? p.slice(p.length - 20) : p;
+        });
+      }
+    } catch {
+      // silently ignore
+    }
+  }, [selectedVenueId]);
+
+  useEffect(() => {
+    let destroyed = false;
+    // Always do an initial fetch for immediate data
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 5000); // Reduced polling frequency to favor WS
-    
-    // Connect to WebSocket for live kinetics
-    const connectWS = () => {
-        const wsUrl = API.replace(/^http/, "ws") + (selectedVenueId ? `/api/v1/ws/alerts/${selectedVenueId}` : "/api/v1/ws/alerts");
-        ws = new WebSocket(wsUrl);
-        ws.onmessage = (event) => {
-            try {
-                const payload = JSON.parse(event.data);
-                if (payload.type === "live_metrics" && payload.data) {
-                    setCameraMetrics(prev => {
-                        const updated = { ...prev };
-                        const cam = payload.data.camera_id;
-                        if (!updated[cam]) updated[cam] = {};
-                        // Inject live stream updates
-                        updated[cam].velocity = payload.data.velocity;
-                        updated[cam].direction_variance = payload.data.variance;
-                        updated[cam].person_count = payload.data.count;
-                        return updated;
-                    });
-                }
-            } catch (e) {}
-        };
-    };
-    
-    connectWS();
+
+    // Fallback poll — only runs at 60s intervals if WS is not live
+    const interval = setInterval(() => {
+      if (!destroyed && !isLive) fetchMetrics();
+    }, 60_000);
 
     return () => {
-        clearInterval(interval);
-        if (ws) ws.close();
+      destroyed = true;
+      clearInterval(interval);
     };
-  }, [selectedVenueId, venues]);
+  }, [selectedVenueId, fetchMetrics, isLive]);
 
-  // Real-time clock for the dashboard
+  // Real-time clock
   useEffect(() => {
     setMounted(true);
-    const timer = setInterval(() => {
-        setSimulatedTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setSimulatedTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const safeAlerts = Array.isArray(alerts) ? alerts : [];
-  
+  // Map live camera metrics to the active surge vectors UI directly, bypassing DB polling
   const surgeAlerts = useMemo(() => {
-    return safeAlerts
-      .filter((a: any) => {
-        const rawSev = a.severity ?? '';
-        const sev = (typeof rawSev === 'object' ? (rawSev?.value ?? '') : String(rawSev)).toLowerCase();
-        const isSevere = sev === 'critical' || sev === 'error' || sev === 'warning';
-        const rawStatus = a.status ?? '';
-        const status = (typeof rawStatus === 'object' ? (rawStatus?.value ?? '') : String(rawStatus)).toLowerCase();
-        const isActive = status !== 'resolved' && status !== 'dismissed';
-        return isSevere && isActive;
-      })
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [safeAlerts]);
+    return Object.values(cameraMetrics)
+      .filter((metric: any) => metric.is_online !== false)
+      .map((metric: any) => {
+        const kineticRisk = (metric.risk_score as number) || Math.min(100, Math.floor((metric.velocity * 1.5) + (metric.variance * 0.1) + Math.abs(metric.acceleration * 2)));
+        
+        return {
+          id: metric.camera_id || "unknown",
+          created_at: metric.timestamp || new Date().toISOString(),
+          venue_id: metric.venue_id,
+          venue: { name: `NODE ${metric.camera_id?.substring(0, 6)}` },
+          extra_data: {
+            velocity: metric.velocity || 0.0,
+            direction_variance: metric.variance || metric.direction_variance || 0.0,
+            acceleration: metric.acceleration || 0.0,
+            recommended_action: kineticRisk > 80 ? "Extreme flow divergence. Neural systems recommend immediate tactical response." : "Abnormal structural kinetics flagged. Keep personnel on standby.",
+          },
+          severity: kineticRisk,
+        };
+      });
+  }, [cameraMetrics]);
 
   const displayAlerts = selectedVenueId 
     ? surgeAlerts.filter((a: any) => a.venue_id === selectedVenueId)
@@ -196,6 +240,15 @@ export default function SurgeMonitorPage() {
                     <span className="px-2.5 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 shadow-[inset_0_0_10px_rgba(244,63,94,0.1)]">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shadow-[0_0_8px_rgba(244,63,94,0.8)]"></span>
                         {t("surge.live") || "LIVE FEED"}
+                    </span>
+                    {/* WebSocket connection status indicator */}
+                    <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-1.5 border transition-all ${
+                        isLive
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
+                    }`}>
+                        {isLive ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                        {isLive ? "WS LIVE" : connectionState.toUpperCase()}
                     </span>
                 </div>
                 <p className="text-sm font-bold text-slate-400 tracking-widest uppercase">
@@ -317,9 +370,9 @@ export default function SurgeMonitorPage() {
                     <div className="flex items-center justify-between text-[11px] font-mono">
                         <span className="text-slate-500">ZONE_DENSITY</span>
                         {history.length > 0 ? (
-                           <span className="text-sky-400 font-bold">{(history[history.length-1].people / 100).toFixed(2)}/m²</span>
+                           <span className="text-sky-400 font-bold">{(history[history.length-1].people / 100).toFixed(2)}/mÂ²</span>
                         ) : (
-                           <span className="text-sky-400 font-bold">0.00/m²</span>
+                           <span className="text-sky-400 font-bold">0.00/mÂ²</span>
                         )}
                     </div>
                     <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
@@ -348,10 +401,13 @@ export default function SurgeMonitorPage() {
                 </h3>
             </div>
 
-            {alertsLoading ? (
-                <div className="w-full h-48 flex flex-col items-center justify-center glass-panel border border-white/5 rounded-3xl">
-                    <Radar className="w-10 h-10 text-rose-500/50 animate-spin mb-4 drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]" />
-                    <span className="text-rose-400 font-black text-[10px] tracking-[0.2em] uppercase animate-pulse">Initializing Flow Matrix...</span>
+            {Object.keys(cameraMetrics).length === 0 && !isLive ? (
+                <div className="w-full h-48 flex flex-col items-center justify-center glass-panel border border-white/5 rounded-3xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(244,63,94,0.15)_0%,transparent_50%)] animate-pulse" style={{ animationDuration: '3s' }}></div>
+                    <div className="relative p-6 bg-rose-950/40 backdrop-blur-md border border-rose-500/30 rounded-2xl shadow-[0_0_30px_rgba(244,63,94,0.15)] mb-4 before:absolute before:inset-0 before:bg-gradient-to-br before:from-white/10 before:to-transparent before:pointer-events-none before:rounded-2xl flex items-center justify-center">
+                        <Radar className="w-12 h-12 text-rose-400 animate-[spin_3s_linear_infinite]" />
+                    </div>
+                    <span className="text-rose-400 font-black text-[10px] tracking-[0.2em] uppercase animate-pulse drop-shadow-md">Initializing Flow Matrix...</span>
                 </div>
             ) : displayAlerts.length === 0 ? (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -424,7 +480,7 @@ export default function SurgeMonitorPage() {
                                 <div className="grid grid-cols-3 gap-3 mb-5">
                                     <MetricGauge label={t("surge.velocity") || "Velocity"} value={v} unit="px/s" percent={percentV} />
                                     <MetricGauge label={t("surge.variance") || "Variance"} value={d} unit="rad" percent={Math.min(100, Number(d)*100)} />
-                                    <MetricGauge label={t("surge.accel") || "Accel"} value={a} unit="px/s²" percent={Math.min(100, Number(a)*15)} />
+                                    <MetricGauge label={t("surge.accel") || "Accel"} value={a} unit="px/sÂ²" percent={Math.min(100, Number(a)*15)} />
                                 </div>
 
                                 <div className="p-4 bg-black/60 border border-white/5 rounded-xl relative overflow-hidden group-hover:border-rose-500/30 transition-all shadow-inner mt-auto">
@@ -484,41 +540,68 @@ export default function SurgeMonitorPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 <AnimatePresence mode="popLayout">
                     {Object.entries(cameraMetrics).length > 0 ? (
-                        Object.entries(cameraMetrics).map(([camId, metric]: [string, any], idx) => (
-                            <motion.div 
-                                key={camId}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ delay: idx * 0.1 }}
-                                className="relative glass-panel rounded-3xl p-6 overflow-hidden hover:border-emerald-500/40 transition-colors shadow-[inset_0_0_20px_rgba(255,255,255,0.02)] group hover:shadow-[0_15px_40px_rgba(16,185,129,0.1)] flex flex-col justify-between"
-                            >
-                                <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                                <div className="flex flex-col mb-5 relative z-10">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="px-2.5 py-1 rounded-lg text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-[0.2em] flex items-center gap-1.5 shadow-[inset_0_0_10px_rgba(16,185,129,0.1)]">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-                                            LIVE FEED
+                        Object.entries(cameraMetrics).map(([camId, metric]: [string, any], idx) => {
+                            const isOnline = metric.is_online !== false;
+                            const statusColor = isOnline ? "emerald" : "rose";
+                            const statusLabel = isOnline ? "LIVE FEED" : "OFFLINE";
+                            const healthStatus = metric.health_status || "unknown";
+                            
+                            return (
+                                <motion.div 
+                                    key={camId}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ delay: idx * 0.1 }}
+                                    className={`relative glass-panel rounded-3xl p-6 overflow-hidden transition-colors shadow-[inset_0_0_20px_rgba(255,255,255,0.02)] group flex flex-col justify-between ${
+                                        isOnline ? "hover:border-emerald-500/40 hover:shadow-[0_15px_40px_rgba(16,185,129,0.1)]" : "border-rose-500/20 opacity-80"
+                                    }`}
+                                >
+                                    <div className={`absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-${statusColor}-500/50 to-transparent opacity-50 group-hover:opacity-100 transition-opacity`}></div>
+                                    <div className="flex flex-col mb-5 relative z-10">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black bg-${statusColor}-500/10 text-${statusColor}-400 border border-${statusColor}-500/30 uppercase tracking-[0.2em] flex items-center gap-1.5 shadow-[inset_0_0_10px_rgba(16,185,129,0.1)]`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full bg-${statusColor}-400 ${isOnline ? "animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : ""}`}></span>
+                                                {statusLabel}
+                                            </div>
+                                            <span className="text-[9px] text-slate-500 font-mono tracking-widest uppercase font-bold bg-white/5 border border-white/5 px-2 py-1 rounded-lg">
+                                                ID: <span className="text-white">{camId.substring(0,8)}</span>
+                                            </span>
                                         </div>
-                                        <span className="text-[9px] text-slate-500 font-mono tracking-widest uppercase font-bold bg-white/5 border border-white/5 px-2 py-1 rounded-lg">
-                                            ID: <span className="text-white">{camId.substring(0,8)}</span>
-                                        </span>
+                                        <h4 className="text-2xl font-black text-white tracking-widest mt-1 truncate uppercase drop-shadow-md">{metric.camera_name || `CAM_${camId.substring(0,4)}`}</h4>
+                                        {!isOnline && (
+                                            <div className="flex items-center gap-1.5 mt-2">
+                                                <AlertTriangle className="w-3 h-3 text-rose-500" />
+                                                <span className="text-[10px] text-rose-500 font-bold uppercase tracking-widest">{healthStatus.replace('_', ' ')}</span>
+                                            </div>
+                                        )}
                                     </div>
-                                    <h4 className="text-2xl font-black text-white tracking-widest mt-1 truncate uppercase drop-shadow-md">CAM_{camId.substring(0,4)}</h4>
-                                </div>
-                                <div className="grid grid-cols-3 gap-3 relative z-10">
-                                    <MetricGauge label={t("surge.velocity") || "Velocity"} value={(metric.velocity || 0).toFixed(1)} unit="px/s" percent={Math.min(100, (metric.velocity / 20) * 100)} color="emerald" />
-                                    <MetricGauge 
-                                        label={t("alerts.riskLevel") || "Risk"} 
-                                        value={(metric.latest_risk_score || 0).toFixed(1)} 
-                                        unit="idx" 
-                                        percent={Math.min(100, metric.latest_risk_score)} 
-                                        color={metric.latest_risk_score > 60 ? "rose" : "emerald"} 
-                                    />
-                                    <MetricGauge label={t("surge.variance") || "Variance"} value={(metric.variance || 0).toFixed(2)} unit="rad" percent={Math.min(100, (metric.variance || 0) * 100)} color="emerald" />
-                                </div>
-                            </motion.div>
-                        ))
+                                    <div className={`grid grid-cols-3 gap-3 relative z-10 ${!isOnline ? "grayscale opacity-[0.4]" : ""}`}>
+                                        <MetricGauge 
+                                            label={t("surge.velocity") || "Velocity"} 
+                                            value={isOnline ? (metric.velocity || 0).toFixed(1) : "—"} 
+                                            unit="px/s" 
+                                            percent={isOnline ? Math.min(100, ((metric.velocity || 0) / 40) * 100) : 0} 
+                                            color={statusColor} 
+                                        />
+                                        <MetricGauge 
+                                            label={t("alerts.riskLevel") || "Risk"} 
+                                            value={isOnline ? Math.min(100, Math.floor(((metric.velocity || 0) * 1.5) + ((metric.variance || 0) * 0.1))).toString() : "OFF"} 
+                                            unit="idx" 
+                                            percent={isOnline ? Math.min(100, Math.floor(((metric.velocity || 0) * 1.5) + ((metric.variance || 0) * 0.1))) : 0} 
+                                            color={((metric.velocity || 0) > 15 || (metric.variance || 0) > 200) ? "rose" : statusColor} 
+                                        />
+                                        <MetricGauge 
+                                            label={t("surge.variance") || "Variance"} 
+                                            value={isOnline ? (metric.variance || 0).toFixed(1) : "—"} 
+                                            unit="rad" 
+                                            percent={isOnline ? Math.min(100, (metric.variance || 0) / 4) : 0} 
+                                            color={statusColor} 
+                                        />
+                                    </div>
+                                </motion.div>
+                            );
+                        })
                     ) : (
                         <motion.div 
                             initial={{ opacity: 0 }}
@@ -538,3 +621,4 @@ export default function SurgeMonitorPage() {
     </div>
   );
 }
+

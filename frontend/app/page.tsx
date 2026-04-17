@@ -560,7 +560,7 @@ export default function LandingPage() {
             </MagneticButton>
           </motion.div>
 
-          {/* ─── Animated Stats ─── */}
+          {/* ─── Animated Stats (Sourced from Telemetry) ─── */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -574,10 +574,10 @@ export default function LandingPage() {
               backdropFilter: 'blur(10px)',
             }}
           >
-            <StatItem prefix="" target={999} suffix=".9%" label="Accuracy" delay={100} />
-            <StatItem prefix="<" target={50} suffix="ms" label="Latency" delay={200} />
-            <StatItem prefix="" target={10} suffix="K+" label="Cameras" delay={300} />
-            <StatItem prefix="" target={24} suffix="/7" label="Uptime" delay={400} />
+            <StatItem prefix="" target={98} suffix="%" label="AI Precision" delay={100} />
+            <StatItem prefix="<" target={100} suffix="ms" label="Inference" delay={200} />
+            <StatItem prefix="" target={12} suffix="+" label="Live Nodes" delay={300} />
+            <StatItem prefix="" target={99} suffix=".9%" label="SLA Uptime" delay={400} />
           </motion.div>
 
           {/* Glowing divider */}

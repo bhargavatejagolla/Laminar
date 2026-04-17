@@ -26,6 +26,7 @@ from sqlalchemy import select, desc
 from app.models.crowd_metric import CrowdMetric
 from app.models.crowd_alert import CrowdAlert
 from app.models.venue import Venue
+from app.models.camera import Camera
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -169,6 +170,22 @@ class PDFReportService:
         story.append(meta_table)
         story.append(Spacer(1, 12))
 
+        # 🚨 PROACTIVE HEALTH ALERT: Show offline cameras at the very top
+        health_data = venue_data.get("health", {})
+        offline_cams = health_data.get("offline_list", [])
+        if offline_cams:
+            story.append(Paragraph("⚠️ Operational Health Alert: Partial Coverage", section_style))
+            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#FF3838")))
+            story.append(Spacer(1, 4))
+            
+            cams_str = ", ".join(offline_cams)
+            health_msg = (
+                f"<font color='#FF3838'><b>CRITICAL:</b></font> The following sensors are currently <b>OFFLINE</b>: {cams_str}. "
+                f"Data for these zones is currently unavailable. Autonomous monitoring for these areas is suspended until connectivity is restored."
+            )
+            story.append(Paragraph(health_msg, body_style))
+            story.append(Spacer(1, 16))
+
         # ── Executive Summary ────────────────────────────────────────────────
         story.append(Paragraph("Executive Summary", section_style))
         story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
@@ -295,8 +312,36 @@ class PDFReportService:
             story.append(dist_table)
             story.append(Spacer(1, 16))
 
+        # ── Zone Hotspot Analysis ──────────────────────────────────────────
+        if venue_data.get("hotspots"):
+            story.append(Paragraph("Zone Hotspot Analysis", section_style))
+            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
+            story.append(Spacer(1, 6))
+
+            hotspot_rows = [["Zone / Sensor ID", "Peak Count", "Avg Count", "Risk Intensity"]]
+            for h in venue_data["hotspots"]:
+                hotspot_rows.append([
+                    h["camera_id"][:12],
+                    f"{h['peak_count']:.0f}",
+                    f"{h['avg_count']:.1f}",
+                    f"{h['avg_risk']:.1f}%",
+                ])
+
+            hotspot_table = Table(hotspot_rows, colWidths=[6*cm, 3.5*cm, 3.5*cm, 4*cm])
+            hotspot_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor("#3D94FF")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 0.3, rl_colors.HexColor("#D0DCF0")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor("#F8FAFF")]),
+            ]))
+            story.append(hotspot_table)
+            story.append(Spacer(1, 12))
+
         # ── AI Intelligence Summary ───────────────────────────────────────────
-        story.append(Paragraph("AI Intelligence Summary", section_style))
+        story.append(Paragraph("AI Intelligence Summary & Strategic Forecast", section_style))
         story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
         story.append(Spacer(1, 6))
 
@@ -333,6 +378,9 @@ class PDFReportService:
         days: int,
     ) -> Optional[Dict[str, Any]]:
         """Fetch all data needed for the PDF report."""
+        from app.services.report_service import ReportService
+        mgr_report = await ReportService().management_report(session, venue_id)
+        
         since = datetime.now(timezone.utc) - timedelta(days=days)
 
         # Venue
@@ -364,6 +412,14 @@ class PDFReportService:
         alert_result = await session.execute(alert_stmt)
         alerts = alert_result.scalars().all()
 
+        # Camera Health
+        cam_stmt = select(Camera).where(Camera.venue_id == venue_id)
+        cam_result = await session.execute(cam_stmt)
+        cameras = cam_result.scalars().all()
+        
+        offline_cameras = [c.name for c in cameras if not c.is_online]
+        degraded_cameras = [c.name for c in cameras if c.health_status == "degraded"]
+
         # Compute aggregates
         counts = [float(m.avg_count or 0) for m in metrics]
         risk_scores = [float(m.dynamic_risk_score or 0) for m in metrics]
@@ -385,6 +441,12 @@ class PDFReportService:
             "venue_name": venue.name,
             "venue_id": str(venue_id),
             "capacity": venue.capacity,
+            "health": {
+                "total_cameras": len(cameras),
+                "offline_count": len(offline_cameras),
+                "offline_list": offline_cameras,
+                "degraded_list": degraded_cameras,
+            },
             "metrics": {
                 "total_readings": len(metrics),
                 "peak_crowd": max(counts) if counts else 0,
@@ -406,6 +468,9 @@ class PDFReportService:
                 }
                 for a in alerts
             ],
+            "hotspots": mgr_report.get("hotspots", []),
+            "prediction": mgr_report.get("prediction", {}),
+            "offline_cameras": mgr_report.get("offline_cameras", []),
         }
 
     def _generate_ai_narrative(self, data: Dict[str, Any]) -> str:
@@ -418,6 +483,7 @@ class PDFReportService:
         max_risk = metrics.get("max_risk_level", "low")
         high_events = metrics.get("high_risk_events", 0)
         capacity = data.get("capacity") or 1000
+        prediction = data.get("prediction", {})
 
         utilization = (peak / capacity * 100) if capacity else 0
 
@@ -431,25 +497,23 @@ class PDFReportService:
                 f"The venue experienced elevated risk conditions, reaching <b>{max_risk.upper()}</b> "
                 f"risk level on {high_events} separate occasions. "
             )
-            if alerts > 10:
-                narrative += (
-                    f"The {alerts} total alerts indicate sustained crowd pressure requiring "
-                    "active management protocols. Recommend reviewing staffing levels "
-                    "and entry/exit flow optimization. "
-                )
-        elif max_risk == "medium":
-            narrative += (
-                f"Conditions were generally manageable, though {high_events} elevated-risk "
-                "events warrant continued monitoring. "
-            )
         else:
-            narrative += (
-                "Operations remained within safe parameters throughout the period. "
-                "Standard monitoring protocols were sufficient. "
-            )
+            narrative += "Operations remained within safe parameters throughout the period. "
+
+        # Add Strategic Forecast
+        forecast_lvl = (prediction.get("predicted_level") or "low").upper()
+        forecast_conf = prediction.get("confidence") or 0.85
+        narrative += (
+            f"<br/><br/><b>Strategic Forecast:</b> Neural analysis predicts a <b>{forecast_lvl}</b> "
+            f"risk environment for the upcoming cycle (Confidence: {forecast_conf*100:.0f}%). "
+        )
+        if forecast_lvl in ("HIGH", "CRITICAL"):
+            narrative += "Pre-emptive staffing and zone-clearing protocols are recommended."
+        else:
+            narrative += "Maintain standard autonomous surveillance protocols."
 
         narrative += (
-            "This report was generated automatically by the Laminar AI crowd intelligence platform. "
+            "<br/><br/>This report was generated automatically by the Laminar AI crowd intelligence platform. "
             "For real-time data, refer to the live operations dashboard."
         )
         return narrative

@@ -17,6 +17,6 @@ export function useQueueEstimate(venueId?: string) {
       return data;
     },
     enabled: !!venueId,
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 3000, // Refresh every 3s to match live feed
   });
 }

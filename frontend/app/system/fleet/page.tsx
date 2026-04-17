@@ -3,8 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Cpu, RefreshCw, CircuitBoard, Wifi, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/services/api";
 
 interface EdgeNode {
   node_id: string;
@@ -27,9 +26,8 @@ export default function FleetHealthPage() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/edge/model-status`);
-      const data = await res.json();
-      setFleet(data);
+      const res = await api.get('/edge/model-status');
+      setFleet(res.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -47,14 +45,10 @@ export default function FleetHealthPage() {
     setSimulating(true);
     const nodes = ["CAM-EDGE-001", "CAM-EDGE-002", "CAM-EDGE-003", "CAM-EDGE-004"];
     for (const node of nodes) {
-      await fetch(`${API_URL}/api/v1/edge/sync-model-weights`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          edge_node_id: node,
-          local_samples: Math.floor(Math.random() * 5000) + 100,
-          model_version: fleet?.global_version || "v1.0.0",
-        }),
+      await api.post('/edge/sync-model-weights', {
+        edge_node_id: node,
+        local_samples: Math.floor(Math.random() * 5000) + 100,
+        model_version: fleet?.global_version || "v1.0.0",
       });
     }
     await fetchStatus();

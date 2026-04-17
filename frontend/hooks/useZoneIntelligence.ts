@@ -53,6 +53,7 @@ export interface ZoneIntelligenceSnapshot {
   camera_id: string;
   zone_id: string;
   timestamp: string;
+  is_live?: boolean;
   density: ZoneIntelligenceDensity;
   dwell: ZoneIntelligenceDwell;
   flow: ZoneIntelligenceFlow;
@@ -98,6 +99,7 @@ export function useZoneIntelligenceSummary(refetchInterval = 2000) {
         }
       );
     },
+    staleTime: 1000,
     refetchInterval,
   });
 }
@@ -113,6 +115,7 @@ export function useZoneIntelligenceCamera(cameraId?: string, refetchInterval = 2
       // Backend wraps snapshot in { camera_id, status, snapshot: {...} }
       return data?.snapshot ?? data;
     },
+    staleTime: 1000,
     enabled: !!cameraId,
     refetchInterval,
   });

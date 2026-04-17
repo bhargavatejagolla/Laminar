@@ -7,6 +7,7 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: getDashboardStats,
-    refetchInterval: 10000,
+    staleTime: 2000,
+    refetchInterval: 3000,
   });
 }

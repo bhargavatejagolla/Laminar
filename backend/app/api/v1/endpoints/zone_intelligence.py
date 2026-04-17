@@ -146,87 +146,26 @@ async def get_intelligence_summary(
         health_status = meta.get("health_status", "unknown")
 
         orch = all_orch.get(camera_id)
-        snap = orch.get_latest().to_dict() if (orch and orch.get_latest()) else None
-
-        # Fallback 1: DB-backed persistent snapshot cache
-        if snap is None:
-            snap = meta.get("last_snapshot")
-
-            # Get venue_id for correctly querying alerts
-            venue_id = meta.get("venue_id")
-            
-            # Get latest count from frames
-            frame_res = await session.execute(
-                select(CrowdFrame.detected_count)
-                .where(CrowdFrame.camera_id == camera_id)
-                .order_by(CrowdFrame.captured_at.desc())
-                .limit(1)
-            )
-            last_count = frame_res.scalar_one_or_none() or 0
-            
-            # Get latest alert for summary and risk (per Venue)
-            alert_res = await session.execute(
-                select(CrowdAlert)
-                .where(CrowdAlert.venue_id == venue_id)
-                .order_by(CrowdAlert.created_at.desc())
-                .limit(1)
-            )
-            last_alert = alert_res.scalar_one_or_none()
-            
-            if last_alert or last_count > 0:
-                # 🚀 SYNTHESIZE SNAPSHOT
-                latest_time = datetime.now(timezone.utc)
-                
-                # Dynamic risk classification for synthesized snapshot
-                # Using same logic as MetricAggregationService._classify_risk_level
-                cap = meta.get("capacity") or 0
-                warn = float(meta.get("warning_threshold")) if meta.get("warning_threshold") else (cap * 0.60 if cap else None)
-                crit = float(meta.get("critical_threshold")) if meta.get("critical_threshold") else (cap * 0.85 if cap else None)
-                
-                if warn is not None and crit is not None:
-                    med_start = warn * 0.5
-                    if last_count >= crit:
-                        risk_level = "critical"
-                    elif last_count >= warn:
-                        risk_level = "high"
-                    elif last_count >= med_start:
-                        risk_level = "medium"
-                    else:
-                        risk_level = "low"
-                else:
-                    risk_level = last_alert.risk_level if last_alert else "low"
-
-                snap = {
-                    "camera_id": camera_id,
-                    "timestamp": latest_time.isoformat(),
-                    "is_synthesized": True,
-                    "density": {
-                        "current": last_count,
-                        "trend": "stable",
-                    },
-                    "prediction": {
-                        "density_5m": last_count,
-                        "trend": "stable",
-                    },
-                    "intelligence": {
-                        "overall_risk_level": risk_level,
-                        "summary": last_alert.explanation if (last_alert and last_alert.explanation) else "System online — monitoring venue capacity.",
-                        "recommended_action": (last_alert.extra_data or {}).get("recommended_action") if last_alert else "Monitor site normally.",
-                        "contributing_factors": (last_alert.extra_data or {}).get("factors", []) if last_alert else [],
-                        "alert_triggered": True if (last_alert and last_alert.status in ["open", "acknowledged"]) else False,
-                    }
-                }
+        snap_obj = orch.get_latest() if orch else None
+        
+        # If we have an active orchestrator snapshot, it's LIVE
+        if snap_obj:
+            snap = snap_obj.to_dict()
+            snap["is_live"] = True
+        else:
+            # No live orchestrator, check if we should show a cached DB snapshot
+            # ONLY if it's very recent? For now, we follow "no static data" 
+            # and only return 'active' if we have a live orchestrator.
+            snap = None
 
         # Determine status
-        # If we have a snapshot (live, DB cache, or Synthesized), we are effectively 'active' 
-        # for dashboard purposes so the user sees data.
         if not is_online or health_status == "offline":
             cameras.append({
                 "camera_id": camera_id,
                 "camera_name": camera_name,
                 "venue_name": venue_name,
                 "status": "offline",
-                "snapshot": snap,
+                "snapshot": None, # Force no static data for offline
             })
             continue
 
@@ -258,7 +197,7 @@ async def get_intelligence_summary(
 
     return {
         "total_cameras": len(all_camera_ids),
-        "active_cameras": sum(1 for c in cameras if c["status"] == "active"),
+        "active_cameras": sum(1 for c in cameras if c["status"] == "active" or (c["status"] != "warming_up" and c.get("snapshot"))),
         "recent_alerts": alert_count,
         "risk_breakdown": risk_breakdown,
         "cameras": cameras,

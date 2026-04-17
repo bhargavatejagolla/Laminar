@@ -24,8 +24,15 @@ from app.models.crowd_alert import CrowdAlert
 from app.models.user import UserRole
 from app.schemas.alert import AlertResponse
 
-
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
+
+def verify_alert_access(alert: CrowdAlert, user):
+    if not user.is_super_admin:
+        if str(alert.venue_id) not in [str(v.id) for v in user.venues]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized for this alert's Location Matrix"
+            )
 
 
 # ==========================================================
@@ -41,8 +48,7 @@ async def get_db() -> AsyncSession:
 # List Alerts
 # ==========================================================
 
-@router.get("/", response_model=List[AlertResponse])
-@router.get("", response_model=List[AlertResponse])  # Accept without trailing slash too
+@router.get("", response_model=List[AlertResponse])
 async def list_alerts(
     status_filter: Optional[str] = None,
     skip: int = Query(0, ge=0),
@@ -57,13 +63,20 @@ async def list_alerts(
     - Optional status filtering.
     """
 
-    # Default: show only active alerts
-    query = select(CrowdAlert).where(CrowdAlert.status != "resolved")
+    # Default: show all alerts (including resolved for history) unless overridden
+    query = select(CrowdAlert)
 
     # If user explicitly requests a status
     if status_filter:
         query = select(CrowdAlert).where(CrowdAlert.status == status_filter)
 
+    if not user.is_super_admin:
+        allowed_venue_ids = {str(v.id) for v in user.venues}
+        query = query.where(CrowdAlert.venue_id.in_(list(allowed_venue_ids)))
+
+    # Add pagination and execution
+    query = query.offset(skip).limit(limit).order_by(CrowdAlert.created_at.desc())
+    
     result = await db.execute(query)
     alerts = result.scalars().all()
 
@@ -78,18 +91,18 @@ async def list_alerts(
 async def acknowledge_alert(
     alert_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(UserRole.OPERATOR,
-                 UserRole.MANAGER, UserRole.ADMIN)),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Acknowledge an alert.
-    - Operator or higher.
+    - Admin or higher.
     """
 
     alert = await db.get(CrowdAlert, alert_id)
 
     if not alert :
         raise HTTPException(status_code=404, detail="Alert not found")
+    verify_alert_access(alert, user)
 
     alert.status = "acknowledged"
     await db.commit()
@@ -106,17 +119,18 @@ async def acknowledge_alert(
 async def resolve_alert(
     alert_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(UserRole.MANAGER, UserRole.ADMIN)),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Resolve an alert.
-    - Manager or Admin only.
+    - Admin or higher.
     """
 
     alert = await db.get(CrowdAlert, alert_id)
 
     if not alert :
         raise HTTPException(status_code=404, detail="Alert not found")
+    verify_alert_access(alert, user)
 
     alert.status = "resolved"
     await db.commit()
@@ -133,17 +147,18 @@ async def resolve_alert(
 async def delete_alert(
     alert_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(UserRole.ADMIN)),
+    user=Depends(require_role(UserRole.SUPER_ADMIN)),
 ):
     """
     Soft delete alert.
-    - Admin only.
+    - Super Admin only.
     """
 
     alert = await db.get(CrowdAlert, alert_id)
 
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+    verify_alert_access(alert, user)
 
     alert.soft_delete()
     await db.commit()

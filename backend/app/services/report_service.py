@@ -5,7 +5,7 @@ import csv
 import io
 import statistics
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crowd_metric import CrowdMetric
@@ -142,6 +142,40 @@ class ReportService:
 
         alert_count = alert_result.scalar() or 0
 
+        # 🚨 PROACTIVE HEALTH CHECK: Identify Offline Sensors
+        offline_stmt = (
+            select(Camera.name)
+            .where(Camera.venue_id == venue_id)
+            .where(Camera.is_online.isnot(True))
+            .where(Camera.is_deleted.isnot(True))
+        )
+        offline_result = await session.execute(offline_stmt)
+        offline_cameras = [r[0] for r in offline_result.all()]
+
+        # Zone breakdown (Hotspots)
+        zone_stmt = (
+            select(
+                CrowdMetric.camera_id, 
+                func.max(CrowdMetric.avg_count).label("peak"),
+                func.avg(CrowdMetric.avg_count).label("avg"),
+                func.avg(CrowdMetric.dynamic_risk_score).label("risk")
+            )
+            .where(CrowdMetric.venue_id == venue_id)
+            .where(CrowdMetric.bucket_start >= today_start)
+            .group_by(CrowdMetric.camera_id)
+            .order_by(desc("risk"))
+            .limit(5)
+        )
+        zone_result = await session.execute(zone_stmt)
+        hotspots = []
+        for r in zone_result.all():
+            hotspots.append({
+                "camera_id": str(r.camera_id),
+                "peak_count": float(r.peak or 0),
+                "avg_count": float(r.avg or 0),
+                "avg_risk": float(r.risk or 0)
+            })
+
         # Prediction
         prediction = await self.prediction_service.forecast_risk(
             session=session,
@@ -153,6 +187,8 @@ class ReportService:
             "report_generated_at": datetime.now(timezone.utc).isoformat(),
             "daily_summary": summary,
             "alerts_today": alert_count,
+            "offline_cameras": offline_cameras,
+            "hotspots": hotspots,
             "prediction": {
                 "predicted_level": prediction.get("predicted_level"),
                 "predicted_risk_score": prediction.get("predicted_risk_score"),

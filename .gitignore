@@ -32,16 +32,21 @@ laminar.db
 tmp/
 logs/
 downloads/
-backend/storage/alert_snapshots/
+
+# Generated evidence storage (large files, not for version control)
 backend/storage/clips/
+backend/storage/alert_snapshots/
 backend/storage/semantic_snapshots/
-backend/storage/*.faiss
-backend/storage/*.json
-backend/storage/*.db
-backend/frontend_build/
+backend/storage/semantic_index.faiss
+backend/storage/semantic_meta.json
+
+# Test / debug scripts
+backend/test_*.py
+backend/test_*.ps1
+backend/update_enum.py
+backend/patch_urls.py
 frontend/patch_urls.py
-backend/patch*.py
-backend/fix*.py
-backend/debug*.py
-backend/test*.py
+
+# Misc binaries
 cloudflared.exe.exe
+

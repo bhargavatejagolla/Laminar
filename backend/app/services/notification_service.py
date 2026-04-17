@@ -67,25 +67,261 @@ class NotificationService:
         alert: CrowdAlert,
     ) -> None:
         """
-        Send a specialized notification for camera health issues.
-        These are distinct from crowd risk alerts.
+        Send a specialized notification for camera health issues with
+        actionable, issue-type-specific descriptions and step-by-step guidance.
         """
         venue_repo = Repository[Venue](Venue)
         venue = await venue_repo.get_by_id(session, alert.venue_id)
-        
         if not venue:
             return
 
         extra = alert.extra_data or {}
         issue_label = extra.get("issue_label", "Camera Health Issue")
-        cam_name = extra.get("camera_name", "Unknown Camera")
-        
-        # Resolve recipients (already handles camera issues in _resolve_recipients)
+        cam_name    = extra.get("camera_name", "Unknown Camera")
+        cam_location = extra.get("camera_location", "")
+        issue_type  = extra.get("issue_type", "unknown")
+
+        # ─── Issue-specific actionable content ────────────────────────────────
+        ISSUE_GUIDE: dict = {
+            "offline": {
+                "description": (
+                    f"Camera '{cam_name}' has stopped transmitting heartbeats and is considered "
+                    f"offline. Common causes include a network/PoE outage, power failure, or "
+                    f"physical cable disconnection."
+                ),
+                "steps": [
+                    "Verify the network switch and PoE injector powering this camera are active.",
+                    "Check power indicator LEDs on the camera housing.",
+                    "Attempt a remote restart from the Camera Health dashboard.",
+                    "Dispatch a technician if the camera remains offline for more than 10 minutes.",
+                ],
+                "color": "#dc2626",
+            },
+            "black_screen": {
+                "description": (
+                    f"Camera '{cam_name}' is transmitting frames that are completely black. "
+                    f"The IR illuminator may have failed, the aperture may be blocked, or the "
+                    f"camera may be in an incorrect low-light exposure mode."
+                ),
+                "steps": [
+                    "Confirm the camera is not pointed at a sealed surface or placed inside an enclosure.",
+                    "Check IR LEDs — they should glow faint red in darkness when active.",
+                    "Review exposure and night-mode settings via the camera's web interface.",
+                    "Clean the lens if IR LEDs appear active but the image remains black.",
+                ],
+                "color": "#7c3aed",
+            },
+            "lens_covered": {
+                "description": (
+                    f"Camera '{cam_name}' has critically low frame variance indicative of lens "
+                    f"obstruction. This is a recognised tamper signature and requires immediate "
+                    f"physical investigation."
+                ),
+                "steps": [
+                    "⚠️ SECURITY — Physically inspect the camera immediately.",
+                    "Check for tape, spray paint, cloth, or any object placed over the lens.",
+                    "Review adjacent camera footage and access logs for suspicious activity.",
+                    "File a security incident report if intentional tampering is confirmed.",
+                ],
+                "color": "#dc2626",
+            },
+            "blurred": {
+                "description": (
+                    f"Camera '{cam_name}' is producing severely blurred frames. Likely causes: "
+                    f"condensation inside the housing, dust accumulation on the lens, or a "
+                    f"drifted auto-focus motor."
+                ),
+                "steps": [
+                    "Clean the external lens surface with a clean microfiber cloth.",
+                    "Inspect the dome cover for internal moisture or condensation.",
+                    "Trigger the auto-focus function via the camera's web interface.",
+                    "Replace the dome gasket if moisture ingress is suspected.",
+                ],
+                "color": "#d97706",
+            },
+            "rotated": {
+                "description": (
+                    f"Camera '{cam_name}' appears to have been physically rotated or misaligned — "
+                    f"the structural horizon in the frame has shifted significantly from baseline."
+                ),
+                "steps": [
+                    "Physically inspect and tighten any loose fasteners on the camera mount.",
+                    "Re-align the camera to its original field of view using the live preview.",
+                    "Check whether vibration or tampering caused the bracket to shift.",
+                    "Update the camera baseline snapshot in the system after re-alignment.",
+                ],
+                "color": "#f97316",
+            },
+        }
+
+        guide = ISSUE_GUIDE.get(issue_type, {
+            "description": f"Camera '{cam_name}' has reported a health issue: {issue_label}.",
+            "steps": ["Review the Camera Health dashboard and inspect the camera."],
+            "color": "#eab308",
+        })
+        color       = guide["color"]
+        description = guide["description"]
+        steps: list = guide["steps"]
+        location_suffix = f" — {cam_location}" if cam_location else ""
+
         role_recipients = await self._resolve_recipients(session, alert)
-        
         if not role_recipients:
             return
 
+        all_emails: set = set()
+        for emails in role_recipients.values():
+            all_emails.update(emails)
+
+        from app.models.user import User
+        stmt_lang  = select(User.email, User.language_preference).where(User.email.in_(all_emails))
+        result_lang = await session.execute(stmt_lang)
+        user_langs  = {row[0]: row[1] or "en" for row in result_lang.all()}
+
+        from app.services.translation_service import TranslationService
+        t = TranslationService.t
+
+        # Optional AI block
+        ai_html = ""
+        try:
+            from app.services.ai_provider_service import get_ai_provider
+            ai_provider = get_ai_provider()
+            prompt = (
+                f"Security systems engineer context. Camera issue '{issue_label}' detected on "
+                f"'{cam_name}' at '{venue.name}'{location_suffix}. Write a precise 2-sentence "
+                f"technical summary of the most likely root cause and the single most critical "
+                f"immediate action required."
+            )
+            ai_text = await ai_provider.generate_response(prompt)
+            if ai_text:
+                ai_html = (
+                    f'<div style="background:#1f2937;border-left:5px solid #3b82f6;'
+                    f'padding:15px;color:#f3f4f6;margin-bottom:20px;font-size:14px;border-radius:4px;">'
+                    f'<div style="font-size:11px;color:#93c5fd;text-transform:uppercase;'
+                    f'font-weight:bold;margin-bottom:8px;">🤖 AI Hardware Diagnostic</div>'
+                    f'<em>"{ai_text}"</em></div>'
+                )
+        except Exception:
+            pass
+
+        steps_html = "".join(
+            f'<li style="margin-bottom:8px;line-height:1.6;">{s}</li>' for s in steps
+        )
+        location_row = (
+            f'<tr style="border-bottom:1px solid #e5e7eb;">'
+            f'<td style="padding:8px 0;font-weight:bold;width:130px;">Location</td>'
+            f'<td style="padding:8px 0;">{cam_location}</td></tr>'
+        ) if cam_location else ""
+
+        for role_label, emails in role_recipients.items():
+            if not emails:
+                continue
+            emails_by_lang: dict = {}
+            for email in emails:
+                lang = user_langs.get(email, "en")
+                emails_by_lang.setdefault(lang, []).append(email)
+
+            for lang, lang_emails in emails_by_lang.items():
+                try:
+                    html = (
+                        f'<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;'
+                        f'background:#f1f5f9;margin:0;padding:0;">'
+                        f'<div style="background:{color};padding:24px 28px;color:white;">'
+                        f'<div style="font-size:11px;opacity:.75;text-transform:uppercase;margin-bottom:4px;">'
+                        f'Laminar AI &mdash; Camera Health Alert</div>'
+                        f'<h1 style="margin:0;font-size:22px;">{issue_label}</h1>'
+                        f'<p style="margin:5px 0 0;opacity:.9;font-size:14px;">'
+                        f'{cam_name}{location_suffix}</p></div>'
+                        f'<div style="padding:28px;background:#ffffff;">'
+                        f'{ai_html}'
+                        f'<div style="background:#fef9c3;border:1px solid #fbbf24;border-radius:8px;'
+                        f'padding:16px;margin-bottom:20px;">'
+                        f'<div style="font-size:11px;color:#92400e;font-weight:bold;'
+                        f'text-transform:uppercase;margin-bottom:8px;">⚠ What This Means</div>'
+                        f'<p style="margin:0;color:#78350f;font-size:13px;line-height:1.6;">{description}</p></div>'
+                        f'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;'
+                        f'padding:16px;margin-bottom:20px;">'
+                        f'<div style="font-size:11px;color:#166534;font-weight:bold;'
+                        f'text-transform:uppercase;margin-bottom:10px;">✅ Recommended Actions</div>'
+                        f'<ol style="margin:0;padding-left:20px;color:#15803d;font-size:13px;">'
+                        f'{steps_html}</ol></div>'
+                        f'<table style="width:100%;border-collapse:collapse;font-size:13px;color:#374151;">'
+                        f'<tr style="border-bottom:1px solid #e5e7eb;">'
+                        f'<td style="padding:8px 0;font-weight:bold;width:130px;">Camera</td>'
+                        f'<td style="padding:8px 0;">{cam_name}</td></tr>'
+                        f'<tr style="border-bottom:1px solid #e5e7eb;">'
+                        f'<td style="padding:8px 0;font-weight:bold;">Venue</td>'
+                        f'<td style="padding:8px 0;">{venue.name}</td></tr>'
+                        f'{location_row}'
+                        f'<tr style="border-bottom:1px solid #e5e7eb;">'
+                        f'<td style="padding:8px 0;font-weight:bold;">Issue Type</td>'
+                        f'<td style="padding:8px 0;">{issue_label}</td></tr>'
+                        f'<tr style="border-bottom:1px solid #e5e7eb;">'
+                        f'<td style="padding:8px 0;font-weight:bold;">Status</td>'
+                        f'<td style="padding:8px 0;">{alert.status.upper()}</td></tr>'
+                        f'<tr><td style="padding:8px 0;font-weight:bold;">Detected</td>'
+                        f'<td style="padding:8px 0;">'
+                        f'{datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}'
+                        f'</td></tr></table>'
+                        f'<div style="margin-top:24px;">'
+                        f'<a href="http://localhost:3000/cameras/health" style="display:inline-block;'
+                        f'padding:12px 28px;background:{color};color:white;text-decoration:none;'
+                        f'border-radius:6px;font-weight:bold;font-size:14px;">'
+                        f'Open Camera Health Dashboard &rarr;</a></div>'
+                        f'<hr style="border:1px solid #e5e7eb;margin:24px 0;"/>'
+                        f'<p style="font-size:11px;color:#9ca3af;">Auto-generated by Laminar AI &mdash; '
+                        f'sent to {role_label} contacts only.</p>'
+                        f'</div></body></html>'
+                    )
+                    msg = EmailMessage()
+                    msg["From"] = settings.SMTP_USER
+                    msg["Subject"] = (
+                        f"[CAMERA ALERT] {issue_label} — {cam_name}"
+                        f" | {venue.name} [{role_label.upper()}]"
+                    )
+                    msg.add_alternative(html, subtype="html")
+                    await self._send_email(msg, lang_emails)
+                except Exception as e:
+                    logger.error(f"Failed to send camera notification: {e}")
+
+        alert.last_notified_at = datetime.now(timezone.utc)
+        await session.commit()
+
+    async def notify_status_change(
+        self,
+        session: AsyncSession,
+        alert: CrowdAlert,
+        status: str,
+    ) -> None:
+        """
+        Handle notifications for alert status changes (resolved, acknowledged).
+        For now, this just logs the change, as WebSocket handles the real-time push. 
+        Could be expanded to send email confirmations for resolved alerts.
+        """
+        logger.info(
+            f"NotificationService: Alert {alert.id} status changed to {status}",
+            extra={"alert_id": str(alert.id), "status": status}
+        )
+        if status != "resolved":
+            return
+            
+        venue_repo = Repository[Venue](Venue)
+        venue = await venue_repo.get_by_id(session, alert.venue_id)
+        if not venue:
+            return
+
+        location_text = getattr(venue, 'location', None) or getattr(venue, 'address', None) or venue.name
+        if alert.extra_data and alert.extra_data.get("camera_location"):
+            location_text = alert.extra_data.get("camera_location")
+            
+        role_recipients = await self._resolve_recipients(session, alert)
+        if not role_recipients:
+            return
+        
+        is_auto = alert.resolved_by is None
+        actor = "Laminar AI System" if is_auto else "Operator"
+        reason = alert.notes if alert.notes else "Risk levels decreased."
+        label_color = "#16a34a" # Green for resolved
+        
         all_emails = set()
         for emails in role_recipients.values():
             all_emails.update(emails)
@@ -94,34 +330,6 @@ class NotificationService:
         stmt_lang = select(User.email, User.language_preference).where(User.email.in_(all_emails))
         result_lang = await session.execute(stmt_lang)
         user_langs = {row[0]: row[1] or "en" for row in result_lang.all()}
-
-        color = "#eab308" # Yellow for health issues
-        
-        # Generate AI explanation for the camera issue
-        from app.services.ai_provider_service import get_ai_provider
-        from app.services.translation_service import TranslationService
-        
-        t = TranslationService.t
-        ai_provider = get_ai_provider()
-        
-        prompt = (
-            f"You are a technical security analyst for the Laminar physical security system. "
-            f"A camera health issue has been detected: '{issue_label}' on camera '{cam_name}' at venue '{venue.name}'. "
-            f"Please write a short, professional, 2-sentence executive summary explaining what this technical issue means "
-            f"and what immediate physical or technical maintenance action might be required."
-        )
-        ai_explanation = await ai_provider.generate_response(prompt)
-        
-        ai_html = ""
-        if ai_explanation:
-            ai_html = f"""
-            <div style="background:#1f2937; border-left: 5px solid #3b82f6; padding:15px; color:#f3f4f6; margin-bottom:20px; font-size:16px; border-radius:4px;">
-                <div style="font-size:12px; color:#93c5fd; text-transform:uppercase; font-weight:bold; margin-bottom:8px;">
-                    🤖 AI Hardware Diagnostic
-                </div>
-                <em>"{ai_explanation}"</em>
-            </div>
-            """
         
         for role_label, emails in role_recipients.items():
             if not emails:
@@ -136,39 +344,69 @@ class NotificationService:
             
             for lang, lang_emails in emails_by_lang.items():
                 try:
+                    html = (
+                        f'<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;'
+                        f'background:#f1f5f9;margin:0;padding:0;">'
+                        f'<div style="background:{label_color};padding:24px 28px;color:white;">'
+                        f'<div style="font-size:11px;opacity:.75;text-transform:uppercase;margin-bottom:4px;">'
+                        f'Laminar AI &mdash; Alert Resolution</div>'
+                        f'<h1 style="margin:0;font-size:22px;">✅ Incident Resolved</h1>'
+                        f'<p style="margin:5px 0 0;opacity:.9;font-size:14px;">'
+                        f'Venue: {venue.name}</p></div>'
+                        f'<div style="padding:28px;background:#ffffff;">'
+                        f'<p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">'
+                        f'The crowd alert at <strong>{location_text}</strong> has been successfully closed by <strong>{actor}</strong>.</p>'
+                        f'<div style="margin-top:20px;padding:16px;background:#f8fafc;border-left:4px solid {label_color};">'
+                        f'<div style="font-size:11px;color:#64748b;font-weight:bold;text-transform:uppercase;margin-bottom:4px;">Resolution Notes</div>'
+                        f'<div style="color:#0f172a;font-size:14px;">{reason}</div></div>'
+                        f'<div style="margin-top:24px;">'
+                        f'<a href="http://localhost:3000/alerts" style="display:inline-block;'
+                        f'padding:12px 28px;background:{label_color};color:white;text-decoration:none;'
+                        f'border-radius:6px;font-weight:bold;font-size:14px;">'
+                        f'View Analytics Dashboard &rarr;</a></div>'
+                        f'<hr style="border:1px solid #e5e7eb;margin:24px 0;"/>'
+                        f'<p style="font-size:11px;color:#9ca3af;">Auto-generated by Laminar AI &mdash; '
+                        f'sent to {role_label} contacts only.</p>'
+                        f'</div></body></html>'
+                    )
+                    
                     msg = EmailMessage()
                     msg["From"] = settings.SMTP_USER
-                    msg["Subject"] = f"[CAMERA ALERT] {issue_label} — {cam_name} [{role_label.upper()}]"
-                    
-                    html = f"""
-                    <html>
-                    <body style="font-family: Arial, sans-serif; background:#f9fafb; padding:0; margin:0;">
-                        <div style="background:{color}; padding:25px; color:white;">
-                            <h1 style="margin:0;">{t(lang, "camera_alert", "Camera Alert")}</h1>
-                            <h2 style="margin:0;">{issue_label}</h2>
-                        </div>
-                        <div style="padding:25px;">
-                            {ai_html}
-                            <p><strong>{t(lang, "camera", "Camera")}:</strong> {cam_name}</p>
-                            <p><strong>{t(lang, "venue", "Venue")}:</strong> {venue.name}</p>
-                            <p><strong>{t(lang, "description", "Description")}:</strong> {alert.explanation or getattr(alert, "notes", "A technical issue was detected with the camera stream.")}</p>
-                            <p><strong>{t(lang, "status", "Status")}:</strong> {alert.status.upper()}</p>
-                            <p><strong>{t(lang, "time", "Time")}:</strong> {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}</p>
-                            <hr style="border:1px solid #eee; margin:20px 0;"/>
-                            <p style="font-size:14px; color:#666;">{t(lang, "health_alert_note", "This is a technical health alert. Maintenance may be required.")}</p>
-                            <p><a href="http://localhost:3000/cameras/health" style="display:inline-block; padding:10px 20px; background-color:#2563eb; color:white; text-decoration:none; border-radius:5px;">{t(lang, "check_health", "Check Camera Health")}</a></p>
-                        </div>
-                    </body>
-                    </html>
-                    """
+                    msg["Subject"] = f"[RESOLVED] Crowd Alert — {venue.name} [{role_label.upper()}]"
                     msg.add_alternative(html, subtype="html")
                     await self._send_email(msg, lang_emails)
-                    
                 except Exception as e:
-                    logger.error(f"Failed to send camera notification: {e}")
-
-        alert.last_notified_at = datetime.now(timezone.utc)
-        await session.commit()
+                    logger.error(f"Failed to send resolution notification: {e}")
+                    
+        # Send Offline SMS (using simulation mode typically, but routing logic counts)
+        try:
+            stmt = select(User.phone_number, User.language_preference).where(User.receive_sms_alerts == True, User.phone_number.isnot(None))
+            result = await session.execute(stmt)
+            contacts = result.all()
+            
+            if contacts:
+                lang_groups = {}
+                for phone, lang in contacts:
+                    lang = lang or "en"
+                    if lang not in lang_groups:
+                        lang_groups[lang] = []
+                    lang_groups[lang].append(phone)
+                    
+                for lang, phone_numbers in lang_groups.items():
+                    sms_msg = (
+                        f"✅ ALERT RESOLVED ✅\n"
+                        f"Venue: {venue.name}\n"
+                        f"Loc: {location_text}\n"
+                        f"Closed by: {actor}\n"
+                        f"Notes: {reason}"
+                    )
+                    
+                    async def _send_sms_resolve():
+                        await self.sms_service.notify_recipients(phone_numbers, sms_msg)
+                        
+                    asyncio.create_task(_send_sms_resolve())
+        except Exception as e:
+            logger.error(f"Failed to trigger offline SMS resolution alerts: {e}")
 
     async def notify(
         self,
@@ -326,7 +564,7 @@ class NotificationService:
             for email, alert_email, role in res.all():
                 contact_email = alert_email if alert_email else email
                 label = None
-                if getattr(role, 'value', role) in ("admin", "manager"):
+                if getattr(role, 'value', role) in ("super_admin", "admin", "manager", "user"):
                     label = "Management"
                 elif getattr(role, 'value', role) == "operator":
                     label = "Supervisor"
@@ -615,9 +853,20 @@ class NotificationService:
         avg_count     = live.get("avg_count", 0)
         max_count     = live.get("max_count", 0)
         occupancy_pct = live.get("occupancy_percent", 0)
-        growth_rate   = live.get("growth_rate", 0)
+        growth_rate   = live.get("growth_rate") or extra.get("velocity", 0.0)
         risk_score    = live.get("dynamic_risk_score", 0)
         metric_time   = live.get("bucket_start", "—")
+
+        # ── Alert Context / Explanation ──
+        explanation_html = ""
+        if getattr(alert, "explanation", None):
+            expl_label = t(lang, "alert_explanation", "Risk Engine Explanation")
+            explanation_html = f"""
+            <div style="background:#f8fafc; border-left:4px solid #94a3b8; padding:12px; margin-bottom:18px; font-size:14px; color:#334155;">
+                <div style="font-size:11px; text-transform:uppercase; font-weight:bold; color:#64748b; margin-bottom:4px;">💡 {expl_label}</div>
+                {alert.explanation}
+            </div>
+            """
 
         # ── Derive surge velocity label relative to venue thresholds ──
         # A surge is significant if it would cross a threshold within 10 minutes
@@ -791,6 +1040,7 @@ class NotificationService:
           <div style="padding:24px;">
 
             {ai_brief_block}
+            {explanation_html}
             {weather_html}
             {holiday_html}
             {early_warning_block}

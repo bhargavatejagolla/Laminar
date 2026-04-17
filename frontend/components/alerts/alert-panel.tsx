@@ -6,21 +6,30 @@ import { ShieldCheck, Loader2 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useEffect, useRef } from "react";
 
-export default function AlertPanel() {
-  const { data, isLoading } = useAlerts();
+export default function AlertPanel({ filter = "live" }: { filter?: "live" | "history" | "all" } = {}) {
+  const { data, crowdAlerts, cameraAlerts, isLoading } = useAlerts();
   const isInitialLoad = useRef(true);
   const knownAlerts = useRef<Set<string>>(new Set());
 
+  // Combine both types for a master list
+  let allAlerts = [...(crowdAlerts || []), ...(cameraAlerts || [])];
+  
+  if (filter === "live") {
+      allAlerts = allAlerts.filter(a => a.status !== "resolved");
+  } else if (filter === "history") {
+      allAlerts = allAlerts.filter(a => a.status === "resolved");
+  }
+
   useEffect(() => {
-    if (data) {
+    if (allAlerts.length > 0) {
       if (isInitialLoad.current) {
-        data.forEach((a: any) => knownAlerts.current.add(a.id));
+        allAlerts.forEach((a: any) => knownAlerts.current.add(a.id));
         isInitialLoad.current = false;
         return;
       }
 
       let hasNewUrgent = false;
-      data.forEach((a: any) => {
+      allAlerts.forEach((a: any) => {
         if (!knownAlerts.current.has(a.id)) {
           knownAlerts.current.add(a.id);
           if (a.risk_level === 'critical' || a.risk_level === 'high') {
@@ -34,7 +43,7 @@ export default function AlertPanel() {
         audio.play().catch(e => console.log('Audio play prevented by browser:', e));
       }
     }
-  }, [data]);
+  }, [allAlerts]);
 
   if (isLoading) {
     return (
@@ -45,7 +54,15 @@ export default function AlertPanel() {
     );
   }
 
-  if (!data || data.length === 0) {
+  if (allAlerts.length === 0) {
+    if (filter === "history") {
+      return (
+        <div className="flex flex-col items-center justify-center p-12 bg-slate-900/40 rounded-xl border border-slate-800 text-center">
+          <h3 className="text-slate-400 font-semibold mb-1 tracking-wide">Blank History</h3>
+          <p className="text-slate-500 text-sm max-w-sm">There are no resolved alerts existing in the telemetry memory index right now.</p>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-emerald-950/10 rounded-xl border border-emerald-900/20 text-center">
         <div className="p-3 bg-emerald-500/10 rounded-full mb-4">
@@ -58,17 +75,24 @@ export default function AlertPanel() {
   }
 
   // Smart Prioritization Sorting
-  const sortedAlerts = [...data].sort((a: any, b: any) => {
+  const sortedAlerts = [...allAlerts].sort((a: any, b: any) => {
     const riskWeight: Record<string, number> = {
-      critical: 4,
-      high: 3,
-      medium: 2,
-      low: 1
+      critical: 5,
+      high: 4,
+      medium: 3,
+      low: 2,
+      camera_issue: 4, // Hardware issues are generally high priority
     };
+    
     const getWeight = (alert: any) => {
+      // Prioritize by actual severity score if available
       if (typeof alert.severity === "number") return alert.severity;
-      const val = typeof alert.severity === "string" ? alert.severity : alert.risk_level;
-      return riskWeight[typeof val === "string" ? val.toLowerCase() : ""] || 2;
+      
+      const type = alert.extra_data?.type || alert.extra_data?.alert_type;
+      if (type === "camera_issue") return riskWeight.camera_issue;
+
+      const level = alert.risk_level || "medium";
+      return riskWeight[level.toLowerCase()] || 3;
     };
     
     const weightA = getWeight(a);
@@ -91,4 +115,4 @@ export default function AlertPanel() {
       </AnimatePresence>
     </div>
   );
-}
+}

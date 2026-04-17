@@ -20,8 +20,7 @@ export default function VenuesPage() {
   const [showFilter, setShowFilter] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.role === "manager";
+  const { user, isAdmin } = useAuth();
 
   const { data: venues, isLoading, isError } = useVenues();
   const queryClient = useQueryClient();

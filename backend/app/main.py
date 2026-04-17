@@ -33,7 +33,6 @@ app = FastAPI(
     docs_url=settings.DOCS_URL,
     redoc_url=settings.REDOC_URL,
     openapi_url=settings.OPENAPI_URL,
-    redirect_slashes=False,  # Prevent 307 redirects on trailing slash differences
 )
 
 # ----------------------------------------------------------
@@ -44,8 +43,8 @@ app.add_middleware(RequestIdMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for public tunnel access (ngrok, localtunnel, etc.)
-    allow_credentials=False,  # Must be False when allow_origins=["*"]
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -141,8 +140,9 @@ async def startup_event():
     # ── Initialize Semantic Vector Store ────────────────────────────────────────
     try:
         from app.vision.vector_store import vector_store
-        await vector_store.initialize()
-        logger.info("Semantic Vector Store initialized for VQA")
+        # Do not await this! The HuggingFace model download will block Uvicorn from opening port 8000.
+        import asyncio
+        asyncio.create_task(vector_store.initialize())
     except Exception as e:
         logger.error(f"Failed to initialize Semantic Vector Store: {e}")
 

@@ -9,7 +9,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, Response
 from fastapi.responses import FileResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +39,14 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["Cameras"])
 camera_service = CameraService()
 
+def verify_camera_access(camera: Camera, user):
+    if not user.is_super_admin:
+        if str(camera.venue_id) not in [str(v.id) for v in user.venues]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized for this camera's Location Matrix"
+            )
+
 
 # ==========================================================
 # Database dependency
@@ -58,8 +66,8 @@ async def get_db() -> AsyncSession:
 async def create_camera(
     camera_data: CameraCreate,
     db: AsyncSession = Depends(get_db),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Admin only
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Create a new camera.
@@ -80,8 +88,11 @@ async def create_camera(
         "tracking_enabled": true
     }
     
-    Requires ADMIN or MANAGER role.
+    Requires SUPER_ADMIN or ADMIN role.
     """
+    if not user.is_super_admin and str(camera_data.venue_id) not in [str(v.id) for v in user.venues]:
+        raise HTTPException(status_code=403, detail="Unauthorized for targeted Location Matrix")
+
     logger.info(f"Creating new camera: {camera_data.name}")
 
     # Create camera instance
@@ -102,6 +113,7 @@ async def create_camera(
         tracking_enabled=camera_data.tracking_enabled,
         hardware_metadata=camera_data.hardware_metadata,
         is_online=False,  # Initially offline until heartbeat
+        health_status="unknown",
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
@@ -161,6 +173,12 @@ async def list_cameras(
         query = query.where(Camera.is_online == is_online)
     if stream_type:
         query = query.where(Camera.stream_type == stream_type)
+
+    if not user.is_super_admin:
+        allowed_venue_ids = {v.id for v in user.venues}
+        if venue_id and venue_id not in allowed_venue_ids:
+            return []  # Filter explicitly
+        query = query.where(Camera.venue_id.in_(list(allowed_venue_ids)))
 
     # Add pagination
     query = query.offset(skip).limit(limit).order_by(Camera.created_at.desc())
@@ -249,6 +267,7 @@ async def get_camera(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera {camera_id} not found"
         )
+    verify_camera_access(camera, user)
 
     return camera
 
@@ -262,8 +281,8 @@ async def update_camera(
     camera_id: UUID,
     camera_data: CameraUpdate,
     db: AsyncSession = Depends(get_db),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    # ✅ RBAC: Admin only
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Update camera configuration.
@@ -272,6 +291,12 @@ async def update_camera(
     Requires ADMIN or MANAGER role.
     """
     try:
+        # Auth check first
+        camera = await db.get(Camera, camera_id)
+        if not camera:
+            raise HTTPException(status_code=404, detail="Camera not found")
+        verify_camera_access(camera, user)
+
         # Use camera_service for consistent validation and logic
         camera = await camera_service.update_camera(
             db,
@@ -304,7 +329,7 @@ async def update_camera(
 async def delete_camera(
     camera_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(UserRole.ADMIN)),  # ✅ RBAC: Admin only
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),  # ✅ RBAC: Admin only
 ):
     """
     Delete a camera permanently.
@@ -319,6 +344,7 @@ async def delete_camera(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera {camera_id} not found"
         )
+    verify_camera_access(camera, user)
 
     # Stop worker immediately before DB deletion
     await vision_manager.notify_camera_deleted(camera_id)
@@ -360,6 +386,7 @@ async def get_camera_health(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera {camera_id} not found"
         )
+    verify_camera_access(camera, user)
 
     # Check VisionManager worker status
     worker = await vision_manager.get_worker(camera_id)
@@ -407,8 +434,7 @@ async def get_camera_health(
 async def restart_camera(
     camera_id: UUID,
     db: AsyncSession = Depends(get_db),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Manually restart a camera stream.
@@ -424,6 +450,7 @@ async def restart_camera(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera {camera_id} not found"
         )
+    verify_camera_access(camera, user)
 
     if not camera.is_active:
         raise HTTPException(
@@ -449,8 +476,7 @@ async def restart_camera(
 async def enable_camera(
     camera_id: UUID,
     db: AsyncSession = Depends(get_db),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Enable a camera.
@@ -465,6 +491,7 @@ async def enable_camera(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera {camera_id} not found"
         )
+    verify_camera_access(camera, user)
 
     if camera.is_active:
         return {"success": True, "message": f"Camera {camera_id} already enabled"}
@@ -487,8 +514,7 @@ async def enable_camera(
 async def disable_camera(
     camera_id: UUID,
     db: AsyncSession = Depends(get_db),
-    # ✅ RBAC: Admin/Manager only
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Disable a camera.
@@ -503,6 +529,7 @@ async def disable_camera(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera {camera_id} not found"
         )
+    verify_camera_access(camera, user)
 
     if not camera.is_active:
         return {"success": True, "message": f"Camera {camera_id} already disabled"}
@@ -529,7 +556,7 @@ async def record_clip(
     camera_id: UUID,
     duration: int = Query(10, ge=1, le=60, description="Duration in seconds (max 60)"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(UserRole.ADMIN, UserRole.MANAGER)),
+    user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
     Trigger a manual 10-second video clip recording.
@@ -537,6 +564,7 @@ async def record_clip(
     camera = await db.get(Camera, camera_id)
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
+    verify_camera_access(camera, user)
         
     worker = await vision_manager.get_worker(camera_id)
     if not worker or not worker.is_running():
@@ -586,27 +614,44 @@ async def list_camera_clips(
 async def download_clip(
     camera_id: UUID,
     filename: str,
+    request: Request,
+    token: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_active_user),
 ):
     """
     Download a recorded clip as an attachment.
+    Accepts JWT via Authorization header OR ?token= query param (needed for browser <a download>).
     """
-    # Use the same logic as EvidenceClipService to find the directory
+    from app.core.security import decode_token
     import os
     from app.services.evidence_clip_service import CLIPS_DIR
-    
+
+    # Resolve token: query param first, then Authorization header
+    bearer = None
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        bearer = auth_header.split(" ", 1)[1]
+    jwt_token = token or bearer
+    if not jwt_token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        payload = decode_token(jwt_token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
     file_path = os.path.join(CLIPS_DIR, filename)
-    
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Clip file not found")
-        
+
     return FileResponse(
         path=file_path,
         filename=filename,
         media_type="video/mp4",
         content_disposition_type="attachment"
     )
+
 
 @router.get("/{camera_id}/density-map")
 async def get_density_map(

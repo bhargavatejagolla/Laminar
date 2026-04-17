@@ -21,8 +21,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+import { api } from "@/services/api";
 
 // ───────────────────────────────────────────────────
 // Types
@@ -35,6 +34,10 @@ interface CameraHealth {
   health_status: string;
   is_online: boolean;
   is_active: boolean;
+  monitoring_active: boolean;
+  frame_issue_count: number;
+  frame_buffer_size: number;
+  issue_confidence: number | null;
   issue: string;
   last_frame_at: string | null;
   last_heartbeat_at: string | null;
@@ -111,10 +114,23 @@ const STATUS_CONFIG: Record<
     icon: <Shield className="w-4 h-4 text-slate-500" />,
     pulse: false,
   },
+  // Newly initialised camera or after restart — worker is connected but hasn't confirmed health yet
+  warming_up: {
+    label: "Warming Up",
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    border: "border-dashed border-cyan-500/40",
+    icon: <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />,
+    pulse: false,
+  },
 };
 
-function getStatusConfig(status: string) {
-  return STATUS_CONFIG[status] ?? STATUS_CONFIG.unknown;
+function getStatusConfig(cam: CameraHealth) {
+  // If camera is registered and online but worker has never processed a frame, use warming_up
+  if (cam.is_online && !cam.monitoring_active && cam.health_status === "unknown") {
+    return STATUS_CONFIG.warming_up;
+  }
+  return STATUS_CONFIG[cam.health_status] ?? STATUS_CONFIG.unknown;
 }
 
 function formatTime(ts: string | null) {
@@ -138,23 +154,25 @@ function SummaryBar({ cameras }: { cameras: CameraHealth[] }) {
       const s = c.health_status;
       if (s === "healthy") acc.healthy++;
       else if (s === "offline") acc.offline++;
+      else if (c.is_online && !c.monitoring_active && s === "unknown") acc.warmingUp++;
       else acc.warning++;
       return acc;
     },
-    { healthy: 0, offline: 0, warning: 0 }
+    { healthy: 0, offline: 0, warning: 0, warmingUp: 0 }
   );
 
   const pills = [
-    { label: "Healthy Nodes", count: counts.healthy, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
-    { label: "Degraded Status", count: counts.warning, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30" },
-    { label: "Critical Offline", count: counts.offline, color: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/30" },
-    { label: "Total Monitored", count: cameras.length, color: "text-slate-300", bg: "bg-white/5", border: "border-white/10" },
+    { label: "Healthy Nodes",    count: counts.healthy,       color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
+    { label: "Degraded Status",  count: counts.warning,       color: "text-amber-400",   bg: "bg-amber-500/10",  border: "border-amber-500/30" },
+    { label: "Critical Offline", count: counts.offline,       color: "text-rose-400",    bg: "bg-rose-500/10",   border: "border-rose-500/30" },
+    { label: "Warming Up",       count: counts.warmingUp,     color: "text-cyan-400",    bg: "bg-cyan-500/10",   border: "border-cyan-500/40" },
+    { label: "Total Monitored",  count: cameras.length,       color: "text-slate-300",   bg: "bg-white/5",       border: "border-white/10" },
   ];
 
   return (
     <div className="flex flex-wrap gap-4 mb-8">
       {pills.map((p) => (
-        <div key={p.label} className={`flex flex-col gap-1 px-5 py-3 rounded-2xl border ${p.bg} ${p.border} backdrop-blur-md shadow-sm relative overflow-hidden group min-w-[160px]`}>
+        <div key={p.label} className={`flex flex-col gap-1 px-5 py-3 rounded-2xl border ${p.bg} ${p.border} backdrop-blur-md shadow-sm relative overflow-hidden group min-w-[140px]`}>
           <div className="absolute inset-x-0 top-0 h-[1px] bg-white opacity-20" />
           <span className={`text-3xl font-black font-heading ${p.color} tracking-tight group-hover:drop-shadow-md transition-all`}>{p.count}</span>
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">{p.label}</span>
@@ -168,14 +186,20 @@ function SummaryBar({ cameras }: { cameras: CameraHealth[] }) {
 // Camera Card — no variant inheritance needed
 // ───────────────────────────────────────────────────
 function CameraCard({ cam, index }: { cam: CameraHealth; index: number }) {
-  const cfg = getStatusConfig(cam.health_status);
+  const cfg = getStatusConfig(cam);
+  const isWarmingUp = cam.is_online && !cam.monitoring_active && cam.health_status === "unknown";
+  // Show partial-issue bar when frame_issue_count > 0 but camera isn't yet confirmed as bad
+  const hasPartialIssues = cam.frame_issue_count > 0 && cam.health_status === "healthy" && cam.frame_buffer_size > 0;
+  const partialPct = cam.frame_buffer_size > 0 ? Math.round((cam.frame_issue_count / cam.frame_buffer_size) * 100) : 0;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.06, ease: "easeOut" }}
-      className={`relative rounded-2xl border ${cfg.border} bg-[#050505] backdrop-blur-2xl p-6 flex flex-col gap-4 hover:-translate-y-1 transition-transform duration-300 overflow-hidden group shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]`}
+      className={`relative rounded-2xl border ${cfg.border} bg-[#050505] backdrop-blur-2xl p-6 flex flex-col gap-4 hover:-translate-y-1 transition-transform duration-300 overflow-hidden group shadow-[inset_0_0_20px_rgba(255,255,255,0.02)] ${
+        isWarmingUp ? "opacity-90" : ""
+      }`}
     >
       {/* Glow blob */}
       <div
@@ -218,15 +242,57 @@ function CameraCard({ cam, index }: { cam: CameraHealth; index: number }) {
          </div>
       </div>
 
+      {/* Partial issue bar — shown when issues appear in buffer but aren't yet confirmed */}
+      {hasPartialIssues && (
+        <div className="px-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] uppercase font-black text-amber-500 tracking-widest">Intermittent Issues</span>
+            <span className="text-[9px] font-mono text-amber-400">{partialPct}% of frames</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-amber-500/70 transition-all duration-500"
+              style={{ width: `${partialPct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Status Badge & Issue Footer */}
       <div className="mt-auto pt-4 border-t border-white/10 flex flex-col gap-2">
-         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${cfg.bg} border ${cfg.border} w-fit`}>
-           {cfg.icon}
-           <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${cfg.color}`}>{cfg.label}</span>
+         <div className="flex items-center gap-2 flex-wrap">
+           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${cfg.bg} border ${cfg.border} w-fit`}>
+             {cfg.icon}
+             <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${cfg.color}`}>{cfg.label}</span>
+           </div>
+           {/* Monitoring active badge */}
+           {!isWarmingUp && (
+             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest ${
+               cam.monitoring_active
+                 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                 : "bg-slate-800/50 border-slate-700/30 text-slate-600"
+             }`}>
+               <span className={`w-1.5 h-1.5 rounded-full ${
+                 cam.monitoring_active ? "bg-emerald-500 animate-pulse" : "bg-slate-600"
+               }`} />
+               {cam.monitoring_active ? "Live" : "Idle"}
+             </div>
+           )}
+           {/* Confidence badge for confirmed issues */}
+           {cam.issue_confidence !== null && cam.issue_confidence !== undefined && cam.health_status !== "healthy" && (
+             <span className="px-2 py-1 rounded-lg border border-white/10 bg-white/5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+               {Math.round(cam.issue_confidence * 100)}% conf
+             </span>
+           )}
          </div>
-         {cam.issue && (
+         {cam.issue && cam.health_status !== "healthy" && (
            <p className="text-[11px] text-slate-400 font-medium leading-relaxed font-mono line-clamp-2 mt-1 px-1">
              <span className="text-rose-400 font-bold opacity-80 mr-1">SYS_ERR:</span>{cam.issue}
+           </p>
+         )}
+         {isWarmingUp && (
+           <p className="text-[10px] text-cyan-400 font-mono mt-1 px-1 animate-pulse">
+             Worker connected — buffering frames for health analysis...
            </p>
          )}
       </div>
@@ -247,17 +313,9 @@ export default function CameraHealthPage() {
   const fetchHealth = useCallback(async () => {
     setLoading(true);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-      const res = await fetch(`${API_BASE}/api/v1/cameras/health/all`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCameras(Array.isArray(data) ? data : []);
-        setLastRefresh(new Date());
-      } else {
-        console.error("Camera health API error:", res.status, res.statusText);
-      }
+      const res = await api.get("/cameras/health/all");
+      setCameras(Array.isArray(res.data) ? res.data : []);
+      setLastRefresh(new Date());
     } catch (e) {
       console.error("Failed to fetch camera health", e);
     } finally {

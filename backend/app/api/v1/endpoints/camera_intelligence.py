@@ -10,6 +10,16 @@ router = APIRouter(prefix="/camera-intelligence", tags=["Camera Intelligence"])
 service = CameraIntelligenceService()
 
 
+@router.get("/metrics")
+async def all_camera_metrics(
+    session: AsyncSession = Depends(get_db)
+):
+    metrics = await service.get_all_camera_metrics(session)
+    return {
+        "cameras": metrics
+    }
+
+
 @router.get("/metrics/{venue_id}")
 async def camera_metrics(
     venue_id: UUID,
