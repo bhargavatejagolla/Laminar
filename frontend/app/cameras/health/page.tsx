@@ -149,6 +149,7 @@ function formatTime(ts: string | null) {
 // Summary Bar
 // ───────────────────────────────────────────────────
 function SummaryBar({ cameras }: { cameras: CameraHealth[] }) {
+  const { t } = useTranslation();
   const counts = cameras.reduce(
     (acc, c) => {
       const s = c.health_status;
@@ -186,7 +187,8 @@ function SummaryBar({ cameras }: { cameras: CameraHealth[] }) {
 // Camera Card — no variant inheritance needed
 // ───────────────────────────────────────────────────
 function CameraCard({ cam, index }: { cam: CameraHealth; index: number }) {
-  const cfg = getStatusConfig(cam);
+  const { t } = useTranslation();
+const cfg = getStatusConfig(cam);
   const isWarmingUp = cam.is_online && !cam.monitoring_active && cam.health_status === "unknown";
   // Show partial-issue bar when frame_issue_count > 0 but camera isn't yet confirmed as bad
   const hasPartialIssues = cam.frame_issue_count > 0 && cam.health_status === "healthy" && cam.frame_buffer_size > 0;
@@ -233,11 +235,11 @@ function CameraCard({ cam, index }: { cam: CameraHealth; index: number }) {
       {/* Metric Grid inside Card */}
       <div className="grid grid-cols-2 gap-3 mt-2">
          <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] uppercase font-black text-slate-500 tracking-widest flex items-center gap-1"><Clock className="w-3 h-3" /> Last Frame</span>
+            <span className="text-[9px] uppercase font-black text-slate-500 tracking-widest flex items-center gap-1"><Clock className="w-3 h-3" /> {t("auto.LastFrame_2465") || "Last Frame"}</span>
             <span className="text-xs font-mono font-bold text-slate-300">{formatTime(cam.last_frame_at)}</span>
          </div>
          <div className="flex flex-col gap-1.5 p-2 rounded-lg bg-white/5 border border-white/5">
-            <span className="text-[9px] uppercase font-black text-slate-500 tracking-widest flex items-center gap-1"><Wifi className="w-3 h-3" /> Heartbeat</span>
+            <span className="text-[9px] uppercase font-black text-slate-500 tracking-widest flex items-center gap-1"><Wifi className="w-3 h-3" /> {t("auto.Heartbeat_7399") || "Heartbeat"}</span>
             <span className="text-xs font-mono font-bold text-slate-300">{formatTime(cam.last_heartbeat_at)}</span>
          </div>
       </div>
@@ -246,7 +248,7 @@ function CameraCard({ cam, index }: { cam: CameraHealth; index: number }) {
       {hasPartialIssues && (
         <div className="px-1">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] uppercase font-black text-amber-500 tracking-widest">Intermittent Issues</span>
+            <span className="text-[9px] uppercase font-black text-amber-500 tracking-widest">{t("auto.IntermittentIss_9461") || "Intermittent Issues"}</span>
             <span className="text-[9px] font-mono text-amber-400">{partialPct}% of frames</span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
@@ -305,7 +307,7 @@ function CameraCard({ cam, index }: { cam: CameraHealth; index: number }) {
 // ───────────────────────────────────────────────────
 export default function CameraHealthPage() {
   const { t } = useTranslation();
-  const [cameras, setCameras] = useState<CameraHealth[]>([]);
+const [cameras, setCameras] = useState<CameraHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [filter, setFilter] = useState<"all" | "healthy" | "issues">("all");
@@ -385,7 +387,7 @@ export default function CameraHealthPage() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/50 border border-white/10 hover:bg-cyan-900/40 hover:border-cyan-500/40 text-cyan-500 text-[10px] font-black uppercase tracking-widest transition-all shadow-[inset_0_0_10px_rgba(34,211,238,0.05)] disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            LIVE
+            {t("auto.LIVE_4994") || "LIVE"}
           </button>
         </div>
       </div>

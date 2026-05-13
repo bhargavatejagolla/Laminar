@@ -3,6 +3,7 @@
 import { Camera } from "@/hooks/useCameras";
 import { Activity, ShieldCheck, ShieldAlert, Video } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   cameras: Camera[];
@@ -15,6 +16,8 @@ const itemVariants = {
 }
 
 export default function CameraStats({ cameras, isLoading }: Props) {
+  const { t } = useTranslation();
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
@@ -47,7 +50,7 @@ export default function CameraStats({ cameras, isLoading }: Props) {
           <h4 className="text-4xl font-black font-heading text-white tracking-tight leading-none drop-shadow-md group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] transition-all">
              {totalCameras}
           </h4>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">Gross Nodes Config</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">{t("auto.GrossNodesConfi_8869") || "Gross Nodes Config"}</p>
         </div>
       </motion.div>
 
@@ -59,14 +62,14 @@ export default function CameraStats({ cameras, isLoading }: Props) {
              <ShieldCheck className="w-5 h-5 text-emerald-400" />
           </div>
           <span className="flex items-center gap-1.5 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/30 tracking-[0.2em] uppercase shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-             LIVE <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+             {t("auto.LIVE_4994") || "LIVE"} <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           </span>
         </div>
         <div className="relative z-10">
            <h4 className="text-4xl font-black font-heading text-white tracking-tight leading-none group-hover:text-emerald-400 drop-shadow-md transition-colors">
               {activeCameras}
            </h4>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">Active Upstream Links</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">{t("auto.ActiveUpstreamL_2515") || "Active Upstream Links"}</p>
         </div>
       </motion.div>
 
@@ -98,7 +101,7 @@ export default function CameraStats({ cameras, isLoading }: Props) {
           <h4 className="text-4xl font-black font-heading text-white tracking-tight leading-none group-hover:text-cyan-400 drop-shadow-md transition-colors">
              {multiSiteMode}
           </h4>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">Cross-Site Operations</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">{t("auto.CrossSiteOperat_2655") || "Cross-Site Operations"}</p>
         </div>
       </motion.div>
 

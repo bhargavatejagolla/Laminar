@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { 
-  LayoutDashboard, 
-  MapPin, 
-  Video, 
-  BellRing, 
-  FileBarChart, 
-  Activity, 
+import {
+  LayoutDashboard,
+  MapPin,
+  Video,
+  BellRing,
+  FileBarChart,
+  Activity,
   Settings,
   BrainCircuit,
   LayoutGrid,
@@ -24,7 +24,12 @@ import {
   Footprints,
   Webhook,
   Search,
-  Users
+  Users,
+  MessageSquare,
+  Car,
+  Globe,
+  TrafficCone,
+  ShieldAlert
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useAlerts } from "@/hooks/useAlerts";
@@ -51,6 +56,7 @@ export default function Sidebar() {
       items: [
         { nameKey: "nav.commandCenter", href: "/dashboard", icon: LayoutDashboard, show: true },
         { nameKey: "nav.venues", href: "/venues", icon: MapPin, show: isAdmin },
+        { nameKey: "nav.liveMap", name: "Live Map", href: "/live-map", icon: Target, show: true },
         { nameKey: "nav.cameras", href: "/cameras", icon: Video, show: isAdmin },
         { nameKey: "nav.cameraHealth", href: "/cameras/health", icon: ShieldCheck, show: isAdmin },
       ].filter(i => i.show)
@@ -64,6 +70,16 @@ export default function Sidebar() {
         { nameKey: "nav.surgeMonitor", href: "/surge", icon: Activity, show: true },
         { nameKey: "nav.personWaitMonitor", href: "/person-wait-monitoring", icon: Clock, show: true },
         { nameKey: "nav.areaSurvey", href: "/dashboard/area-survey", icon: RotateCw, show: true },
+      ].filter(i => i.show)
+    },
+    {
+      labelKey: "nav.smartCity",
+      label: "Smart City OS",
+      items: [
+        { nameKey: "nav.systemsHub", name: "Systems Hub", href: "/smart-systems", icon: Globe, show: true },
+        { nameKey: "nav.smartParking", name: "Smart Parking", href: "/smart-parking", icon: Car, show: true },
+        { nameKey: "nav.trafficControl", name: "Traffic Control", href: "/smart-traffic", icon: TrafficCone, show: isAdmin },
+        { nameKey: "nav.incidentResponse", name: "Incident Response", href: "/smart-incidents", icon: ShieldAlert, show: isAdmin },
       ].filter(i => i.show)
     },
     {
@@ -85,13 +101,13 @@ export default function Sidebar() {
         { nameKey: "nav.profile", href: "/profile", icon: Settings, show: true },
         { nameKey: "nav.settings", href: "/settings", icon: Settings, show: isAdmin },
         { nameKey: "nav.accessControl", href: "/settings/access-control", icon: Users, show: isSuperAdmin },
+        { nameKey: "nav.support", name: "Support", href: "/support", icon: MessageSquare, show: true },
       ].filter(i => i.show)
     },
     {
       labelKey: "nav.enterpriseAI",
       items: [
         { nameKey: "nav.automations", href: "/system/actions", icon: Webhook, show: isSuperAdmin },
-        { nameKey: "nav.journeyMap", href: "/system/journeys", icon: Footprints, show: isSuperAdmin },
         { nameKey: "nav.fleetHealth", href: "/system/fleet", icon: CircuitBoard, show: isSuperAdmin },
       ].filter(i => i.show)
     }
@@ -101,7 +117,7 @@ export default function Sidebar() {
     <>
       {/* Mobile Backdrop */}
       {mounted && sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 z-20 lg:hidden backdrop-blur-md"
           onClick={() => setSidebarOpen(false)}
         />
@@ -119,7 +135,7 @@ export default function Sidebar() {
         {/* ── Brand Header ─────────────────────────── */}
         <div className="h-20 flex items-center justify-between px-6 border-b border-white/5 shrink-0 relative overflow-hidden bg-[rgba(10,10,15,0.4)] backdrop-blur-3xl">
           <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
-          
+
           <div className="flex items-center gap-4 z-10 w-full">
             <div className="relative flex items-center justify-center">
               {/* Outer Radar Sweep Animation */}
@@ -129,16 +145,16 @@ export default function Sidebar() {
                 <Target className="w-5 h-5 text-cyan-400" />
               </div>
             </div>
-            
+
             <div className="flex flex-col">
               <h1 className="text-lg font-bold text-white tracking-[0.2em] uppercase leading-none font-heading shadow-cyan-400/50 drop-shadow-md">
                 Laminar
               </h1>
-              <p className="text-[9px] text-cyan-400/80 tracking-[0.3em] uppercase mt-1 font-bold">AI Platform</p>
+              <p className="text-[9px] text-cyan-400/80 tracking-[0.3em] uppercase mt-1 font-bold">{t("auto.AIPlatform_8627") || "AI Platform"}</p>
             </div>
           </div>
 
-          <button 
+          <button
             className="lg:hidden p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors z-10 border border-white/10"
             onClick={() => setSidebarOpen(false)}
           >
@@ -153,14 +169,14 @@ export default function Sidebar() {
               <p className="px-3 mb-4 text-[10px] font-black text-slate-500/80 uppercase tracking-[0.25em]">
                 {t(section.labelKey)}
               </p>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {section.items.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                   const badge = (item as any).badgeKey === "alerts" ? activeAlertsCount : 0;
 
                   return (
                     <Link
-                      key={item.nameKey}
+                      key={`${item.href}-${(item as any).nameKey || (item as any).name}`}
                       href={item.href}
                       onClick={() => { if (window.innerWidth < 1024) setSidebarOpen(false); }}
                       className={`
@@ -182,8 +198,8 @@ export default function Sidebar() {
                       <div className={`p-1.5 rounded-lg transition-colors relative z-10 ${isActive ? "bg-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.3)]" : "group-hover:bg-white/10"}`}>
                         <item.icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-300"}`} />
                       </div>
-                      
-                      <span className="font-semibold text-sm flex-1 tracking-wider relative z-10">{t(item.nameKey)}</span>
+
+                      <span className="font-semibold text-sm flex-1 tracking-wider relative z-10">{(item as any).nameKey ? t((item as any).nameKey) : (item as any).name}</span>
 
                       {badge > 0 && (
                         <span className="relative z-10 flex items-center justify-center min-w-[22px] h-[22px] px-1 rounded-full bg-rose-500/20 border border-rose-500/50 text-rose-400 text-[10px] font-black shadow-[0_0_10px_rgba(244,63,94,0.4)] animate-pulse">
@@ -206,7 +222,7 @@ export default function Sidebar() {
         <div className="p-5 border-t border-white/5 shrink-0 bg-[rgba(10,10,15,0.6)] backdrop-blur-xl relative">
           <div className="rounded-xl border border-white/5 bg-[#000000] px-4 py-3.5 overflow-hidden relative shadow-inner">
             <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent scan-line opacity-50" />
-            
+
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{t("nav.system")}</p>
@@ -219,8 +235,8 @@ export default function Sidebar() {
                 </div>
               </div>
               <div className="text-right flex flex-col items-end">
-                <p className="text-[10px] text-slate-500 font-mono font-bold hover:text-cyan-400 cursor-pointer transition-colors tracking-wider">v2.1</p>
-                <p className="text-[9px] text-cyan-500 font-mono font-black tracking-[0.3em] mt-1 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">AI-READY</p>
+                <p className="text-[10px] text-slate-500 font-mono font-bold hover:text-cyan-400 cursor-pointer transition-colors tracking-wider">{t("auto.v21_4017") || "v2.1"}</p>
+                <p className="text-[9px] text-cyan-500 font-mono font-black tracking-[0.3em] mt-1 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">{t("auto.AIREADY_4174") || "AI-READY"}</p>
               </div>
             </div>
           </div>

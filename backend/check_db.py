@@ -1,24 +1,29 @@
+
 import asyncio
+from uuid import UUID
 from sqlalchemy import select
 from app.core.database import db_manager
-from app.models.crowd_alert import CrowdAlert
-from app.models.crowd_metric import CrowdMetric
+from app.models.venue import Venue
+from app.models.camera import Camera
 
-async def check_db():
+async def check_assignments():
     await db_manager.initialize()
     async with db_manager.session() as session:
-        print("Checking Crowd Alerts:")
-        alert_stmt = select(CrowdAlert).order_by(CrowdAlert.created_at.desc()).limit(5)
-        alerts = (await session.execute(alert_stmt)).scalars().all()
-        for a in alerts:
-            print(f"Alert: id={a.id}, risk_level={a.risk_level}, status={a.status}, created={a.created_at}")
+        # Check all venues and their cameras
+        stmt = select(Venue)
+        res = await session.execute(stmt)
+        venues = res.scalars().all()
+        
+        print("=== VENUES ===")
+        for v in venues:
+            print(f"Venue: {v.name} ({v.id}) | Domain: {v.venue_type} | Capacity: {v.capacity}")
             
-        print("\nChecking Crowd Metrics:")
-        metric_stmt = select(CrowdMetric).order_by(CrowdMetric.bucket_start.desc()).limit(5)
-        metrics = (await session.execute(metric_stmt)).scalars().all()
-        for m in metrics:
-            print(f"Metric: time={m.bucket_start}, count={m.avg_count}, capacity={m.venue.capacity if m.venue else 'None'}, occupancy={m.occupancy_percent}, risk={m.dynamic_risk_score}, level={m.risk_level}")
-    await db_manager.close()
+            # Find cameras for this venue
+            c_stmt = select(Camera).where(Camera.venue_id == v.id)
+            c_res = await session.execute(c_stmt)
+            cameras = c_res.scalars().all()
+            for c in cameras:
+                print(f"  -> Camera: {c.name} ({c.id}) | Status: {'ONLINE' if c.is_online else 'OFFLINE'} | Active: {c.is_active}")
 
 if __name__ == "__main__":
-    asyncio.run(check_db())
+    asyncio.run(check_assignments())

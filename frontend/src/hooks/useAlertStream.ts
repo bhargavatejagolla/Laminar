@@ -56,7 +56,9 @@ interface UseAlertStreamOptions {
 const BASE_WS_URL =
   process.env.NEXT_PUBLIC_WS_URL ||
   (typeof window !== "undefined"
-    ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
+    ? (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      ? `ws://${window.location.hostname}:8000`
+      : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
     : "ws://localhost:8000");
 
 function normalizeWsOrigin(raw: string): string {

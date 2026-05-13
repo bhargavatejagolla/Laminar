@@ -2,7 +2,7 @@
 Laminar - Vision Stream Worker
 -------------------------------
 
-Connects: CameraSource → YOLODetector → FrameIngestionService → DetectionStorage
+Connects: CameraSource -> YOLODetector -> FrameIngestionService -> DetectionStorage
 
 Features:
 - One worker per camera (async isolation)
@@ -21,6 +21,7 @@ Features:
 
 import asyncio
 import time
+import threading
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
@@ -46,6 +47,8 @@ from app.services.dwell_time_service import get_dwell_service
 from app.services.intelligence.zone_orchestrator import get_zone_orchestrator
 
 logger = get_logger(__name__)
+_shared_pose_estimator = None
+_pose_lock = threading.Lock()
 
 
 class StreamWorker:
@@ -69,10 +72,10 @@ class StreamWorker:
         skip_factor: int = 1,
         max_processing_time_ms: float = 500,
         heartbeat_interval: int = 30,
-        batch_size: int = 1,          # ✅ ZERO-LAG: Flush every single detection immediately
+        batch_size: int = 1,          #   ZERO-LAG: Flush every single detection immediately
         enable_detection: bool = True,
-        static_diff_threshold: float = 0.4,   # ✅ SUPER SENSITIVE: Minimum movement triggers fresh YOLO
-        health_check_interval: int = 15,       # ✅ Health check every 15 frames for faster connectivity alerts
+        static_diff_threshold: float = 0.4,   #   SUPER SENSITIVE: Minimum movement triggers fresh YOLO
+        health_check_interval: int = 15,       #   Health check every 15 frames for faster connectivity alerts
     ):
         """
         Initialize stream worker.
@@ -143,13 +146,9 @@ class StreamWorker:
         self._panic_frame_counter = 0
 
         # Mediapipe integration for accurate Sitting/Standing
-        from mediapipe.python.solutions import pose as mp_pose
-        self.mp_pose = mp_pose
-        self.pose_estimator = self.mp_pose.Pose(
-            static_image_mode=False, 
-            min_detection_confidence=0.5,
-            model_complexity=0
-        )
+        # PERFORMANCE: Initialization moved to processing loop to avoid blocking main thread
+        self._pose_available = True  # We assume it's available until it fails
+        self._pose_failed = False
 
         # Dwell time tracking (separate frame, non-breaking)
         self.dwell_service = get_dwell_service(camera_id)
@@ -157,8 +156,8 @@ class StreamWorker:
         self._dwell_zones: list = []   # cached zones for overlay; refreshed async
         self._dwell_zone_refresh_counter: int = 0
 
-        # ── Intelligence Layer ────────────────────────────────────────────────
-        # One orchestrator per camera — coordinates surge/dwell/flow engines.
+        #    Intelligence Layer                                                 
+        # One orchestrator per camera   coordinates surge/dwell/flow engines.
         self._intelligence = get_zone_orchestrator(str(camera_id))
         self._latest_intelligence = None   # ZoneIntelligenceSnapshot, for API
         # Lazily fetched venue metadata (avoid per-frame DB hit)
@@ -171,7 +170,7 @@ class StreamWorker:
         
         # --- Analytics Tracker ---
         from app.vision.tracker import CentroidTracker
-        self.tracker = CentroidTracker(max_disappeared=5, max_distance=50)
+        self.tracker = CentroidTracker(max_disappeared=20, max_distance=80) # Boosted for occlusion
         self.entry_count = 0
         self.exit_count = 0
         self.line_crossed = set()
@@ -202,6 +201,10 @@ class StreamWorker:
         self._last_state_save_time: Optional[datetime] = None
         self._state_snapshot_interval: int = 30  # seconds
 
+        # Semantic Vault Snapshots (full-frame JPEG every 30 s for semantic search)
+        self._last_semantic_snapshot_time: Optional[float] = None
+        self._semantic_snapshot_interval: int = 30  # seconds (user requested 30s instead of 15s)
+
         # Metrics
         self._frames_processed = 0
         self._frames_skipped = 0
@@ -212,7 +215,7 @@ class StreamWorker:
         self._last_error: Optional[str] = None
         self._last_error_time: Optional[datetime] = None
 
-        # ✅ Per-camera state for frame-diff skip and health rate-limiting
+        #   Per-camera state for frame-diff skip and health rate-limiting
         self._prev_gray_frame: Optional[np.ndarray] = None   # Downsampled grayscale of last processed frame
         self._health_check_counter: int = 0                  # Counts frames since last health analysis
         self._last_detection_result: Tuple[int, float] = (0, 0.0)  # Reused when scene is static
@@ -225,6 +228,21 @@ class StreamWorker:
         # Frame-diff counters (also reset in start())
         self._frame_count_for_forced: int = 0
         self._metrics_broadcast_counter: int = 0
+
+        #    JPEG cache: encode once per processing cycle, serve instantly   
+        self._cached_frame_bytes: Optional[bytes] = None
+        self._cached_jpeg_quality: int = 80
+
+        # ReID throttle: only run embedding extraction every N frames
+        self._reid_frame_counter: int = 0
+        self._reid_throttle_frames: int = 15  # ~0.5s at 30fps
+
+        # Posture temporal smoothing: prevents label flicker between frames
+        # Maps object_id -> deque of recent posture labels
+        self._posture_history: Dict[int, deque] = {}
+
+        # Manual frame injection (demo/testing)
+        self.injected_frame: Optional[np.ndarray] = None
 
     # ==========================================================
     # Lifecycle
@@ -261,6 +279,8 @@ class StreamWorker:
         self._batch_detections = []
         self._batch_frame_count = 0
         self._frame_count_for_forced = 0
+
+        # Start loops
         self._last_saved_count = None
         self._last_state_save_time = None
 
@@ -268,7 +288,7 @@ class StreamWorker:
         self._task = asyncio.create_task(self._run())
         self._heartbeat_task = asyncio.create_task(self._heartbeat())
 
-        # 🚀 INSTANT-READY: Force an immediate tick to register the orchestrator
+        #   INSTANT-READY: Force an immediate tick to register the orchestrator
         # and provide initial zeroed state (prevents "warming_up" or "empty" dashboard).
         # We use a task here because metadata fetch might take a moment.
         async def initial_tick():
@@ -333,153 +353,146 @@ class StreamWorker:
     # ==========================================================
 
     async def _run(self) -> None:
-        """Main async processing loop."""
-        logger.info(
-            "Stream loop started",
-            extra={"camera_id": str(self.camera_id)},
-        )
-
-        frame_counter = 0
+        """Main high-performance readout loop."""
+        logger.warning(f"STREAM_WORKER_READOUT_START: Camera {self.camera_id}")
+        
+        self._current_raw_frame = None
+        self._detection_task = asyncio.create_task(self._detection_loop())
 
         while self._running:
             try:
                 loop_start = time.time()
 
-                # Check source health
+                # 1. Source Health Management
                 if not self.source.is_healthy():
                     if self._unhealthy_since is None:
                         self._unhealthy_since = time.time()
 
-                    # --- REPORT OFFLINE TO DB ---
                     if self._last_health_status != "offline":
                         self._last_health_status = "offline"
                         async def set_offline():
                             from app.core.database import db_manager
                             from app.models.camera import Camera
-                            from sqlalchemy import select
                             async with db_manager.session() as s:
+                                from sqlalchemy import select
                                 cam_res = await s.execute(select(Camera).where(Camera.id == self.camera_id))
                                 cam = cam_res.scalar_one_or_none()
-                                if cam:
-                                    await self.health_service.update_camera_health(s, cam, "offline")
+                                if cam: await self.health_service.update_camera_health(s, cam, "offline")
                         asyncio.create_task(set_offline())
                     
                     unhealthy_duration = time.time() - self._unhealthy_since
-                    # Exponential backoff up to 10 seconds
                     backoff = min(10.0, 2.0 * (1.5 ** (unhealthy_duration / 5.0)))
-
-                    # If unhealthy for > 30s, try to restart the source internally
+                    
                     if unhealthy_duration > 30.0:
                         if self._last_source_restart is None or (time.time() - self._last_source_restart) > 60.0:
-                            logger.error(
-                                "Source unhealthy for >30s, attempting internal restart.",
-                                extra={"camera_id": str(self.camera_id)}
-                            )
                             self._last_source_restart = time.time()
                             try:
-                                # ✅ FASTER RECOVERY: Reset health state upon restart attempt
                                 self._unhealthy_since = None
-                                self._last_health_status = None
-                                
                                 loop = asyncio.get_event_loop()
                                 await loop.run_in_executor(None, self.source.stop)
                                 await loop.run_in_executor(None, self.source.start)
-                            except Exception as e:
-                                logger.error(f"Internal source restart failed: {e}")
-
-                    logger.warning(
-                        f"Camera source unhealthy for {unhealthy_duration:.1f}s, waiting {backoff:.1f}s...",
-                        extra={"camera_id": str(self.camera_id)},
-                    )
-                    # ── Intelligence tick with count=0 when source is unhealthy ─────
-                    # This ensures the orchestrator transitions from warming_up → active
-                    # (with 0 density) even while offline, so the dashboard shows
-                    # the correct status instead of being stuck at warming_up forever.
-                    try:
-                        self._intelligence.tick(
-                            zone_id           = "camera",
-                            count             = 0,
-                            active_tracks     = [],
-                            venue_id          = self._intel_venue_id,
-                            venue_name        = self._intel_venue_name,
-                            metric_id         = None,
-                            capacity          = self._intel_capacity,
-                            warning_threshold = self._intel_warning_threshold,
-                            critical_threshold= self._intel_critical_threshold,
-                        )
-                    except Exception:
-                        pass
+                            except Exception: pass
 
                     await asyncio.sleep(backoff)
                     continue
-                else:
-                    if self._last_health_status == "offline":
-                        self._last_health_status = "healthy" # Temporary until analyze_frame runs
-                        async def set_online():
-                            from app.core.database import db_manager
-                            from app.models.camera import Camera
-                            from sqlalchemy import select
-                            async with db_manager.session() as s:
-                                cam_res = await s.execute(select(Camera).where(Camera.id == self.camera_id))
-                                cam = cam_res.scalar_one_or_none()
-                                if cam:
-                                    await self.health_service.update_camera_health(s, cam, "healthy")
-                        asyncio.create_task(set_online())
-                    self._unhealthy_since = None
 
-                # Read frame
-                result = await self.source.read()
-                if result is None:
+                # 2. Frame Acquisition
+                if self.injected_frame is not None:
+                    frame = self.injected_frame.copy()
+                    ret = True
+                    await asyncio.sleep(0.01)
+                else:
+                    try:
+                        read_result = await asyncio.wait_for(self.source.read(), timeout=1.0)
+                        if read_result is None:
+                            await asyncio.sleep(0.1)
+                            continue
+                        ret, frame = read_result
+                    except asyncio.TimeoutError:
+                        await asyncio.sleep(0.5)
+                        continue
+
+                if not ret or frame is None:
                     await asyncio.sleep(0.05)
                     continue
 
-                success, frame = result
-                if not success or frame is None:
-                    self._failed_frames += 1
-                    await asyncio.sleep(0.05)
-                    continue
+                # 3. Store for Detection Loop
+                self._current_raw_frame = frame.copy()
 
-                # Frame skipping for performance
-                frame_counter += 1
-                if frame_counter % self.skip_factor != 0:
-                    self._frames_skipped += 1
-                    continue
+                # 4. Critical Logic: Recording (must stay in readout loop for fidelity)
+                if self._is_recording:
+                    self._recording_frames.append(frame.copy())
+                    now = datetime.now(timezone.utc)
+                    if self._recording_start_time and (now - self._recording_start_time).total_seconds() >= self._recording_duration:
+                        asyncio.create_task(self._finish_recording())
 
-                # Process frame
-                await self._process_frame(frame)
+                # 5. Always update MJPEG cache
+                frame_to_encode = self._latest_annotated_frame if self._latest_annotated_frame is not None else frame
+                try:
+                    _, buf = cv2.imencode('.jpg', frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    self._cached_frame_bytes = buf.tobytes()
+                except Exception: pass
 
-                # Prevent tight loop CPU spike and enforce FPS
-                if self.target_fps and self.target_fps > 0:
-                    elapsed = time.time() - loop_start
-                    target_interval = 1.0 / self.target_fps
-                    if elapsed < target_interval:
-                        await asyncio.sleep(target_interval - elapsed)
+                # Enforce readout FPS
+                elapsed = time.time() - loop_start
+                target_interval = 1.0 / (self.target_fps or 15)
+                if elapsed < target_interval:
+                    await asyncio.sleep(target_interval - elapsed)
                 else:
-                    await asyncio.sleep(0)
+                    await asyncio.sleep(0.005)
 
-            except asyncio.CancelledError:
-                break
             except Exception as e:
-                self._last_error = str(e)
-                self._last_error_time = datetime.now(timezone.utc)
-                logger.error(
-                    "Stream worker error",
-                    extra={
-                        "camera_id": str(self.camera_id),
-                        "error": str(e),
-                    },
-                    exc_info=True,
-                )
-                await asyncio.sleep(1)  # Prevent rapid failure loop
+                logger.error(f"Stream readout loop error: {e}")
+                await asyncio.sleep(1)
 
-        logger.info(
-            "Stream loop stopped",
-            extra={"camera_id": str(self.camera_id)},
-        )
+    async def _detection_loop(self):
+        """Dedicated background task for AI inference (YOLO, Pose, ReID)."""
+        logger.warning(f"STREAM_WORKER_DETECTION_START: Camera {self.camera_id}")
+        while self._running:
+            try:
+                if self._current_raw_frame is not None:
+                    # Run the heavy processing pipeline
+                    await self._process_frame(self._current_raw_frame.copy())
+                
+                # Dynamic interval based on processing load
+                await asyncio.sleep(0.1) 
+            except Exception as e:
+                logger.error(f"Detection loop error: {e}")
+                await asyncio.sleep(1)
+
+    def _get_pose_estimator(self):
+        """Lazy loader for shared Mediapipe Pose estimator (Thread Safe)."""
+        global _shared_pose_estimator
+        if self._pose_failed:
+            return None
+            
+        if _shared_pose_estimator is None:
+            with _pose_lock:
+                if _shared_pose_estimator is None:
+                    try:
+                        logger.info("Initializing shared Mediapipe Pose estimator (Lazy Load @ Thread Pool)")
+                        try:
+                            from mediapipe.solutions import pose as mp_pose
+                        except ImportError:
+                            from mediapipe.python.solutions import pose as mp_pose
+                            
+                        _shared_pose_estimator = mp_pose.Pose(
+                            static_image_mode=False,
+                            model_complexity=1,
+                            min_detection_confidence=0.55,
+                            min_tracking_confidence=0.5
+                        )
+                        self._pose_available = True
+                    except Exception as e:
+                        logger.error(f"Failed to lazy-load Mediapipe Pose: {e}")
+                        self._pose_failed = True
+                        self._pose_available = False
+                        return None
+        return _shared_pose_estimator
 
     async def _process_frame(self, frame: np.ndarray) -> None:
         """
-        Process a single frame: detect → ingest → store detections.
+        Process a single frame: detect -> ingest -> store detections.
         
         Args:
             frame: BGR/RGB frame from camera
@@ -492,7 +505,7 @@ class StreamWorker:
             self._update_quality_metrics(frame)
 
             # ==========================================================
-            # Health check (rate-limited — only every N frames)
+            # Health check (rate-limited   only every N frames)
             # ==========================================================
             self._health_check_counter += 1
             if self._health_check_counter >= self.health_check_interval or (not self._camera_name and self._health_check_counter == 1):
@@ -516,6 +529,10 @@ class StreamWorker:
                                     logger.info(f"Resolved camera name: {self._camera_name}", extra={"camera_id": str(self.camera_id)})
                                 if not hasattr(self, "_intel_venue_id") and cam.venue_id:
                                     self._intel_venue_id = str(cam.venue_id)
+                                
+                                # Force online status and update timestamp
+                                cam.is_online = True
+                                cam.last_frame_at = datetime.now(timezone.utc)
                                 await self.health_service.update_camera_health(health_session, cam, status)
 
                     asyncio.create_task(update_health_and_meta(health_issue))
@@ -538,12 +555,12 @@ class StreamWorker:
             # ==========================================================
             # Step 1: Frame-diff static-scene skip (biggest CPU saver)
             # ==========================================================
-            # Downscale to 80x80 grayscale — fast, cheap, good diff signal
+            # Downscale to 80x80 grayscale   fast, cheap, good diff signal
             small = cv2.resize(frame, (80, 80), interpolation=cv2.INTER_NEAREST)
             gray  = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
             scene_changed = True
             self._frame_count_for_forced += 1
-            is_forced = self._frame_count_for_forced >= 3  # ✅ LIVE PERSISTENCE: Force YOLO every 3 frames (~0.1s)
+            is_forced = self._frame_count_for_forced >= 3  #   LIVE PERSISTENCE: Force YOLO every 3 frames (~0.1s)
 
             boxes: list = []
             detect_time: float = 0.0
@@ -551,7 +568,7 @@ class StreamWorker:
             if self._prev_gray_frame is not None and not is_forced:
                 diff = float(np.mean(np.abs(gray.astype(np.int16) - self._prev_gray_frame.astype(np.int16))))
                 if diff < self.static_diff_threshold:
-                    # Scene is static — reuse last YOLO result, skip inference entirely
+                    # Scene is static   reuse last YOLO result, skip inference entirely
                     scene_changed = False
                     detected_count, avg_confidence = self._last_detection_result
                     # detect_time stays 0.0 (no inference ran)
@@ -562,27 +579,51 @@ class StreamWorker:
             self._prev_gray_frame = gray
 
             if self.detector and scene_changed:
-                # ✅ PERFORMANCE FIX: Run YOLO in thread executor so the async event loop
-                # is NEVER blocked by 100-250ms CPU inference. Each camera worker runs
-                # independently — no cross-camera interference.
-                loop = asyncio.get_event_loop()
-                detection_result = await loop.run_in_executor(
-                    None,
-                    lambda: self.detector.detect_people(frame, return_boxes=True, max_boxes=500)
-                )
+                try:
+                    #   ✅ Low light intensity & object hiding enhancement (CLAHE)
+                    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+                    l_channel, a_channel, b_channel = cv2.split(lab)
+                    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                    cl = clahe.apply(l_channel)
+                    enhanced_frame = cv2.cvtColor(cv2.merge((cl, a_channel, b_channel)), cv2.COLOR_LAB2BGR)
 
-                if hasattr(detection_result, 'count'):
-                    detected_count = detection_result.count
-                    avg_confidence = detection_result.avg_confidence
-                    boxes = detection_result.bounding_boxes
-                    detect_time = detection_result.inference_time_ms
-                else:
-                    detected_count, avg_confidence = detection_result
+                    #   PERFORMANCE FIX: Run YOLO in thread executor so the async event loop
+                    # is NEVER blocked by 100-250ms CPU inference.
+                    loop = asyncio.get_event_loop()
+                    detection_result = await loop.run_in_executor(
+                        None,
+                        lambda: self.detector.detect_people(enhanced_frame, return_boxes=True, max_boxes=500)
+                    )
+
+                    if hasattr(detection_result, 'count'):
+                        detected_count = detection_result.count
+                        avg_confidence = detection_result.avg_confidence
+                        boxes = detection_result.bounding_boxes
+                        detect_time = detection_result.inference_time_ms
+                    else:
+                        detected_count, avg_confidence = detection_result
+                        boxes = []
+                        detect_time = 0.0
+
+                    # Cache result for reuse on static frames
+                    self._last_detection_result = (detected_count, avg_confidence)
+                
+                except RuntimeError as e:
+                    if "not initialized" in str(e):
+                        logger.warning(
+                            "YOLO detector not yet initialized, skipping detection for this frame",
+                            extra={"camera_id": str(self.camera_id)}
+                        )
+                    else:
+                        logger.error(f"Detector runtime error: {e}")
+                    detected_count, avg_confidence = 0, 0.0
                     boxes = []
                     detect_time = 0.0
-
-                # Cache result for reuse on static frames
-                self._last_detection_result = (detected_count, avg_confidence)
+                except Exception as e:
+                    logger.error(f"Unexpected detector error: {e}")
+                    detected_count, avg_confidence = 0, 0.0
+                    boxes = []
+                    detect_time = 0.0
 
             elif not self.detector:
                 detected_count = 0
@@ -613,6 +654,15 @@ class StreamWorker:
             # Update Tracker
             objects = self.tracker.update(rects)
             
+            #    Purge evicted objects from line_crossed                           
+            # When an object leaves the tracker it may re-enter through a different
+            # gate. Keeping its ID in line_crossed prevents the re-entry from being
+            # counted, causing systematic UNDER-counts.
+            disappeared_ids = set(self.tracker.disappeared.keys())
+            max_disappeared = getattr(self.tracker, 'max_disappeared', 5)
+            stale_ids = {oid for oid in disappeared_ids if self.tracker.disappeared.get(oid, 0) >= max_disappeared}
+            self.line_crossed -= stale_ids
+
             # Map centroids to bounding boxes to compute kinetics/aspect ratios
             centroid_to_box = {
                 (int((x1 + x2) / 2.0), int((y1 + y2) / 2.0)): (x1, y1, x2, y2)
@@ -628,42 +678,65 @@ class StreamWorker:
             normal_count = 0
             walking_count = 0
             
-            # Per-box posture lookup: maps (x1,y1,x2,y2) → (label, bgr_color)
+            # Per-box posture lookup: maps (x1,y1,x2,y2) -> (label, bgr_color)
             box_posture_map: dict = {}
             
             import math
-            for object_id, centroid in objects.items():
+
+            #    Resolution-normalized speed thresholds                       
+            # Normalize by frame diagonal so thresholds work at any resolution
+            # (e.g. 1080p vs 480p camera would otherwise need different values)
+            frame_diag = math.hypot(orig_w, orig_h) or 1.0
+            # Slow  < 1.2% diagonal/s  -> sitting or standing
+            # Medium 1.2 3.5%          -> normal walking pace
+            # Fast  > 3.5%             -> brisk walk / running
+            SLOW_THRESH   = frame_diag * 0.012   # px/s
+            FAST_THRESH   = frame_diag * 0.035   # px/s
+
+            # Sort people by box area (largest/closest first) so they get priority for high-accuracy slots
+            # This ensures that in crowded scenes, the most prominent people are tracked best.
+            def get_box_area(oid_centroid):
+                bbox = centroid_to_box.get(oid_centroid[1])
+                return (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) if bbox else 0
+
+            sorted_items = sorted(objects.items(), key=get_box_area, reverse=True)
+
+            for object_id, centroid in sorted_items:
                 cx, cy = centroid
                 history = self.tracker.history.get(object_id, [])
                 
-                # Check Entry/Exit crossing
+                #    Entry/Exit crossing                                        
                 if len(history) >= 2:
                     y_prev = history[-2][1]
-                    # crossed from top to bottom
                     if y_prev < mid_y and cy >= mid_y:
                         if object_id not in self.line_crossed:
                             self.entry_count += 1
                             self.line_crossed.add(object_id)
-                    # crossed from bottom to top
                     elif y_prev > mid_y and cy <= mid_y:
                         if object_id not in self.line_crossed:
                             self.exit_count += 1
                             self.line_crossed.add(object_id)
+                    # We do NOT discard the object here. It is handled by tracker eviction.
                 
-                # Assess Movement Speed
-                if len(history) >= 3:
+                #    Smooth speed over last N frames                           
+                if len(history) >= 5:
+                    # Use full history window for stable speed estimate
+                    dx = centroid[0] - history[0][0]
+                    dy = centroid[1] - history[0][1]
+                    dist = math.hypot(dx, dy)
+                    speed_per_frame = dist / len(history)
+                elif len(history) >= 2:
                     dx = centroid[0] - history[0][0]
                     dy = centroid[1] - history[0][1]
                     dist = math.hypot(dx, dy)
                     speed_per_frame = dist / len(history)
                 else:
-                    speed_per_frame = 0
-                    
-                # Calculate true speed in px/s 
+                    speed_per_frame = 0.0
+
                 current_fps = self.target_fps if self.target_fps and self.target_fps > 0 else 15.0
                 true_speed_px_s = speed_per_frame * current_fps
-                    
-                # Assess Posture via Mediapipe Pose Estimation
+
+                #    Posture detection                                          
                 is_sitting = False
                 bbox = centroid_to_box.get((cx, cy))
                 w = h = 0
@@ -671,59 +744,120 @@ class StreamWorker:
                     x1, y1, x2, y2 = bbox
                     w = x2 - x1
                     h = y2 - y1
-                    # Basic fallback and validation
-                    if h > 0 and (w / float(h)) > 1.2:
-                        is_sitting = True
-                
-                if true_speed_px_s < 15.0:
-                    if bbox and w > 15 and h > 30 and not is_sitting:
+
+                # Use SLOW_THRESH to decide whether to run MediaPipe
+                if true_speed_px_s < SLOW_THRESH and self._pose_available:
+                    pose_slots_used = sitting_count + standing_count
+                    if bbox and w > 15 and h > 30 and pose_slots_used < 8:
                         try:
+                            #   PERFORMANCE: MediaPipe is CPU-heavy. Run in thread executor.
                             crop = frame[y1:y2, x1:x2]
                             if crop.size > 0:
                                 crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                                results = self.pose_estimator.process(crop_rgb)
+                                
+                                loop = asyncio.get_event_loop()
+                                def process_pose(img):
+                                    estimator = self._get_pose_estimator()
+                                    if not estimator:
+                                        return None
+                                    with _pose_lock:
+                                        return estimator.process(img)
+                                
+                                results = await loop.run_in_executor(None, process_pose, crop_rgb)
                                 
                                 if results.pose_landmarks:
-                                    landmarks = results.pose_landmarks.landmark
-                                    if landmarks[24].visibility > 0.4 and landmarks[26].visibility > 0.4:
-                                        a = np.array([landmarks[24].x, landmarks[24].y])
-                                        b = np.array([landmarks[26].x, landmarks[26].y])
-                                        c = np.array([landmarks[28].x, landmarks[28].y])
+                                    lm = results.pose_landmarks.landmark
+                                    
+                                    # Choice of side based on visibility
+                                    left_vis  = min(lm[23].visibility, lm[25].visibility, lm[27].visibility)
+                                    right_vis = min(lm[24].visibility, lm[26].visibility, lm[28].visibility)
+                                    
+                                    knee_angle = None
+                                    hip_y, knee_y, ankle_y = 0.0, 0.0, 0.0
+                                    
+                                    if right_vis > 0.45 and right_vis >= left_vis:
+                                        a = np.array([lm[24].x, lm[24].y])
+                                        b = np.array([lm[26].x, lm[26].y])
+                                        c = np.array([lm[28].x, lm[28].y])
+                                        hip_y, knee_y, ankle_y = lm[24].y, lm[26].y, lm[28].y
+                                        rad = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
+                                        ang = abs(rad * 180.0 / np.pi)
+                                        knee_angle = 360 - ang if ang > 180 else ang
+                                    elif left_vis > 0.45:
+                                        a = np.array([lm[23].x, lm[23].y])
+                                        b = np.array([lm[25].x, lm[25].y])
+                                        c = np.array([lm[27].x, lm[27].y])
+                                        hip_y, knee_y, ankle_y = lm[23].y, lm[25].y, lm[27].y
+                                        rad = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
+                                        ang = abs(rad * 180.0 / np.pi)
+                                        knee_angle = 360 - ang if ang > 180 else ang
+
+                                    if knee_angle is not None:
+                                        # Total leg height in image coords
+                                        leg_h = abs(ankle_y - hip_y) or 0.01
+                                        # In sitting, hip and knee are vertically closer
+                                        hip_knee_dist = abs(knee_y - hip_y)
+                                        hip_knee_ratio = hip_knee_dist / leg_h
                                         
-                                        radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
-                                        angle = np.abs(radians * 180.0 / np.pi)
-                                        if angle > 180.0:
-                                            angle = 360 - angle
-                                            
-                                        is_sitting = (angle < 135)
-                        except Exception:
+                                        if knee_angle < 115:
+                                            is_sitting = True
+                                        elif knee_angle < 155 and hip_knee_ratio < 0.35:
+                                            is_sitting = True
+                        except Exception as e:
+                            logger.debug(f"MediaPipe offload failed: {e}")
                             pass
 
-                    if is_sitting:
-                        sitting_count += 1
-                        status = "Sitting"
-                        color = (0, 255, 255)  # Yellow-Cyan
-                    else:
-                        standing_count += 1
-                        status = "Standing"
-                        color = (255, 100, 0)  # Blue
-                elif true_speed_px_s < 45.0:
-                    normal_count += 1
-                    status = "Normal"
-                    color = (0, 220, 80)  # Green
+                # Fallback to aspect ratio if slow and not yet determined
+                if true_speed_px_s < SLOW_THRESH and not is_sitting:
+                    if h > 0 and (w / float(h)) > 1.25:
+                        is_sitting = True
+
+                #    Posture Mapping                                            
+                if true_speed_px_s < SLOW_THRESH:
+                    raw_label = "Sitting" if is_sitting else "Standing"
+                elif true_speed_px_s < FAST_THRESH:
+                    raw_label = "Normal"
                 else:
+                    raw_label = "Walking"
+
+                hist_dq = self._posture_history.setdefault(object_id, deque(maxlen=5))
+                hist_dq.append(raw_label)
+                # Majority vote, tie -> keep current raw_label
+                from collections import Counter
+                vote_label = Counter(hist_dq).most_common(1)[0][0]
+
+                #    Assign counts & colors                                     
+                status = vote_label
+                if vote_label == "Sitting":
+                    sitting_count += 1
+                    color = (0, 255, 255)    # Yellow-Cyan
+                elif vote_label == "Standing":
+                    standing_count += 1
+                    color = (255, 100, 0)    # Blue-Orange
+                elif vote_label == "Normal":
+                    normal_count += 1
+                    color = (0, 220, 80)     # Green
+                else:  # Walking
                     walking_count += 1
-                    status = "Walking"
-                    color = (0, 165, 255)  # Orange
-                
+                    color = (0, 165, 255)    # Orange
+
                 # Centroid dot
                 cv2.circle(annotated_frame, (cx, cy), 4, color, -1)
                 
                 # Store for bounding-box annotation pass
                 if bbox:
                     box_posture_map[bbox] = (status, color)
-            
-            # Compute tracker-based average velocity (px/frame → px/s)
+
+            # Prune posture history for objects no longer tracked (memory hygiene)
+            live_ids = set(objects.keys())
+            for old_id in list(self._posture_history.keys()):
+                if old_id not in live_ids:
+                    del self._posture_history[old_id]
+
+
+
+            # Compute tracker-based average velocity (px/frame -> px/s)
+
             # Used as fallback if mediapipe pose detection returns 0 (e.g. only 1 person)
             tracker_speeds = []
             for _oid, _cent in objects.items():
@@ -794,49 +928,55 @@ class StreamWorker:
                     cv2.rectangle(annotated_frame, (x1, label_y - th - 3), (x1 + tw + 6, label_y + 3), (0, 0, 0), -1)
                     cv2.putText(annotated_frame, label, (x1 + 3, label_y), font, font_scale, box_color, 1, cv2.LINE_AA)
 
-                    # ── 🔴 [LIVE INTELLIGENCE] ReID & Journey Tracking ──────────────────
-                    from app.services.reid_service import reid_service
-                    from app.services.journey_manager_service import journey_manager
-                    
-                    try:
-                        embedding = reid_service.extract_embedding(frame, [x1, y1, x2, y2])
-                        global_id, insight_msg = journey_manager.process_detection(
-                            str(self.camera_id), embedding, self._camera_name
-                        )
+                    #      [LIVE INTELLIGENCE] ReID & Journey Tracking                   
+                    #   PERF: Throttle to every _reid_throttle_frames frames to avoid per-frame GPU/CPU overhead
+                    global_id = None
+                    self._reid_frame_counter += 1
+                    if self._reid_frame_counter >= self._reid_throttle_frames:
+                        self._reid_frame_counter = 0
+                        from app.services.reid_service import reid_service
+                        from app.services.journey_manager_service import journey_manager
                         
-                        if insight_msg:
-                            # ── 🔴 Broadcast Live Cross-Camera Notification ──
-                            from app.api.v1.endpoints.websocket import ws_manager
-                            asyncio.create_task(ws_manager.broadcast({
-                                "type": "journey_cross_camera",
-                                "data": {
-                                    "global_id": global_id,
-                                    "insight": insight_msg,
-                                    "camera_id": str(self.camera_id),
-                                    "camera_name": self._camera_name
-                                }
-                            }))
-                            # Also dispatch as a UI alert
-                            asyncio.create_task(ws_manager.broadcast({
-                                "type": "alert",
-                                "data": {
-                                    "id": f"trk-{global_id[:8]}-{int(now.timestamp())}",
-                                    "type": "cross_camera_tracking",
-                                    "risk_level": "medium",
-                                    "severity": 40,
-                                    "explanation": insight_msg,
-                                    "created_at": now.isoformat(),
-                                    "extra_data": {
-                                        "risk_color": "violet",
+                        try:
+                            # Pass the full camera frame for complete pristine screenshot
+                            embedding = reid_service.extract_embedding(frame, [x1, y1, x2, y2])
+                            global_id, insight_msg = await journey_manager.process_detection(
+                                str(self.camera_id), embedding, self._camera_name, frame_crop=frame
+                            )
+                            
+                            if insight_msg:
+                                #      Broadcast Live Cross-Camera Notification   
+                                from app.api.v1.endpoints.websocket import ws_manager
+                                asyncio.create_task(ws_manager.broadcast({
+                                    "type": "journey_cross_camera",
+                                    "data": {
+                                        "global_id": global_id,
+                                        "insight": insight_msg,
                                         "camera_id": str(self.camera_id),
-                                        "camera_name": self._camera_name,
-                                        "target_id": global_id
+                                        "camera_name": self._camera_name
                                     }
-                                }
-                            }))
-                    except Exception as e:
-                        global_id = None
-                        logger.error(f"ReID/Journey logic failed for cam {self.camera_id}: {e}")
+                                }))
+                                # Also dispatch as a UI alert
+                                asyncio.create_task(ws_manager.broadcast({
+                                    "type": "alert",
+                                    "data": {
+                                        "id": f"trk-{global_id[:8]}-{int(now.timestamp())}",
+                                        "type": "cross_camera_tracking",
+                                        "risk_level": "medium",
+                                        "severity": 40,
+                                        "explanation": insight_msg,
+                                        "created_at": now.isoformat(),
+                                        "extra_data": {
+                                            "risk_color": "violet",
+                                            "camera_id": str(self.camera_id),
+                                            "camera_name": self._camera_name,
+                                            "target_id": global_id
+                                        }
+                                    }
+                                }))
+                        except Exception as e:
+                            global_id = None
+                            logger.error(f"ReID/Journey logic failed for cam {self.camera_id}: {e}")
 
                     scaled_boxes.append({
                         "id": obj.get("id", 0),
@@ -853,7 +993,7 @@ class StreamWorker:
             self._latest_heatmap_frame = heatmap_frame
 
             # ----------------------------------------------------------
-            # DWELL TIME OVERLAY (new separate frame — non-breaking)
+            # DWELL TIME OVERLAY (new separate frame   non-breaking)
             # ----------------------------------------------------------
             # Refresh zone list every 150 frames (~5s at 30fps)
             if self._dwell_zone_refresh_counter <= 0:
@@ -862,14 +1002,26 @@ class StreamWorker:
                     asyncio.ensure_future(self._refresh_dwell_zones())
             self._dwell_zone_refresh_counter -= 1
 
-            active_tracks = self.dwell_service.update(
+            # --- Dwell Time Tracking Pass (Overlay and Intelligence) ---
+            dwell_overlays = self.dwell_service.update(
                 boxes=scaled_boxes,
                 zones=self._dwell_zones,
+                frame=frame,  # Pass frame so service can capture person snapshots
             )
+
+            
+            # --- SNAPSHOT CAPTURE: Waiting People ---
+            for track in dwell_overlays:
+                if track.get("needs_snapshot"):
+                    # Trigger async snapshot capture
+                    bbox = track.get("bbox")
+                    track_id = track.get("track_id")
+                    if bbox and track_id:
+                        asyncio.create_task(self._capture_track_snapshot(track_id, bbox, frame))
 
             # Draw dwell overlay
             dwell_frame = annotated_frame.copy()
-            for trk in active_tracks:
+            for trk in dwell_overlays:
                 bbox = trk["bbox"]
                 if len(bbox) == 4:
                     x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
@@ -877,7 +1029,7 @@ class StreamWorker:
                     mins = int(secs // 60)
                     label = f"ID{trk['track_id']} | {mins}m{int(secs%60)}s" if mins > 0 else f"ID{trk['track_id']} | {int(secs)}s"
                     if trk.get('zone'):
-                        label += f" · {trk['zone'][:8]}"
+                        label += f"   {trk['zone'][:8]}"
 
                     # Orange bracket for dwell view
                     color = (0, 140, 255)
@@ -889,19 +1041,20 @@ class StreamWorker:
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 200, 255), 1, cv2.LINE_AA)
             self._latest_dwell_frame = dwell_frame
 
-            # ── Intelligence Layer tick ────────────────────────────────────
-            # Synchronous — cheap pure-Python math, no I/O.
+            #    Intelligence Layer tick                                     
+            # Synchronous   cheap pure-Python math, no I/O.
             try:
                 self._latest_intelligence = self._intelligence.tick(
                     zone_id            = "camera",
                     count              = detected_count,
-                    active_tracks      = active_tracks,
+                    active_tracks      = dwell_overlays,
                     venue_id           = self._intel_venue_id,
                     venue_name         = self._intel_venue_name,
                     metric_id          = None,   # orchestrator generates its own UUID
                     capacity           = self._intel_capacity,
                     warning_threshold  = self._intel_warning_threshold,
                     critical_threshold = self._intel_critical_threshold,
+                    model_metadata     = getattr(self, '_intel_model_metadata', None),
                 )
                 # Lazily prefetch venue metadata once per worker lifetime
                 if not self._intel_venue_fetched:
@@ -924,10 +1077,12 @@ class StreamWorker:
 
             try:
                 # Run every frame to maintain accurate velocity tracking
+                config_for_panic = getattr(self, '_intel_model_metadata', None)
                 panic_result = self.panic_detector.process_frame(
                     frame=frame,
                     current_crowd_count=detected_count,
-                    camera_id=self.camera_id
+                    camera_id=self.camera_id,
+                    config=config_for_panic
                 )
                 
                 # Extract movement metrics for ingestion
@@ -940,7 +1095,7 @@ class StreamWorker:
             except Exception as e:
                 logger.error(f"Movement analysis failed for camera {self.camera_id}: {e}")
 
-            # ── 🔴 [LIVE BROADCAST] Push kinetics to WebSocket ──────────────────
+            #      [LIVE BROADCAST] Push kinetics to WebSocket                   
             self._metrics_broadcast_counter += 1
             if self._metrics_broadcast_counter % 5 == 0: # Every ~5 frames for smoothness
                 try:
@@ -1018,6 +1173,28 @@ class StreamWorker:
                 self._last_saved_count = detected_count
                 self._last_state_save_time = now
 
+            # ----------------------------------------------------------
+            # SEMANTIC VAULT SNAPSHOT  (non-blocking, every 60 s)
+            # Saves a full-resolution JPEG of the current frame so the
+            # semantic search engine has rich historical frames to index.
+            # ----------------------------------------------------------
+            _now_ts = time.time()
+            if (
+                self._last_semantic_snapshot_time is None
+                or (_now_ts - self._last_semantic_snapshot_time) >= self._semantic_snapshot_interval
+            ):
+                self._last_semantic_snapshot_time = _now_ts
+                _snapshot_frame = frame.copy()
+                _cam_id_str = str(self.camera_id)
+                _ts_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                asyncio.get_event_loop().run_in_executor(
+                    None,
+                    self._write_semantic_snapshot,
+                    _snapshot_frame,
+                    _cam_id_str,
+                    _ts_str,
+                )
+
             # If panic triggered, dispatch critical alarm
             if panic_result.get("panic_detected"):
                 import uuid
@@ -1043,7 +1220,7 @@ class StreamWorker:
                                 "trend": "rapidly_increasing",
                                 "severity": 95,
                                 "should_alert": True,
-                                "reason": panic_result.get("reason", "🚨 CROWD SURGE / PANIC DETECTED"),
+                                "reason": panic_result.get("reason", "  CROWD SURGE / PANIC DETECTED"),
                                 "recommended_action": "HIGH RISK: Increase monitoring, prepare crowd control staff, and ensure exits are clear.",
                                 "predicted_level": "CRITICAL",
                                 "risk_score": 100.0,
@@ -1082,6 +1259,75 @@ class StreamWorker:
                 },
                 exc_info=True,
             )
+
+    # ------------------------------------------------------------------
+    # Semantic Vault Helper (runs in thread-pool executor – no async I/O)
+    # ------------------------------------------------------------------
+    def _write_semantic_snapshot(self, frame: np.ndarray, camera_id_str: str, ts_str: str) -> None:
+        """Write a full-resolution JPEG to the semantic snapshot vault.
+
+        Designed to run in a thread-pool executor so it never blocks the
+        asyncio event loop.  One file is written per camera per 60 s.
+        """
+        import os
+        try:
+            snap_dir = os.path.join(os.getcwd(), "storage", "semantic_snapshots")
+            os.makedirs(snap_dir, exist_ok=True)
+            filename = f"{camera_id_str}_{ts_str}.jpg"
+            save_path = os.path.join(snap_dir, filename)
+            ok = cv2.imwrite(save_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+            if ok:
+                logger.info(
+                    "Semantic snapshot saved",
+                    extra={"camera_id": camera_id_str, "path": save_path},
+                )
+            else:
+                logger.warning(
+                    "Semantic snapshot write failed (cv2.imwrite returned False)",
+                    extra={"camera_id": camera_id_str, "path": save_path},
+                )
+        except Exception as e:
+            logger.error(f"Semantic snapshot error for camera {camera_id_str}: {e}")
+
+    async def _capture_track_snapshot(self, track_id: int, bbox: List[int], frame: np.ndarray) -> None:
+        """Captures a cropped snapshot of a specific tracked person."""
+        try:
+            import os
+            import cv2
+            import uuid
+
+            # Ensure snapshot directory exists
+            snapshot_dir = os.path.join("storage", "snapshots")
+            if not os.path.exists(snapshot_dir):
+                os.makedirs(snapshot_dir, exist_ok=True)
+
+            # 1. Crop the person
+            x1, y1, x2, y2 = map(int, bbox)
+            h, w = frame.shape[:2]
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(w, x2), min(h, y2)
+            
+            if (x2 - x1) < 10 or (y2 - y1) < 10:
+                return
+
+            crop = frame[y1:y2, x1:x2]
+            
+            # 2. Save the file
+            filename = f"track_{self.camera_id}_{track_id}_{uuid.uuid4().hex[:8]}.jpg"
+            save_path = os.path.join("storage", "snapshots", filename)
+            abs_path = os.path.join(os.getcwd(), save_path)
+            
+            ok = cv2.imwrite(abs_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            
+            if ok:
+                # 3. Update the track in the service
+                track = self.dwell_service._tracks.get(track_id)
+                if track:
+                    track.snapshot_captured = True
+                    track.snapshot_path = save_path
+                logger.info(f"Captured snapshot for track {track_id}: {save_path}")
+        except Exception as e:
+            logger.error(f"Failed to capture snapshot for track {track_id}: {e}")
 
     async def _fetch_intel_venue_meta(self) -> None:
         try:
@@ -1179,6 +1425,7 @@ class StreamWorker:
                     # Use absolute count thresholds (not percentages)
                     self._intel_warning_threshold = row.Venue.warning_threshold
                     self._intel_critical_threshold = row.Venue.critical_threshold
+                    self._intel_model_metadata = row.Venue.model_metadata or {}
         except Exception as e:
             logger.error(f"Failed to fetch intel venue meta: {e}")
 
@@ -1206,7 +1453,7 @@ class StreamWorker:
                 return
             except ValueError as e:
                 # Validation errors (rate-limit, duplicate, inactive camera) are
-                # not transient — retrying immediately will always fail.
+                # not transient   retrying immediately will always fail.
                 # Silently drop the frame and let the next cycle proceed normally.
                 logger.debug(
                     "Frame skipped (validation)",
@@ -1260,64 +1507,67 @@ class StreamWorker:
 
     async def _heartbeat(self) -> None:
         """Periodic heartbeat for health monitoring and dwell DB flush."""
-        while self._running:
-            await asyncio.sleep(self.heartbeat_interval)
+        try:
+            while self._running:
+                await asyncio.sleep(self.heartbeat_interval)
 
-            if self._running:  # Check again after sleep
-                logger.info(
-                    "Worker heartbeat",
-                    extra={
-                        "camera_id": str(self.camera_id),
-                        "fps": self._calculate_fps(),
-                        "frames_processed": self._frames_processed,
-                        "avg_processing_ms": self._avg_processing_time(),
-                        "source_healthy": self.source.is_healthy(),
-                        "pending_detections": len(self._batch_detections),
-                        "detection_enabled": self.detector is not None,
-                        "last_saved_count": self._last_saved_count,
-                        "last_save_ago": (
-                            (datetime.now(timezone.utc) -
-                             self._last_state_save_time).total_seconds()
-                            if self._last_state_save_time else None
-                        ),
-                    },
-                )
-
-                # Flush evicted dwell tracks to PostgreSQL and update Heartbeat
-                try:
-                    from app.core.database import db_manager
-                    from sqlalchemy import update
-                    from app.models.camera import Camera
-                    
-                    async with db_manager.session() as session:
-                        # 1. Dwell track flush
-                        try:
-                            if hasattr(self.dwell_service, '_evicted') and self.dwell_service._evicted:
-                                flushed = await self.dwell_service.flush_evicted_to_db(session)
-                                if flushed:
-                                    logger.info(
-                                        "Flushed dwell records to DB",
-                                        extra={"camera_id": str(self.camera_id), "count": flushed},
-                                    )
-                        except Exception as e:
-                            logger.warning(f"Dwell time DB flush failed: {str(e)}")
-                        
-                        # 2. Heartbeat update to prevent OFFLINE false positives
-                        try:
-                            await session.execute(
-                                update(Camera)
-                                .where(Camera.id == self.camera_id)
-                                .values(last_heartbeat_at=datetime.now(timezone.utc), is_online=True)
-                            )
-                            await session.commit()
-                        except Exception as e:
-                            logger.error(f"Heartbeat camera DB update failed: {str(e)}")
-                            
-                except Exception as e:
-                    logger.warning(
-                        "Heartbeat overall loop failed entirely",
-                        extra={"camera_id": str(self.camera_id), "error": str(e)},
+                if self._running:  # Check again after sleep
+                    logger.info(
+                        "Worker heartbeat",
+                        extra={
+                            "camera_id": str(self.camera_id),
+                            "fps": self._calculate_fps(),
+                            "frames_processed": self._frames_processed,
+                            "avg_processing_ms": self._avg_processing_time(),
+                            "source_healthy": self.source.is_healthy(),
+                            "pending_detections": len(self._batch_detections),
+                            "detection_enabled": self.detector is not None,
+                            "last_saved_count": self._last_saved_count,
+                            "last_save_ago": (
+                                (datetime.now(timezone.utc) -
+                                 self._last_state_save_time).total_seconds()
+                                if self._last_state_save_time else None
+                            ),
+                        },
                     )
+
+                    # Flush evicted dwell tracks to PostgreSQL and update Heartbeat
+                    try:
+                        from app.core.database import db_manager
+                        from sqlalchemy import update
+                        from app.models.camera import Camera
+                        
+                        async with db_manager.session() as session:
+                            # 1. Dwell track flush
+                            try:
+                                if hasattr(self.dwell_service, '_evicted') and self.dwell_service._evicted:
+                                    flushed = await self.dwell_service.flush_evicted_to_db(session)
+                                    if flushed:
+                                        logger.info(
+                                            "Flushed dwell records to DB",
+                                            extra={"camera_id": str(self.camera_id), "count": flushed},
+                                        )
+                            except Exception as e:
+                                logger.warning(f"Dwell time DB flush failed: {str(e)}")
+                            
+                            # 2. Heartbeat update to prevent OFFLINE false positives
+                            try:
+                                await session.execute(
+                                    update(Camera)
+                                    .where(Camera.id == self.camera_id)
+                                    .values(last_heartbeat_at=datetime.now(timezone.utc), is_online=True)
+                                )
+                                await session.commit()
+                            except Exception as e:
+                                logger.error(f"Heartbeat camera DB update failed: {str(e)}")
+                                
+                    except Exception as e:
+                        logger.warning(
+                            "Heartbeat overall loop failed entirely",
+                            extra={"camera_id": str(self.camera_id), "error": str(e)},
+                        )
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            pass
 
     # ==========================================================
     # Health & Metrics
@@ -1356,14 +1606,24 @@ class StreamWorker:
         return self._latest_annotated_frame
 
     def get_latest_frame_jpeg(self, quality: int = 70) -> Optional[bytes]:
-        """Get the latest frame as JPEG bytes for MJPEG streaming."""
+        """Get the latest frame as JPEG bytes for MJPEG streaming.
+        
+        Returns pre-cached bytes encoded during frame processing   O(1), no encode overhead.
+        Falls back to on-demand encode if cache is empty.
+        """
+        # Fast path: return pre-encoded cache (updated every processing cycle)
+        cached = getattr(self, '_cached_jpeg_bytes', None)
+        if cached is not None:
+            return cached
+
+        # Fallback: encode on demand (first frame before cache is ready)
         frame = self._latest_annotated_frame
         if frame is None:
             return None
         try:
             ret, buffer = cv2.imencode(
                 '.jpg', frame,
-                [cv2.IMWRITE_JPEG_QUALITY, quality]
+                [cv2.IMWRITE_JPEG_QUALITY, getattr(self, '_cached_jpeg_quality', quality)]
             )
             if ret:
                 return buffer.tobytes()
@@ -1407,27 +1667,11 @@ class StreamWorker:
                     for z in zones
                 ]
         except Exception:
-            pass  # Non-critical — zones will remain as-is until next refresh
+            pass  # Non-critical   zones will remain as-is until next refresh
 
     def get_latest_heatmap_jpeg(self, quality: int = 70) -> Optional[bytes]:
         """Get the latest heatmap frame as JPEG bytes."""
         frame = self._latest_heatmap_frame
-        if frame is None:
-            return None
-        try:
-            ret, buffer = cv2.imencode(
-                '.jpg', frame,
-                [cv2.IMWRITE_JPEG_QUALITY, quality]
-            )
-            if ret:
-                return buffer.tobytes()
-        except Exception:
-            pass
-        return None
-
-    def get_latest_dwell_frame_jpeg(self, quality: int = 70) -> Optional[bytes]:
-        """Get the latest dwell-annotated frame as JPEG bytes."""
-        frame = getattr(self, "_latest_dwell_frame", None)
         if frame is None:
             return None
         try:

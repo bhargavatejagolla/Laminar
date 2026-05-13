@@ -33,9 +33,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 import { api } from "@/services/api";
 
-async function queryAssistant(question: string): Promise<string> {
+async function queryAssistant(question: string, language?: string): Promise<string> {
   try {
-    const { data } = await api.post('/assistant/query', { question });
+    const lang = language || (typeof window !== "undefined" ? localStorage.getItem("laminar_language") || "en" : "en");
+    const { data } = await api.post('/assistant/query', { question, user_language: lang });
     return data.answer ?? "No response from AI engine.";
   } catch (err: any) {
     throw new Error(`API error: ${err?.response?.data?.detail || err.message}`);
@@ -52,13 +53,40 @@ interface IndexStatus {
   message: string;
 }
 
+import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
+
 export default function AIAssistantChat() {
+  const { t } = useTranslation();
+
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Magnetic Button Logic
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const springX = useSpring(mouseX, { stiffness: 200, damping: 20 });
+  const springY = useSpring(mouseY, { stiffness: 200, damping: 20 });
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    mouseX.set(x * 0.4);
+    mouseY.set(y * 0.4);
+  };
+
+  const handleMouseLeave = () => {
+    mouseX.set(0);
+    mouseY.set(0);
+    setIsHovered(false);
+  };
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
       content:
-        "👋 Hello! I'm your Laminar AI Copilot — powered by a local LLM and your real-time venue data. Ask me anything about crowd levels, alerts, or venue analytics.",
+        "👋 Hello! I'm Randy AI, your ultra-intelligent premium assistant. Ask me anything—from live analytics and crowd matrices to complex software patterns, general intelligence, or simply converse with me in Telugu or Hindi!",
       timestamp: new Date(),
     },
   ]);
@@ -130,7 +158,7 @@ export default function AIAssistantChat() {
       ]);
     } catch (e: any) {
       const errMsg =
-        "⚠️ Could not reach the AI engine. Make sure Ollama is running locally with a model like `llama3`.";
+        "🔄 Randy AI is momentarily unavailable. The intelligent systems are reconnecting—please try again in a moment.";
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: errMsg, timestamp: new Date() },
@@ -165,53 +193,78 @@ export default function AIAssistantChat() {
     <>
       {/* Floating Button */}
       {!isOpen && (
-        <button
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
           onClick={() => setIsOpen(true)}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onMouseEnter={() => setIsHovered(true)}
+          style={{ x: springX, y: springY }}
           id="ai-assistant-toggle"
-          className="fixed bottom-6 right-6 group flex items-center gap-2 pl-4 pr-5 py-3 rounded-full 
-            bg-gradient-to-r from-cyan-600 to-blue-600 text-white 
-            shadow-[0_0_30px_rgba(6,182,212,0.5)] hover:shadow-[0_0_40px_rgba(6,182,212,0.7)] 
-            hover:scale-105 active:scale-95 transition-all duration-300 z-50 cursor-pointer"
+          className="fixed bottom-8 right-8 group flex items-center gap-3 pl-5 pr-6 py-4 rounded-full 
+            bg-[#010410] text-white overflow-hidden
+            border border-white/10
+            shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.05)]
+            hover:border-cyan-500/50 hover:shadow-[0_0_40px_rgba(34,211,238,0.25)] 
+            transition-all duration-300 z-50 cursor-pointer"
         >
-          <div className="relative">
-            <Sparkles className="w-5 h-5" />
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+          {/* Animated Background Shimmer */}
+          <motion.div
+            animate={{ x: ["-100%", "200%"] }}
+            transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: "easeInOut" }}
+            style={{ position: "absolute", inset: 0, zIndex: 0, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)", pointerEvents: "none" }}
+          />
+
+          {/* Dynamic BG Glow */}
+          <div style={{ position: "absolute", inset: 0, zIndex: 0, background: "radial-gradient(circle at center, rgba(34,211,238,0.1), transparent 70%)", opacity: isHovered ? 1 : 0.5, transition: "opacity 0.3s" }} />
+
+          <div className="relative z-10 flex items-center gap-3">
+             <div className="relative">
+              <Sparkles className="w-6 h-6 text-cyan-400" />
+              <motion.span 
+                animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-cyan-400 rounded-full border-2 border-[#010410]" 
+              />
+            </div>
+            <span className="text-sm font-black uppercase tracking-[0.2em] text-white group-hover:text-cyan-100 transition-colors">{t("auto.RandyAI_9416") || "Randy AI"}</span>
           </div>
-          <span className="text-sm font-semibold tracking-wide">AI Copilot</span>
-        </button>
+
+          {/* Glowing Border Sweep */}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            style={{ position: "absolute", inset: -2, borderRadius: "999px", padding: "1px", background: "conic-gradient(from 0deg, transparent 60%, rgba(34,211,238,1) 80%, transparent 100%)", maskImage: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)", maskComposite: "exclude", WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)", WebkitMaskComposite: "xor", opacity: isHovered ? 1 : 0 }}
+          />
+        </motion.button>
       )}
 
       {/* Chat Window */}
       {isOpen && (
         <div
-          className="fixed bottom-6 right-6 w-[360px] sm:w-[420px] flex flex-col z-50 rounded-2xl overflow-hidden
-            bg-[#070e1a]/95 backdrop-blur-2xl
-            border border-cyan-500/20
-            shadow-[0_25px_80px_rgba(0,0,0,0.8),0_0_0_1px_rgba(6,182,212,0.08),inset_0_1px_0_rgba(255,255,255,0.04)]"
+          className="fixed bottom-6 right-6 w-[380px] sm:w-[480px] flex flex-col z-50 rounded-2xl overflow-hidden
+            bg-[#020611]/95 backdrop-blur-[60px]
+            border border-cyan-500/30
+            shadow-[0_0_120px_rgba(6,182,212,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)]"
           style={{ maxHeight: "85vh" }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#0c1829] to-[#091525] border-b border-cyan-500/10 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center">
-                <Brain className="w-5 h-5 text-cyan-400" />
-                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0c1829] ${
-                  !backendOnline
-                    ? 'bg-amber-500'
-                    : indexStatus?.ollama_online
-                    ? 'bg-emerald-500'
-                    : 'bg-red-500'
-                }`} title={!backendOnline ? 'Backend offline' : indexStatus?.ollama_online ? 'Ollama online' : 'Ollama offline'} />
+          <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-cyan-900/40 via-blue-900/40 to-[#020611] border-b border-cyan-500/20 shrink-0">
+            <div className="flex items-center gap-4">
+              <div className="relative w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/30 to-blue-600/30 border border-cyan-500/40 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+                <Brain className="w-6 h-6 text-cyan-300" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#020611] bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,1)]" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm font-bold text-white tracking-wide">Laminar AI</h3>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 bg-cyan-500/10 text-cyan-400 rounded border border-cyan-500/20 uppercase tracking-wider">
-                    {indexStatus?.model_in_use && indexStatus.model_in_use !== 'none' ? indexStatus.model_in_use.replace('-coder', '') : 'Local LLM'}
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white tracking-widest uppercase">{t("auto.RandyAI_9416") || "Randy AI"}</h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30 uppercase tracking-widest shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+                    {t("auto.OmniV3_419") || "Omni-V3"}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 font-mono">
-                  {indexStatus ? `${indexStatus.index_documents} docs · ${indexStatus.last_indexed_at ? new Date(indexStatus.last_indexed_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Never'}` : 'Ollama · FAISS'}
+                <p className="text-[11px] text-cyan-200/50 font-mono tracking-wider">
+                  {indexStatus ? `${indexStatus.index_documents} memory nodes synced` : 'Quantum Core Active'}
                 </p>
               </div>
             </div>
@@ -261,10 +314,10 @@ export default function AIAssistantChat() {
                   </div>
                 )}
                 <div
-                  className={`max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                  className={`max-w-[85%] rounded-3xl px-4 py-3 text-[15px] leading-relaxed shadow-xl ${
                     msg.role === "user"
-                      ? "bg-gradient-to-br from-cyan-600 to-blue-600 text-white rounded-tr-sm shadow-lg shadow-cyan-900/30"
-                      : "bg-slate-800/60 border border-slate-700/50 text-slate-200 rounded-tl-sm"
+                      ? "bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-600 text-white rounded-tr-sm shadow-[0_10px_25px_rgba(6,182,212,0.3)] border border-cyan-400/20"
+                      : "bg-[#0b1221]/90 backdrop-blur-xl border border-cyan-500/20 text-slate-100 rounded-tl-sm shadow-[0_10px_25px_rgba(0,0,0,0.5)]"
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -290,7 +343,7 @@ export default function AIAssistantChat() {
                   <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                   <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                   <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                  <span className="text-[10px] ml-1 text-slate-500 font-mono">analyzing data...</span>
+                  <span className="text-[10px] ml-1 text-slate-500 font-mono">{t("auto.analyzingdata_2038") || "analyzing data..."}</span>
                 </div>
               </div>
             )}
@@ -299,7 +352,7 @@ export default function AIAssistantChat() {
             {showSuggestions && messages.length <= 1 && !isTyping && (
               <div className="mt-3 space-y-1.5">
                 <p className="text-[10px] text-slate-600 font-mono uppercase tracking-wider px-1 flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-amber-500" /> Suggested questions
+                  <Zap className="w-3 h-3 text-amber-500" /> {t("auto.Suggestedquesti_8885") || "Suggested questions"}
                 </p>
                 {SUGGESTED_PROMPTS.map((prompt, i) => (
                   <button
@@ -344,8 +397,8 @@ export default function AIAssistantChat() {
                 <Send className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-center mt-2 text-[9px] text-slate-700 font-mono uppercase tracking-widest">
-              Powered by Ollama · Local · Offline · Private
+            <p className="text-center mt-3 mb-1 text-[10px] text-cyan-300/40 font-mono uppercase tracking-[0.25em]">
+              POWERED BY RANDY AI · SECURE · MULTILINGUAL
             </p>
           </div>
         </div>

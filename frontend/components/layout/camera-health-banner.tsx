@@ -5,8 +5,11 @@ import { AlertCircle, Camera, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useState } from "react"
 import Link from "next/link"
+import { useTranslation } from "react-i18next";
 
 export default function CameraHealthBanner() {
+  const { t } = useTranslation();
+
   const { cameraAlerts } = useAlerts()
   const [closedIds, setClosedIds] = useState<string[]>([])
 
@@ -44,7 +47,7 @@ export default function CameraHealthBanner() {
                   href="/cameras" 
                   className="text-xs font-semibold text-yellow-500 hover:text-yellow-400 underline underline-offset-4 transition-colors"
                 >
-                  Inspect Camera
+                  {t("auto.InspectCamera_2820") || "Inspect Camera"}
                 </Link>
                 <button 
                   onClick={() => setClosedIds(prev => [...prev, alert.id])}

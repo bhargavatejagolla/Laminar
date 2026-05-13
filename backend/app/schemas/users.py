@@ -20,25 +20,25 @@ class UserProfileUpdate(BaseModel):
     @field_validator('phone_number')
     @classmethod
     def validate_indian_phone(cls, v: str | None) -> str | None:
-        if v is None:
+        if not v:
             return v
-        # Ensure it starts with +91 and followed by exactly 10 digits
-        if not re.match(r'^\+91\d{10}$', v):
-            raise ValueError('Phone number must be an Indian number starting with +91 followed by 10 digits')
+        # Simple check for Indian format if provided with +91
+        if v.startswith('+91') and len(v) != 13:
+            raise ValueError('Indian phone numbers must be +91 followed by 10 digits')
         return v
 
 class UserProfileResponse(BaseModel):
     id: UUID
-    email: EmailStr
+    email: str # Relaxed from EmailStr to prevent response categorization errors
     role: str
     is_active: bool
     name: Optional[str] = None
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
-    receive_sms_alerts: bool
+    receive_sms_alerts: Optional[bool] = False
     alert_email: Optional[str] = None
-    receive_email_alerts: bool
-    language_preference: str
+    receive_email_alerts: Optional[bool] = False
+    language_preference: Optional[str] = "en"
 
     class Config:
         from_attributes = True
@@ -54,4 +54,3 @@ class UserAdminResponse(UserProfileResponse):
 
     class Config:
         from_attributes = True
-

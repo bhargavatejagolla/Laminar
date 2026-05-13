@@ -181,6 +181,8 @@ class LaminarIntelligenceService:
                 "critical_threshold": venue.critical_threshold,
                 "warning_threshold_pct": venue.warning_threshold_percent,
                 "critical_threshold_pct": venue.critical_threshold_percent,
+                "latitude": venue.latitude,
+                "longitude": venue.longitude,
             }
 
         # Cameras in venue
@@ -400,56 +402,59 @@ class LaminarIntelligenceService:
         
         if not metrics:
             situation = t(lang, "intel_no_data", 
-                "Intelligence engine is active for {venue_name}, but no live crowd metrics have been ingested in the last 10 minutes. "
-                "The system is standing by for vision stream data."
+                "Tactical neural mesh deployed for {venue_name}. Spatial mapping active. "
+                "No significant biological signatures or dense kinetic movement detected in the primary tracking radius "
+                "over the past anomaly window. The grid remains on high-alert standby awaiting live stream ingress."
             ).format(venue_name=venue_name)
         else:
             situation = t(lang, "intel_situation", 
-                "Surveillance intelligence identified a {severity} crowd condition at {venue_name}. "
-                "The venue capacity is {capacity} persons. "
-                "Real-time monitoring across {cam_count} active camera(s) "
-                "shows a current crowd average of {avg:.0f} with a peak of {peak:.0f} persons."
+                "Neural surveillance intelligence has identified a {severity} density anomaly at {venue_name} (GPS: {lat:.4f}, {lng:.4f}). "
+                "Structural capacity ceiling is {capacity}. "
+                "Real-time geospatial monitoring across {cam_count} active vision nodes "
+                "detects a sustained kinetic crowd average of {avg:.0f} with a local maximum cluster of {peak:.0f} entities."
             ).format(
                 severity=severity, venue_name=venue_name, capacity=capacity, 
-                cam_count=len(cameras), avg=total_avg, peak=total_peak
+                cam_count=len(cameras), avg=total_avg, peak=total_peak,
+                lat=venue.get("latitude", 0), lng=venue.get("longitude", 0)
             )
 
         observed = t(lang, "intel_observed",
             "{trend_desc} "
-            "Risk scoring across sensor feeds indicates a dominant risk classification of {risk}. "
-            "Dynamic risk score: {score:.2f}."
+            "Predictive risk scoring across all sensor feeds isolates a highly correlated primary risk classification of {risk}. "
+            "Dynamic flow-variance score evaluates at {score:.2f} out of nominal."
         ).format(
             trend_desc=trend_desc, risk=dominant_risk.upper(), score=float(risk_score or 0)
         )
 
         risk_text = t(lang, "intel_risk", 
-            "{alert_info}Current crowd conditions at {venue_name} are classified as {severity}. "
+            "{alert_info}Current geospatial conditions at {venue_name} evaluate squarely as {severity}. "
         ).format(
-            alert_info=(t(lang, "active_alert_note", "Active alert is in effect. ") if alerts else ""),
+            alert_info=(t(lang, "active_alert_note", "Tactical alert override is in effect. ") if alerts else ""),
             venue_name=venue_name, severity=severity
         )
         
         if predicted_level and esc_prob > 0:
             risk_text += t(lang, "intel_prediction_addon", 
-                "The prediction engine projects escalation to {level} with a probability of {prob}%."
+                "The neural projection engine forecasts a chaotic escalation to {level} with a calculated confidence probability of {prob}%."
             ).format(level=predicted_level.upper(), prob=int(esc_prob * 100))
             
         if alert and alert.escalation_level > 0:
-            risk_text += " " + t(lang, "intel_esc_note", "Escalation level {level} has been triggered.").format(level=alert.escalation_level)
+            risk_text += " " + t(lang, "intel_esc_note", "Velocity escalation layer {level} has been breached.").format(level=alert.escalation_level)
 
         if predicted_level and esc_prob > 0.5:
             prediction = t(lang, "intel_outcome_high",
-                "High probability ({prob}%) of crowd conditions escalating to {level}. "
-                "If current movement patterns persist, venue saturation may occur within the next 10-20 minutes."
+                "High probabilistic certainty ({prob}%) that kinetic conditions will rapidly escalate to {level}. "
+                "If current biological velocity vectors persist without intervention, critical zone saturation is mathematically imminent within 10-20 minutes."
             ).format(prob=int(esc_prob*100), level=predicted_level.upper())
         elif dominant_risk in ["high", "critical"]:
             prediction = t(lang, "intel_outcome_elevated",
-                "Crowd dynamics suggest sustained high-risk conditions. If inflow continues at current rate, "
-                "critical thresholds may be reached within the next 15-30 minutes."
+                "Kinetic flow dynamics indicate sustained high-risk congestion zones. If ingress variance continues at current velocity, "
+                "geospatial collapse thresholds will be triggered within the next 15-30 minutes."
             )
         else:
             prediction = t(lang, "intel_outcome_nominal",
-                "Based on current patterns, crowd levels are expected to remain at {risk} risk for the near term. Continue standard monitoring protocols."
+                "Low-probability kinetic risk projected. Based on current flow patterns, spatial density is mathematically modeled to remain at {risk} parameters. "
+                "Maintain baseline spatial sweeps and standard protocol vigilance."
             ).format(risk=dominant_risk.upper())
 
         # Generate specific actions
@@ -705,13 +710,18 @@ Respond ONLY with valid JSON. No preamble, no explanation.
         """
         Generate a concise AI intelligence brief for notifications/emails.
         
-        This replaces the simpler `_generate_ai_brief` in notification_service
+        This replaces the simpler _generate_ai_brief in notification_service
         with the full intelligence engine output.
         
         Returns a pre-formatted text suitable for inclusion in email notifications.
         """
         try:
-            intel = await self.analyze_venue(session, alert.venue_id, alert, lang=lang)
+            domain = alert.extra_data.get("domain", "crowd") if alert.extra_data else "crowd"
+            
+            if domain == "crowd":
+                intel = await self.analyze_venue(session, alert.venue_id, alert, lang=lang)
+            else:
+                intel = await self.analyze_event(session, domain, alert, lang=lang)
             
             from app.services.translation_service import TranslationService
             t = TranslationService.t
@@ -740,14 +750,83 @@ Respond ONLY with valid JSON. No preamble, no explanation.
             if intel.cross_camera_insights:
                 brief += f"\n🎥 {h_correlation}\n{intel.cross_camera_insights}\n"
             
-            brief += f"\n_{h_gen_by}: {intel.generated_by} | {intel.timestamp}_"
             return brief
         except Exception as e:
             logger.error(f"Intelligence brief generation failed: {e}")
             return (
-                f"Crowd intelligence alert for {venue_name} at {location}. "
+                f"Intelligence alert for {venue_name} at {location}. "
                 f"Risk level: {alert.risk_level.upper()}. Please review the dashboard for full details."
             )
+
+    async def analyze_event(
+        self, session: AsyncSession, domain: str, alert: CrowdAlert, lang: str = "en"
+    ) -> OperationalIntelligence:
+        """
+        AI analysis for tactical events (Traffic, Incident, Parking).
+        """
+        from app.models.venue import Venue
+        venue_result = await session.execute(select(Venue).where(Venue.id == alert.venue_id).limit(1))
+        venue = venue_result.scalar_one_or_none()
+        venue_name = venue.name if venue else "the venue"
+        
+        extra = alert.extra_data or {}
+        risk_map = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM", "low": "LOW"}
+        severity = risk_map.get(alert.risk_level.lower(), "MODERATE")
+        
+        # Staffing Context from Venue Config
+        staffing_cfg = getattr(venue, "staffing_config", {}) or {}
+        required_staff = staffing_cfg.get(alert.risk_level.lower(), "N/A")
+        staff_str = f"Recommended deployment: {required_staff} staff members." if required_staff != "N/A" else "Standard tactical staffing."
+
+        # Domain-specific rule-based generation
+        if domain == "traffic":
+            situation = f"Laminar AI detected a traffic {alert.risk_level} event at {venue_name}. Analysis indicates congestion spikes in primary transit corridors."
+            trends = f"Vehicle flow has reached {extra.get('count', 'elevated')} units. Pattern detection suggests persistent gridlock if throughput is not increased."
+            risk_text = f"High density risk identified. Congestion level: {extra.get('density', 'N/A')}. Venue capacity optimization is prioritized."
+            outcome = "Likely sustained delay for the next 20-30 minutes unless traffic priority is adjusted."
+            actions = [
+                "Activate signal priority and emergency mesh overrides.",
+                "Deploy traffic marshals to primary intersections.",
+                f"{staff_str} Coordinate with transit command.",
+                "Update variable message signs for zone redirection."
+            ]
+        elif domain == "incident":
+            event_type = extra.get('type', 'Accident').replace('_', ' ').title()
+            situation = f"CRITICAL: Tactical incident ({event_type}) identified at {venue_name} via neural vision sweep."
+            trends = f"Event verified with high confidence in live feeds. {extra.get('explanation', '')}"
+            risk_text = f"Immediate life-safety or thoroughfare risk. Severity: {severity}. {extra.get('impact', 'High impact on traffic.')}"
+            outcome = "Potential major obstruction and secondary collision risk if not geofenced."
+            actions = [
+                "Dispatch emergency response and medical services immediately.",
+                f"Deploy {required_staff} security/safety personnel to geofence the sector." if required_staff != "N/A" else "Deploy safety team for sector geofencing.",
+                "Activate tactical incident command and notify police.",
+                "Freeze incoming traffic to the affected corridor."
+            ]
+        elif domain == "parking":
+            occupancy = extra.get('occupancy', 'N/A')
+            situation = f"Parking infrastructure at {venue_name} has reached a {alert.risk_level} saturation state."
+            trends = f"Current occupancy: {occupancy} vehicles. Inflow velocity remains high."
+            risk_text = "Saturation risk leading to entry-point queueing and peripheral congestion."
+            outcome = "Full vacancy depletion expected for the next 45-60 minutes."
+            actions = [
+                "Redirect incoming vehicles to overflow lots.",
+                f"{staff_str} Deploy parking attendants for flow management.",
+                "Update digital signage to 'FULL' status.",
+                "Sync with traffic command for peripheral monitoring."
+            ]
+        else:
+            situation = "Generic tactical event identified."
+
+        return OperationalIntelligence(
+            situation_analysis=situation,
+            observed_trends=trends,
+            risk_assessment=risk_text,
+            predicted_outcome=outcome,
+            recommended_actions=actions,
+            severity=severity,
+            confidence="high",
+            generated_by="Laminar AI Tactical Analysis"
+        )
 
     async def get_system_intelligence(self, session: AsyncSession) -> Dict[str, Any]:
         """

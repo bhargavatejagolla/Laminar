@@ -11,7 +11,7 @@ router = APIRouter(prefix="/events", tags=["Events"])
 event_repo = Repository[VenueEvent](VenueEvent)
 
 
-@router.post("/")
+@router.post("")
 async def create_event(
     venue_id: str,
     event_type: str,

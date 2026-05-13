@@ -1,0 +1,64 @@
+{
+  "en": {
+    "dashboard": {
+      "slaAndResponse": "SLA & Response",
+      "compliant": "Compliant",
+      "avgAcknowledgment": "Avg Acknowledgment",
+      "mins": "mins",
+      "target5mins": "Target: <5 mins",
+      "platformAlerts7d": "Platform Alerts (7d)",
+      "total": "total",
+      "monitorClosely": "Monitor closely",
+      "globalPolicy": "Global Policy: Critical alerts under 5m",
+      "viewReport": "View Report"
+    },
+    "venues": {
+      "editVenue": "Edit Venue",
+      "deleteVenueText": "Delete Venue",
+      "yes": "Yes",
+      "no": "No",
+      "capacity": "Capacity",
+      "warn": "Warn",
+      "crit": "Crit",
+      "cameras": "Cameras",
+      "monitoring": "Monitoring",
+      "active": "ACTIVE",
+      "paused": "PAUSED",
+      "viewVenueDetails": "View Venue Details",
+      "systemErrorUplink": "System Error: Failed to establish uplink with Venue registry.",
+      "noActiveVenues": "No Active Venues",
+      "connectFirstVenue": "Connect your first venue mapping to begin processing Crowd Intelligence streams."
+    }
+  },
+  "te": {
+    "dashboard": {
+      "slaAndResponse": "SLA మరియు ప్రతిస్పందన",
+      "compliant": "కంప్లైంట్",
+      "avgAcknowledgment": "సగటు గుర్తింపు",
+      "mins": "నిమిషం",
+      "target5mins": "లక్ష్యం: <5 నిమి",
+      "platformAlerts7d": "ప్లాట్‌ఫారమ్ హెచ్చరికలు (7రోజులు)",
+      "total": "మొత్తం",
+      "monitorClosely": "దగ్గరగా పర్యవేక్షించండి",
+      "globalPolicy": "గ్లోబల్ పాలసీ: 5 నిమి లోపు క్లిష్టమైన హెచ్చరికలు",
+      "viewReport": "నివేదిక చూడండి"
+    },
+    "venues": {
+      "editVenue": "స్థలాన్ని సవరించండి",
+      "deleteVenueText": "స్థలాన్ని తొలగించండి",
+      "yes": "అవును",
+      "no": "కాదు",
+      "capacity": "సామర్థ్యం",
+      "warn": "హెచ్చరిక",
+      "crit": "తీవ్రమైన",
+      "cameras": "కెమెరాలు",
+      "monitoring": "పర్యవేక్షణ",
+      "active": "చురుకైన",
+      "paused": "పాజ్ చేయబడింది",
+      "viewVenueDetails": "వేదిక వివరాలను చూడండి",
+      "systemErrorUplink": "సిస్టమ్ లోపం: వేదిక రిజిస్ట్రీతో అప్‌లింక్ ఏర్పాటు చేయడంలో విఫలమైంది.",
+      "noActiveVenues": "చురుకైన స్థలాలు లేవు",
+      "connectFirstVenue": "క్రౌడ్ ఇంటెలిజెన్స్ స్ట్రీమ్‌లను ప్రాసెస్ చేయడం ప్రారంభించడానికి మీ మొదటి స్థానాన్ని కనెక్ట్ చేయండి."
+    }
+  }
+}

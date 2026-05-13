@@ -269,6 +269,25 @@ class AlertEngineService:
                 # 🔥 Send notification for the escalated alert
                 await self.notification_service.notify(session, existing)
 
+                # ── ⚡ Tactical Mesh Push (Escalation) ────────────────────────
+                try:
+                    await self.notification_service.push_notification(
+                        domain="crowd",
+                        type="Escalated Alert",
+                        priority=existing.risk_level.upper(),
+                        description=f"ESCALATION: {existing.explanation}",
+                        venue_id=str(existing.venue_id),
+                        venue_name=venue.name,
+                        camera_id=decision.get("camera_id"),
+                        metadata={
+                            "alert_id": str(existing.id),
+                            "severity": existing.severity,
+                            "is_escalated": True
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Tactical mesh escalation push failed: {e}")
+
                 # ── ⚡ Real-Time WebSocket Push (Escalation) ───────────────────
                 try:
                     from app.core.plugin_registry import plugin_registry
@@ -382,6 +401,25 @@ class AlertEngineService:
 
         created = await self.alert_repo.create(session, alert, commit=True)
         await self.notification_service.notify(session, created)
+
+        # ── ⚡ Tactical Mesh Push (New Alert) ───────────────────────────
+        try:
+            await self.notification_service.push_notification(
+                domain="crowd",
+                type=decision.get("alert_type", "Crowd Anomaly"),
+                priority=created.risk_level.upper(),
+                description=created.explanation,
+                venue_id=str(created.venue_id),
+                venue_name=decision.get("venue_name"),
+                camera_id=decision.get("camera_id"),
+                metadata={
+                    "alert_id": str(created.id),
+                    "severity": created.severity,
+                    "predicted_level": created.predicted_level
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Tactical mesh new alert push failed: {e}")
 
         # ── ⚡ Automated Actions (New Alert) ──────────────────────────────────
         # Fire events to trigger defined automation rules (Webhooks, IoT, etc.)

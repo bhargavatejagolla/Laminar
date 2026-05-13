@@ -1,10 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Search, Loader2, Camera, Clock, Eye, AlertTriangle, Info, Wifi, WifiOff } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Link from 'next/link';
-import { api } from '@/services/api';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Search, Loader2, Wifi, WifiOff, Scan, Activity,
+  Crosshair, Cpu, Server, AlertTriangle, Eye, RefreshCw, Target,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+// ─────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────
 
 interface SearchResult {
   description: string;
@@ -12,17 +17,27 @@ interface SearchResult {
   timestamp: string;
   image_url: string | null;
   distance: number;
-  bbox?: number[]; // [x1, y1, x2, y2] normalized 0-100
+  bbox?: number[] | null;
 }
 
 interface IndexStatus {
   total_items: number;
   model_loaded: boolean;
+  semantic_snapshots?: number;
+  vector_store_integrity?: boolean;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+// ─────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────
 
-const EXAMPLE_QUERIES = [
+const API_BASE = "/api/v1";
+const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1")
+  .replace(/\/api\/v1$/, "");
+const FETCH_TIMEOUT_MS = 60_000;
+const STATUS_POLL_MS = 15_000;
+
+const PRESET_QUERIES = [
   "Person in a red shirt",
   "Person wearing blue clothing",
   "Individual near gate area",
@@ -30,272 +45,456 @@ const EXAMPLE_QUERIES = [
   "Person in dark jacket",
 ];
 
+const SCAN_PHASES = [
+  { label: "NEURAL LINK INIT", icon: Cpu },
+  { label: "VECTOR SCAN", icon: Server },
+  { label: "TARGET ISOLATION", icon: Crosshair },
+  { label: "MATCH EXTRACTION", icon: Activity },
+];
+
+// ─────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────
+
+async function fetchWithTimeout(url: string, options: RequestInit, ms: number) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+function resolveImage(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${BACKEND_BASE}${url}`;
+}
+
+function friendlyError(err: unknown): string {
+  if (err instanceof DOMException && err.name === "AbortError") {
+    return "Search timed out. The AI is performing a deep forensic scan — try again in a moment or use a more specific query.";
+  }
+  if (err instanceof Error) return err.message;
+  return "An unexpected error occurred.";
+}
+
+// ─────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────
+
 export default function AISearchPage() {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [indexStatus, setIndexStatus] = useState<IndexStatus | null>(null);
+  const [status, setStatus] = useState<IndexStatus | null>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Poll index status every 5s to show if it's populated
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const res = await api.get('/search/status');
-        setIndexStatus(res.data);
-      } catch {
-        // non-critical
+  // ── Status polling ─────────────────────────────────────────
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/search/status`, {}, 5000);
+      if (res.ok) {
+        const data = await res.json();
+        setStatus(data);
+        setBackendOnline(true);
+      } else {
+        setBackendOnline(false);
       }
-    };
-    checkStatus();
-    const id = setInterval(checkStatus, 5000);
-    return () => clearInterval(id);
+    } catch {
+      setBackendOnline(false);
+    }
   }, []);
 
-  const handleSearch = async (q?: string) => {
-    const searchQuery = q ?? query;
-    if (!searchQuery.trim()) return;
-    if (q) setQuery(q);
+  useEffect(() => {
+    fetchStatus();
+    const id = setInterval(fetchStatus, STATUS_POLL_MS);
+    return () => clearInterval(id);
+  }, [fetchStatus]);
+
+  // ── Phase cycling during load ──────────────────────────────
+  useEffect(() => {
+    if (!loading) { setPhase(0); return; }
+    const id = setInterval(() => setPhase(p => (p + 1) % SCAN_PHASES.length), 1000);
+    return () => clearInterval(id);
+  }, [loading]);
+
+  // ── Search handler ─────────────────────────────────────────
+  const handleSearch = useCallback(async (override?: string) => {
+    const q = (override ?? query).trim();
+    if (!q || loading) return;
 
     setLoading(true);
     setError(null);
     setResults([]);
     setHasSearched(true);
-    
+
     try {
-      const res = await api.post('/search/semantic', { query: searchQuery.trim(), top_k: 8 });
-      setResults(res.data || []);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err.message || 'Search failed. Backend VQA system may be offline.');
+      const res = await fetchWithTimeout(
+        `${API_BASE}/search/semantic`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q, top_k: 8 }),
+        },
+        FETCH_TIMEOUT_MS,
+      );
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.detail || `Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+      setResults(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(friendlyError(err));
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, loading]);
 
-  const indexReady = (indexStatus?.total_items ?? 0) > 0;
+  // ── Derived state ──────────────────────────────────────────
+  const indexReady =
+    (status?.total_items ?? 0) > 0 || (status?.semantic_snapshots ?? 0) > 0;
 
+  const PhaseIcon = SCAN_PHASES[phase].icon;
+
+  // ── Render ─────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-auto custom-scrollbar bg-[#0a0a0f] text-slate-300 min-h-[calc(100vh-5rem)]">
-      <div className="p-8 max-w-7xl mx-auto">
+    <div
+      className="min-h-screen bg-[#030508] text-white overflow-x-hidden"
+      style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
+    >
+      {/* ── Background ─────────────────────────────────────── */}
+      <div className="fixed inset-0 pointer-events-none select-none">
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.025)_1px,transparent_1px)] bg-[size:72px_72px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_-10%,rgba(56,189,248,0.06),transparent)]" />
+        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-[#030508] to-transparent" />
+      </div>
+
+      {/* ── Content ────────────────────────────────────────── */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-10">
+
         {/* Header */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="p-3 bg-cyan-500/10 rounded-xl border border-cyan-500/20 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-            <Search className="h-6 w-6 text-cyan-400" />
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-center gap-5 mb-10"
+        >
+          <div className="relative p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 shadow-[0_0_24px_rgba(56,189,248,0.12)] shrink-0">
+            <Scan className="h-7 w-7 text-sky-400" />
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping opacity-75" />
           </div>
-          <div>
-            <h1 className="text-3xl font-black uppercase tracking-[0.2em] text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+
+          <div className="flex-1">
+            <h1 className="text-3xl md:text-4xl font-black uppercase tracking-[0.15em] bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">
               AI Video Search
             </h1>
-            <p className="text-sm font-mono text-slate-400 mt-1 uppercase tracking-widest">
-              Natural Language Object & Person Query Interface
+            <p className="text-[11px] text-slate-600 uppercase tracking-widest mt-0.5">
+              Advanced Neural Trajectory &amp; Object Core
             </p>
           </div>
 
-          {/* Index Status Indicator */}
-          <div className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold uppercase tracking-widest"
-            style={{ 
-              borderColor: indexReady ? 'rgba(16,185,129,0.3)' : 'rgba(100,116,139,0.3)',
-              background: indexReady ? 'rgba(16,185,129,0.05)' : 'rgba(100,116,139,0.05)'
-            }}>
-            {indexReady ? (
-              <>
-                <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">{indexStatus!.total_items} Events Indexed</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-slate-500">Building Index...</span>
-              </>
-            )}
+          {/* Online badge */}
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full border text-[11px] font-bold uppercase tracking-widest whitespace-nowrap transition-all duration-500 ${backendOnline === null
+            ? "bg-slate-800/60 border-slate-700 text-slate-500"
+            : backendOnline
+              ? indexReady
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+              : "bg-red-500/10 border-red-500/30 text-red-400"
+            }`}>
+            {backendOnline === null
+              ? <><Loader2 className="w-3 h-3 animate-spin" /> Connecting…</>
+              : backendOnline
+                ? indexReady
+                  ? <><Wifi className="w-3 h-3" />{(status?.total_items || status?.semantic_snapshots || 0)} Nodes Online</>
+                  : <><Wifi className="w-3 h-3" />Ready</>
+                : <><WifiOff className="w-3 h-3" />Backend Offline</>
+            }
           </div>
-        </div>
+        </motion.div>
 
-        {/* Index Not Ready Warning */}
-        {!indexReady && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-amber-400 font-mono mb-6 max-w-4xl mx-auto"
-          >
-            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-bold mb-1">Semantic Index is Building</p>
-              <p className="opacity-80 font-normal">
-                The AI search engine indexes frames every 5 seconds as cameras detect people. 
-                If your camera stream is active and detecting people, events will appear shortly. 
-                Searches on an empty index will return no results.
-              </p>
-            </div>
-          </motion.div>
-        )}
+        {/* Offline warning */}
+        <AnimatePresence>
+          {backendOnline === false && (
+            <motion.div
+              key="offline"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-6 flex items-start gap-3 p-4 rounded-xl bg-red-500/8 border border-red-500/20 text-sm text-red-400 overflow-hidden"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                Backend unreachable. Run{" "}
+                <code className="font-mono bg-red-500/15 px-1.5 py-0.5 rounded text-xs">
+                  python start.py
+                </code>{" "}
+                from the project root, then{" "}
+                <button onClick={fetchStatus} className="underline hover:text-red-300 inline-flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" />retry
+                </button>.
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Search Bar */}
-        <form onSubmit={(e) => { e.preventDefault(); handleSearch(); }} className="relative mb-8 w-full max-w-4xl mx-auto group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-[20px] blur opacity-25 group-hover:opacity-40 transition duration-500"></div>
-          <div className="relative flex items-center bg-[#111116] border border-white/10 rounded-2xl overflow-hidden focus-within:border-cyan-500/50 focus-within:ring-1 ring-cyan-500/50 transition-all shadow-inner">
-            <div className="pl-6 text-cyan-500">
-              <Search className="w-5 h-5" />
-            </div>
+        {/* Search bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="mb-6"
+        >
+          <div className="flex gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl focus-within:border-sky-500/50 focus-within:shadow-[0_0_28px_rgba(56,189,248,0.08)] transition-all duration-300">
+            <Search className="ml-3 my-auto h-4 w-4 text-slate-500 shrink-0" />
             <input
+              ref={inputRef}
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g., 'Person wearing a red shirt near Gate 3'"
-              className="w-full bg-transparent pl-4 pr-16 py-5 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-0 font-mono"
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
+              placeholder="Describe target — e.g. 'Person in a red shirt'"
+              className="flex-1 bg-transparent py-3 text-sm text-white placeholder-slate-600 outline-none"
+              disabled={loading}
             />
             <button
-              type="submit"
+              onClick={() => handleSearch()}
               disabled={loading || !query.trim()}
-              className="absolute right-3 px-6 py-2.5 bg-cyan-500/20 hover:bg-cyan-500 hover:text-white text-cyan-400 disabled:opacity-50 disabled:hover:bg-cyan-500/20 disabled:hover:text-cyan-400 font-bold uppercase tracking-widest text-xs rounded-xl transition-all border border-cyan-500/30"
+              className={`px-6 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest transition-all duration-200 ${loading || !query.trim()
+                ? "bg-slate-800 text-slate-600 cursor-not-allowed"
+                : "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-[0_0_18px_rgba(56,189,248,0.35)] hover:shadow-[0_0_30px_rgba(56,189,248,0.55)] hover:scale-[1.02] active:scale-[0.98]"
+                }`}
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "SEARCH"}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "ENGAGE"}
             </button>
           </div>
-        </form>
 
-        {/* Example Queries */}
-        <div className="flex flex-wrap gap-2 mb-8 max-w-4xl mx-auto">
-          <span className="text-xs text-slate-600 uppercase tracking-widest font-bold self-center mr-2">Try:</span>
-          {EXAMPLE_QUERIES.map((q) => (
-            <button
-              key={q}
-              onClick={() => handleSearch(q)}
-              className="text-xs px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all font-mono"
+          {/* Preset chips */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {PRESET_QUERIES.map(q => (
+              <button
+                key={q}
+                onClick={() => { setQuery(q); handleSearch(q); }}
+                disabled={loading}
+                className="px-3 py-1.5 rounded-full text-xs text-slate-400 border border-white/8 bg-white/[0.03] hover:border-sky-500/40 hover:text-sky-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Loading panel */}
+        <AnimatePresence>
+          {loading && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.2 }}
+              className="mb-8 p-8 rounded-2xl border border-sky-500/15 bg-sky-500/[0.03] flex flex-col items-center gap-5"
             >
-              {q}
-            </button>
-          ))}
-        </div>
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-2 border-sky-500/20 animate-spin border-t-sky-400" />
+                <PhaseIcon className="absolute inset-0 m-auto w-5 h-5 text-sky-400" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-sky-400 font-bold tracking-[0.2em] text-xs uppercase animate-pulse">
+                  {SCAN_PHASES[phase].label}
+                </p>
+                <p className="text-slate-600 text-xs">Scanning snapshots for pattern match…</p>
+              </div>
+              <div className="w-56 h-0.5 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-sky-500 to-blue-500 rounded-full transition-all duration-1000"
+                  style={{ width: `${(phase + 1) * 25}%` }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Error Handling */}
-        {error && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center gap-3 text-rose-400 font-mono mb-8 max-w-4xl mx-auto">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-            <p className="text-sm">{error}</p>
+        {/* Error banner */}
+        <AnimatePresence>
+          {error && !loading && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="mb-6 flex items-start gap-3 p-4 rounded-xl bg-amber-500/8 border border-amber-500/25 text-amber-400 text-sm"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span>{error}</span>
+              </div>
+              <button
+                onClick={() => { setError(null); handleSearch(); }}
+                className="text-xs underline hover:text-amber-300 flex items-center gap-1 shrink-0"
+              >
+                <RefreshCw className="w-3 h-3" />Retry
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* No results */}
+        {hasSearched && !loading && !error && results.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-4 py-24 text-slate-600"
+          >
+            <Eye className="w-12 h-12 opacity-25" />
+            <p className="font-bold uppercase tracking-widest text-sm">No Targets Identified</p>
+            <p className="text-xs text-slate-700">
+              Try a different colour or description, or ensure snapshots have been captured.
+            </p>
           </motion.div>
         )}
 
-        {/* Results Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <AnimatePresence mode="popLayout">
-            {/* Empty State */}
-            {!loading && hasSearched && results.length === 0 && !error && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="col-span-full py-20 flex flex-col items-center justify-center text-slate-500"
-              >
-                <Eye className="h-16 w-16 mb-4 opacity-20" />
-                <p className="text-lg font-mono uppercase tracking-[0.2em] mb-2">No Matches Found</p>
-                <p className="text-sm text-center max-w-md opacity-70">
-                  {indexReady
-                    ? `No events matching "${query}" were found in the ${indexStatus?.total_items} indexed frames. Try broader terms or different clothing colors.`
-                    : "The semantic index is empty. Ensure your camera stream is active and detecting people. Searches populate as the live feed runs."}
-                </p>
-              </motion.div>
-            )}
+        {/* Results grid */}
+        <AnimatePresence>
+          {!loading && results.length > 0 && (
+            <motion.div
+              key="results"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"
+            >
+              {results.map((result, idx) => {
+                const imgSrc = resolveImage(result.image_url);
+                const confPct = Math.max(0, Math.min(100, Math.round((1 - result.distance) * 100)));
 
-            {!loading && !hasSearched && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="col-span-full py-20 flex flex-col items-center justify-center text-slate-500"
-              >
-                <Eye className="h-16 w-16 mb-4 opacity-20" />
-                <p className="text-lg font-mono uppercase tracking-[0.2em]">Awaiting Search Query</p>
-              </motion.div>
-            )}
+                return (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.06 }}
+                    className="group relative bg-[#0b0d12] border border-white/[0.08] rounded-2xl overflow-hidden shadow-xl hover:border-sky-500/35 hover:shadow-[0_0_28px_rgba(56,189,248,0.12)] transition-all duration-300 flex flex-col"
+                  >
+                    {/* Image area */}
+                    <div className="relative aspect-video bg-black overflow-hidden shrink-0">
+                      {/* Scanline overlay */}
+                      <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,rgba(56,189,248,0.03)_0px,rgba(56,189,248,0.03)_1px,transparent_1px,transparent_4px)] z-10 pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent z-10 pointer-events-none" />
 
-            {/* Loading state */}
-            {loading && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="col-span-full py-20 flex flex-col items-center justify-center text-slate-500"
-              >
-                <Loader2 className="h-12 w-12 mb-4 animate-spin text-cyan-400" />
-                <p className="text-sm font-mono uppercase tracking-widest text-cyan-400">Scanning Semantic Index...</p>
-              </motion.div>
-            )}
+                      {imgSrc ? (
+                        <img
+                          src={imgSrc}
+                          alt="Match"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          onError={e => {
+                            const el = e.target as HTMLImageElement;
+                            el.style.display = "none";
+                            const parent = el.parentElement;
+                            if (parent && !parent.querySelector(".img-fallback")) {
+                              const fb = document.createElement("div");
+                              fb.className = "img-fallback absolute inset-0 flex items-center justify-center text-slate-700 text-xs";
+                              fb.innerText = "Snapshot unavailable";
+                              parent.appendChild(fb);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-slate-700 text-xs">
+                          No snapshot
+                        </div>
+                      )}
 
-            {/* Result cards */}
-            {!loading && results.map((result, idx) => (
-              <motion.div
-                key={idx}
-                layout
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: idx * 0.05, duration: 0.3 }}
-                className="group relative bg-[#111116] border border-white/5 rounded-2xl overflow-hidden shadow-lg hover:border-cyan-500/40 hover:shadow-[0_0_30px_rgba(34,211,238,0.15)] transition-all flex flex-col"
-              >
-                {/* Result Image with optional Bounding Box */}
-                <div className="relative aspect-video bg-black/60 overflow-hidden shrink-0 border-b border-white/5">
-                  {result.image_url ? (
-                    <>
-                      <img 
-                        src={result.image_url.startsWith('http') ? result.image_url : `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '')}${result.image_url}`} 
-                        alt="Search Match" 
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
-                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
-                      />
-                      {/* Bounding Box Overlay if coordinates are present */}
+                      {/* Bounding box */}
                       {result.bbox && result.bbox.length === 4 && (
-                        <div 
-                          className="absolute border-2 border-emerald-400 bg-emerald-400/20 shadow-[0_0_15px_rgba(16,185,129,0.5)] z-10 transition-all duration-300"
+                        <div
+                          className="absolute border border-sky-400 z-20 shadow-[0_0_8px_rgba(56,189,248,0.5)]"
                           style={{
                             left: `${result.bbox[0]}%`,
                             top: `${result.bbox[1]}%`,
                             width: `${result.bbox[2] - result.bbox[0]}%`,
-                            height: `${result.bbox[3] - result.bbox[1]}%`
+                            height: `${result.bbox[3] - result.bbox[1]}%`,
                           }}
                         >
-                          <span className="absolute -top-6 left-0 bg-emerald-500 text-black text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-t-sm whitespace-nowrap">
-                            TARGET MATCH
+                          <span className="absolute -top-5 left-0 text-[9px] font-bold text-sky-400 bg-black/80 px-1 py-0.5 rounded whitespace-nowrap flex items-center gap-0.5">
+                            <Target className="w-2 h-2" /> LOCK
                           </span>
                         </div>
                       )}
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 font-mono text-xs uppercase gap-2">
-                       <Camera className="w-8 h-8 opacity-20" />
-                       No Visual Data
-                    </div>
-                  )}
-                  
-                  {/* Confidence Badge */}
-                  <div className="absolute top-3 right-3 bg-black/80 backdrop-blur-md border border-white/10 px-3 py-1 rounded-full text-xs font-black text-cyan-400 font-mono shadow-[0_0_10px_rgba(34,211,238,0.2)]">
-                    {((1 / (1 + result.distance)) * 100).toFixed(1)}% MATCH
-                  </div>
-                </div>
 
-                {/* Result Details */}
-                <div className="p-5 flex-1 flex flex-col">
-                  <p className="text-sm text-slate-200 leading-relaxed font-medium mb-4 flex-1">
-                    {result.description}
-                  </p>
-                  
-                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
-                    <Link href={`/cameras/${result.camera_id}`} className="flex items-center space-x-2 text-xs text-slate-400 hover:text-cyan-400 transition-colors bg-white/5 px-2.5 py-1.5 rounded-lg border border-transparent hover:border-cyan-500/30 group/link">
-                      <Camera className="w-3.5 h-3.5 text-cyan-500/60 group-hover/link:text-cyan-400" />
-                      <span className="font-mono uppercase tracking-widest truncate max-w-[100px]">{result.camera_id.slice(0, 8)}</span>
-                    </Link>
-                    
-                    <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-mono">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{new Date(result.timestamp).toLocaleTimeString()}</span>
+                      {/* Confidence pill */}
+                      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-black/65 border border-sky-500/35 rounded-full px-2 py-0.5 text-[10px] font-bold text-sky-400 backdrop-blur-sm">
+                        <span className={`w-1.5 h-1.5 rounded-full ${confPct >= 70 ? "bg-emerald-400" : confPct >= 45 ? "bg-yellow-400" : "bg-red-400"} animate-pulse`} />
+                        {confPct}%
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+
+                    {/* Meta */}
+                    <div className="p-4 flex flex-col gap-2 flex-1">
+                      <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
+                        {result.description}
+                      </p>
+                      <div className="mt-auto pt-2 border-t border-white/[0.05] flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                          <span className="opacity-60">⏱</span>
+                          <span suppressHydrationWarning>
+                            {new Date(result.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 font-mono truncate">
+                          CAM: {result.camera_id.slice(0, 12)}…
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Landing idle state */}
+        {!hasSearched && !loading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { delay: 0.25 } }}
+            className="flex flex-col items-center gap-6 py-28 text-center"
+          >
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full bg-sky-500/[0.05] border border-sky-500/15 flex items-center justify-center">
+                <Crosshair className="w-9 h-9 text-sky-500/40" />
+              </div>
+              <div className="absolute inset-0 rounded-full border border-sky-500/10 animate-ping" />
+            </div>
+            <div>
+              <p className="font-black text-base uppercase tracking-[0.2em] text-slate-500">
+                Awaiting Target Description
+              </p>
+              <p className="text-slate-700 text-xs mt-1">
+                Describe clothing colour, object, or behaviour to begin
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+              {PRESET_QUERIES.map(q => (
+                <button
+                  key={q}
+                  onClick={() => { setQuery(q); handleSearch(q); }}
+                  className="px-3 py-1.5 rounded-full text-xs text-slate-500 border border-white/8 bg-white/[0.03] hover:border-sky-500/40 hover:text-sky-400 transition-all duration-150"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
       </div>
     </div>
   );

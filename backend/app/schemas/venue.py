@@ -21,6 +21,8 @@ class VenueCreate(BaseModel):
     critical_threshold: int = Field(default=900, ge=1)
     venue_type: Optional[str] = None
     staffing_config: Optional[Dict[str, Any]] = None
+    model_metadata: Optional[Dict[str, Any]] = None
+    model_config = {"protected_namespaces": ()}
 
 
 class VenueUpdate(BaseModel):
@@ -38,6 +40,8 @@ class VenueUpdate(BaseModel):
     expected_version: Optional[int] = None
     venue_type: Optional[str] = None
     staffing_config: Optional[Dict[str, Any]] = None
+    model_metadata: Optional[Dict[str, Any]] = None
+    model_config = {"protected_namespaces": ()}
 
 
 class VenueBulkDeleteRequest(BaseModel):
@@ -55,10 +59,12 @@ class CapacityStatusRequest(BaseModel):
 class VenueResponse(BaseModel):
     id: UUID
     name: str
-    capacity: int
+    capacity: Optional[int]
     location: Optional[str]
     city: Optional[str]
     country: Optional[str]
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     warning_threshold: int
     critical_threshold: int
     is_active: bool
@@ -66,17 +72,17 @@ class VenueResponse(BaseModel):
     dynamic_risk_score: Optional[float]
     venue_type: Optional[str]
     staffing_config: Optional[Dict[str, Any]]
+    model_metadata: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
 
 
 class VenueStatsResponse(BaseModel):
     id: UUID
     name: str
-    capacity: int
+    capacity: Optional[int]
     current_risk: Optional[float]
     risk_level: Optional[str] = None
     current_occupancy: float
@@ -91,9 +97,12 @@ class VenueStatsResponse(BaseModel):
     created_at: datetime
     city: Optional[str]
     country: Optional[str]
+    avg_velocity: float = 0.0
+    avg_wait_time: float = 0.0
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
 
 
 class CapacityStatusResponse(BaseModel):

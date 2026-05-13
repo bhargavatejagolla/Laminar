@@ -104,7 +104,8 @@ class _ZoneState:
         self,
         capacity: Optional[int] = None,
         warning_threshold: Optional[int] = None,
-        critical_threshold: Optional[int] = None
+        critical_threshold: Optional[int] = None,
+        model_metadata: Optional[Dict[str, Any]] = None,
     ) -> SurgeSignal:
         n = len(self._window)
         if n == 0:
@@ -170,25 +171,30 @@ class _ZoneState:
         local_density_thresholds = [("critical", 50), ("high", 30), ("medium", 15), ("low", 0)]
         local_rate_thresholds = [("critical", _FALLBACK_RATE_CRITICAL), ("high", _FALLBACK_RATE_HIGH), ("medium", _FALLBACK_RATE_MEDIUM), ("low", 0)]
 
-        if critical_threshold is not None:
-            warn_val = warning_threshold if warning_threshold is not None else int(critical_threshold * 0.7)
+        if critical_threshold is not None or warning_threshold is not None:
+            crit_val = critical_threshold if critical_threshold is not None else (warning_threshold * 1.5 if warning_threshold else 50)
+            warn_val = warning_threshold if warning_threshold is not None else int(crit_val * 0.7)
             medium_val = max(1, int(warn_val * 0.7))
             
             local_density_thresholds = [
-                ("critical", critical_threshold),
+                ("critical", crit_val),
                 ("high",     warn_val),
                 ("medium",   medium_val),
                 ("low",       0),
             ]
 
-            # Scale rate thresholds relative to warning level:
-            # Critical rate = 50% of warning threshold per minute
-            # High rate = 25% of warning threshold per minute
-            # Medium rate = 10% of warning threshold per minute
+            custom_surge_rate = None
+            if model_metadata and "surge_rate" in model_metadata:
+                try: custom_surge_rate = float(model_metadata["surge_rate"])
+                except: pass
+
+            base_rate = custom_surge_rate if custom_surge_rate is not None else (warn_val * 0.1)
+
+            # Scale rate thresholds relative to base_rate
             local_rate_thresholds = [
-                ("critical", warn_val * 0.5),
-                ("high",     warn_val * 0.25),
-                ("medium",   warn_val * 0.1),
+                ("critical", base_rate * 5.0),
+                ("high",     base_rate * 2.5),
+                ("medium",   base_rate),
                 ("low",       0),
             ]
 
@@ -243,7 +249,8 @@ class SurgeIntelligenceEngine:
         ts: Optional[float] = None,
         capacity: Optional[int] = None,
         warning_threshold: Optional[int] = None,
-        critical_threshold: Optional[int] = None
+        critical_threshold: Optional[int] = None,
+        model_metadata: Optional[Dict[str, Any]] = None,
     ) -> SurgeSignal:
         """
         Push a new density observation and return the current surge signal.
@@ -258,7 +265,7 @@ class SurgeIntelligenceEngine:
         """
         state = self._get_zone(zone_id)
         state.push(count, ts)
-        sig = state.compute(capacity=capacity, warning_threshold=warning_threshold, critical_threshold=critical_threshold)
+        sig = state.compute(capacity=capacity, warning_threshold=warning_threshold, critical_threshold=critical_threshold, model_metadata=model_metadata)
         return sig
 
     def get_signal(self, zone_id: str) -> SurgeSignal:

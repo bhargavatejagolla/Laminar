@@ -21,6 +21,7 @@ from uuid import UUID
 from decimal import Decimal
 from datetime import datetime
 
+from enum import Enum
 from sqlalchemy import (
     String,
     Integer,
@@ -30,23 +31,25 @@ from sqlalchemy import (
     Numeric,
     JSON,
     Index,
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 
 
+class VenueDomain(str, Enum):
+    PEOPLE = "people"
+    PARKING = "parking"
+    TRAFFIC = "traffic"
+    INCIDENT = "incident"
+
+
 class Venue(BaseModel):
     """
     Venue represents a monitored physical location.
-
-    Examples:
-        - Stadium
-        - Railway station
-        - Public event ground
-        - Airport terminal
-        - City square
     """
+    model_config = {"protected_namespaces": ()}
 
     __tablename__ = "venues"
 
@@ -118,6 +121,7 @@ class Venue(BaseModel):
     
     venue_type: Mapped[Optional[str]] = mapped_column(
         String(100),
+        default=VenueDomain.PEOPLE,
         nullable=True,
     )
     

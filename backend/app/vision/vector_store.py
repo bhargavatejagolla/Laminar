@@ -10,9 +10,10 @@ import faiss
 import asyncio
 import numpy as np
 from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 from app.core.logging import get_logger
+import concurrent.futures
 
 logger = get_logger(__name__)
 
@@ -35,17 +36,29 @@ class SemanticVectorStore:
         self._current_id = 0
         
         self._lock = asyncio.Lock()
+        self._write_lock = asyncio.Lock() # Lock for index/meta modifications
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="FAISS_ML_Worker")
         
-    async def initialize(self):
-        """Asynchronously load the transformer model and FAISS index."""
+        # Dirty flag for batch saving
+        self._needs_save = False
+        self._save_interval = 30 # seconds
+        self._last_save_time = datetime.now()
+        
+    async def initialize(self, load_model: bool = True):
+        """Load the FAISS index and optionally the embedding model."""
         logger.info("Initializing Semantic Vector Store...")
         
-        def _load():
-            # Use a fast, lightweight model suitable for CPU inference
-            from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
-            self.embedding_dim = self.model.get_sentence_embedding_dimension()
+        if load_model:
+            from app.core.ml_hub import ml_hub
+            self.model = await ml_hub.get_embedding_model()
+            if self.model:
+                self.embedding_dim = self.model.get_sentence_embedding_dimension()
+            else:
+                self.embedding_dim = 384 # Fallback
+        else:
+            self.embedding_dim = 384 # Assume default
             
+        def _load_index():
             # Load FAISS index if it exists
             if os.path.exists(self.index_path):
                 self.index = faiss.read_index(self.index_path)
@@ -54,54 +67,123 @@ class SemanticVectorStore:
                 
             # Load metadata
             if os.path.exists(self.meta_path):
-                with open(self.meta_path, 'r') as f:
+                with open(self.meta_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # Convert string keys back to int
                     self.metadata = {int(k): v for k, v in data.items()}
                     if self.metadata:
                         self._current_id = max(self.metadata.keys()) + 1
                         
-        self._loading_task = asyncio.create_task(asyncio.to_thread(_load))
-        # Do not block here! The model will be usable once _loading_task completes.
-        logger.info("Semantic Vector Store load started in background.")
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(self._executor, _load_index)
+        
+        # Initial integrity check
+        is_valid, error = self.verify_integrity()
+        if not is_valid:
+            logger.error(f"Semantic Vector Store Integrity Failure: {error}")
+        else:
+            logger.info(f"Semantic Vector Store verified. ({len(self.metadata)} items)")
+            
+    def verify_integrity(self) -> Tuple[bool, str]:
+        """Verify that FAISS index and metadata are in sync."""
+        if self.index is None:
+            return False, "Index not loaded"
+        
+        faiss_count = self.index.ntotal
+        meta_count = len(self.metadata)
+        
+        if faiss_count != meta_count:
+            return False, f"Desync detected: FAISS={faiss_count}, Metadata={meta_count}"
+        
+        return True, ""
+        
+    async def shutdown(self):
+        """Cleanly shutdown the vector store's thread pool."""
+        logger.info("Shutting down Semantic Vector Store executor...")
+        self._executor.shutdown(wait=False)
         
     async def add_event(self, description: str, camera_id: str, timestamp: str, image_url: str = None, bbox: list = None):
         """Add a semantic description of a frame/event to the index."""
         if not self.model or not self.index:
+            logger.warning("Attempted to add event but model/index not loaded.")
             return
             
-        async with self._lock:
+        async with self._write_lock:
             def _embed_and_add():
-                # Generate embedding
-                embedding = self.model.encode([description], convert_to_numpy=True)
-                
-                # Add to FAISS index
-                self.index.add(embedding)
-                
-                # Store metadata
-                idx = self._current_id
-                self.metadata[idx] = {
-                    "description": description,
-                    "camera_id": str(camera_id),
-                    "timestamp": timestamp,
-                    "image_url": image_url,
-                    "bbox": bbox
-                }
-                self._current_id += 1
-                
-                # Periodically save (every 100 items) or we can just save on exit.
-                # Here we save every time for simplicity, but it's threaded.
-                faiss.write_index(self.index, self.index_path)
-                with open(self.meta_path, 'w') as f:
-                    json.dump(self.metadata, f)
+                try:
+                    # Generate embedding
+                    embedding = self.model.encode([description], convert_to_numpy=True)
                     
+                    # Add to FAISS index
+                    self.index.add(embedding)
+                    
+                    # Store metadata
+                    idx = self._current_id
+                    self.metadata[idx] = {
+                        "description": description,
+                        "camera_id": str(camera_id),
+                        "timestamp": timestamp,
+                        "image_url": image_url,
+                        "bbox": bbox
+                    }
+                    self._current_id += 1
+                    self._needs_save = True
+                    
+                    # Log integrity after every 100 adds
+                    if self._current_id % 100 == 0:
+                        logger.info(f"Vector Store checkpoint: {self._current_id} events indexed.")
+                except Exception as e:
+                    logger.exception(f"Internal error during embedding/indexing: {e}")
+                    raise
+
             try:
-                await asyncio.to_thread(_embed_and_add)
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(self._executor, _embed_and_add)
+                
+                # Immediate save if it's been long enough or we have many pending
+                if self._needs_save:
+                    now = datetime.now()
+                    if (now - self._last_save_time).total_seconds() > self._save_interval:
+                        await self.save_index()
             except Exception as e:
                 logger.error(f"Failed to add semantic event: {e}")
+                raise # Re-raise to let caller know it failed
+
+    async def save_index(self):
+        """Force save of FAISS index and metadata to disk."""
+        if not self._needs_save:
+            return
+            
+        async with self._write_lock:
+            def _write_to_disk():
+                logger.info(f"Saving vector store to disk... ({len(self.metadata)} items)")
+                faiss.write_index(self.index, self.index_path)
+                with open(self.meta_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.metadata, f)
+            
+            try:
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(self._executor, _write_to_disk)
+                self._needs_save = False
+                self._last_save_time = datetime.now()
+            except Exception as e:
+                logger.error(f"CRITICAL: Failed to save index to disk: {e}")
 
     async def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        """Search the index using natural language with deduplication and accuracy thresholds."""
+        """Search the index using natural language with deduplication."""
+        # Integrity check — log and return [] instead of raising
+        is_valid, error = self.verify_integrity()
+        if not is_valid:
+            logger.warning(f"Vector Store integrity issue (returning []): {error}")
+            return []
+
+        if not self.model:
+            logger.info("Lazy-loading embedding model for search...")
+            try:
+                await self.initialize(load_model=True)
+            except Exception as exc:
+                logger.warning(f"Model lazy-load failed (returning []): {exc}")
+                return []
+
         if not self.model or not self.index or self._current_id == 0:
             return []
             
@@ -123,11 +205,6 @@ class SemanticVectorStore:
                 if idx in self.metadata and idx != -1:
                     dist = float(distances[0][i])
                     
-                    # Mathematical distance filtering is too strict for generic real-world queries.
-                    # We will ALWAYS return the top-K closest semantic hits, relying on our
-                    # exact NLP color matching and Live Window to ensure accuracy.
-                    # if dist > MAX_DISTANCE_THRESHOLD:
-                    #     continue
                     meta = self.metadata[idx].copy()
                     cam_id = meta.get("camera_id")
                     timestamp = meta.get("timestamp", "")
@@ -139,20 +216,11 @@ class SemanticVectorStore:
                         dt = datetime.fromisoformat(ts_str)
                         if dt.tzinfo is None:
                             dt = dt.replace(tzinfo=timezone.utc)
-                            
-                        # Removed the 5-minute Live Window filter so users can search all 
-                        # historical indexing events during the demo.
-                        # if (now_utc - dt).total_seconds() > LIVE_WINDOW_SECONDS:
-                        #     continue
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Timestamp parse error: {e}")
                         pass
                         
-                    # Note: We rely on FAISS semantic distance for relevance ranking.
-                    # Strict literal color filtering was removed because YOLO frame descriptions
-                    # only contain zone/object labels, never clothing colors.
-                    
                     # Deduplicate by camera and time segment (e.g., 10 seconds)
-                    # Example: "2026-03-29T03:00:54Z" -> "2026-03-29T03:00:5"
                     time_bucket = timestamp[:18] if len(timestamp) >= 19 else str(idx)
                     dedup_key = f"{cam_id}_{time_bucket}"
                     
@@ -167,9 +235,15 @@ class SemanticVectorStore:
             return results
             
         try:
-            return await asyncio.to_thread(_execute_search)
+            # We don't strictly need a lock for search if we trust FAISS L2 is thread-safe for reads while writes happen,
+            # but using _write_lock here would cause search to block during indexing.
+            # However, if FAISS index is being modified (self.index.add), concurrent searches might crash if not synced.
+            # Let's use the lock to be safe, as the user mentioned stability is the priority.
+            async with self._write_lock:
+                loop = asyncio.get_running_loop()
+                return await loop.run_in_executor(self._executor, _execute_search)
         except Exception as e:
-            logger.error(f"Semantic search failed: {e}")
-            return []
+            logger.exception(f"Semantic search failed (VectorStore): {e}")
+            raise
 
 vector_store = SemanticVectorStore()

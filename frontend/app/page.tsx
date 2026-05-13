@@ -1,875 +1,887 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Shield, ChevronRight, ArrowRight, Eye, Brain, Video, Activity, TrendingUp, ShieldAlert, Bell, ServerCrash, Sparkles, Orbit, Satellite, Globe } from "lucide-react";
-import PremiumImageBackground from "@/components/background/premium-image-background";
-import Stardust3D from "@/components/background/stardust-3d";
-import ProceduralGalaxy from "@/components/background/procedural-galaxy";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import {
+  motion, useMotionValue, useSpring, AnimatePresence, useScroll, useTransform,
+} from "framer-motion";
+import {
+  Shield, ChevronRight, Eye, Zap, Sparkles, Activity, Brain,
+  ShieldAlert, TrendingUp, Bell, ArrowRight, Cpu,
+} from "lucide-react";
+import {
+  DashboardPreview, FeaturesSection, HowItWorksSection,
+  UseCasesSection, TestimonialsSection, PricingSection, FAQSection, FinalCTA,
+  Reveal, SectionLabel, LiveCounter,
+} from "@/components/landing/sections";
+import { CinematicBackground } from "@/components/background/cinematic-bg";
+import Orb from "@/components/ui/Orb";
+import BlurText from "@/components/ui/BlurText";
+import GooeyNav from "@/components/ui/GooeyNav";
+import Hyperspeed from "@/components/ui/Hyperspeed";
+import Reflections from "@/components/ui/Reflections";
+import BorderGlow from "@/components/ui/BorderGlow";
+import PillNav from "@/components/ui/PillNav";
 
-/* ─── Animated counter hook ─── */
-function useCounter(target: number, duration = 2000, delay = 0) {
-  const [count, setCount] = useState(0);
-  const [started, setStarted] = useState(false);
+/* ══════════════════════════════════════════════════════
+   CURSOR SPOTLIGHT — follows mouse with premium glow
+══════════════════════════════════════════════════════ */
+function CursorSpotlight() {
+  const { t } = useTranslation();
+  const mx = useMotionValue(-400);
+  const my = useMotionValue(-400);
+  const sx = mx;
+  const sy = my;
+
   useEffect(() => {
-    const t = setTimeout(() => setStarted(true), delay);
-    return () => clearTimeout(t);
-  }, [delay]);
-  useEffect(() => {
-    if (!started) return;
-    let startTime: number | null = null;
-    const step = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(eased * target));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [started, target, duration]);
-  return count;
+    const h = (e: MouseEvent) => { mx.set(e.clientX); my.set(e.clientY); };
+    window.addEventListener("mousemove", h);
+    return () => window.removeEventListener("mousemove", h);
+  }, [mx, my]);
+
+  return (
+    <>
+      {/* Small professional neutral dot — 6px */}
+      <motion.div
+        style={{
+          position: "fixed", zIndex: 4, pointerEvents: "none",
+          width: 6, height: 6, borderRadius: "50%",
+          background: "rgba(255,255,255,0.95)",
+          boxShadow: "0 0 4px rgba(255,255,255,0.5)",
+          x: sx, y: sy, translateX: "-50%", translateY: "-50%",
+        } as any}
+      />
+    </>
+  );
 }
 
-/* ─── Typewriter hook ─── */
-function useTypewriter(words: string[], speed = 80, pause = 2000) {
-  const [displayed, setDisplayed] = useState("");
-  const [wordIdx, setWordIdx] = useState(0);
-  const [charIdx, setCharIdx] = useState(0);
-  const [deleting, setDeleting] = useState(false);
-  useEffect(() => {
-    const word = words[wordIdx];
-    if (!deleting && charIdx < word.length) {
-      const t = setTimeout(() => setCharIdx(c => c + 1), speed);
-      return () => clearTimeout(t);
-    }
-    if (!deleting && charIdx === word.length) {
-      const t = setTimeout(() => setDeleting(true), pause);
-      return () => clearTimeout(t);
-    }
-    if (deleting && charIdx > 0) {
-      const t = setTimeout(() => setCharIdx(c => c - 1), speed / 2);
-      return () => clearTimeout(t);
-    }
-    if (deleting && charIdx === 0) {
-      setDeleting(false);
-      setWordIdx(i => (i + 1) % words.length);
-    }
-  }, [charIdx, deleting, wordIdx, words, speed, pause]);
-  useEffect(() => {
-    setDisplayed(words[wordIdx].slice(0, charIdx));
-  }, [charIdx, wordIdx, words]);
-  return displayed;
-}
+/* ══════════════════════════════════════════════════════
+   MAGNETIC BUTTON — premium with sweep + magnetic pull
+══════════════════════════════════════════════════════ */
+function MagBtn({
+  children, onClick, primary = false, className = "",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  primary?: boolean;
+  className?: string;
+}) {
+  const mx = useMotionValue(0), my = useMotionValue(0);
+  const sx = useSpring(mx, { stiffness: 250, damping: 22 });
+  const sy = useSpring(my, { stiffness: 250, damping: 22 });
+  const [hovered, setHovered] = useState(false);
 
-/* ─── Magnetic button hook ─── */
-function MagneticButton({ children, onClick, style }: { children: React.ReactNode; onClick?: () => void; style?: React.CSSProperties }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const springX = useSpring(x, { stiffness: 300, damping: 20 });
-  const springY = useSpring(y, { stiffness: 300, damping: 20 });
-  const handleMove = (e: React.MouseEvent) => {
-    const btn = ref.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    x.set((e.clientX - cx) * 0.25);
-    y.set((e.clientY - cy) * 0.25);
+  const handle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    mx.set(dx * 0.28); my.set(dy * 0.28);
   };
-  const handleLeave = () => { x.set(0); y.set(0); };
+
   return (
     <motion.button
-      ref={ref}
+      onMouseMove={handle}
+      onMouseLeave={() => { mx.set(0); my.set(0); setHovered(false); }}
+      onMouseEnter={() => setHovered(true)}
       onClick={onClick}
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
-      style={{ ...style, x: springX, y: springY }}
-      whileTap={{ scale: 0.94 }}
+      style={{
+        x: sx, y: sy,
+        padding: primary ? "14px 38px" : "13px 30px",
+        borderRadius: 999,
+        border: primary ? "1px solid rgba(34,211,238,0.4)" : "1px solid rgba(255,255,255,0.12)",
+        background: primary
+          ? "linear-gradient(135deg,rgba(34,211,238,1) 0%,rgba(99,102,241,1) 50%,rgba(59,130,246,1) 100%)"
+          : "rgba(255,255,255,0.02)",
+        color: primary ? "#000d1a" : "#e2e8f0",
+        fontWeight: primary ? 800 : 700,
+        fontSize: "0.7rem",
+        letterSpacing: "0.15em",
+        textTransform: "uppercase",
+        cursor: "pointer",
+        backdropFilter: primary ? "none" : "blur(16px) saturate(200%)",
+        WebkitBackdropFilter: primary ? "none" : "blur(16px) saturate(200%)",
+        boxShadow: primary
+          ? "0 0 40px rgba(34,211,238,0.3), 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.4)"
+          : "inset 0 1px 0 rgba(255,255,255,0.05), 0 4px 16px rgba(0,0,0,0.4)",
+        display: "flex", alignItems: "center", gap: 10,
+        position: "relative", overflow: "hidden",
+        WebkitFontSmoothing: "antialiased",
+        transition: "all 0.3s cubic-bezier(0.16,1,0.3,1)",
+      } as any}
+      whileHover={primary
+        ? { scale: 1.02, boxShadow: "0 0 60px rgba(34,211,238,0.5), 0 14px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.45)", y: -2 }
+        : { borderColor: "rgba(34,211,238,0.3)", background: "rgba(255,255,255,0.08)", y: -2 }
+      }
+      whileTap={{ scale: 0.97 }}
     >
+      {primary && (
+        <motion.div
+          animate={{ x: ["-200%", "200%"] }}
+          transition={{ duration: 3, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}
+          style={{
+            position: "absolute", inset: 0,
+            background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
       {children}
     </motion.button>
   );
 }
 
-/* ─── 3D Tilt card hook ─── */
-function TiltCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const rotateX = useMotionValue(0);
-  const rotateY = useMotionValue(0);
-  const springRX = useSpring(rotateX, { stiffness: 200, damping: 20 });
-  const springRY = useSpring(rotateY, { stiffness: 200, damping: 20 });
-  const handleMove = (e: React.MouseEvent) => {
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const px = (e.clientX - rect.left) / rect.width;
-    const py = (e.clientY - rect.top) / rect.height;
-    rotateY.set((px - 0.5) * 14);
-    rotateX.set((0.5 - py) * 14);
-  };
-  const handleLeave = () => { rotateX.set(0); rotateY.set(0); };
-  return (
-    <motion.div
-      ref={ref}
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
-      style={{ ...style, rotateX: springRX, rotateY: springRY, transformStyle: 'preserve-3d', perspective: '800px' }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/* ─── Starfield Background Component ─── */
-function StarfieldBackground() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+/* ══════════════════════════════════════════════════════
+   TYPEWRITER — cinematic word cycling
+══════════════════════════════════════════════════════ */
+function Typewriter({ words }: { words: string[] }) {
+  const { t } = useTranslation();
+  const [wi, setWi] = useState(0);
+  const [text, setText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!mounted) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let stars: { x: number; y: number; radius: number; alpha: number; twinkleSpeed: number; twinklePhase: number }[] = [];
-    let animationId: number;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      initStars();
-    };
-
-    const initStars = () => {
-      stars = [];
-      const starCount = Math.floor((canvas.width * canvas.height) / 2500);
-      for (let i = 0; i < starCount; i++) {
-        stars.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          radius: Math.random() * 1.8 + 0.5,
-          alpha: Math.random() * 0.6 + 0.2,
-          twinkleSpeed: Math.random() * 0.02 + 0.005,
-          twinklePhase: Math.random() * Math.PI * 2,
-        });
+    const cur = words[wi];
+    const timeout = setTimeout(() => {
+      if (!deleting && text.length < cur.length) {
+        setText(cur.slice(0, text.length + 1));
+      } else if (!deleting && text.length === cur.length) {
+        setTimeout(() => setDeleting(true), 2400);
+      } else if (deleting && text.length > 0) {
+        setText(cur.slice(0, text.length - 1));
+      } else {
+        setDeleting(false);
+        setWi((wi + 1) % words.length);
       }
-    };
-
-    const draw = () => {
-      if (!ctx || !canvas) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // REMOVED solid background fill safely to show PremiumBackground galaxy beneath
-
-      // Draw stars with twinkling effect
-      stars.forEach(star => {
-        const time = Date.now() / 1000;
-        const twinkle = Math.sin(time * star.twinkleSpeed + star.twinklePhase) * 0.3 + 0.7;
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha * twinkle})`;
-        ctx.fill();
-      });
-
-      // Draw distant nebula clouds
-      const nebulaGradient = ctx.createRadialGradient(
-        canvas.width * 0.7, canvas.height * 0.2, 50,
-        canvas.width * 0.7, canvas.height * 0.2, 300
-      );
-      nebulaGradient.addColorStop(0, 'rgba(59, 130, 246, 0.03)');
-      nebulaGradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.02)');
-      nebulaGradient.addColorStop(1, 'transparent');
-      ctx.fillStyle = nebulaGradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const nebulaGradient2 = ctx.createRadialGradient(
-        canvas.width * 0.2, canvas.height * 0.8, 50,
-        canvas.width * 0.2, canvas.height * 0.8, 400
-      );
-      nebulaGradient2.addColorStop(0, 'rgba(34, 211, 238, 0.02)');
-      nebulaGradient2.addColorStop(1, 'transparent');
-      ctx.fillStyle = nebulaGradient2;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      animationId = requestAnimationFrame(draw);
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-    draw();
-
-    return () => {
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animationId);
-    };
-  }, []);
+    }, deleting ? 42 : 72);
+    return () => clearTimeout(timeout);
+  }, [text, deleting, wi, words]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: -2,
-        pointerEvents: 'none',
-      }}
-    />
+    <span style={{
+      background: "linear-gradient(135deg,#60a5fa 0%,#22d3ee 40%,#a78bfa 80%)",
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      backgroundClip: "text",
+      filter: "drop-shadow(0 0 30px rgba(34,211,238,0.4))",
+      display: "inline-block",
+    }}>
+      {text}
+      <motion.span
+        animate={{ opacity: [1, 0, 1] }}
+        transition={{ duration: 0.7, repeat: Infinity }}
+        style={{
+          display: "inline-block", width: 3, height: "0.85em",
+          background: "#22d3ee", marginLeft: 4, verticalAlign: "middle",
+          borderRadius: 2, boxShadow: "0 0 8px #22d3ee",
+          WebkitTextFillColor: "initial",
+        }}
+      />
+    </span>
   );
 }
 
-/* ─── Orbiting Planets ─── */
-function OrbitingPlanets() {
+/* ─── LENS FLARE ─── */
+function LensFlare() {
+  const { t } = useTranslation();
+  const mx = useMotionValue(0), my = useMotionValue(0);
+  const sx = useSpring(mx, { stiffness: 60, damping: 25 });
+  const sy = useSpring(my, { stiffness: 60, damping: 25 });
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      // Move flare opposite to mouse for parallax effect
+      mx.set((e.clientX - window.innerWidth / 2) * -0.15);
+      my.set((e.clientY - window.innerHeight / 2) * -0.15);
+    };
+    window.addEventListener("mousemove", h);
+    return () => window.removeEventListener("mousemove", h);
+  }, [mx, my]);
+
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: -1, overflow: 'hidden' }}>
-      {/* Large glowing planet - top right */}
-      <motion.div
-        animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
-        transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
-        style={{
-          position: 'absolute',
-          top: '5%',
-          right: '-5%',
-          width: '400px',
-          height: '400px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle at 30% 30%, rgba(59,130,246,0.15), rgba(34,211,238,0.05), transparent)',
-          filter: 'blur(50px)',
-        }}
-      />
-
-      {/* Ringed planet - bottom left */}
-      <motion.div
-        animate={{ y: [0, 15, 0], x: [0, -8, 0] }}
-        transition={{ duration: 25, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut', delay: 2 }}
-        style={{
-          position: 'absolute',
-          bottom: '-10%',
-          left: '-8%',
-          width: '450px',
-          height: '450px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle at 70% 70%, rgba(139,92,246,0.12), rgba(16,185,129,0.03), transparent)',
-          filter: 'blur(60px)',
-        }}
-      />
-
-      {/* Small orbiting moon */}
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 60, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-        style={{
-          position: 'absolute',
-          top: '20%',
-          left: '10%',
-          width: '100px',
-          height: '100px',
-        }}
-      >
-        <motion.div
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY }}
-          style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: '#22d3ee',
-            boxShadow: '0 0 20px rgba(34,211,238,0.8)',
-            position: 'absolute',
-            top: 0,
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
-        />
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 1, overflow: "hidden" }}>
+      <motion.div style={{ x: sx, y: sy, position: "absolute", top: "40%", left: "40%" }}>
+        {/* Core flare */}
+        <div style={{ width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(34,211,238,0.06) 0%, transparent 70%)", filter: "blur(16px)" }} />
+        {/* Secondary rings */}
+        <div style={{ position: "absolute", top: "120%", left: "120%", width: 100, height: 100, borderRadius: "50%", border: "1px solid rgba(167,139,250,0.04)", background: "rgba(167,139,250,0.02)" }} />
+        <div style={{ position: "absolute", top: "180%", left: "180%", width: 60, height: 60, borderRadius: "50%", border: "1px solid rgba(34,211,238,0.03)", background: "rgba(34,211,238,0.01)" }} />
       </motion.div>
     </div>
   );
 }
 
-/* ─── Floating Particles ─── */
-function FloatingParticles() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  if (!mounted) return null;
-
-  const particles = Array.from({ length: 30 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    duration: 15 + Math.random() * 20,
-    delay: Math.random() * 10,
-    size: 1 + Math.random() * 3,
-    opacity: 0.1 + Math.random() * 0.3,
-  }));
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: -1, overflow: 'hidden' }}>
-      {particles.map(p => (
-        <motion.div
-          key={p.id}
-          animate={{
-            y: ['-10vh', '110vh'],
-            x: [`${p.x}vw`, `${p.x + (Math.random() - 0.5) * 20}vw`],
-            opacity: [0, p.opacity, 0],
-          }}
-          transition={{
-            duration: p.duration,
-            repeat: Number.POSITIVE_INFINITY,
-            delay: p.delay,
-            ease: 'linear',
-          }}
-          style={{
-            position: 'absolute',
-            left: `${p.x}vw`,
-            top: '-10vh',
-            width: p.size,
-            height: p.size,
-            borderRadius: '50%',
-            background: `radial-gradient(circle, rgba(34,211,238,0.6), rgba(59,130,246,0.3))`,
-            filter: 'blur(1px)',
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-const features = [
-  { icon: <Video className="w-6 h-6" />, title: "Agnostic Integration", description: "Seamlessly ingest feeds from IP, RTSP, USB, or legacy cameras with zero vendor lock-in.", color: "#22d3ee", rgb: "34,211,238" },
-  { icon: <Activity className="w-6 h-6" />, title: "Real-Time Detection", description: "Hardware-accelerated YOLO models performing counting and tracking with uncompromised precision.", color: "#10b981", rgb: "16,185,129" },
-  { icon: <TrendingUp className="w-6 h-6" />, title: "Predictive Forecasting", description: "Advanced LSTM pipelines modeling crowd dynamics to predict surges 60 minutes ahead.", color: "#a78bfa", rgb: "167,139,250" },
-  { icon: <ShieldAlert className="w-6 h-6" />, title: "Dynamic Risk Scoring", description: "Multivariate risk engine evaluating density, velocity, and environmental variables.", color: "#f59e0b", rgb: "245,158,11" },
-  { icon: <Bell className="w-6 h-6" />, title: "Omnichannel Alerts", description: "Low-latency WebSocket delivery, cascading SMS dispatch for immediate hazard response.", color: "#f43f5e", rgb: "244,63,94" },
-  { icon: <ServerCrash className="w-6 h-6" />, title: "Failsafe Topology", description: "Circuit breakers and auto-healing ensuring the intelligence platform never goes dark.", color: "#22d3ee", rgb: "34,211,238" },
-];
-
-/* ─── Stat item with counter ─── */
-function StatItem({ prefix = '', target, suffix = '', label, delay }: { prefix?: string; target: number; suffix?: string; label: string; delay: number }) {
-  const [inView, setInView] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setInView(true); }, { threshold: 0.5 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, []);
-  const count = useCounter(inView ? target : 0, 2000, delay);
+/* ══════════════════════════════════════════════════════
+   GLASS HUD CARD — luxury floating card component
+══════════════════════════════════════════════════════ */
+function GlassHUDCard({
+  style, children, glowColor = "34,211,238",
+}: {
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+  glowColor?: string;
+}) {
+  const { t } = useTranslation();
   return (
     <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: delay / 1000 + 0.8, duration: 0.6 }}
-      whileHover={{ scale: 1.08 }}
-      style={{ textAlign: 'center', position: 'relative' }}
+      animate={{ y: [0, -5, 0] }}
+      transition={{
+        duration: 5,
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
+      style={{
+        position: "absolute",
+        zIndex: 10,
+        ...style,
+      }}
     >
-      <div style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 900, color: '#fff', marginBottom: '4px', fontVariantNumeric: 'tabular-nums' }}>
-        {prefix}{count}{suffix}
-      </div>
-      <div style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em' }}>{label}</div>
+      <BorderGlow
+        glowColor="180 80 80" // Refined slate/cyan glow
+        glowIntensity={0.8}
+        glowRadius={30}
+        edgeSensitivity={20}
+        borderRadius={14}
+        backgroundColor="rgba(8,12,30,0.92)"
+        colors={['rgba(34,211,238,0.4)', 'rgba(99,102,241,0.4)', 'rgba(255,255,255,0.2)']}
+      >
+        <div style={{
+          padding: "13px 16px",
+          minHeight: "100%",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          position: "relative",
+          isolation: "isolate",
+          overflow: "hidden", // Contain shimmer
+          borderRadius: 14,
+        }}>
+          {/* Shimmer Effect */}
+          <motion.div
+            animate={{ x: ["-100%", "200%"] }}
+            transition={{ duration: 4, repeat: Infinity, repeatDelay: 5, ease: "easeInOut" }}
+            style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(115deg, transparent, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%, transparent)",
+              pointerEvents: "none", zIndex: 3
+            }}
+          />
+          {/* Inner top white shimmer */}
+          <div style={{
+            position: "absolute", top: 0, left: 0, right: 0, height: 1,
+            background: `linear-gradient(90deg,transparent 5%,rgba(255,255,255,0.18) 40%,rgba(${glowColor},0.22) 60%,transparent 95%)`,
+            pointerEvents: "none",
+            zIndex: 2
+          }} />
+          {children}
+        </div>
+      </BorderGlow>
     </motion.div>
   );
 }
 
-export default function LandingPage() {
-  const router = useRouter();
-  const typeText = useTypewriter(["Crowd Risk", "Safety Systems", "Threat Detection", "Mass Surveillance"], 70, 2500);
+/* ══════════════════════════════════════════════════════
+   LIVE NEURAL HUD — hero floating intelligence cards
+══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════
+   LIVE NEURAL HUD — hero floating intelligence cards
+   Powered by real-time telemetry
+══════════════════════════════════════════════════════ */
+import { useSystemIntelligence } from "@/hooks/useIntelligence";
+import { useAlerts } from "@/hooks/useAlerts";
+import { useTranslation } from "react-i18next";
+
+
+/* ══════════════════════════════════════════════════════
+   THREAT TICKER — scrolling live events banner
+══════════════════════════════════════════════════════ */
+// ThreatTicker is now defined below with live data integration.
+
+/* ══════════════════════════════════════════════════════
+   NAVBAR — ultra-minimal futuristic premium navbar
+══════════════════════════════════════════════════════ */
+function Navbar({ router, mounted }: { router: ReturnType<typeof useRouter>; mounted: boolean }) {
+  const { t } = useTranslation();
+  const pathname = usePathname();
+
+  // Prevent hydration mismatch by using static text or suppressing warning
+  const brandText = mounted ? (t("auto.LAMINAR_2701") || "LAMINAR") : "LAMINAR";
+  const intelligenceText = mounted ? (t("auto.INTELLIGENCE_844") || "INTELLIGENCE") : "INTELLIGENCE";
+  const loginText = mounted ? (t("auto.LOGIN_7203") || "LOG IN") : "LOG IN";
+  const deployText = mounted ? (t("auto.DEPLOY_3240") || "DEPLOY") : "DEPLOY";
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", overflowX: 'hidden' }}>
-      <ProceduralGalaxy />
-
-      <div style={{ position: 'relative', zIndex: 10 }}>
-
-        {/* ─── NAVBAR ─── */}
-        <motion.nav
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '20px 48px', maxWidth: '1400px', margin: '0 auto',
-            borderBottom: '1px solid rgba(34,211,238,0.1)',
-            backdropFilter: 'blur(10px)',
-          }}
-        >
+    <div style={{
+      position: "fixed",
+      top: 20,
+      left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 100,
+      width: "100%",
+      maxWidth: 1400,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "0 40px",
+      pointerEvents: "none"
+    }}>
+      {/* Brand Title (Left) */}
+      <motion.div
+        whileHover={{ scale: 1.02 }}
+        onClick={() => {
+          if (pathname === '/') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            router.push("/");
+          }
+        }}
+        style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", pointerEvents: "auto" }}
+      >
+        <div style={{ position: "relative" }}>
           <motion.div
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
-            whileHover={{ scale: 1.04 }}
-            onClick={() => router.push("/")}
+            animate={{ filter: ["drop-shadow(0 0 5px rgba(34,211,238,0.4))", "drop-shadow(0 0 15px rgba(34,211,238,0.8))", "drop-shadow(0 0 5px rgba(34,211,238,0.4))"] }}
+            transition={{ duration: 3, repeat: Infinity }}
           >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 15, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-              style={{ position: 'relative' }}
-            >
-              <Shield style={{ width: 20, height: 20, color: '#22d3ee' }} />
-              <motion.div
-                animate={{ scale: [1, 1.5, 1] }}
-                transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(34,211,238,0.3), transparent)',
-                  transform: 'translate(-50%, -50%)',
-                  pointerEvents: 'none',
-                }}
-              />
-            </motion.div>
-            <span style={{ color: '#fff', fontWeight: 900, letterSpacing: '0.25em', fontSize: '0.8rem' }}>LAMINAR</span>
+            <Shield style={{ width: 22, height: 22, color: "#22d3ee" }} />
           </motion.div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            {['Features', 'Architecture', 'Pricing'].map((item) => (
-              <motion.span
-                key={item}
-                whileHover={{ color: '#22d3ee' }}
-                style={{ color: '#475569', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer', transition: 'color 0.3s' }}
-              >
-                {item}
-              </motion.span>
-            ))}
-            <motion.button
-              whileHover={{ color: '#22d3ee' }}
-              onClick={() => router.push("/login")}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}
-            >
-              Sign In
-            </motion.button>
-            <MagneticButton
-              onClick={() => router.push("/register")}
-              style={{
-                background: 'linear-gradient(135deg, rgba(34,211,238,0.15), rgba(59,130,246,0.15))',
-                border: '1px solid rgba(34,211,238,0.4)',
-                color: '#22d3ee', fontWeight: 700, fontSize: '0.7rem',
-                letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer',
-                padding: '9px 20px', borderRadius: '999px',
-              }}
-            >
-              Get Started →
-            </MagneticButton>
-          </div>
-        </motion.nav>
-
-        {/* ─── HERO ─── */}
-        <main style={{ textAlign: 'center', padding: '80px 24px 60px', maxWidth: '1100px', margin: '0 auto' }}>
-
-          {/* Badge */}
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '8px',
-              padding: '6px 16px', borderRadius: '999px',
-              border: '1px solid rgba(34,211,238,0.2)',
-              background: 'rgba(34,211,238,0.06)',
-              marginBottom: '52px', backdropFilter: 'blur(12px)'
-            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            style={{ position: "absolute", inset: -6, pointerEvents: "none" }}
           >
-            <motion.span
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-              style={{ width: 6, height: 6, borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 10px #22d3ee' }}
-            />
-            <span style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.2em', color: '#22d3ee', textTransform: 'uppercase' }}>
-              Production Grade Intelligence
-            </span>
-          </motion.div>
-
-          {/* Headline with typewriter */}
-          <motion.h1
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fontSize: 'clamp(48px, 9vw, 100px)', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.03em', color: '#fff', marginBottom: '32px' }}
-          >
-            AI-Powered
-            <br />
-            <span style={{
-              background: 'linear-gradient(135deg, #60a5fa 0%, #22d3ee 40%, #a78bfa 80%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-              display: 'inline-block', minWidth: '4px',
-              filter: 'drop-shadow(0 0 30px rgba(34,211,238,0.5))',
-            }}>
-              {typeText}
-              <motion.span
-                animate={{ opacity: [1, 0, 1] }}
-                transition={{ duration: 0.8, repeat: Number.POSITIVE_INFINITY }}
-                style={{ display: 'inline-block', width: '3px', height: '0.9em', background: '#22d3ee', marginLeft: '3px', verticalAlign: 'middle', borderRadius: '2px' }}
-              />
-            </span>
-            <br />
-            Intelligence
-          </motion.h1>
-
-          {/* Subtitle */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.7 }}
-            style={{ fontSize: '1.05rem', color: '#64748b', maxWidth: '600px', margin: '0 auto 48px', lineHeight: 1.75, fontWeight: 400 }}
-          >
-            Universal camera-agnostic platform transforming any CCTV network into a
-            proactive crowd safety system with real-time detection and forecasting.
-          </motion.p>
-
-          {/* CTA buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.75, duration: 0.6 }}
-            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '16px', marginBottom: '80px' }}
-          >
-            <MagneticButton
-              onClick={() => router.push("/register")}
-              style={{
-                background: 'linear-gradient(135deg, #22d3ee, #3b82f6)',
-                color: '#000', fontWeight: 900, fontSize: '0.72rem',
-                letterSpacing: '0.12em', textTransform: 'uppercase',
-                padding: '16px 36px', borderRadius: '999px', border: 'none', cursor: 'pointer',
-                boxShadow: '0 0 40px rgba(34,211,238,0.5), 0 4px 20px rgba(0,0,0,0.4)',
-                display: 'flex', alignItems: 'center', gap: '8px',
-                position: 'relative', overflow: 'hidden',
-              }}
-            >
-              Deploy Intelligence <ChevronRight style={{ width: 16, height: 16 }} />
-            </MagneticButton>
-            <MagneticButton
-              onClick={() => router.push("/dashboard")}
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(34,211,238,0.2)',
-                color: '#94a3b8', fontWeight: 700, fontSize: '0.72rem',
-                letterSpacing: '0.12em', textTransform: 'uppercase',
-                padding: '16px 36px', borderRadius: '999px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '8px', backdropFilter: 'blur(12px)',
-              }}
-            >
-              <Eye style={{ width: 16, height: 16 }} /> View Demo
-            </MagneticButton>
-          </motion.div>
-
-          {/* ─── Animated Stats (Sourced from Telemetry) ─── */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-            style={{
-              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '1px', maxWidth: '680px', margin: '0 auto',
-              background: 'rgba(34,211,238,0.1)',
-              borderRadius: '20px', overflow: 'hidden',
-              border: '1px solid rgba(34,211,238,0.15)',
-              backdropFilter: 'blur(10px)',
-            }}
-          >
-            <StatItem prefix="" target={98} suffix="%" label="AI Precision" delay={100} />
-            <StatItem prefix="<" target={100} suffix="ms" label="Inference" delay={200} />
-            <StatItem prefix="" target={12} suffix="+" label="Live Nodes" delay={300} />
-            <StatItem prefix="" target={99} suffix=".9%" label="SLA Uptime" delay={400} />
-          </motion.div>
-
-          {/* Glowing divider */}
-          <motion.div
-            initial={{ scaleX: 0, opacity: 0 }}
-            animate={{ scaleX: 1, opacity: 1 }}
-            transition={{ delay: 1.2, duration: 1.2 }}
-            style={{
-              height: '1px', marginTop: '80px',
-              background: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.6), rgba(59,130,246,0.6), transparent)',
-              boxShadow: '0 0 20px rgba(34,211,238,0.3)',
-            }}
-          />
-        </main>
-
-        {/* ─── FEATURES GRID ─── */}
-        <section style={{ padding: '80px 48px', maxWidth: '1200px', margin: '0 auto' }}>
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.7 }}
-            style={{ textAlign: 'center', marginBottom: '64px' }}
-          >
-            <h2 style={{ fontSize: 'clamp(28px, 4vw, 52px)', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', marginBottom: '16px' }}>
-              Architected for <span style={{ color: '#22d3ee', textShadow: '0 0 20px rgba(34,211,238,0.5)' }}>Resilience</span>
-            </h2>
-            <p style={{ color: '#475569', maxWidth: '520px', margin: '0 auto', fontSize: '1rem', lineHeight: 1.65 }}>
-              Mission-critical infrastructure demanding zero downtime and infinite scalability.
-            </p>
-          </motion.div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-            {features.map((f, i) => (
-              <TiltCard key={i} style={{ borderRadius: '20px' }}>
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-40px' }}
-                  transition={{ delay: (i % 3) * 0.12, duration: 0.6 }}
-                  style={{
-                    background: 'rgba(8,12,28,0.8)',
-                    border: `1px solid rgba(${f.rgb}, 0.15)`,
-                    borderRadius: '20px', padding: '32px',
-                    backdropFilter: 'blur(20px)',
-                    position: 'relative', overflow: 'hidden', height: '100%',
-                    cursor: 'default',
-                    transition: 'border-color 0.3s, box-shadow 0.3s',
-                  }}
-                  whileHover={{
-                    borderColor: `rgba(${f.rgb}, 0.5)`,
-                    boxShadow: `0 20px 60px rgba(${f.rgb}, 0.15), 0 0 0 1px rgba(${f.rgb}, 0.3)`,
-                  }}
-                >
-                  {/* Gradient corner glow */}
-                  <div style={{
-                    position: 'absolute', top: 0, right: 0, width: '120px', height: '120px',
-                    background: `radial-gradient(circle at top right, rgba(${f.rgb}, 0.15), transparent 70%)`,
-                    pointerEvents: 'none',
-                  }} />
-
-                  {/* Icon with ring */}
-                  <motion.div
-                    whileHover={{ scale: 1.1, rotate: 5 }}
-                    style={{
-                      width: '52px', height: '52px', borderRadius: '14px',
-                      background: `rgba(${f.rgb}, 0.1)`,
-                      border: `1px solid rgba(${f.rgb}, 0.3)`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      marginBottom: '20px', color: f.color,
-                      boxShadow: `0 0 20px rgba(${f.rgb}, 0.2)`,
-                    }}
-                  >
-                    {f.icon}
-                  </motion.div>
-
-                  <h3 style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '1rem', marginBottom: '10px', letterSpacing: '-0.01em' }}>{f.title}</h3>
-                  <p style={{ color: '#475569', fontSize: '0.875rem', lineHeight: 1.7 }}>{f.description}</p>
-
-                  {/* Bottom accent on hover */}
-                  <motion.div
-                    initial={{ scaleX: 0, opacity: 0 }}
-                    whileHover={{ scaleX: 1, opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                    style={{
-                      position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px',
-                      background: `linear-gradient(90deg, transparent, ${f.color}, transparent)`,
-                      transformOrigin: 'left',
-                    }}
-                  />
-                </motion.div>
-              </TiltCard>
-            ))}
-          </div>
-        </section>
-
-        {/* ─── ANIMATED PIPELINE ─── */}
-        <section style={{ padding: '60px 48px 80px', maxWidth: '960px', margin: '0 auto' }}>
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7 }}
-            style={{ textAlign: 'center', marginBottom: '56px' }}
-          >
-            <h2 style={{ fontSize: 'clamp(28px, 4vw, 48px)', fontWeight: 900, color: '#fff', marginBottom: '12px' }}>
-              N-Tier{' '}
-              <span style={{ background: 'linear-gradient(135deg, #60a5fa, #22d3ee, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                Intelligence Pipeline
-              </span>
-            </h2>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            style={{
-              background: 'rgba(8,12,28,0.85)',
-              border: '1px solid rgba(34,211,238,0.2)',
-              borderRadius: '28px', padding: '48px 40px',
-              backdropFilter: 'blur(30px)',
-              boxShadow: '0 0 80px rgba(34,211,238,0.08)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0', flexWrap: 'nowrap' }}>
-              {[
-                { icon: <Video style={{ width: 28, height: 28 }} />, label: 'Edge Nodes', sub: 'Video Ingestion', color: '#22d3ee', rgb: '34,211,238', shape: 'square' },
-                null,
-                { icon: <Brain style={{ width: 32, height: 32 }} />, label: 'AI Core', sub: 'YOLO + LSTM', color: '#a78bfa', rgb: '167,139,250', shape: 'circle' },
-                null,
-                { icon: <ShieldAlert style={{ width: 28, height: 28 }} />, label: 'Dispatch', sub: 'Alert Matrix', color: '#f43f5e', rgb: '244,63,94', shape: 'square' },
-              ].map((item, i) => {
-                if (!item) {
-                  const flowColor = i === 1 ? '#22d3ee' : '#a78bfa';
-                  return (
-                    <div key={i} style={{ flex: 1, height: '2px', background: 'rgba(34,211,238,0.1)', position: 'relative', minWidth: '60px', overflow: 'hidden' }}>
-                      {[0, 1, 2].map((j) => (
-                        <motion.div
-                          key={j}
-                          animate={{ x: ['-100%', '400%'] }}
-                          transition={{ duration: 1.8, repeat: Number.POSITIVE_INFINITY, ease: 'linear', delay: j * 0.6 }}
-                          style={{
-                            position: 'absolute', top: 0, bottom: 0, width: '30%',
-                            background: `linear-gradient(90deg, transparent, ${flowColor}, transparent)`
-                          }}
-                        />
-                      ))}
-                    </div>
-                  );
-                }
-                return (
-                  <motion.div
-                    key={i}
-                    whileHover={{ scale: 1.1, y: -6 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', flex: '0 0 auto' }}
-                  >
-                    <motion.div
-                      animate={{ boxShadow: [`0 0 20px rgba(${item.rgb},0.3)`, `0 0 40px rgba(${item.rgb},0.6)`, `0 0 20px rgba(${item.rgb},0.3)`] }}
-                      transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                      style={{
-                        width: item.shape === 'circle' ? '80px' : '68px',
-                        height: item.shape === 'circle' ? '80px' : '68px',
-                        borderRadius: item.shape === 'circle' ? '50%' : '18px',
-                        background: `rgba(${item.rgb}, 0.08)`,
-                        border: `1px solid rgba(${item.rgb}, 0.4)`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: item.color,
-                      }}
-                    >
-                      {item.icon}
-                    </motion.div>
-                    <div style={{ textAlign: 'center' }}>
-                      <p style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{item.label}</p>
-                      <p style={{ color: '#475569', fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '3px', fontWeight: 600 }}>{item.sub}</p>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-        </section>
-
-        {/* ─── CTA ─── */}
-        <section style={{ padding: '60px 24px 120px' }}>
-          <motion.div
-            initial={{ opacity: 0, y: 40, scale: 0.97 }}
-            whileInView={{ opacity: 1, y: 0, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.9 }}
-            style={{
-              maxWidth: '860px', margin: '0 auto', textAlign: 'center',
-              background: 'rgba(8,12,28,0.9)',
-              border: '1px solid transparent',
-              backgroundClip: 'padding-box',
-              borderRadius: '40px', padding: '80px 48px',
-              position: 'relative', overflow: 'hidden',
-            }}
-          >
-            {/* Animated conic border */}
             <div style={{
-              position: 'absolute', inset: 0, borderRadius: '40px', padding: '1px', zIndex: -1,
-              background: 'conic-gradient(from 0deg, #22d3ee, #3b82f6, #a78bfa, #f43f5e, #22d3ee)',
-              WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-              WebkitMaskComposite: 'xor',
-              maskComposite: 'exclude',
+              position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+              width: 3.5, height: 3.5, borderRadius: "50%", background: "#22d3ee",
+              boxShadow: "0 0 10px #22d3ee",
             }} />
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-              style={{
-                position: 'absolute', inset: '-1px', borderRadius: '40px', padding: '1px', zIndex: 0,
-                background: 'conic-gradient(from 0deg, #22d3ee, #3b82f6, #a78bfa, #f43f5e, #22d3ee)',
-                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                WebkitMaskComposite: 'xor',
-                maskComposite: 'exclude',
-                opacity: 0.5,
-              }}
-            />
-
-            {/* Inner glow */}
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '600px', height: '300px', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(34,211,238,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <motion.span
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                style={{ display: 'inline-block', padding: '6px 16px', borderRadius: '999px', background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.2)', color: '#22d3ee', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '28px' }}
-              >
-                Early Access Program
-              </motion.span>
-
-              <h2 style={{ fontSize: 'clamp(32px, 5vw, 64px)', fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: '24px' }}>
-                Initialize Your{' '}
-                <span style={{ background: 'linear-gradient(135deg, #60a5fa, #22d3ee, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                  Security Matrix.
-                </span>
-              </h2>
-
-              <p style={{ color: '#475569', fontSize: '1rem', lineHeight: 1.7, maxWidth: '480px', margin: '0 auto 40px' }}>
-                Connect your infrastructure. Activate predictive intelligence in under 15 minutes.
-              </p>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'center' }}>
-                <MagneticButton onClick={() => router.push("/register")} style={{ background: 'linear-gradient(135deg, #22d3ee, #3b82f6)', color: '#000', fontWeight: 900, fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '16px 36px', borderRadius: '999px', border: 'none', cursor: 'pointer', boxShadow: '0 0 40px rgba(34,211,238,0.4)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  Deploy System <ArrowRight style={{ width: 18, height: 18 }} />
-                </MagneticButton>
-                <MagneticButton onClick={() => router.push("/login")} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(34,211,238,0.2)', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase', padding: '16px 36px', borderRadius: '999px', cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
-                  Access Portal
-                </MagneticButton>
-              </div>
-            </div>
           </motion.div>
-        </section>
+        </div>
+        <div className="hidden lg:block">
+          <span style={{ color: "#fff", fontWeight: 900, letterSpacing: "0.40em", fontSize: "0.9rem", textShadow: "0 0 15px rgba(34,211,238,0.3)" }}>{brandText}</span>
+          <span style={{ color: "#475569", fontSize: "0.5rem", letterSpacing: "0.20em", fontWeight: 800, marginLeft: 8 }}>{intelligenceText}</span>
+        </div>
+      </motion.div>
 
-        {/* ─── FOOTER ─── */}
-        <footer style={{ borderTop: '1px solid rgba(34,211,238,0.1)', padding: '28px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', maxWidth: '1400px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Shield style={{ width: 16, height: 16, color: '#22d3ee' }} />
-            <span style={{ color: '#e2e8f0', fontWeight: 800, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Laminar</span>
-          </div>
-          <p style={{ color: '#334155', fontSize: '0.72rem' }}>© {new Date().getFullYear()} Laminar Intelligence. All rights reserved.</p>
-        </footer>
+      {/* Center PillNav */}
+      <div style={{ pointerEvents: "auto" }}>
+        <PillNav
+          logoComponent={<Zap size={20} color="#22d3ee" />}
+          items={[
+            { label: "Features", href: "#features" },
+            { label: "Solutions", href: "#solutions" },
+            { label: "Pricing", href: "#pricing" },
+            { label: "Docs", href: "#docs" }
+          ]}
+          activeHref={pathname}
+          baseColor="rgba(1, 4, 16, 0.85)"
+          pillColor="#22d3ee"
+          hoveredPillTextColor="#000"
+          pillTextColor="#94a3b8"
+        />
+      </div>
 
-        {/* ─── AI Copilot FAB ─── */}
+      {/* Action Buttons (Right) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 32, pointerEvents: "auto" }}>
         <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 1.5, type: "spring", stiffness: 200 }}
-          whileHover={{ scale: 1.08, y: -2 }}
-          whileTap={{ scale: 0.94 }}
+          whileHover={{ color: "#fff", scale: 1.05 }}
+          onClick={() => router.push("/login")}
+          style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "0.65rem", fontWeight: 800, letterSpacing: "0.15em", cursor: "pointer", transition: "all 0.3s" }}
+        >
+          {loginText}
+        </motion.button>
+
+        <motion.button
+          whileHover={{ scale: 1.05, background: "rgba(34,211,238,1)", boxShadow: "0 0 35px rgba(34,211,238,0.4)" }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => router.push("/register")}
+          className="hidden sm:flex"
           style={{
-            position: 'fixed', bottom: '24px', right: '24px', zIndex: 50,
-            display: 'flex', alignItems: 'center', gap: '8px',
-            background: 'rgba(8,16,36,0.95)',
-            border: '1px solid rgba(34,211,238,0.4)',
-            borderRadius: '999px', padding: '12px 22px',
-            color: '#22d3ee', fontWeight: 700, fontSize: '0.7rem',
-            letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 0 30px rgba(34,211,238,0.3), 0 4px 20px rgba(0,0,0,0.4)',
+            background: "rgba(34,211,238,0.9)",
+            color: "#000",
+            padding: "10px 24px",
+            borderRadius: 999,
+            fontWeight: 900,
+            fontSize: "0.65rem",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            cursor: "pointer",
+            transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+            display: "flex", alignItems: "center", gap: 10,
+            boxShadow: "0 8px 25px rgba(34,211,238,0.15)",
+            border: "none"
           }}
         >
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}>
-            <Sparkles style={{ width: 15, height: 15 }} />
-          </motion.div>
-          AI Copilot
+          {deployText}
+          <ChevronRight size={13} strokeWidth={3} />
         </motion.button>
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   BG CONTROL WIDGET — floating premium toggle
+   ══════════════════════════════════════════════════════ */
+function BGControlWidget({ mode, setMode }: { mode: 'galaxy' | 'hyperspeed', setMode: (m: 'galaxy' | 'hyperspeed') => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{
+        position: "fixed", bottom: 20, left: "50%", x: "-50%", // Center on mobile
+        zIndex: 100,
+        background: "rgba(1,4,16,0.85)",
+        borderRadius: 999,
+        padding: "4px",
+        border: "1px solid rgba(255,255,255,0.08)",
+        display: "flex", gap: 4,
+        backdropFilter: "blur(16px)",
+        boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
+      }}
+      className="md:left-8 md:translate-x-0 bottom-6 left-1/2 -translate-x-1/2"
+    >
+      {(['galaxy', 'hyperspeed'] as const).map((m) => (
+        <motion.button
+          key={m}
+          onClick={() => setMode(m)}
+          style={{
+            padding: "8px 24px",
+            borderRadius: 999,
+            border: "none",
+            background: mode === m ? "#22d3ee" : "transparent",
+            color: mode === m ? "#000" : "#64748b",
+            fontSize: "0.58rem",
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "0.15em",
+            cursor: "pointer",
+            transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+            boxShadow: mode === m ? "0 0 20px rgba(34,211,238,0.3)" : "none"
+          }}
+        >
+          {m}
+        </motion.button>
+      ))}
+    </motion.div>
+  );
+}
+
+
+
+/* ══════════════════════════════════════════════════════
+   STATS GRID
+══════════════════════════════════════════════════════ */
+function StatsGrid() {
+  const { t } = useTranslation();
+  const { data: systemData } = useSystemIntelligence();
+
+  const stats = [
+    { value: "98", suffix: "%", label: "AI Accuracy" },
+    { value: "<100", suffix: "ms", label: "Response" },
+    { value: systemData?.total_venues?.toString() || "0", suffix: "", label: "Active Venues" },
+    { value: "99.9", suffix: "%", label: "System Uptime" },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 1.1 }}
+      className="grid grid-cols-2 lg:grid-cols-4 gap-0 max-w-[720px] w-full overflow-hidden bg-[rgba(1,4,16,0.65)] rounded-[32px] border border-[rgba(255,255,255,0.04)] shadow-[0_30px_100px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.03)] relative z-[5] mt-16 backdrop-blur-[20px]"
+    >
+      <div style={{ position: "absolute", inset: 0, borderRadius: 32, padding: 1, background: "linear-gradient(to bottom right, rgba(255,255,255,0.08), transparent, rgba(34,211,238,0.04))", maskImage: "linear-gradient(black, black) content-box, linear-gradient(black, black)", maskComposite: "exclude", pointerEvents: "none" }} />
+      {stats.map((s, i) => (
+        <motion.div
+          key={i}
+          whileHover={{ background: "rgba(34,211,238,0.03)" }}
+          style={{
+            padding: "32px 24px", textAlign: "center",
+            borderRight: i < 3 ? "1px solid rgba(255,255,255,0.04)" : "none",
+            transition: "background 0.4s",
+            position: "relative",
+          }}
+        >
+          <div style={{ fontSize: "2rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.04em", lineHeight: 1 }}>
+            {s.value}<span style={{ fontSize: "0.9rem", color: "#22d3ee", fontWeight: 800, marginLeft: 2 }}>{s.suffix}</span>
+          </div>
+          <div style={{ fontSize: "0.55rem", color: "#475569", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.2em", marginTop: 10 }}>{s.label}</div>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════
+   TRUST LOGOS
+══════════════════════════════════════════════════════ */
+// logos constant removed.
+
+function TrustSection() {
+  const { t } = useTranslation();
+  const companies = ["Lockheed Martin", "General Dynamics", "Northrop Grumman", "Raytheon", "Palantir", "SpaceX", "L3Harris", "Boeing", "Airbus"];
+  return (
+    <section id="trusted-by" style={{ padding: "120px 24px 60px", textAlign: "center", position: "relative", zIndex: 1 }}>
+      <Reveal>
+        <p style={{ color: "#475569", fontSize: "0.55rem", fontWeight: 900, letterSpacing: "0.25em", marginBottom: 60, textTransform: "uppercase", opacity: 0.8 }}>
+          {t("auto.TRUSTEDBYLEADER_1198") || "TRUSTED BY LEADERS IN"} <span style={{ color: "#fff" }}>{t("auto.GLOBALSECURITY_2821") || "GLOBAL SECURITY"}</span> & <span style={{ color: "#fff" }}>{t("auto.DEFENSE_5038") || "DEFENSE"}</span>
+        </p>
+        <div style={{ overflow: "hidden", position: "relative", width: "100%", maxWidth: "100vw", margin: "0 auto", padding: "20px 0" }}>
+          {/* Fading edges marquee mask */}
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "15%", background: "linear-gradient(90deg, #000 0%, transparent 100%)", zIndex: 2, pointerEvents: "none" }} />
+          <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "15%", background: "linear-gradient(-90deg, #000 0%, transparent 100%)", zIndex: 2, pointerEvents: "none" }} />
+
+          <motion.div
+            animate={{ x: [0, -1200] }}
+            transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
+            style={{ display: "flex", gap: "80px", whiteSpace: "nowrap", width: "max-content" }}
+          >
+            {[...companies, ...companies, ...companies].map((c, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, opacity: 0.35, transition: "all 0.4s", cursor: "default" }}>
+                <div style={{ padding: 10, borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#22d3ee" }}>
+                  <Shield size={18} strokeWidth={2.5} />
+                </div>
+                <span style={{ color: "#fff", fontSize: "1.6rem", fontWeight: 900, letterSpacing: "-0.04em", filter: "drop-shadow(0 0 10px rgba(0,0,0,0.5))" }}>{c}</span>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════
+   GLOBAL ATMOSPHERIC REFLECTIONS
+══════════════════════════════════════════════════════ */
+function GlobalReflections() {
+  const { t } = useTranslation();
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+      {/* Dynamic atmospheric light patches */}
+      <motion.div
+        animate={{
+          x: ["-10%", "10%", "-5%"],
+          y: ["-10%", "5%", "-10%"],
+          opacity: [0.15, 0.25, 0.15]
+        }}
+        transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+        style={{
+          position: "absolute", top: "-20%", left: "-20%", width: "80%", height: "80%",
+          background: "radial-gradient(circle, rgba(34,211,238,0.12) 0%, transparent 70%)",
+          filter: "blur(16px)",
+          willChange: "transform, opacity",
+          transform: "translateZ(0)",
+        }}
+      />
+      <motion.div
+        animate={{
+          x: ["10%", "-10%", "5%"],
+          y: ["10%", "-5%", "10%"],
+          opacity: [0.1, 0.2, 0.1]
+        }}
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        style={{
+          position: "absolute", bottom: "-20%", right: "-20%", width: "70%", height: "70%",
+          background: "radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 70%)",
+          filter: "blur(16px)",
+          willChange: "transform, opacity",
+          transform: "translateZ(0)",
+        }}
+      />
+      {/* Light streak covering page */}
+      <motion.div
+        animate={{
+          rotate: [15, 20, 15],
+          x: ["-100%", "100%"]
+        }}
+        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+        style={{
+          position: "absolute", top: "20%", left: 0, width: "150%", height: 1,
+          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)",
+          zIndex: 0,
+          willChange: "transform",
+        }}
+      />
+      {/* Glass grain / Noise texture — inline to avoid external 404 */}
+      <div style={{ position: "absolute", inset: 0, opacity: 0.015, backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E\")", pointerEvents: "none", transform: "translateZ(0)" }} />
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════════════════ */
+function Footer() {
+  const { t } = useTranslation();
+  return (
+    <footer style={{
+      borderTop: "1px solid rgba(34,211,238,0.05)",
+      padding: "36px 56px",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      flexWrap: "wrap", gap: 20,
+      maxWidth: 1440, margin: "0 auto",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Shield style={{ width: 14, height: 14, color: "#22d3ee" }} />
+        <span style={{ color: "#f8fafc", fontWeight: 900, fontSize: "0.72rem", letterSpacing: "0.2em" }}>{t("auto.LAMINAR_2701") || "LAMINAR"}</span>
+        <span style={{ color: "#334155", fontSize: "0.46rem", letterSpacing: "0.14em", fontWeight: 600 }}>{t("auto.AIINTELLIGENCE_0") || "AI INTELLIGENCE"}</span>
+      </div>
+      <div style={{ display: "flex", gap: 36 }}>
+        {["Privacy", "Terms", "Docs", "Status", "Blog"].map(l => (
+          <motion.span
+            key={l}
+            whileHover={{ color: "#22d3ee", y: -1 }}
+            style={{ color: "#475569", fontSize: "0.65rem", fontWeight: 500, cursor: "pointer", transition: "color 0.2s" }}
+          >
+            {l}
+          </motion.span>
+        ))}
+      </div>
+      <p style={{ color: "#334155", fontSize: "0.65rem" }}>© {new Date().getFullYear()} Laminar Intelligence Inc.</p>
+    </footer>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   MAIN PAGE
+══════════════════════════════════════════════════════ */
+export default function LandingPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const { t } = useTranslation();
+  const router = useRouter();
+  const [bgMode, setBgMode] = useState<'galaxy' | 'hyperspeed'>('hyperspeed');
+  const { scrollY } = useScroll();
+  const heroParallax = useTransform(scrollY, [0, 600], [0, -80]);
+
+  const hyperspeedOptions = useMemo(() => ({
+    onSpeedUp: () => { },
+    onSlowDown: () => { },
+    distortion: 'turbulentDistortion',
+    length: 500,
+    roadWidth: 26,     // Doubled width to fill the screen
+    islandWidth: 6,
+    lanesPerRoad: 6,   // More lanes for a wider tunnel
+    fov: 95,
+    fovSpeedUp: 140,
+    speedUp: 3.5,
+    carLightsFade: 0.45,
+    totalSideLightSticks: 60,
+    lightPairsPerRoadWay: 120, // More traffic to fill the space
+    shoulderLinesWidthPercentage: 0.05,
+    brokenLinesWidthPercentage: 0.1,
+    brokenLinesLengthPercentage: 0.5,
+    lightStickWidth: [0.1, 0.4],
+    lightStickHeight: [1.3, 1.8],
+    movingAwaySpeed: [90, 120],
+    movingCloserSpeed: [-160, -220],
+    carLightsLength: [500 * 0.05, 500 * 0.2],
+    carLightsRadius: [0.05, 0.14],
+    carWidthPercentage: [0.3, 0.5],
+    carShiftX: [-0.6, 0.6],
+    carFloorSeparation: [0.1, 3],
+    colors: {
+      roadColor: 0x030408,
+      islandColor: 0x060810,
+      background: 0x000000,
+      shoulderLines: 0x0a0a0f,
+      brokenLines: 0x0a0a0f,
+      leftCars: [0x22d3ee, 0x6366f1, 0x3b82f6],
+      rightCars: [0xf43f5e, 0xa78bfa, 0x3b82f6],
+      sticks: 0x3b82f6,
+    }
+  }), []);
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "#000000",
+      color: "#f0f4f8",
+      fontFamily: "'General Sans','Inter',sans-serif",
+      overflowX: "hidden",
+    }}>
+      {/* ── Global reflections ── */}
+      <GlobalReflections />
+
+      {/* ── Cursor spotlight ── */}
+      <CursorSpotlight />
+
+
+      {/* ── Cinematic background system ── */}
+      <AnimatePresence mode="wait">
+        {bgMode === 'galaxy' ? (
+          <motion.div key="galaxy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "fixed", inset: 0, zIndex: 0, transform: "translateZ(0)", willChange: "transform", pointerEvents: "none" }}>
+            <CinematicBackground />
+          </motion.div>
+        ) : (
+          <motion.div key="hyperspeed" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "fixed", inset: 0, zIndex: 0, transform: "translateZ(0)", willChange: "transform" }}>
+            <Hyperspeed effectOptions={hyperspeedOptions} />
+          </motion.div>
+        )}
+
+
+
+      </AnimatePresence>
+
+      <Reflections mode={bgMode} />
+
+      {/* ── Page content ── */}
+      <div style={{ position: "relative", zIndex: 10 }}>
+        <Navbar router={router} mounted={mounted} />
+        <BGControlWidget mode={bgMode} setMode={setBgMode} />
+
+
+        {/* ═══════ HERO SECTION ═══════ */}
+        <motion.main
+          style={{
+            maxWidth: 1440, margin: "0 auto",
+            padding: "100px 5% 60px",
+            position: "relative",
+            minHeight: "92vh",
+            display: "flex", alignItems: "center",
+            y: heroParallax,
+          }}
+        >
+          {/* Removed Hero Focal Orb to prevent dark overlapping circle */}
+
+          {/* Removed speculative HUD to restore minimal hero density */}
+
+          <div className="w-full max-w-7xl mx-auto px-6 md:px-10 relative z-10">
+            <div className="max-w-3xl relative z-2">
+              {/* ── Live badge ── */}
+              <motion.div
+                initial={{ opacity: 0, y: 24, scale: 0.88 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 10,
+                  padding: "5px 16px 5px 5px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(34,211,238,0.15)",
+                  background: "rgba(1,5,20,0.65)",
+                  backdropFilter: "blur(16px)",
+                  marginBottom: 36,
+                  position: "relative", overflow: "hidden",
+                }}
+              >
+                <motion.div
+                  animate={{ x: ["-200%", "200%"] }}
+                  transition={{ duration: 4, repeat: Infinity, repeatDelay: 3, ease: "easeInOut" }}
+                  style={{
+                    position: "absolute", inset: 0,
+                    background: "linear-gradient(90deg,transparent,rgba(34,211,238,0.08),transparent)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <span style={{
+                  padding: "4px 12px",
+                  borderRadius: 999,
+                  background: "rgba(34,211,238,0.12)",
+                  fontSize: "0.52rem", fontWeight: 800, color: "#22d3ee",
+                  letterSpacing: "0.16em", textTransform: "uppercase",
+                }}>
+                  {t("auto.AISECURITY_1110") || "AI SECURITY"}
+                </span>
+                <motion.span
+                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.3, 0.8] }}
+                  transition={{ duration: 1.4, repeat: Infinity }}
+                  style={{ width: 5, height: 5, borderRadius: "50%", background: "#22d3ee", boxShadow: "0 0 10px #22d3ee", display: "inline-block" }}
+                />
+                <span style={{ fontSize: "0.52rem", fontWeight: 600, color: "#94a3b8", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                  {t("auto.REALTIMEINTELLI_918") || "REAL-TIME INTELLIGENCE"}
+                </span>
+              </motion.div>
+
+              <div style={{ marginBottom: 28 }}>
+                <BlurText
+                  text="Intelligence Beyond"
+                  delay={80}
+                  animateBy="words"
+                  direction="top"
+                  className="hero-headline text-4xl md:text-6xl lg:text-8xl"
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.0, duration: 1.3, ease: [0.16, 1, 0.3, 1] }}
+                  style={{
+                    fontSize: "clamp(42px, 10vw, 110px)",
+                    fontWeight: 900,
+                    lineHeight: 0.88,
+                    letterSpacing: "-0.065em",
+                    color: "#ffffff",
+                    textShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                    marginTop: -4,
+                  }}
+                >
+                  <Typewriter words={["Surveillance", "Security", "Monitoring", "Prediction"]} />
+                </motion.div>
+              </div>
+
+              {/* ── Subtext ── */}
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55, duration: 0.9 }}
+                style={{
+                  fontSize: "clamp(0.9rem, 2vw, 1.05rem)",
+                  color: "#b0bec5",
+                  maxWidth: 560, lineHeight: 1.75, marginBottom: 48,
+                }}
+              >
+                Real-time footfall analysis, suspicious activity detection, zone intelligence,
+                smart alerts, and predictive monitoring —{" "}
+                <span style={{ color: "#ffffff", fontWeight: 600 }}>{t("auto.poweredbynextge_2611") || "powered by next-gen AI"}</span>.
+              </motion.p>
+
+              {/* ── CTA Buttons ── */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 0.7 }}
+                className="flex flex-wrap gap-4 mb-16"
+              >
+                <MagBtn primary onClick={() => router.push("/register")}>
+                  <Zap size={14} /> {t("auto.DeployIntellige_4320") || "Deploy Intelligence"} <ChevronRight size={13} />
+                </MagBtn>
+                <MagBtn onClick={() => router.push("/dashboard")}>
+                  <Eye size={14} /> {t("auto.ViewLiveDemo_455") || "View Live Demo"}
+                </MagBtn>
+              </motion.div>
+
+              {/* ── Stats ── */}
+              <div className="mb-10">
+                <StatsGrid />
+              </div>
+
+            </div>
+          </div>
+        </motion.main>
+
+
+
+        {/* ── All Sections ── */}
+        <TrustSection />
+        <DashboardPreview />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <UseCasesSection />
+        <TestimonialsSection />
+        <PricingSection />
+        <FAQSection />
+        <FinalCTA
+          onGetStarted={() => router.push("/register")}
+          onLogin={() => router.push("/login")}
+        />
+        <Footer />
+        <BGControlWidget mode={bgMode} setMode={setBgMode} />
+      </div>
+
     </div>
   );
 }

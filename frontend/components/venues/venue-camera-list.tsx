@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { Activity, Video, Wifi, WifiOff } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
 
 interface Camera {
   id: string;
@@ -14,6 +15,8 @@ interface Camera {
 }
 
 export default function VenueCameraList({ venueId }: { venueId: string }) {
+  const { t } = useTranslation();
+
   const { data: cameras, isLoading } = useQuery<Camera[]>({
     queryKey: ["cameras", venueId],
     queryFn: async () => {
@@ -30,7 +33,7 @@ export default function VenueCameraList({ venueId }: { venueId: string }) {
     return (
       <div className="p-6 text-center border border-dashed border-slate-700/50 rounded-xl bg-slate-800/20">
         <Video className="w-6 h-6 text-slate-500 mx-auto mb-2" />
-        <p className="text-sm font-medium text-slate-400">No cameras connected to this sector.</p>
+        <p className="text-sm font-medium text-slate-400">{t("auto.Nocamerasconnec_5202") || "No cameras connected to this sector."}</p>
       </div>
     );
   }
@@ -51,15 +54,15 @@ export default function VenueCameraList({ venueId }: { venueId: string }) {
           <div className="flex items-center gap-4">
             {camera.is_active ? (
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-emerald-500/20 text-[10px] font-semibold text-emerald-400 uppercase">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> {t("auto.Active_3416") || "Active"}
                </div>
             ) : (
                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-rose-500/20 text-[10px] font-semibold text-rose-400 uppercase">
-                  <WifiOff className="w-3 h-3" /> Offline
+                  <WifiOff className="w-3 h-3" /> {t("auto.Offline_6760") || "Offline"}
                </div>
             )}
             <Link href={`/cameras/${camera.id}`} className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors">
-              View Feed
+              {t("auto.ViewFeed_6065") || "View Feed"}
             </Link>
           </div>
         </div>

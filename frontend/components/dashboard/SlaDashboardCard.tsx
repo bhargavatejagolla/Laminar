@@ -3,9 +3,11 @@
 import React from "react";
 import { Clock, ShieldAlert, CheckCircle2, AlertTriangle, Activity } from "lucide-react";
 import { useSlaMetrics } from "@/hooks/useSlaMetrics";
+import { useTranslation } from "react-i18next";
 
 export function SlaDashboardCard() {
   const { data: metrics, isLoading } = useSlaMetrics();
+  const { t } = useTranslation();
 
   // Handle loading state gracefully by retaining layout
   const avgResponseTime = isLoading 
@@ -28,42 +30,42 @@ export function SlaDashboardCard() {
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-emerald-500" />
-            SLA & Response
+            {t("dashboard.slaAndResponse") || "SLA & Response"}
           </h3>
           <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5`}>
             {isLoading && <Activity className="w-3 h-3 animate-spin" />}
-            {complianceRate}% Compliant
+            {complianceRate}% {t("dashboard.compliant") || "Compliant"}
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Avg Acknowledgment</p>
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">{t("auto.AvgAcknowledgme_4712") || "Avg Acknowledgment"}</p>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-black text-slate-200">{avgResponseTime}</span>
-              <span className="text-xs font-bold text-slate-500 mb-1">mins</span>
+              <span className="text-xs font-bold text-slate-500 mb-1">{t("auto.mins_6667") || "mins"}</span>
             </div>
             <p className="text-xs text-emerald-500 font-medium mt-2 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Target: &lt;5 mins
+              <CheckCircle2 className="w-3 h-3" /> {t("auto.Targetlt5mins_2041") || "Target: &lt;5 mins"}
             </p>
           </div>
 
           <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Platform Alerts (7d)</p>
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">{t("dashboard.platformAlerts7d") || "Platform Alerts (7d)"}</p>
             <div className="flex items-end gap-2">
               <span className="text-4xl font-black text-slate-200">{breachesCount}</span>
-              <span className="text-xs font-bold text-slate-500 mb-1">total</span>
+              <span className="text-xs font-bold text-slate-500 mb-1">{t("dashboard.total") || "total"}</span>
             </div>
             <p className="text-xs text-amber-500 font-medium mt-2 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" /> Monitor closely
+              <AlertTriangle className="w-3 h-3" /> {t("dashboard.monitorClosely") || "Monitor closely"}
             </p>
           </div>
         </div>
 
         <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Global Policy: Critical alerts under 5m</p>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t("dashboard.globalPolicy") || "Global Policy: Critical alerts under 5m"}</p>
           <button className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-wider flex flex-row items-center">
-            View Report
+            {t("dashboard.viewReport") || "View Report"}
           </button>
         </div>
       </div>

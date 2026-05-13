@@ -26,6 +26,8 @@ import httpx
 import json
 import os
 import asyncio
+import time
+from collections import deque
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -43,7 +45,12 @@ from app.services.translation_service import TranslationService
 from app.services.laminar_intelligence_service import laminar_intelligence
 
 
+
 logger = get_logger(__name__)
+
+# Tactical Mesh State (In-Memory Buffer)
+_notification_buffer = deque(maxlen=50)
+_sse_subscribers: List[asyncio.Queue] = []
 
 
 class NotificationService:
@@ -443,7 +450,7 @@ class NotificationService:
             location_text = alert.extra_data.get("camera_location")
 
         # Get per-role recipient groups
-        role_recipients = await self._resolve_recipients(session, alert)
+        role_recipients = await self._resolve_recipients(session, alert.risk_level, alert.extra_data)
 
         if not role_recipients:
             logger.warning("No email recipients configured for any role.")
@@ -534,7 +541,7 @@ class NotificationService:
             await self._trigger_offline_sms(session, alert, venue, location_text, live_metrics)
 
 
-    async def _resolve_recipients(self, session: AsyncSession, alert: CrowdAlert) -> dict[str, list[str]]:
+    async def _resolve_recipients(self, session: AsyncSession, risk_level: str, extra_data: dict = None) -> dict[str, list[str]]:
         """
         Returns a dict mapping role label → recipient emails.
         Fetches static config emails and active profiles from the DB.
@@ -564,9 +571,10 @@ class NotificationService:
             for email, alert_email, role in res.all():
                 contact_email = alert_email if alert_email else email
                 label = None
-                if getattr(role, 'value', role) in ("super_admin", "admin", "manager", "user"):
+                role_val = getattr(role, 'value', role)
+                if role_val in ("super_admin", "admin", "manager", "user"):
                     label = "Management"
-                elif getattr(role, 'value', role) == "operator":
+                elif role_val == "operator":
                     label = "Supervisor"
                 
                 if label:
@@ -581,17 +589,134 @@ class NotificationService:
         filtered: dict[str, list[str]] = {}
         filtered["Management"] = recipients.get("Management", [])
 
-        is_camera_issue = alert.extra_data and alert.extra_data.get("type") == "camera_issue"
+        extra = extra_data or {}
+        is_camera_issue = extra.get("type") == "camera_issue"
+        police_only = extra.get("requires_police_only") == True
+        risk_level = (risk_level or "low").lower()
         
-        if is_camera_issue or alert.risk_level in ["high", "critical"]:
+        if police_only:
+            filtered.clear()
+            if "Police / Security" in recipients:
+                filtered["Police / Security"] = recipients["Police / Security"]
+            return {k: v for k, v in filtered.items() if v}
+        
+        if is_camera_issue or risk_level in ["medium", "high", "critical"]:
             if "Supervisor" in recipients:
                 filtered["Supervisor"] = recipients["Supervisor"]
             
-        if not is_camera_issue and alert.risk_level == "critical":
+        # Police receive both High and Critical for non-camera issues
+        if not is_camera_issue and risk_level in ["high", "critical"]:
             if "Police / Security" in recipients:
                 filtered["Police / Security"] = recipients["Police / Security"]
 
         return {k: v for k, v in filtered.items() if v}
+
+
+    async def notify_realtime_event(
+        self,
+        session: AsyncSession,
+        domain: str,
+        type: str,
+        priority: str,
+        description: str,
+        venue_id: str,
+        venue_name: str,
+        camera_id: str = None,
+        metadata: dict = None,
+        lang: str = "en"
+    ) -> None:
+        """
+        Refined tactical notification trigger for Smart City events.
+        Automatically captures evidence snapshots if camera_id is provided.
+        """
+        # Map tactical priority to risk_level
+        risk_map = {
+            "CRITICAL": "critical",
+            "HIGH": "high",
+            "MEDIUM": "medium",
+            "LOW": "low"
+        }
+        risk_level = risk_map.get(priority.upper(), "low")
+
+        # Get recipients
+        role_recipients = await self._resolve_recipients(session, risk_level, metadata)
+        if not role_recipients:
+            return
+
+        # Fetch venue for location context
+        venue_repo = Repository[Venue](Venue)
+        try:
+            venue = await venue_repo.get_by_id(session, UUID(venue_id))
+        except:
+            venue = None
+
+        if not venue:
+            return
+
+        location_text = getattr(venue, 'location', None) or getattr(venue, 'address', None) or venue_name
+        if metadata and metadata.get("camera_location"):
+            location_text = metadata.get("camera_location")
+
+        # Build a temporary CrowdAlert for email builder
+        # Add domain to extra_data so AI engine and email builder can see it
+        temp_alert = CrowdAlert(
+            venue_id=venue.id,
+            risk_level=risk_level,
+            explanation=description,
+            status="open",
+            extra_data={**(metadata or {}), "domain": domain, "type": type}
+        )
+        
+        color = self.COLOR_MAP.get(risk_level, "#16a34a")
+
+        # Fetch languages for all email recipients
+        all_emails = set()
+        for emails in role_recipients.values():
+            all_emails.update(emails)
+            
+        from app.models.user import User
+        stmt_lang = select(User.email, User.language_preference).where(User.email.in_(all_emails))
+        result_lang = await session.execute(stmt_lang)
+        user_langs = {row[0]: row[1] or "en" for row in result_lang.all()}
+
+        for role_label, emails in role_recipients.items():
+            if not emails:
+                continue
+                
+            emails_by_lang = {}
+            for email in emails:
+                lang = user_langs.get(email, "en")
+                emails_by_lang.setdefault(lang, []).append(email)
+            
+            for lang, lang_emails in emails_by_lang.items():
+                try:
+                    # Leverage rich insights from metadata for the AI Executive Brief
+                    ai_brief = (metadata or {}).get("insight")
+                    ai_brief_is_llm = True if ai_brief else False
+
+                    message = self._build_email(
+                        alert=temp_alert,
+                        venue=venue,
+                        location_text=location_text,
+                        color=color,
+                        ai_brief=ai_brief,
+                        ai_brief_is_llm=ai_brief_is_llm,
+                        role_label=role_label,
+                        lang=lang,
+                        live_metrics={**(metadata or {}), "domain": domain, "type": type}
+                    )
+                    # Subject is already set correctly inside _build_email — do NOT set it again here
+                    # (EmailMessage["key"] = val APPENDS, not replaces — causes Gmail 550 duplicate Subject)
+
+                    logger.info(f"Real-time {domain} notification sent to {role_label} ({lang})")
+                    await self._send_email(message, lang_emails)
+                    logger.info(f"Email dispatched to {role_label} ({len(lang_emails)} recipients)")
+                except Exception as e:
+                    logger.warning(f"Real-time email to {role_label} failed: {e}")
+
+        # Trigger SMS for critical/high
+        if risk_level in ["high", "critical"]:
+            await self._trigger_offline_sms(session, temp_alert, venue, location_text, metadata)
 
     # ==========================================================
     # Offline SMS Alert Method
@@ -733,8 +858,8 @@ class NotificationService:
 
     def _rule_based_brief(self, alert: CrowdAlert, venue: Venue, location_text: str, lang: str = "en") -> str:
         """
-        Generate a professional situation brief from alert data — no LLM needed.
-        Always produces meaningful human-readable content.
+        Generate a professional situation brief from alert data.
+        Optimized to handle low-data states gracefully.
         """
         t = TranslationService.t
         risk = alert.risk_level.upper()
@@ -744,31 +869,53 @@ class NotificationService:
         prob_pct = f"{int(escalation_prob * 100)}%" if escalation_prob else t(lang, "unknown", "unknown")
 
         action_map = {
-            "critical": t(lang, "critical_action", "Immediate management intervention and security deployment required."),
-            "high": t(lang, "high_action", "Supervisors should be notified and crowd-control measures activated."),
-            "medium": t(lang, "medium_action", "Monitor closely and prepare contingency staff."),
-            "low": t(lang, "low_action", "Situation is developing — continue standard monitoring."),
+            "critical": t(lang, "critical_action", "Immediate management intervention and security response deployment required."),
+            "high": t(lang, "high_action", "Supervisors should activate crowd-control protocols and verify sensor data."),
+            "medium": t(lang, "medium_action", "Monitor closely and prepare contingency staff for deployment."),
+            "low": t(lang, "low_action", "Situation is developing — continue standard monitoring and maintain readiness."),
         }
-        action = action_map.get(alert.risk_level.lower(), t(lang, "default_action", "Review dashboard for details."))
+        action = action_map.get(alert.risk_level.lower(), t(lang, "default_action", "Examine dashboard for tactical details."))
 
         trajectory = ""
         if predicted_level and escalation_prob:
-            traj_text = t(lang, "trajectory_prediction", "The system predicts escalation to {level} with {prob} probability.")
+            traj_text = t(lang, "trajectory_prediction", "AI engine predicts escalation to {level} with {prob} probability.")
             trajectory = " " + traj_text.format(level=predicted_level.upper(), prob=prob_pct)
 
         staffing_cfg = getattr(venue, "staffing_config", {}) or {}
-        required_staff_val = staffing_cfg.get(alert.risk_level.lower(), t(lang, "not_configured", "N/A"))
+        required_staff_val = staffing_cfg.get(alert.risk_level.lower())
         
-        brief_fmt = t(lang, "brief_format", "A {risk} crowd risk (severity {severity}) has been detected at {venue} near {location}.{trajectory} {action} Recommended Staffing: {staff} personnel.")
+        if not required_staff_val:
+            capacity = getattr(venue, 'capacity', None)
+            if capacity:
+                warn = getattr(venue, 'warning_threshold', None) or int(capacity * 0.70)
+                crit = getattr(venue, 'critical_threshold', None) or int(capacity * 0.90)
+                if alert.risk_level.lower() in ['critical', 'high']:
+                    required_staff_val = str(max(5, crit // 40))
+                elif alert.risk_level.lower() == 'medium':
+                    required_staff_val = str(max(3, warn // 60))
+                else:
+                    required_staff_val = str(max(1, capacity // 100))
+            else:
+                required_staff_val = t(lang, "dynamic", "Dynamic Deployment")
         
+        # Determine if data is sparse (e.g. initial alert or low ingest)
+        data_state_note = ""
+        if alert.extra_data and alert.extra_data.get("count", 0) == 0 and "incident" not in alert.extra_data.get("domain", ""):
+            data_state_note = t(lang, "sparse_data_note", " [SYSTEM READY - STANDING BY FOR DATA]")
+
+        brief_fmt = t(lang, "brief_format", "A {risk} {domain} risk detected at {venue} near {location}.{trajectory} {action} Recommended Staffing: {staff}{note}")
+        
+        domain_label = alert.extra_data.get("domain", "crowd").title() if alert.extra_data else "Crowd"
+
         return brief_fmt.format(
             risk=risk,
-            severity=severity,
+            domain=domain_label,
             venue=venue.name,
             location=location_text,
             trajectory=trajectory,
             action=action,
-            staff=required_staff_val
+            staff=required_staff_val,
+            note=data_state_note
         )
 
     async def _generate_ai_brief(self, alert: CrowdAlert, venue: Venue, location_text: str, session: AsyncSession = None, lang: str = "en") -> tuple[str, bool]:
@@ -820,17 +967,32 @@ class NotificationService:
             predicted = getattr(alert, 'predicted_level', 'unknown')
             subject_prefix = f"PREDICTED {predicted.upper()}"
 
+        # Domain-aware Iconography & Labels
+        extra = alert.extra_data or {}
+        domain = extra.get("domain", "crowd")
+        icon = {"parking": "🅿️", "traffic": "🚗", "incident": "🚨", "crowd": "👥"}.get(domain, "🔔")
+        
+        # Protective Labels (Ensure crowd remains "Crowd Alert" and "occupancy")
+        if domain == "crowd":
+            domain_label = t(lang, 'email_subject_prefix', 'Crowd Alert')
+            count_label = t(lang, 'persons', 'persons')
+            occupancy_term = t(lang, 'occupancy', 'occupancy')
+        else:
+            domain_label = {"parking": "Smart Parking", "traffic": "Traffic Flow", "incident": "Tactical Incident"}.get(domain, "System Alert")
+            count_label = {"parking": "Vehicles", "traffic": "Vehicles", "incident": "Units"}.get(domain, "Count")
+            occupancy_term = f"{domain} saturation"
+
         # Translate role label if possible
         role_key = "role_management" if "Management" in role_label else "role_police" if "Police" in role_label else None
         display_role = t(lang, role_key, role_label) if role_key else role_label
 
-        # Camera issue subject override
+        # Set Subject
         if alert.extra_data and alert.extra_data.get("type") == "camera_issue":
             issue_label = alert.extra_data.get("issue_label", "Camera Issue")
             cam_name = alert.extra_data.get("camera_name", "Unknown Camera")
             msg["Subject"] = f"[CAMERA ALERT] {issue_label} — {cam_name} [{display_role.upper()}]"
         else:
-            msg["Subject"] = f"[{subject_prefix}] {t(lang, 'email_subject_prefix', 'Crowd Alert')} — {venue.name} [{display_role.upper()}]"
+            msg["Subject"] = f"[{subject_prefix}] {icon} {domain_label} — {venue.name} [{display_role.upper()}]"
 
         msg.set_content("This email requires HTML support.")
 
@@ -847,15 +1009,42 @@ class NotificationService:
         warning_threshold = getattr(venue, 'warning_threshold', None)
         critical_threshold = getattr(venue, 'critical_threshold', None)
         staffing_cfg = getattr(venue, "staffing_config", {}) or {}
-        required_staff = staffing_cfg.get(alert.risk_level.lower(), "Not configured")
+        required_staff = staffing_cfg.get(alert.risk_level.lower())
+        if not required_staff:
+            if capacity:
+                _crit = critical_threshold or int(capacity * 0.9)
+                _warn = warning_threshold or int(capacity * 0.7)
+                if alert.risk_level.lower() in ['critical', 'high']:
+                    required_staff = str(max(5, _crit // 40))
+                elif alert.risk_level.lower() == 'medium':
+                    required_staff = str(max(3, _warn // 60))
+                else:
+                    required_staff = str(max(1, int(capacity // 100)))
+            else:
+                required_staff = t(lang, "dynamic", "Dynamic Deployment")
 
-        # ── Live crowd metrics ──
-        avg_count     = live.get("avg_count", 0)
-        max_count     = live.get("max_count", 0)
-        occupancy_pct = live.get("occupancy_percent", 0)
-        growth_rate   = live.get("growth_rate") or extra.get("velocity", 0.0)
-        risk_score    = live.get("dynamic_risk_score", 0)
-        metric_time   = live.get("bucket_start", "—")
+        # ── Metric Mapping (Bridge domain-specific keys to standard variables) ──
+        if domain == "traffic":
+            avg_count     = extra.get("vehicle_count") or extra.get("count") or live.get("avg_count", 0)
+            max_count     = extra.get("vehicle_count") or extra.get("max_count", 0)
+            risk_score    = extra.get("risk_score") or live.get("dynamic_risk_score", 0)
+            growth_rate   = extra.get("velocity") or live.get("growth_rate", 0.0)
+            if capacity and avg_count:
+                occupancy_pct = min(100, (avg_count / capacity) * 100)
+        elif domain == "parking":
+            avg_count     = extra.get("occupancy") or live.get("avg_count", 0)
+            max_count     = extra.get("occupancy") or live.get("max_count", 0)
+            risk_score    = extra.get("risk_score") or live.get("dynamic_risk_score", 0)
+            if capacity and avg_count:
+                occupancy_pct = min(100, (avg_count / capacity) * 100)
+        else:
+            avg_count     = live.get("avg_count", 0)
+            max_count     = live.get("max_count", 0)
+            occupancy_pct = live.get("occupancy_percent", 0)
+            growth_rate   = live.get("growth_rate") or extra.get("velocity", 0.0)
+            risk_score    = live.get("dynamic_risk_score", 0)
+
+        metric_time = live.get("bucket_start") or datetime.now().strftime("%H:%M")
 
         # ── Alert Context / Explanation ──
         explanation_html = ""
@@ -877,32 +1066,33 @@ class NotificationService:
         falling_label = t(lang, "falling", "FALLING")
         stable_label = t(lang, "stable", "STABLE")
 
+        surge_unit = "px/s" if domain == "traffic" else "%/min"
         surge_block = ""
         if growth_rate > (surge_threshold * 2):
-            surge_label = f"🔴 {rapid_label} (+{growth_rate:.1f}%/min)"
+            surge_label = f"🔴 {rapid_label} (+{growth_rate:.1f}{surge_unit})"
             surge_block = f"""
             <div style="background:#b91c1c; padding:15px; color:white; margin-bottom:20px; border-radius:4px; font-weight:bold; font-size:16px; border:2px solid #fecaca; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                📈 <strong>{t(lang, 'surge_monitor_alert', 'SURGE MONITOR ALERT')}</strong>: {t(lang, 'rapid_growth_detected', 'Rapid crowd growth detected at')} {growth_rate:.1f}%/min.
+                📈 <strong>{t(lang, 'surge_monitor_alert', 'SURGE MONITOR ALERT')}</strong>: {t(lang, 'rapid_growth_detected', 'Rapid growth/flow detected at')} {growth_rate:.1f}{surge_unit}.
             </div>
             """
         elif growth_rate > surge_threshold:
-            surge_label = f"🟠 {rising_label} (+{growth_rate:.1f}%/min)"
+            surge_label = f"🟠 {rising_label} (+{growth_rate:.1f}{surge_unit})"
             surge_block = f"""
             <div style="background:#ea580c; padding:15px; color:white; margin-bottom:20px; border-radius:4px; font-weight:bold; border:1px solid #fed7aa; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                📈 <strong>{t(lang, 'surge_monitor_warning', 'SURGE MONITOR WARNING')}</strong>: {t(lang, 'steady_growth_detected', 'Steady crowd growth identified at')} {growth_rate:.1f}%/min.
+                📈 <strong>{t(lang, 'surge_monitor_warning', 'SURGE MONITOR WARNING')}</strong>: {t(lang, 'steady_growth_detected', 'Steady growth/flow identified at')} {growth_rate:.1f}{surge_unit}.
             </div>
             """
         elif growth_rate < -surge_threshold:
-            surge_label = f"🟢 {falling_label} ({growth_rate:.1f}%/min)"
+            surge_label = f"🟢 {falling_label} ({growth_rate:.1f}{surge_unit})"
         else:
-            surge_label = f"🟡 {stable_label} ({growth_rate:+.1f}%/min)"
+            surge_label = f"🟡 {stable_label} ({growth_rate:+.1f}{surge_unit})"
 
         # ── Venue threshold display ──
-        capacity_display = f"{capacity} {t(lang, 'persons', 'persons')}" if capacity else t(lang, "not_configured", "Not configured")
+        capacity_display = f"{capacity} {count_label}" if capacity else t(lang, "not_configured", "Not configured")
         if warning_threshold and critical_threshold:
-            threshold_display = f"{t(lang, 'warning', 'Warning')} ≥ {warning_threshold} | {t(lang, 'critical', 'Critical')} ≥ {critical_threshold} {t(lang, 'persons', 'persons')}"
+            threshold_display = f"{t(lang, 'warning', 'Warning')} ≥ {warning_threshold} | {t(lang, 'critical', 'Critical')} ≥ {critical_threshold} {count_label}"
         elif warning_threshold:
-            threshold_display = f"{t(lang, 'warning', 'Warning')} ≥ {warning_threshold} {t(lang, 'persons', 'persons')} | {t(lang, 'critical', 'Critical')}: {t(lang, 'not_configured', 'Not configured')}"
+            threshold_display = f"{t(lang, 'warning', 'Warning')} ≥ {warning_threshold} {count_label} | {t(lang, 'critical', 'Critical')}: {t(lang, 'not_configured', 'Not configured')}"
         else:
             threshold_display = t(lang, "thresholds_not_set", "Thresholds not configured — edit Venue Settings to set limits.")
 
@@ -917,12 +1107,14 @@ class NotificationService:
         else:
             occ_bar_color = "#16a34a" # green/low
 
-        occupancy_bar = f"""
-        <div style="margin:10px 0; background:#374151; border-radius:4px; height:14px; overflow:hidden;">
-            <div style="width:{occ_pct_clamped}%; height:100%; background:{occ_bar_color}; transition:width 0.3s;"></div>
-        </div>
-        <div style="font-size:11px; color:#9ca3af; margin-top:2px;">{occ_pct_clamped}% occupancy — {int(avg_count)} of {capacity or '?'} persons</div>
-        """
+        occupancy_bar = ""
+        if domain != "incident":
+            occupancy_bar = f"""
+            <div style="margin:10px 0; background:#374151; border-radius:4px; height:14px; overflow:hidden;">
+                <div style="width:{occ_pct_clamped}%; height:100%; background:{occ_bar_color}; transition:width 0.3s;"></div>
+            </div>
+            <div style="font-size:11px; color:#9ca3af; margin-top:2px;">{occ_pct_clamped}% {occupancy_term} — {int(avg_count)} of {capacity or '?'} {count_label.lower()}</div>
+            """
 
         # ── Prediction block ──
         if predicted_level is not None and predicted_score is not None:
@@ -986,16 +1178,106 @@ class NotificationService:
             police_label = t(lang, "police_escalation_label", "POLICE ESCALATION REQUIRED")
             police_block = f"""<div style="background:#000; color:white; padding:10px; margin-bottom:20px;">🚔 {police_label}</div>"""
 
-        # ── AI Brief block ──
+        tactical_info = ""
+        if domain == "traffic":
+            # ── Traffic-specific telemetry block ──────────────────────────────
+            trf_vehicles   = extra.get("vehicle_count") or live.get("avg_count", 0)
+            trf_speed      = extra.get("flow_speed") or live.get("flow_speed", 0.0)
+            trf_wait       = extra.get("wait_time") or live.get("wait_time", 0.0)
+            trf_congestion = extra.get("congestion_level") or extra.get("density", "-")
+            trf_risk       = extra.get("risk_score") or live.get("dynamic_risk_score", 0)
+            trf_insight    = extra.get("insight", "")
+            trf_rec        = extra.get("recommendation", "")
+            flow_label     = "Stalled" if trf_speed < 5 else "Slow Crawl" if trf_speed < 20 else "Moderate" if trf_speed < 60 else "Fast"
+            trf_color_map  = {"Critical": "#dc2626", "High": "#f97316", "Medium": "#eab308", "Low": "#16a34a"}
+            cong_color     = trf_color_map.get(trf_congestion, "#94a3b8")
+            risk_pct       = min(100, max(0, int(trf_risk)))
+            risk_bar_color = "#dc2626" if risk_pct > 70 else "#f97316" if risk_pct > 40 else "#16a34a"
+            if trf_congestion in ("Critical", "High"):
+                ops_text = (
+                    f"At {int(trf_vehicles)} vehicles with {float(trf_wait):.1f} min average wait and "
+                    f"{flow_label.lower()} flow ({float(trf_speed):.1f} px/s), this corridor is operating "
+                    f"beyond safe throughput capacity. Immediate signal override and marshal deployment are required."
+                )
+            elif trf_congestion == "Medium":
+                ops_text = (
+                    f"{int(trf_vehicles)} vehicles are moving at {float(trf_speed):.1f} px/s with a "
+                    f"{float(trf_wait):.1f} min wait estimate. Load balancing is advised — extend green phase "
+                    f"by 10–15 s on primary corridors and activate alternate route signage."
+                )
+            else:
+                ops_text = (
+                    f"Traffic is flowing normally: {int(trf_vehicles)} vehicles at {float(trf_speed):.1f} px/s. "
+                    f"No immediate intervention required. Continue standard monitoring cadence."
+                )
+            insight_html = ""
+            if trf_insight:
+                insight_html += f'<div style="background:#0f172a;border-left:4px solid {cong_color};padding:14px;border-radius:6px;margin-top:14px;"><div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:1px;margin-bottom:6px;">&#129504; AI Insight</div><p style="color:#e2e8f0;margin:0;font-size:13px;line-height:1.55;">{trf_insight}</p></div>'
+            if trf_rec:
+                insight_html += f'<div style="background:#172554;border-left:4px solid #3b82f6;padding:14px;border-radius:6px;margin-top:10px;"><div style="font-size:10px;color:#93c5fd;text-transform:uppercase;font-weight:700;letter-spacing:1px;margin-bottom:6px;">&#128203; Recommendation</div><p style="color:#e2e8f0;margin:0;font-size:13px;line-height:1.55;">{trf_rec}</p></div>'
+            tactical_info = f"""
+            <div style="background:#1f2937; padding:18px; color:#f3f4f6; margin-bottom:16px; font-size:14px; border-radius:8px; border-left:4px solid #f59e0b;">
+                <div style="font-size:11px; text-transform:uppercase; font-weight:700; color:#f59e0b; letter-spacing:1px; margin-bottom:12px;">&#128663; Traffic Telemetry</div>
+                <table width="100%" style="border-collapse:collapse; color:#e2e8f0; font-size:13px;">
+                  <tr><td style="padding:6px 0; border-bottom:1px solid #374151;">&#128205; Location</td><td style="text-align:right; font-weight:600; border-bottom:1px solid #374151;">{location_text}</td></tr>
+                  <tr><td style="padding:6px 0; border-bottom:1px solid #374151;">&#128336; Timestamp</td><td style="text-align:right; border-bottom:1px solid #374151;">{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</td></tr>
+                  <tr><td style="padding:6px 0; border-bottom:1px solid #374151;">&#128663; Vehicles Detected</td><td style="text-align:right; font-weight:800; font-size:16px; border-bottom:1px solid #374151;">{int(trf_vehicles)}</td></tr>
+                  <tr><td style="padding:6px 0; border-bottom:1px solid #374151;">&#127937; Congestion Level</td><td style="text-align:right; font-weight:700; color:{cong_color}; border-bottom:1px solid #374151;">{trf_congestion}</td></tr>
+                  <tr><td style="padding:6px 0; border-bottom:1px solid #374151;">&#9889; Flow Speed</td><td style="text-align:right; border-bottom:1px solid #374151;">{float(trf_speed):.1f} px/s &nbsp;({flow_label})</td></tr>
+                  <tr><td style="padding:6px 0; border-bottom:1px solid #374151;">&#9201; Est. Wait Time</td><td style="text-align:right; font-weight:700; border-bottom:1px solid #374151;">{float(trf_wait):.1f} min</td></tr>
+                  <tr><td style="padding:6px 0;">&#127919; Risk Score</td><td style="text-align:right; font-weight:800; color:{cong_color};">{risk_pct}%</td></tr>
+                </table>
+                <div style="margin-top:10px; background:#111827; border-radius:4px; height:8px; overflow:hidden;">
+                  <div style="width:{risk_pct}%; height:100%; background:{risk_bar_color}; border-radius:4px;"></div>
+                </div>
+                <div style="font-size:10px; color:#6b7280; margin-top:4px; text-align:right;">{risk_pct}% risk index</div>
+            </div>
+            <div style="background:#0d1117; border:1px solid #21262d; border-radius:8px; padding:16px; margin-bottom:20px;">
+                <div style="font-size:10px; color:#7d8590; text-transform:uppercase; font-weight:700; letter-spacing:1px; margin-bottom:8px;">&#9881;&#65039; What This Means For Operations</div>
+                <p style="color:#c9d1d9; margin:0; font-size:13px; line-height:1.6;">{ops_text}</p>
+                {insight_html}
+            </div>
+            """
+        elif domain == "incident":
+            lat = extra.get("latitude")
+            lng = extra.get("longitude")
+            coords_html = f"🌐 <strong>Coordinates:</strong> {float(lat):.4f}, {float(lng):.4f}<br/>" if lat and lng else ""
+            
+            tactical_info = f"""
+            <div style="background:#1f2937; padding:15px; color:#f3f4f6; margin-bottom:20px; font-size:14px; border-radius:4px;">
+                <div style="margin-bottom:8px; color:#cbd5e1;">
+                    📍 <strong>Location:</strong> {location_text}<br/>
+                    {coords_html}
+                    🕒 <strong>Timestamp:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
+                    🚨 <strong>Classification:</strong> {extra.get('type', 'Standard Alert').replace('_', ' ').title()}<br/>
+                    🚗 <strong>Vehicles Involved:</strong> {extra.get('vehicle_count', 'N/A')}
+                </div>
+            </div>
+            """
+        elif domain == "parking":
+            tactical_info = f"""
+            <div style="background:#1f2937; padding:15px; color:#f3f4f6; margin-bottom:20px; font-size:14px; border-radius:4px;">
+                <div style="margin-bottom:8px; color:#cbd5e1;">
+                    📍 <strong>Location:</strong> {location_text}<br/>
+                    🕒 <strong>Timestamp:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}<br/>
+                    🚨 <strong>Classification:</strong> {extra.get('type', 'Standard Alert').replace('_', ' ').title()}<br/>
+                    📊 <strong>Capacity Reached:</strong> {extra.get('occupancy', 'N/A')} vehicles detected
+                </div>
+            </div>
+            """
+
+        # ── AI Brief/Insights block ──
         ai_brief_block = ""
         if ai_brief:
+            ai_brief_html = str(ai_brief).replace("\n", "<br/>")
             brief_label = f"🤖 {t(lang, 'ai_brief_label', 'AI Executive Brief')}" if ai_brief_is_llm else f"📋 {t(lang, 'system_brief', 'System Brief')}"
             border_color = "#3b82f6" if ai_brief_is_llm else "#f59e0b"
             source_note = f"{t(lang, 'generated_by_label', 'Generated by')} {t(lang, 'source_local_llm', 'Local LLM')}" if ai_brief_is_llm else t(lang, "system_brief", "System Generated Brief")
+            
             ai_brief_block = f"""
             <div style="background:#1f2937; border-left:5px solid {border_color}; padding:15px; color:#f3f4f6; margin-bottom:20px; font-size:15px; line-height:1.5; border-radius:4px;">
                 <div style="font-size:12px; color:#93c5fd; text-transform:uppercase; font-weight:bold; margin-bottom:8px;">{brief_label}</div>
-                <em>"{ai_brief}"</em>
+                <div style="font-style: italic;">{ai_brief_html}</div>
                 <div style="font-size:10px; color:#6b7280; margin-top:8px;">{source_note}</div>
             </div>
             """
@@ -1027,88 +1309,134 @@ class NotificationService:
             </div>
             """
 
+        # Define Gradient and Theme based on domain
+        gradients = {
+            "crowd": "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",      # Indigo to Violet
+            "parking": "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",    # Sky to Blue
+            "traffic": "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",    # Amber to Yellow
+            "incident": "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)"    # Red to Dark Red
+        }
+        header_bg = gradients.get(domain, color)
+        maps_link = f"https://www.google.com/maps/search/?api=1&query={venue.latitude},{venue.longitude}"
+        domain_label = domain.upper() if domain else "ALERT"
+        subject_prefix = alert.risk_level.upper()
+        icon = "🚨" if domain == "incident" else "📊"
+
         html_content = f"""
+        <!DOCTYPE html>
         <html>
-        <body style="font-family: Arial, sans-serif; margin:0; padding:0; background:#f1f5f9;">
-
-          <!-- Header -->
-          <div style="background:{color}; padding:28px 25px; color:white;">
-            <h1 style="margin:0; font-size:24px;">{t(lang, 'email_header', 'Crowd Risk Alert')} — {alert.risk_level.upper()}</h1>
-            <p style="margin:6px 0 0; font-size:14px; opacity:0.85;">📍 {venue.name} &nbsp;|&nbsp; {location_text} &nbsp;|&nbsp; {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}</p>
-          </div>
-
-          <div style="padding:24px;">
-
-            {ai_brief_block}
-            {explanation_html}
-            {weather_html}
-            {holiday_html}
-            {early_warning_block}
-            {police_block}
-            {sms_block}
-            {surge_block}
-
-            <!-- Live Crowd Snapshot -->
-            <div style="background:white; border:1px solid #e5e7eb; border-radius:8px; padding:18px; margin-bottom:18px;">
-              <h3 style="margin:0 0 12px; color:#111827; font-size:15px;">📡 {t(lang, "live_snapshot", "Live Crowd Snapshot")} <span style="font-size:11px; color:#6b7280;">{t(lang, "as_of", "as of")} {metric_time}</span></h3>
-              {occupancy_bar}
-              <table width="100%" style="font-size:13px; color:#374151; border-collapse:collapse; margin-top:12px;">
-                <tr style="background:#f9fafb;">
-                  <td style="padding:7px 10px;">{t(lang, "current_count", "Current Count")}</td>
-                  <td style="padding:7px 10px; text-align:right; font-weight:bold;">{int(avg_count)} {t(lang, "persons", "persons")}</td>
-                </tr>
-                <tr>
-                  <td style="padding:7px 10px;">{t(lang, "peak_count", "Peak Count")}</td>
-                  <td style="padding:7px 10px; text-align:right;">{int(max_count)} {t(lang, "persons", "persons")}</td>
-                </tr>
-                <tr style="background:#f9fafb;">
-                  <td style="padding:7px 10px;">{t(lang, "surge_velocity", "Surge Velocity")}</td>
-                  <td style="padding:7px 10px; text-align:right;">{surge_label}</td>
-                </tr>
-                <tr>
-                  <td style="padding:7px 10px;">{t(lang, "risk_score", "Risk Score")}</td>
-                  <td style="padding:7px 10px; text-align:right;">{risk_score:.1f} / 100</td>
-                </tr>
-              </table>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; margin: 0; padding: 0; line-height: 1.6; }}
+            .container {{ max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }}
+            .header {{ background: {header_bg}; padding: 32px 24px; color: #ffffff; position: relative; }}
+            .header h1 {{ margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }}
+            .header p {{ margin: 8px 0 0; font-size: 14px; opacity: 0.9; font-weight: 500; }}
+            .content {{ padding: 24px; }}
+            .card {{ background: #fdfdfd; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin-bottom: 20px; }}
+            .ai-brief {{ background: #0f172a; border-radius: 12px; padding: 20px; color: #f1f5f9; position: relative; border-left: 4px solid #3b82f6; }}
+            .ai-brief h2 {{ margin: 0 0 12px; font-size: 11px; text-transform: uppercase; color: #3b82f6; letter-spacing: 1px; }}
+            .badge {{ display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }}
+            .badge-risk {{ background: #fee2e2; color: #991b1b; }}
+            .stat-table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+            .stat-table td {{ padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }}
+            .stat-table td:last-child {{ text-align: right; font-weight: 600; color: #0f172a; }}
+            .btn-primary {{ display: inline-block; padding: 12px 24px; background: #0f172a; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 10px; }}
+            .btn-maps {{ display: inline-block; margin-top: 8px; font-size: 13px; color: #3b82f6; text-decoration: none; font-weight: 500; }}
+            .footer {{ background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; }}
+            .progress-bg {{ background: #e2e8f0; height: 8px; border-radius: 4px; margin: 10px 0; overflow: hidden; }}
+            .progress-fill {{ background: {color}; height: 100%; border-radius: 4px; }}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <!-- Premium Header -->
+            <div class="header">
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; margin-bottom: 8px; letter-spacing: 1px; opacity: 0.8;">Laminar Tactical Network</div>
+              <h1>{icon} {subject_prefix} — {domain_label}</h1>
+              <p>📍 {venue.name} &nbsp;|&nbsp; {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}</p>
             </div>
 
-            <!-- Venue Capacity Config -->
-            <div style="background:white; border:1px solid #e5e7eb; border-radius:8px; padding:18px; margin-bottom:18px;">
-              <h3 style="margin:0 0 12px; color:#111827; font-size:15px;">🏟 {t(lang, "venue_config", "Venue Configuration")}</h3>
-              <table width="100%" style="font-size:13px; color:#374151; border-collapse:collapse;">
-                <tr style="background:#f9fafb;">
-                  <td style="padding:7px 10px;">{t(lang, "capacity_label", "Venue Capacity")}</td>
-                  <td style="padding:7px 10px; text-align:right; font-weight:bold;">{capacity_display}</td>
-                </tr>
-                <tr>
-                  <td style="padding:7px 10px;">{t(lang, "thresholds_label", "Alert Thresholds")}</td>
-                  <td style="padding:7px 10px; text-align:right;">{threshold_display}</td>
-                </tr>
-                <tr style="background:#f9fafb;">
-                  <td style="padding:7px 10px;">{t(lang, "staffing_label", "Required Staffing")}</td>
-                  <td style="padding:7px 10px; text-align:right; font-weight:bold;">{required_staff}</td>
-                </tr>
-                <tr>
-                  <td style="padding:7px 10px;">{t(lang, "alert_status_label", "Alert Status")}</td>
-                  <td style="padding:7px 10px; text-align:right;">{alert.status.upper()} | {t(lang, "severity", "Severity")} {alert.severity}</td>
-                </tr>
-              </table>
-              {event_text}
+            <div class="content">
+              {tactical_info}
+              {ai_brief_block}
+
+              {explanation_html}
+              {early_warning_block}
+              {police_block}
+              {surge_block}
+
+              <!-- Tactical Telemetry Card -->
+              <div class="card">
+                <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 15px; display: flex; justify-content: space-between;">
+                  <span>📡 Tactical Telemetry</span>
+                  <span style="font-weight: 400; color: #94a3b8;">As of {metric_time}</span>
+                </div>
+                
+                {occupancy_bar}
+                
+                <table class="stat-table">
+                  <tr>
+                    <td>Current {count_label}</td>
+                    <td>{int(avg_count)}</td>
+                  </tr>
+                  <tr>
+                    <td>{t(lang, "peak_count", "Peak Recorded")}</td>
+                    <td>{int(max_count)}</td>
+                  </tr>
+                  <tr>
+                    <td>{t(lang, "surge_velocity", "Flow Speed/Growth")}</td>
+                    <td>{surge_label}</td>
+                  </tr>
+                  <tr>
+                    <td>{t(lang, "risk_score", "Neural Risk Score")}</td>
+                    <td style="color: {color}!important;">{risk_score:.1f} / 100</td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Venue Infrastructure -->
+              <div class="card">
+                <div style="font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 12px;">🏟 Infrastructure & Staffing</div>
+                <table class="stat-table">
+                  <tr>
+                    <td>{t(lang, "capacity_label", "Design Capacity")}</td>
+                    <td>{capacity_display}</td>
+                  </tr>
+                   <tr>
+                    <td>{t(lang, "staffing_label", "Deployment Requirement")}</td>
+                    <td style="color: #2563eb!important;">{required_staff}</td>
+                  </tr>
+                  <tr>
+                    <td>{t(lang, "thresholds_label", "Response Thresholds")}</td>
+                    <td style="font-size: 12px;">{threshold_display}</td>
+                  </tr>
+                  <tr>
+                    <td>Location</td>
+                    <td>
+                      <a href="{maps_link}" class="btn-maps">View on Fleet Map ↗</a>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Prediction Intel -->
+              {prediction_block}
+
+              <!-- Evidence -->
+              {snapshot_block}
+              {clip_block}
+
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="http://localhost:3000" class="btn-primary">{t(lang, 'view_dashboard', 'Open Command Center')}</a>
+              </div>
             </div>
 
-            <!-- Prediction Intelligence -->
-            {prediction_block}
-
-            {snapshot_block}
-            {clip_block}
-
-            <hr style="border:1px solid #e5e7eb; margin:20px 0;"/>
-            <p style="font-size:12px; color:#6b7280;">
-              {t(lang, "automated_footer", "This is an automated alert generated by <strong>Laminar Predictive Monitoring System</strong>.")}
-            </p>
-            <p>
-              <a href="http://localhost:3000" style="display:inline-block; padding:10px 20px; background-color:#2563eb; color:white; text-decoration:none; border-radius:5px;">{t(lang, 'view_dashboard', 'View Dashboard')}</a>
-            </p>
+            <div class="footer">
+              <p>INTERNAL USE ONLY — Laminar Tactical Network Protocol</p>
+              <p>&copy; {datetime.now().year} Laminar Intelligence. All rights reserved.</p>
+            </div>
           </div>
         </body>
         </html>
@@ -1148,16 +1476,65 @@ class NotificationService:
 
         message["To"] = ", ".join(recipients)
 
+        def sync_send():
+            import smtplib
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+                if settings.SMTP_USE_TLS:
+                    server.starttls()
+                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                server.send_message(message)
+
         try:
-            await aiosmtplib.send(
-                message,
-                hostname=settings.SMTP_HOST,
-                port=settings.SMTP_PORT,
-                username=settings.SMTP_USER,
-                password=settings.SMTP_PASSWORD,
-                start_tls=settings.SMTP_USE_TLS,
-            )
-        except aiosmtplib.SMTPRecipientsRefused as e:
-            logger.error(f"Email bounce (550 5.1.1): Recipients refused {recipients}: {e}")
+            await asyncio.to_thread(sync_send)
         except Exception as e:
             logger.error(f"Failed to send email to {recipients}: {e}")
+
+    # === GLOBAL MESH BROADCAST ===
+    async def push_notification(self, type: str, priority: str, description: str, venue_id: str = None, venue_name: str = None, camera_id: str = None, domain: str = None, metadata: dict = None):
+        """Broadcasts a tactical alert to the unified emergency mesh."""
+        from app.core.global_state import GLOBAL_STATE
+        
+        notif = {
+            "id": f"mesh_{int(time.time()*1000)}",
+            "type": type,
+            "priority": priority,
+            "description": description,
+            "venue_id": str(venue_id) if venue_id else None,
+            "venue_name": venue_name,
+            "camera_id": str(camera_id) if camera_id else None,
+            "domain": domain,
+            "metadata": metadata or {},
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Persistence
+        _notification_buffer.append(notif)
+        # Update GLOBAL_STATE for direct dashboard access
+        GLOBAL_STATE.update(
+            domain="notifications",
+            venue_id="MESH_BUFFER",
+            payload={"recent": list(_notification_buffer)}
+        )
+        
+        # Real-time dispatch
+        for q in _sse_subscribers[:]:
+            try:
+                await q.put(notif)
+            except:
+                if q in _sse_subscribers:
+                    _sse_subscribers.remove(q)
+
+    def get_recent(self, limit: int = 50):
+        buffer_list = list(_notification_buffer)
+        return buffer_list[-limit:] if limit else buffer_list
+
+    async def get_sse_subscriber(self):
+        q = asyncio.Queue()
+        _sse_subscribers.append(q)
+        return q
+
+    def remove_sse_subscriber(self, q):
+        if q in _sse_subscribers:
+            _sse_subscribers.remove(q)
+
+notification_service = NotificationService()

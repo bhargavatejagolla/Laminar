@@ -3,6 +3,7 @@
 import { ZoneIntelligenceSnapshot } from "@/hooks/useZoneIntelligence";
 import { X, Activity, Droplets, Move, Network, Clock, ShieldAlert } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   node?: ZoneIntelligenceSnapshot;
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export default function ZoneDetailPanel({ node, onClose }: Props) {
+  const { t } = useTranslation();
+
   if (!node) return null;
 
   return (
@@ -26,7 +29,7 @@ export default function ZoneDetailPanel({ node, onClose }: Props) {
           </div>
           <div>
             <h2 className="text-white font-bold tracking-widest uppercase">NODE {node.camera_id.substring(0,6)}</h2>
-            <p className="text-[10px] text-cyan-500 tracking-widest uppercase font-mono">Telemetry Feed</p>
+            <p className="text-[10px] text-cyan-500 tracking-widest uppercase font-mono">{t("auto.TelemetryFeed_5969") || "Telemetry Feed"}</p>
           </div>
         </div>
         <button 
@@ -47,7 +50,7 @@ export default function ZoneDetailPanel({ node, onClose }: Props) {
           'bg-emerald-500/10 border-emerald-500/50'
         }`}>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Live Status</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">{t("auto.LiveStatus_9581") || "Live Status"}</p>
             <h3 className="text-xl font-black uppercase tracking-widest">{node.intelligence.overall_risk_level} RISK</h3>
             <p className="text-xs opacity-80 mt-1 max-w-[250px]">{node.intelligence.summary}</p>
           </div>
@@ -57,7 +60,7 @@ export default function ZoneDetailPanel({ node, onClose }: Props) {
         <div className="bg-white/5 border border-white/10 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="w-4 h-4 text-cyan-400" />
-            <span className="text-xs font-bold tracking-widest uppercase text-slate-300">Phase 2 Prediction</span>
+            <span className="text-xs font-bold tracking-widest uppercase text-slate-300">{t("auto.Phase2Predictio_7529") || "Phase 2 Prediction"}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-black/20 p-3 rounded-lg border border-white/5">
@@ -65,7 +68,7 @@ export default function ZoneDetailPanel({ node, onClose }: Props) {
               <p className="text-2xl font-mono text-white">{node?.prediction?.density_10m ?? 0}</p>
             </div>
             <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">Time to Critical</p>
+              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">{t("auto.TimetoCritical_5465") || "Time to Critical"}</p>
               <p className="text-2xl font-mono text-cyan-400">
                 {node?.prediction?.time_to_critical_min ? `${node.prediction.time_to_critical_min}m` : 'Safe'}
               </p>
@@ -77,15 +80,15 @@ export default function ZoneDetailPanel({ node, onClose }: Props) {
         <div className="bg-white/5 border border-white/10 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Clock className="w-4 h-4 text-purple-400" />
-            <span className="text-xs font-bold tracking-widest uppercase text-slate-300">Dwell Metrics</span>
+            <span className="text-xs font-bold tracking-widest uppercase text-slate-300">{t("auto.DwellMetrics_4489") || "Dwell Metrics"}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-3">
              <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">Avg Dwell</p>
+              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">{t("auto.AvgDwell_9693") || "Avg Dwell"}</p>
               <p className="text-lg font-mono text-white">{(node?.dwell?.avg_seconds ?? 0).toFixed(1)}s</p>
             </div>
              <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">Status</p>
+              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">{t("auto.Status_4752") || "Status"}</p>
               <p className="text-lg font-mono text-purple-400 capitalize">{node?.dwell?.zone_status ?? "Unknown"}</p>
             </div>
           </div>
@@ -95,15 +98,15 @@ export default function ZoneDetailPanel({ node, onClose }: Props) {
         <div className="bg-white/5 border border-white/10 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
             <Move className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-bold tracking-widest uppercase text-slate-300">Motion Flow</span>
+            <span className="text-xs font-bold tracking-widest uppercase text-slate-300">{t("auto.MotionFlow_257") || "Motion Flow"}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
              <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">Velocity</p>
+              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">{t("auto.Velocity_7866") || "Velocity"}</p>
               <p className="text-lg font-mono text-white">{(node?.flow?.avg_speed_px_per_frame ?? 0).toFixed(1)} px/f</p>
             </div>
              <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">Intensity</p>
+              <p className="text-[10px] uppercase text-slate-500 tracking-widest font-bold mb-1">{t("auto.Intensity_6345") || "Intensity"}</p>
               <p className="text-lg font-mono text-blue-400 capitalize">{node?.flow?.flow_intensity ?? "Low"}</p>
             </div>
           </div>
@@ -121,7 +124,7 @@ export default function ZoneDetailPanel({ node, onClose }: Props) {
               <div className="relative z-10">
                  <div className="flex items-center gap-2 mb-2">
                     <ShieldAlert className="w-4 h-4 text-indigo-400" />
-                    <span className="text-[10px] tracking-widest uppercase font-black text-indigo-300">Phase 2 AI Fusion</span>
+                    <span className="text-[10px] tracking-widest uppercase font-black text-indigo-300">{t("auto.Phase2AIFusion_9856") || "Phase 2 AI Fusion"}</span>
                  </div>
                  <h4 className="text-sm font-bold text-white mb-1">{node.intelligence.alert_reason?.replace(/_/g, ' ')}</h4>
                  <p className="text-xs text-indigo-200 uppercase tracking-wide leading-relaxed mt-2 p-2 border border-indigo-500/20 bg-black/20 rounded-lg">

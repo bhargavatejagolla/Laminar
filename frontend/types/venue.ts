@@ -10,6 +10,8 @@ export interface Venue {
   critical_threshold_percent: number;
   warning_threshold: number;
   critical_threshold: number;
+  latitude?: number;
+  longitude?: number;
   is_active: boolean;
   monitoring_enabled: boolean;
   dynamic_risk_score?: number;
@@ -27,5 +29,6 @@ export interface VenueStats {
   active_cameras: number;
   camera_count: number;
   monitoring_enabled: boolean;
+  avg_velocity?: number;
   last_updated: string;
 }

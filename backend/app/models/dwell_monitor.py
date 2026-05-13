@@ -84,6 +84,16 @@ class PersonDwellTime(Base):
     # Whether a long-wait alert was already fired for this record
     alert_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Path to snapshots at different stages
+    snapshot_enter_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    snapshot_mid_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # Usually alert moment
+    snapshot_exit_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Explicit exit time (often same as last_seen_time but distinct for data integrity)
+    exit_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    snapshot_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # Legacy support
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

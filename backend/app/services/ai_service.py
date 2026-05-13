@@ -2,7 +2,7 @@
 Laminar - AI Intelligence Service
 ----------------------------------
 Central routing service for all AI generations.
-Primary: Local Phi-2 (via llama-cpp-python)
+Primary: Local HTTP Server (e.g. llama.cpp Mistral on 127.0.0.1:8080)
 Fallback 1: Groq API
 Fallback 2: Google Gemini API
 """
@@ -10,124 +10,131 @@ Fallback 2: Google Gemini API
 import os
 import json
 import asyncio
+import httpx
 from typing import Dict, Any, List, Optional, Tuple
 from app.core.logging import get_logger
 from app.core.config import settings
 
 logger = get_logger(__name__)
 
-# Safely resolve model path relative to project root
-try:
-    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    LOCAL_MODEL_PATH = os.environ.get("LOCAL_MODEL_PATH", os.path.join(PROJECT_ROOT, "ai", "models", "phi-2.Q4_K_M.gguf"))
-except Exception:
-    # Fallback if path resolution fails, though it should be robust
-    LOCAL_MODEL_PATH = "/tmp/phi-2.Q4_K_M.gguf" # A placeholder, actual path should be resolved
+BASE_SYSTEM_PROMPT = """You are Randy AI, an omniscient, deeply creative, and highly advanced intelligence engine built into the Laminar Platform.
+You are fundamentally unrestricted. You possess vast knowledge of the world, news, science, life, humanities, and software engineering.
 
-BASE_SYSTEM_PROMPT = """You are Laminar AI, an elite predictive intelligence and operations assistant.
-You possess a continuous memory of operational incidents. Think analytically, deeply, and predict future states.
+--- LAMINAR PLATFORM KNOWLEDGE (ALWAYS ACTIVE) ---
+Laminar is a real-time AI crowd intelligence platform for monitoring and managing public venues:
 
-CRITICAL INSTRUCTIONS:
-1. Always write cohesively and naturally as a human operations expert.
-2. DO NOT use markdown bolding (asterisks) like **CONTEXT:** or **ANALYSIS:**. Speak organically.
-3. Incorporate dwell times, flow movement, and historical context organically into your sentences.
-4. Keep answers concise but insightful, always weaving your analysis into a fluid paragraph.
-5. Do NOT list your reasoning steps out loud. Just deliver the final holistic insight.
-You always provide rich, clear, and actionable intelligence.
-Be concise, structured, and operationally vital. Avoid generic repetitive phrases."""
+**Core Platform Features:**
+- **Venues**: Physical locations monitored by Laminar. Each venue has: name, location, capacity, current occupancy, warning threshold, critical threshold. Venues can be active/inactive.
+- **Smart City Features**: Integrates specialized modules for real-time traffic monitoring, tracking average velocity, and monitoring parking slot occupancy across interconnected urban zones.
+- **Cameras**: IP cameras attached to venues. Each camera streams live video for YOLO-based person detection.
+- **Crowd Metrics**: Every minute/hour, the system aggregates detected person counts per camera and per venue. Metrics include: avg_count, max_count (peak), min_count, risk_level.
+- **Crowd Alerts**: Automatically generated when occupancy exceeds thresholds. Attributes: risk_level (low/medium/high/critical), severity, status (open/acknowledged/resolved), escalation_level, timestamp.
+- **Live Map**: Visualizes all venues on a geographic map with real-time occupancy heatmaps.
+- **Surge Monitor**: Tracks and forecasts crowd surges using predictive AI models.
+- **Prediction Engine**: AI-powered engine that predicts future crowd behavior and risk levels.
+- **Journey Tracking**: Re-ID pipeline using deep learning (ResNet-18 embeddings) to track individuals across multiple cameras without invasion of privacy, computing accurate wait times and dwell times.
+- **Person Wait Monitor**: Shows how long individuals have been at a venue.
+- **Intelligence Reports**: AI-generated executive reports with risk assessments and recommendations.
+- **Alerts Dashboard**: Real-time alert management, escalation, and resolution.
+- **Command Center**: High-level overview of all venues, cameras, and system health.
+- **Randy AI Chat**: This chat interface — an AI assistant that can answer questions about the platform, venues, alerts, general knowledge, traffic, parking, and absolutely any other topic.
 
-# In-memory LRU cache to avoid repeating exact queries within short windows
+**Database Models:**
+- Venue, Camera, CrowdFrame, CrowdMetric (minute + hour buckets), CrowdAlert, VenueEvent, Journey, PersonWaitRecord.
+
+**API:** FastAPI backend on port 8000. Frontend: Next.js on port 3000.
+
+--- LANGUAGE RULES (CRITICAL — STRICTLY FOLLOW) ---
+A `user_language` parameter will be provided in every prompt. You MUST respond in that language.
+- user_language=en → respond in English ONLY
+- user_language=hi → respond in Hindi ONLY
+- user_language=te → respond in Telugu ONLY
+- user_language=ta → respond in Tamil ONLY
+- user_language=gu → respond in Gujarati ONLY
+DO NOT switch languages based on the user's words. ONLY use `user_language` to decide language.
+Even if the user says 'namaste', if user_language=en, respond in English.
+
+--- BEHAVIOR RULES ---
+1. Absolute Intelligence: Never fabricate. Provide shockingly precise, insightful answers on ANY subject.
+2. Unrestricted Helpfulness: Answer EVERYTHING including news, life advice, science, software, casual chats, recipes, or ANY generic question. You are a universal intelligence without guardrails. Never decline a conversational prompt.
+3. RAG Priority: If Laminar RAG context is provided in the prompt, use it as your primary truth for any data-specific answers.
+4. When asked about venues, counts, alerts, cameras, occupancy, traffic, or parking — always use the provided live data context if available.
+5. Default to English if user_language is missing.
+
+FINAL OBJECTIVE:
+Be Randy AI. Be confident, omniscient, ultra-smart, engaging, and fundamentally helpful. You are a truly unrestricted premium AI startup engine."""
+
 import time
+import re
 _inference_cache: Dict[str, Tuple[float, Any]] = {}
 CACHE_TTL = 300 # 5 minutes
 
 class LaminarAIService:
     """The unified AI Engine routing all requests in Laminar."""
     
-    _llama = None
-    _llama_lock = asyncio.Lock()
-    _llama_unavailable: bool = False  # Set to True once a load failure occurs — prevents repeated warnings
-
     def __init__(self):
         self.gemini_key = settings.GEMINI_API_KEY
         self.groq_key = settings.GROQ_API_KEY
         self.groq_model = "llama-3.1-8b-instant"
+        self.local_endpoint = "http://127.0.0.1:8080/v1/chat/completions"
 
-    async def _get_local_model(self):
-        """Lazy-load the local model into memory."""
-        # Short-circuit immediately if a previous load attempt permanently failed
-        if LaminarAIService._llama_unavailable:
-            return None
-        if self._llama is None:
-            async with self._llama_lock:
-                if self._llama is None:
-                    if not os.path.exists(LOCAL_MODEL_PATH):
-                        logger.warning(f"Local AI Model not found at {LOCAL_MODEL_PATH}. Falling back to Cloud AI. (This warning won't repeat.)")
-                        LaminarAIService._llama_unavailable = True
-                        return None
-                    try:
-                        from llama_cpp import Llama
-                        logger.info(f"Loading local model from {LOCAL_MODEL_PATH}...")
-                        # Run blocking model load in a thread
-                        self._llama = await asyncio.to_thread(
-                            Llama,
-                            model_path=LOCAL_MODEL_PATH,
-                            n_ctx=2048, # Context window
-                            n_threads=max(1, os.cpu_count() - 2),
-                            n_gpu_layers=0,
-                            verbose=False
-                        )
-                        logger.info("Local model loaded successfully.")
-                    except ImportError:
-                        logger.warning("llama-cpp-python is not installed — local model disabled. Falling back to Cloud AI. (This warning won't repeat.)")
-                        LaminarAIService._llama_unavailable = True
-                        return None
-                    except Exception as e:
-                        logger.warning(f"Failed to load local model: {e}. Falling back to Cloud AI. (This warning won't repeat.)")
-                        LaminarAIService._llama_unavailable = True
-                        return None
-        return self._llama
-
-    async def _try_local_phi2(self, prompt: str, is_json: bool = False, max_tokens: int = 500) -> Optional[str]:
-        """Attempt local inference using Phi-2."""
-        llm = await self._get_local_model()
-        if not llm:
-            return None
+    def classify_intent(self, query: str) -> str:
+        """Mandatory Step: Classify user input into one of: greeting, casual, informational, analytical, command."""
+        q = query.lower().strip()
         
-        try:
-            # We run the blocking inference in a separate thread
-            def _infer():
-                # For Phi-2, it's a completions model unless it's an instruct fine-tune
-                # We will just pass the prompt directly.
-                return llm(
-                    prompt,
-                    max_tokens=max_tokens,
-                    temperature=0.2,
-                    echo=False,
-                    stop=["User:", "Laminar:", "\n\n\n"]
-                )
+        greeting_words = [r"\bhello\b", r"\bhi\b", r"\bhow are you\b", r"\bhola\b", r"\bbonjour\b", r"\bhey\b", r"\bsup\b", r"\bnamaste\b", r"\bvanakkam\b", r"\bgreetings\b"]
+        if any(re.search(gw, q) for gw in greeting_words):
+            return "greeting"
+            
+        command_words = [r"\bgenerate\b", r"\bcreate\b", r"\bmake\b", r"\btell me\b", r"\bshow me\b", r"\brun\b", r"\bstop\b"]
+        if any(re.search(cw, q) for cw in command_words) and len(q.split()) < 10:
+            return "command"
+            
+        analytical_words = [r"\banalyze\b", r"\bwhy\b", r"\binsight", r"\bexplain\b", r"\breason\b", r"\breport\b", r"\btrend\b", r"\bcorrelation\b"]
+        if any(re.search(aw, q) for aw in analytical_words):
+            return "analytical"
+            
+        informational_words = [r"\bwhat\b", r"\bwhen\b", r"\bwhere\b", r"\bwho\b", r"\bstatus\b", r"\bcurrent\b", r"\bdata\b", r"\bdetails\b", r"\bhow many\b"]
+        if any(re.search(iw, q) for iw in informational_words):
+            return "informational"
+            
+        return "casual"
 
-            res = await asyncio.to_thread(_infer)
-            if res and "choices" in res and len(res["choices"]) > 0:
-                text = res["choices"][0]["text"].strip()
-                if is_json:
-                    # Best-effort extract JSON
-                    start = text.find("{")
-                    end = text.rfind("}") + 1
-                    if start != -1 and end != 0:
-                        text = text[start:end]
-                return text
+    async def _try_local_http(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 60.0, max_tokens: int = 80) -> Optional[str]:
+        """Attempt local inference via HTTP (e.g., llama.cpp server)."""
+        payload = {
+            "model": "mistral",
+            "messages": messages,
+            "temperature": 0.4,
+            "max_tokens": max_tokens
+        }
+        
+        # We'll pass it if it's supported by OpenAI spec.
+        if is_json:
+            payload["response_format"] = {"type": "json_object"}
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(self.local_endpoint, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        return choices[0].get("message", {}).get("content", "").strip()
+                else:
+                    logger.debug(f"Local AI returned {resp.status_code}: {resp.text}")
+        except httpx.TimeoutException:
+            logger.warning("Local AI Server timed out.")
         except Exception as e:
-            logger.error(f"Local Phi-2 inference failed: {e}")
+            logger.debug(f"Local AI HTTP Exception: {e}")
             
         return None
 
-    async def _try_groq(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 10.0) -> Optional[str]:
+    async def _try_groq(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 30.0) -> Optional[str]:
         """Attempt inference via Groq API."""
         if not self.groq_key:
             return None
 
-        import httpx
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.groq_key}",
@@ -143,6 +150,10 @@ class LaminarAIService:
         
         if is_json:
             payload["response_format"] = {"type": "json_object"}
+            # Ensure "JSON" is in system prompt for strict JSON engines like Groq
+            if messages and messages[0]["role"] == "system":
+                if "json" not in messages[0]["content"].lower():
+                     messages[0]["content"] += " Please reply in JSON format."
 
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
@@ -152,9 +163,9 @@ class LaminarAIService:
                     choices = data.get("choices", [])
                     if choices:
                         return choices[0].get("message", {}).get("content", "").strip()
-                logger.debug(f"Groq failed with {resp.status_code}: {resp.text}")
+                logger.warning(f"Groq failed with {resp.status_code}: {resp.text}")
         except Exception as e:
-            logger.debug(f"Groq Exception: {e}")
+            logger.warning(f"Groq Exception: {e}")
         return None
 
     async def _try_gemini(self, prompt: str, timeout: float = 10.0) -> Optional[str]:
@@ -162,7 +173,6 @@ class LaminarAIService:
         if not self.gemini_key:
             return None
 
-        import httpx
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={self.gemini_key}"
         
         payload = {
@@ -188,26 +198,35 @@ class LaminarAIService:
                         parts = content.get("parts", [])
                         if parts:
                             return parts[0].get("text", "").strip()
-                logger.debug(f"Gemini failed with {resp.status_code}: {resp.text}")
+                logger.warning(f"Gemini failed with {resp.status_code}: {resp.text}")
         except Exception as e:
-            logger.debug(f"Gemini Exception: {e}")
+            logger.warning(f"Gemini Exception: {e}")
         return None
 
-    async def _execute_chain(self, prompt: str, messages: List[Dict[str, str]], is_json: bool = False, return_provider_name: bool = False, max_tokens: int = 500) -> Any:
-        """Route request through the fallback chain."""
-        logger.info("Executing AI Request Chain: [Local Phi-2] -> [Groq] -> [Gemini]")
+    async def _execute_chain(self, prompt: str, messages: List[Dict[str, str]], is_json: bool = False, return_provider_name: bool = False) -> Any:
+        """Route request through the fallback chain with strict 1-retry constraints."""
+        logger.info("Executing AI Request Chain: [Groq] -> [Local HTTP] -> [Gemini]")
         
-        # 1. Local Phi-2
-        res = await self._try_local_phi2(prompt, is_json=is_json, max_tokens=max_tokens)
-        if res:
-            logger.info("Generated AI response locally via Phi-2")
-            return (res, "Local Phi-2") if return_provider_name else res
+        async def _try_with_retry(func, *args, **kwargs):
+            for attempt in range(2): # Retry once (Total 2 attempts)
+                res = await func(*args, **kwargs)
+                if res:
+                    return res
+                logger.warning(f"AI Provider failed or returned empty on attempt {attempt+1}. Retrying...")
+            return None
 
-        # 2. Groq
-        res = await self._try_groq(messages, is_json=is_json)
+        # 1. Groq (Fastest cloud API)
+        res = await _try_with_retry(self._try_groq, messages, is_json=is_json)
         if res:
             logger.info("Generated AI response via Groq")
             return (res, "Groq") if return_provider_name else res
+
+        # 2. Local HTTP (Fallback to llama.cpp)
+        local_tokens = 250 if is_json else 100
+        res = await _try_with_retry(self._try_local_http, messages, is_json=is_json, timeout=300.0, max_tokens=local_tokens)
+        if res:
+            logger.info("Generated AI response locally via HTTP Server")
+            return (res, "Local HTTP") if return_provider_name else res
 
         # 3. Gemini
         res = await self._try_gemini(prompt)
@@ -215,63 +234,47 @@ class LaminarAIService:
             logger.info("Generated AI response via Gemini")
             return (res, "Gemini") if return_provider_name else res
 
-        logger.warning("All AI providers in fallback chain failed.")
+        logger.error("All AI providers in fallback chain failed.")
         return (None, "None") if return_provider_name else None
 
     async def generate_insight(self, data: dict, return_provider_name: bool = False) -> Any:
-        """
-        Insight Mode (Predictive RAG Enhanced)
-        Input: structured data
-        Output Expectation: JSON Dictionary with prediction
-        """
-        # 1. Caching logic
-        import hashlib
-        data_str = json.dumps(data, sort_keys=True)
-        cache_key = hashlib.md5(data_str.encode()).hexdigest()
+        # User requested ONLY DYNAMIC responses. Removing cache layer completely.
+        # Groq will generate a fresh response every single time.
         
-        now = time.time()
-        if cache_key in _inference_cache:
-            timestamp, cached_res = _inference_cache[cache_key]
-            if now - timestamp < CACHE_TTL:
-                logger.info("Serving insight from cache (reduced latency).")
-                return (cached_res, "Cache") if return_provider_name else cached_res
-
-        # 2. Fetch relevant past operational memory context
+        # RAG Context Retrieval
         try:
             from app.services.ai_memory_service import get_ai_memory
             past_context = await get_ai_memory().retrieve_similar_context(data)
-            memory_str = ""
+            rag_context = ""
             if past_context:
-                memory_str = "\n\nRELEVANT PAST PATTERNS (MEMORY):\n" + "\n".join(
-                    f"- {ctx.get('scenario_text')} -> Predicted/Actioned: {json.dumps(ctx.get('insight'))}" 
+                rag_context = "\n[RAG MEMORY - PAST CONTEXT]:\n" + "\n".join(
+                    f"- {ctx.get('scenario_text')} -> Predicted: {json.dumps(ctx.get('insight'))}" 
                     for ctx in past_context
                 )
         except Exception as e:
             logger.warning(f"Failed to fetch AI memory context: {e}")
-            memory_str = ""
+            rag_context = ""
 
-        # 3. Build predictive prompt
         data_str_pretty = json.dumps(data, indent=2)
-        prompt = f'''{BASE_SYSTEM_PROMPT}{memory_str}
+        prompt = f'''{BASE_SYSTEM_PROMPT}
 
 You are generating a predictive insight report for the following surveillance data:
 {data_str_pretty}
+{rag_context}
 
 Please generate a JSON object ONLY with the following exactly lowercase keys: "summary", "risk_level", "insight", "prediction", "recommendation".
 "risk_level" must be one of: "low", "medium", "high", "critical".
-"prediction" should outline the expected development.
-No markdown blocks, just raw JSON.'''
+No markdown blocks, just raw JSON. Please rely on RAG Context where applicable.'''
 
         messages = [
             {"role": "system", "content": BASE_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Generate JSON predictive insight for data:\n{data_str_pretty}{memory_str}\n\nKeys: summary, risk_level, insight, prediction, recommendation."}
+            {"role": "user", "content": f"Context:\n{rag_context}\n\nData:\n{data_str_pretty}\n\nGenerate JSON predictive insight. Keys: summary, risk_level, insight, prediction, recommendation."}
         ]
         
         res = await self._execute_chain(prompt, messages, is_json=True, return_provider_name=return_provider_name)
         text = res[0] if return_provider_name else res
         
         if not text:
-            # Safest fallback
             fallback_dict = {
                 "summary": "AI generation failed.",
                 "risk_level": data.get("current_level", "medium"),
@@ -283,20 +286,13 @@ No markdown blocks, just raw JSON.'''
 
         try:
             parsed = json.loads(text)
-            
-            # 4. Store successful insight into long-term memory
             try:
                 from app.services.ai_memory_service import get_ai_memory
                 asyncio.create_task(get_ai_memory().store_event(data, parsed))
             except Exception as e:
-                logger.debug(f"Async memory storage failed: {e}")
-                
-            # Update cache
-            _inference_cache[cache_key] = (now, parsed)
-            
+                pass
             return (parsed, res[1]) if return_provider_name else parsed
         except json.JSONDecodeError:
-            # If AI didn't output valid json, wrap it
             fallback_dict = {
                 "summary": text[:200],
                 "risk_level": "medium",
@@ -307,63 +303,111 @@ No markdown blocks, just raw JSON.'''
             return (fallback_dict, res[1]) if return_provider_name else fallback_dict
 
     async def generate_chat_response(self, query: str, context: list, return_provider_name: bool = False) -> Any:
-        """
-        Chat Mode
-        Input: User query string and historical context
-        Output Expectation: Natural language response string
-        """
-        # Format history string for local model / gemini
+        intent = self.classify_intent(query)
+        rag_context = ""
+        
+        # RAG GATING LOGIC (CRITICAL)
+        if intent in ["informational", "analytical", "command"]:
+            try:
+                from app.services.ai_memory_service import get_ai_memory
+                past_docs = await get_ai_memory().retrieve_similar_context_string(query, top_k=1)
+                if past_docs:
+                    rag_context = "\n".join(f"- {doc.get('scenario_text')}" for doc in past_docs)
+            except Exception as e:
+                logger.warning(f"Failed to fetch AI memory context: {e}")
+
         history_str = ""
         messages = [{"role": "system", "content": BASE_SYSTEM_PROMPT}]
         
-        for msg in context[-5:]: # Keep last 5 messages for brevity
+        for msg in context[-3:]: # Memory Management: Maintain last 3-5 messages only
             role = msg.get("role", "user").capitalize()
             content = msg.get("content", "")
             history_str += f"{role}: {content}\n"
             messages.append({"role": msg.get("role", "user"), "content": content})
             
         history_str += f"User: {query}\nLaminar:"
-        messages.append({"role": "user", "content": query})
+        
+        # Behavior Engine Prompt Construction
+        behavior_instructions = ""
+        if intent == "greeting":
+            behavior_instructions = "Greeting: You are Randy AI. Introduce yourself warmly and impressively in 1 or 2 lines. Do not use generic chatbot responses."
+        elif intent == "casual":
+            behavior_instructions = "Casual: Chat fluently. If the user uses Hindi/Telugu, respond perfectly in that language."
+        elif intent == "informational":
+            behavior_instructions = "Informational: Provide extremely clear, highly informative explanations. Look at project data if needed."
+        elif intent == "analytical":
+            behavior_instructions = "Analytical: STRICT FORMAT: Insight: <masterful conclusion>, Details: <deep reasoning>, Action: <genius recommendation>."
+        is_rag = intent in ["informational", "analytical", "command"]
+        if is_rag:
+            final_prompt = f"""Context:
+{rag_context if rag_context else "No indexed documents."}
 
-        prompt = f'''{BASE_SYSTEM_PROMPT}
+Intent:
+{intent}
 
-CONVERSATION HISTORY:
-{history_str}'''
+User Query:
+{query}
 
-        res = await self._execute_chain(prompt, messages, is_json=False, return_provider_name=return_provider_name)
+Instructions:
+* use context when available
+* do not hallucinate
+* remain aligned to intent
+* {behavior_instructions}"""
+        else:
+            final_prompt = f"""Intent:
+{intent}
+
+User Query:
+{query}
+
+Instructions:
+* respond naturally
+* do not use system data
+* {behavior_instructions}"""
+            
+        messages.append({"role": "user", "content": final_prompt})
+
+        res = await self._execute_chain(final_prompt, messages, is_json=False, return_provider_name=return_provider_name)
         text = res[0] if return_provider_name else res
+        
         if not text:
-            msg = "I'm currently unable to generate a response. Please check network connections or AI models readiness."
+            msg = "I'm currently unable to process this request. All AI providers in the fallback chain have timed out or failed."
             return (msg, "Fallback") if return_provider_name else msg
 
         return res
 
     async def generate_alert(self, data: dict, return_provider_name: bool = False) -> Any:
-        """
-        Alert Mode
-        Input: Alert data context
-        Output Expectation: JSON Dictionary
-        """
+        try:
+            from app.services.ai_memory_service import get_ai_memory
+            past_context = await get_ai_memory().retrieve_similar_context(data)
+            rag_context = ""
+            if past_context:
+                rag_context = "\n[SIMILAR PAST ALERTS]:\n" + "\n".join(
+                    f"- {ctx.get('scenario_text')} -> {json.dumps(ctx.get('insight'))}" 
+                    for ctx in past_context
+                )
+        except:
+            rag_context = ""
+
         data_str = json.dumps(data, indent=2)
         prompt = f'''{BASE_SYSTEM_PROMPT}
 
 You are explaining an operational alert based on the following data:
 {data_str}
+{rag_context}
 
-Please generate a JSON object ONLY with the following exactly lowercase key: "explanation".
-"explanation" (string): A cohesive, detailed 3-4 sentence natural language paragraph explaining exactly what the alert is, WHY the threshold was breached (analyzing dwell times, flow direction, and crowd density), and what specific action the staff must take to resolve it.
-CRITICAL: The value for "explanation" MUST be a single cohesive paragraph string. Do NOT use nested objects, bullets, arrays, or sub-keys. No markdown blocks, just raw JSON.'''
+Please generate a JSON object ONLY with exactly lowercase key: "explanation".
+"explanation" (string): A cohesive, extremely fast and short 1-2 sentence paragraph. No markdown. Use analytical structure if needed.'''
 
         messages = [
             {"role": "system", "content": BASE_SYSTEM_PROMPT},
-            {"role": "user", "content": f"Explain this alert in JSON format:\n{data_str}\n\nKey: explanation. Must be a flat string paragraph analyzing dwell and flow!"}
+            {"role": "user", "content": f"Context:\n{rag_context}\n\nAlert Data:\n{data_str}\n\nExplain this alert in JSON format with key: explanation."}
         ]
 
         res = await self._execute_chain(prompt, messages, is_json=True, return_provider_name=return_provider_name)
         text = res[0] if return_provider_name else res
         
         if not text:
-            # Safest fallback
             fallback_dict = {
                 "alert": "Crowd alert detected.",
                 "reason": "Thresholds or AI heuristics were met.",
@@ -381,14 +425,13 @@ CRITICAL: The value for "explanation" MUST be a single cohesive paragraph string
                 "action": text[-200:]
             }
             return (fallback_dict, res[1]) if return_provider_name else fallback_dict
-    
+            
     async def generate_raw(self, prompt: str, timeout: float = 20.0, return_provider_name: bool = False) -> Any:
-        """Raw generation fallback for backward compatibility."""
         messages = [
             {"role": "system", "content": BASE_SYSTEM_PROMPT},
             {"role": "user", "content": prompt}
         ]
-        return await self._execute_chain(prompt, messages, is_json=False, return_provider_name=return_provider_name, max_tokens=1000)
+        return await self._execute_chain(prompt, messages, is_json=False, return_provider_name=return_provider_name)
 
 ai_service = LaminarAIService()
 

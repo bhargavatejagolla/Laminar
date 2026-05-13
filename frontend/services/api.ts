@@ -2,13 +2,13 @@ import axios from "axios"
 import axiosRetry from "axios-retry"
 import { toast } from "sonner"
 
-const API_BASE_URL = "/api/v1"
+const IS_DEV = process.env.NODE_ENV === "development";
+
+// Use relative path to leverage Next.js rewrites/proxy (essential for Ngrok and local dev parity)
+const API_BASE_URL = "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json"
-  },
   // Safely parse JSON — fall back if backend returns plain text (e.g. "Internal Server Error")
   transformResponse: [
     (data) => {
@@ -45,12 +45,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      console.error(`[AUTH FATAL] Unauthorized: ${error.config?.url} (${error.response?.status})`)
+    if (error.response?.status === 401) {
+      console.error(`[AUTH FATAL] Unauthorized: ${error.config?.url} (401)`)
       if (typeof window !== "undefined") {
         localStorage.removeItem("access_token")
         window.location.href = "/login"
       }
+    } else if (error.response?.status === 403) {
+      console.error(`[AUTH ACCESS] Forbidden: ${error.config?.url} (403)`)
+      // Don't redirect on 403, just let the request fail so the UI can handle it
     } else if (!error.response || error.response?.status >= 500) {
       const isProxyError = error.message.includes("Network Error") || error.response?.status === 500;
       if (isProxyError && typeof window !== "undefined") {

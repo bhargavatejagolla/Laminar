@@ -9,8 +9,12 @@ import { useEffect, useState } from "react";
 import LanguageSwitcher from "./language-switcher";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
+import { NotificationBell } from "./NotificationBell";
 
 export default function Navbar() {
+  const { t } = useTranslation();
+
   const { user, logout } = useAuth();
   const { toggleSidebar } = useAppStore();
   const { data: alerts, crowdAlerts } = useAlerts();
@@ -74,7 +78,7 @@ export default function Navbar() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]"></span>
           </div>
-          <span className="text-emerald-400 tracking-[0.2em] font-black uppercase">Live Link</span>
+          <span className="text-emerald-400 tracking-[0.2em] font-black uppercase">{t("auto.LiveLink_9234") || "Live Link"}</span>
           <span className="text-white/20 font-normal">/</span>
           <span className="text-cyan-100 tracking-[0.1em]">{mounted ? time : "--:--:--"}</span>
         </div>
@@ -87,7 +91,7 @@ export default function Navbar() {
           <Zap className="w-4 h-4 text-cyan-400 pulse-glow" />
         </div>
         <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-300 to-slate-500 group-hover:from-cyan-100 group-hover:to-cyan-400 transition-all duration-500">
-          Global Operations
+          {t("auto.GlobalOperation_9415") || "Global Operations"}
         </span>
       </div>
 
@@ -101,9 +105,12 @@ export default function Navbar() {
 
         <div className="h-8 w-px bg-white/10 mx-1 rounded-full" />
 
-        {/* Alert Bell */}
-        <Link href="/alerts" className="relative p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-300 group border border-transparent hover:border-white/20">
-          <Bell className={`w-5 h-5 transition-colors ${activeAlertsCount > 0 ? "text-rose-400 group-hover:text-rose-300" : "group-hover:text-cyan-400"}`} />
+        {/* Tactical Mesh Notification Bell */}
+        <NotificationBell />
+
+        {/* Crowd Alert Bell (links to /alerts) */}
+        <Link href="/alerts" className="relative p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-300 group border border-transparent hover:border-white/20" title="Crowd Alerts">
+          <Shield className={`w-5 h-5 transition-colors ${activeAlertsCount > 0 ? "text-rose-400 group-hover:text-rose-300" : "group-hover:text-cyan-400"}`} />
           {activeAlertsCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] flex items-center justify-center rounded-full bg-rose-500 text-[11px] font-black text-white border-[3px] border-[#000000] shadow-[0_0_15px_rgba(244,63,94,0.8)]">
               {activeAlertsCount > 99 ? "99+" : activeAlertsCount}
@@ -189,11 +196,11 @@ export default function Navbar() {
                   </div>
                   
                   <h3 className="text-2xl font-black text-white uppercase tracking-[0.2em] font-heading mb-3 drop-shadow-md">
-                    Terminate Session
+                    {t("auto.TerminateSessio_4291") || "Terminate Session"}
                   </h3>
                   
                   <p className="text-sm font-medium text-slate-300 leading-relaxed mb-8 max-w-[280px]">
-                    Securely disconnect from the Laminar AI Platform? Active monitoring alerts will pause.
+                    {t("auto.Securelydisconn_7319") || "Securely disconnect from the Laminar AI Platform? Active monitoring alerts will pause."}
                   </p>
                   
                   <div className="flex w-full gap-4 mt-2">
@@ -201,14 +208,14 @@ export default function Navbar() {
                       onClick={cancelLogout}
                       className="flex-1 py-3.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-sm font-bold uppercase tracking-[0.15em] transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] focus:ring-2 ring-white/20 outline-none"
                     >
-                      Cancel
+                      {t("auto.Cancel_9092") || "Cancel"}
                     </button>
                     <button
                       onClick={confirmLogout}
                       className="flex-1 py-3.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 border border-rose-400/50 text-white text-sm font-black uppercase tracking-[0.15em] shadow-[0_0_20px_rgba(244,63,94,0.5)] hover:shadow-[0_0_30px_rgba(244,63,94,0.8)] transition-all flex items-center justify-center gap-2 focus:ring-2 ring-rose-500/50 outline-none"
                     >
                       <LogOut className="w-5 h-5 drop-shadow-md" />
-                      Sign Out
+                      {t("auto.SignOut_5123") || "Sign Out"}
                     </button>
                   </div>
                 </div>

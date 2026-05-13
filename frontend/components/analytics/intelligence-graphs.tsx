@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useZoneIntelligenceSummary, CameraIntelligenceEntry } from "@/hooks/useZoneIntelligence";
 import { Activity, TrendingUp } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface TimelinePoint {
   time: string;
@@ -27,6 +28,8 @@ function safeCamKey(cam: CameraIntelligenceEntry, idx: number) {
 }
 
 export default function IntelligenceGraphs() {
+  const { t } = useTranslation();
+
   const { data } = useZoneIntelligenceSummary();
   const [history, setHistory] = useState<TimelinePoint[]>([]);
   const [camKeys, setCamKeys] = useState<string[]>([]);
@@ -82,7 +85,7 @@ export default function IntelligenceGraphs() {
             <TrendingUp className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-white font-bold tracking-widest uppercase text-sm">Aggregated Operations Trend</h2>
+            <h2 className="text-white font-bold tracking-widest uppercase text-sm">{t("auto.AggregatedOpera_7058") || "Aggregated Operations Trend"}</h2>
             <p className="text-[10px] text-indigo-500 tracking-widest uppercase font-mono">
               {data?.cameras.length ? `${data.cameras.length} Camera(s) · Live Timeline` : "Live Timeline Analytics"}
             </p>
@@ -157,7 +160,7 @@ export default function IntelligenceGraphs() {
           <div className="h-full w-full flex items-center justify-center border-t border-white/5">
             <div className="flex flex-col items-center gap-2 text-slate-500">
               <Activity className="w-5 h-5 opacity-50" />
-              <span className="text-[10px] tracking-widest font-bold uppercase">No Active Telemetry Streams</span>
+              <span className="text-[10px] tracking-widest font-bold uppercase">{t("auto.NoActiveTelemet_6928") || "No Active Telemetry Streams"}</span>
             </div>
           </div>
         ) : (

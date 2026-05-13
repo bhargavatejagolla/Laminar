@@ -4,12 +4,15 @@ import React from "react";
 import { useVenues } from "@/hooks/useVenues";
 import { Venue } from "@/types/venue";
 import VenueCapacityBar from "@/components/venues/venue-capacity-bar";
+import { useTranslation } from "react-i18next";
 
 interface VenueCardsProps {
   onSelectVenue: (venueId: string | null) => void;
 }
 
 export default function VenueCards({ onSelectVenue }: VenueCardsProps) {
+  const { t } = useTranslation();
+
   const { data: venues, isLoading, error } = useVenues();
 
   if (isLoading) {
@@ -33,7 +36,7 @@ export default function VenueCards({ onSelectVenue }: VenueCardsProps) {
   if (!venues || venues.length === 0) {
     return (
       <div className="text-slate-400 p-8 text-center bg-[#0b1325] rounded-xl">
-        No venues found. Create your first venue to get started.
+        {t("auto.NovenuesfoundCr_3426") || "No venues found. Create your first venue to get started."}
       </div>
     );
   }
@@ -53,7 +56,7 @@ export default function VenueCards({ onSelectVenue }: VenueCardsProps) {
             </p>
             <div className="mb-3">
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-slate-400">Capacity</span>
+                <span className="text-slate-400">{t("auto.Capacity_3409") || "Capacity"}</span>
                 <span className="text-white font-medium">
                   {venue.current_occupancy ?? 0} / {venue.capacity}
                 </span>

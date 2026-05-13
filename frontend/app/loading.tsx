@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 export default function Loading() {
+  const { t } = useTranslation();
+
   const [fill, setFill] = useState(0);
 
   useEffect(() => {
@@ -83,14 +86,14 @@ export default function Loading() {
            transition={{ duration: 0.5 }}
            className="text-xl font-bold font-mono tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.3)]"
          >
-           LAMINAR AI
+           {t("auto.LAMINARAI_7739") || "LAMINAR AI"}
          </motion.h2>
          <motion.p 
            animate={{ opacity: [0.3, 1, 0.3] }}
            transition={{ duration: 2, repeat: Infinity }}
            className="text-xs text-cyan-500/80 font-mono tracking-[0.2em] mt-3 uppercase font-semibold"
          >
-           Establishing Uplink...
+           {t("auto.EstablishingUpl_3331") || "Establishing Uplink..."}
          </motion.p>
       </div>
     </div>

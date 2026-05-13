@@ -388,9 +388,13 @@ async def get_camera_health(
         )
     verify_camera_access(camera, user)
 
-    # Check VisionManager worker status
+    # Check VisionManager worker status (Crowd) or ORCHESTRATOR (Specialized)
+    from app.vision.orchestrator import ORCHESTRATOR
     worker = await vision_manager.get_worker(camera_id)
-    worker_status = await worker.get_status() if worker else None
+    if not worker:
+        worker = ORCHESTRATOR._workers.get(camera_id)
+        
+    worker_status = await worker.get_status() if (worker and hasattr(worker, 'get_status')) else None
 
     # Determine health status
     if not camera.is_active:

@@ -79,7 +79,13 @@ class ActionEngine:
 
     async def _execute_action(self, rule: ActionRule, event_data: Dict[str, Any]):
         """Executes the specific action defined in the rule."""
+        execution_status = "success"
+        error_detail = None
+        
         try:
+            # Check for Dry Run early
+            is_dry = bool(getattr(rule, 'is_dry_run', False))
+            
             # Use data directly if no template, else merge/replace
             payload = dict(rule.action_payload_template) if rule.action_payload_template else {}
             
@@ -93,10 +99,16 @@ class ActionEngine:
             else:
                 payload = event_data # Fallback to sending event data
 
-            if rule.action_type == ActionType.WEBHOOK:
+            if is_dry:
+                logger.info(f"[DRY RUN] Simulation of {rule.action_type} for rule: {rule.name}")
+                execution_status = "dry_run"
+            elif rule.action_type == ActionType.WEBHOOK:
                 logger.info(f"Sending Webhook to {rule.action_target}")
                 response = await self._http_client.post(rule.action_target, json=payload)
                 logger.info(f"Webhook '{rule.name}' completed with status {response.status_code}")
+                if response.status_code >= 400:
+                    execution_status = "failed"
+                    error_detail = f"HTTP {response.status_code}"
 
             elif rule.action_type == ActionType.EMAIL:
                 from app.services.notification_service import NotificationService
@@ -112,9 +124,8 @@ class ActionEngine:
                 msg.set_content(body)
                 
                 recipients = [r.strip() for r in rule.action_target.split(",")]
-                logger.info(f"Sending automated email to {recipients}")
+                logger.debug(f"Sending automated email to {recipients}")
                 await service._send_email(msg, recipients)
-                logger.info(f"Email action '{rule.name}' dispatched.")
 
             elif rule.action_type == ActionType.SMS:
                 from app.services.sms_alert_service import SmsAlertService
@@ -123,16 +134,47 @@ class ActionEngine:
                 msg_text = f"Laminar Alert: {rule.name} triggered. Risk: {event_data.get('risk_level', 'Unknown')}"
                 recipients = [r.strip() for r in rule.action_target.split(",")]
                 
-                logger.info(f"Sending automated SMS to {recipients}")
                 await sms_service.notify_recipients(recipients, msg_text)
-                logger.info(f"SMS action '{rule.name}' dispatched.")
 
             elif rule.action_type == ActionType.IOT_COMMAND:
                 logger.info(f"IoT Command simulation: topic={rule.action_target}, payload={payload}")
 
         except Exception as e:
+            execution_status = "failed"
+            error_detail = str(e)
             logger.error(f"Action execution failed: {e}")
-            raise
+        
+        # PERSISTENT HISTORY LOGGING
+        try:
+            from app.core.database import db_manager
+            async with db_manager.session() as db:
+                # Re-fetch or merge to ensure we can update
+                # In this specific architecture, we access the DB directly
+                new_log = {
+                    "id": event_data.get("id", "evt_" + datetime.now().strftime("%Y%m%d%H%M%S")),
+                    "timestamp": datetime.now().isoformat(),
+                    "status": execution_status,
+                    "details": error_detail or ("Simulated execution" if execution_status == "dry_run" else "Execution complete")
+                }
+                
+                # Update rule history (keep last 10 for better visibility in Mission Control)
+                current_history = list(rule.history_logs or [])
+                current_history.insert(0, new_log)
+                rule.history_logs = current_history[:10]
+                
+                from sqlalchemy import update
+                await db.execute(
+                    update(ActionRule)
+                    .where(ActionRule.id == rule.id)
+                    .values(history_logs=rule.history_logs)
+                )
+                await db.commit()
+                logger.info(f"Updated history for rule: {rule.name}")
+        except Exception as log_err:
+            logger.error(f"Failed to update action history: {log_err}")
+
+        if execution_status == "failed" and error_detail:
+            raise Exception(error_detail)
 
 # Singleton instance
 action_engine = ActionEngine()

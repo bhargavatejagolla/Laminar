@@ -108,7 +108,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = Field(default=5432, ge=1, le=65535)
 
     # Connection Pool Settings
-    DB_POOL_SIZE: int = Field(default=20, ge=1, le=100)
+    DB_POOL_SIZE: int = Field(default=30, ge=1, le=100)
     DB_MAX_OVERFLOW: int = Field(default=10, ge=0)
     DB_POOL_TIMEOUT: int = Field(default=30, ge=1)
     DB_POOL_RECYCLE: int = Field(default=3600, ge=60)
@@ -204,6 +204,12 @@ class Settings(BaseSettings):
     SMTP_USER: str = Field(...)
     SMTP_PASSWORD: str = Field(...)
     SMTP_USE_TLS: bool = Field(default=True)
+
+    # Auth SMTP Settings (Dedicated for OTP/Login)
+    AUTH_SMTP_HOST: str = Field(default="smtp.gmail.com")
+    AUTH_SMTP_PORT: int = Field(default=587)
+    AUTH_SMTP_USER: Optional[str] = Field(default=None)
+    AUTH_SMTP_PASSWORD: Optional[str] = Field(default=None)
 
     MANAGEMENT_EMAILS: str = Field(default="")
     POLICE_EMAILS: str = Field(default="")

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Search, Loader2, Camera, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/services/api';
+import { useTranslation } from "react-i18next";
 
 // Replace with actual API URL or proxy path
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -18,6 +19,8 @@ interface SearchResult {
 }
 
 export function SemanticSearch() {
+  const { t } = useTranslation();
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,10 +54,10 @@ export function SemanticSearch() {
         </div>
         <div>
           <h2 className="text-xl font-bold bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">
-            AI Video Search
+            {t("auto.AIVideoSearch_2446") || "AI Video Search"}
           </h2>
           <p className="text-sm text-neutral-500">
-            Ask natural language questions about your video history.
+            {t("auto.Asknaturallangu_9720") || "Ask natural language questions about your video history."}
           </p>
         </div>
       </div>
@@ -91,7 +94,7 @@ export function SemanticSearch() {
               className="text-center py-10 text-neutral-600 flex flex-col items-center"
             >
               <Search className="h-10 w-10 mb-3 opacity-20" />
-              <p>Enter a query to search semantic events.</p>
+              <p>{t("auto.Enteraquerytose_9773") || "Enter a query to search semantic events."}</p>
             </motion.div>
           )}
 

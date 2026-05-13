@@ -22,7 +22,7 @@ class CameraCreate(BaseModel):
     stream_url: Optional[str] = Field(
         None, description="RTSP URL, device index, or file path")
     stream_type: str = Field(
-        "rtsp", description="rtsp, http, device, file, or edge")
+        "rtsp", description="rtsp, http, device, file, edge, or browser")
     username: Optional[str] = Field(
         None, description="Authentication username")
     password: Optional[str] = Field(
@@ -44,6 +44,8 @@ class CameraCreate(BaseModel):
         True, description="Whether object tracking is enabled")
     hardware_metadata: Optional[Dict[str, Any]] = Field(
         None, description="Hardware-specific metadata")
+    static_mode_enabled: bool = Field(False, description="Whether to override live feed with a static image")
+    static_image_url: Optional[str] = Field(None, max_length=1000, description="URL of the static image")
 
     @validator('stream_url')
     def validate_stream_url(cls, v, values):
@@ -82,7 +84,7 @@ class CameraCreate(BaseModel):
 
     @validator('stream_type')
     def validate_stream_type(cls, v):
-        valid_types = {'rtsp', 'http', 'https', 'device', 'file', 'edge'}
+        valid_types = {'rtsp', 'http', 'https', 'device', 'file', 'edge', 'browser'}
         if v not in valid_types:
             raise ValueError(f'Stream type must be one of: {valid_types}')
         return v
@@ -108,6 +110,8 @@ class CameraUpdate(BaseModel):
     tracking_enabled: Optional[bool] = None
     model_version: Optional[str] = None
     hardware_metadata: Optional[Dict[str, Any]] = None
+    static_mode_enabled: Optional[bool] = None
+    static_image_url: Optional[str] = None
 
 
 class CameraResponse(BaseModel):
@@ -136,6 +140,8 @@ class CameraResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     hardware_metadata: Optional[Dict[str, Any]]
+    static_mode_enabled: bool
+    static_image_url: Optional[str]
 
 
 class CameraListResponse(BaseModel):

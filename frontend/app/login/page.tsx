@@ -4,290 +4,129 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { GoogleLogin } from '@react-oauth/google';
 import { login, loginWithGoogle } from "@/services/auth";
-import { Activity, ShieldCheck, ChevronLeft, Mail, Sparkles, Eye, EyeOff, Key, AlertCircle, Fingerprint, Globe } from "lucide-react";
-import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
+import { ChevronLeft, Mail, Eye, EyeOff, Key, AlertCircle, Fingerprint, Zap } from "lucide-react";
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import Link from "next/link";
-import PremiumImageBackground from "@/components/background/premium-image-background";
+import Orb from "@/components/ui/Orb";
+import GradientBlinds from "@/components/ui/GradientBlinds";
+import { useTranslation } from "react-i18next";
 
-/* ─── Starfield Background ─── */
-function StarfieldBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let stars: { x: number; y: number; radius: number; alpha: number; twinkleSpeed: number; twinklePhase: number }[] = [];
-    let animationId: number;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      initStars();
-    };
-
-    const initStars = () => {
-      stars = [];
-      const starCount = Math.floor((canvas.width * canvas.height) / 2500);
-      for (let i = 0; i < starCount; i++) {
-        stars.push({
-          x: Math.random() * canvas.width,
-          y: Math.random() * canvas.height,
-          radius: Math.random() * 1.8 + 0.5,
-          alpha: Math.random() * 0.6 + 0.2,
-          twinkleSpeed: Math.random() * 0.02 + 0.005,
-          twinklePhase: Math.random() * Math.PI * 2,
-        });
-      }
-    };
-
-    const draw = () => {
-      if (!ctx || !canvas) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      gradient.addColorStop(0, '#020617');
-      gradient.addColorStop(0.5, '#0a0f1a');
-      gradient.addColorStop(1, '#03050a');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      stars.forEach(star => {
-        const time = Date.now() / 1000;
-        const twinkle = Math.sin(time * star.twinkleSpeed + star.twinklePhase) * 0.3 + 0.7;
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha * twinkle})`;
-        ctx.fill();
-      });
-
-      // Add a faint nebula effect on top
-      const nebulaGradient = ctx.createRadialGradient(
-        canvas.width * 0.8, canvas.height * 0.2, 50,
-        canvas.width * 0.8, canvas.height * 0.2, 350
-      );
-      nebulaGradient.addColorStop(0, 'rgba(34,211,238,0.03)');
-      nebulaGradient.addColorStop(0.5, 'rgba(59,130,246,0.02)');
-      nebulaGradient.addColorStop(1, 'transparent');
-      ctx.fillStyle = nebulaGradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      animationId = requestAnimationFrame(draw);
-    };
-
-    resize();
-    window.addEventListener('resize', resize);
-    draw();
-
-    return () => {
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animationId);
-    };
-  }, []);
+/* ══════════════════════════════════════════════════════════
+   ORB BACKGROUND — Shader-based interactive orb
+══════════════════════════════════════════════════════════ */
+function OrbBackground() {
+  const { t } = useTranslation();
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: -2,
-        pointerEvents: 'none',
-      }}
-    />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
+      <Orb
+        hue={0}
+        hoverIntensity={1.5}
+        rotateOnHover
+        backgroundColor="#000000"
+      />
+    </motion.div>
   );
 }
 
-/* ─── Radar sweep canvas ─── */
-function RadarSweep() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    let angle = 0;
-    let animId: number;
-    const blips: { x: number; y: number; age: number; r: number }[] = [
-      { x: 0.35, y: 0.3, age: 0, r: 3 },
-      { x: 0.65, y: 0.55, age: Math.PI * 0.8, r: 2 },
-      { x: 0.2, y: 0.65, age: Math.PI * 1.4, r: 2.5 },
-      { x: 0.75, y: 0.25, age: Math.PI * 1.8, r: 2 },
-      { x: 0.5, y: 0.45, age: Math.PI * 0.4, r: 3 },
-    ];
-    const draw = () => {
-      const W = canvas.width;
-      const H = canvas.height;
-      const cx = W / 2;
-      const cy = H / 2;
-      const R = Math.min(W, H) * 0.42;
-
-      ctx.clearRect(0, 0, W, H);
-
-      // Concentric rings
-      for (let i = 1; i <= 4; i++) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, (R / 4) * i, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(34,211,238,${0.06 + i * 0.02})`;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      // Cross-hair lines
-      ctx.beginPath();
-      ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
-      ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
-      ctx.strokeStyle = 'rgba(34,211,238,0.08)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Sweep gradient
-      const grad = (ctx as any).createConicGradient
-        ? (ctx as any).createConicGradient(angle, cx, cy)
-        : null;
-      if (grad) {
-        grad.addColorStop(0, 'rgba(34,211,238,0)');
-        grad.addColorStop(1, 'rgba(34,211,238,0.15)');
-        ctx.beginPath();
-        ctx.arc(cx, cy, R, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, R, angle - 1.2, angle);
-        ctx.closePath();
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-        g.addColorStop(0, 'rgba(34,211,238,0.0)');
-        g.addColorStop(1, 'rgba(34,211,238,0.12)');
-        ctx.fillStyle = g;
-        ctx.fill();
-      }
-
-      // Sweep leading line
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(angle) * R, cy + Math.sin(angle) * R);
-      ctx.strokeStyle = 'rgba(34,211,238,0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Blips
-      blips.forEach(b => {
-        const angDiff = ((angle - b.age) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-        if (angDiff < Math.PI * 2) {
-          const alpha = Math.max(0, 1 - angDiff / (Math.PI * 2));
-          const bx = cx + (b.x - 0.5) * 2 * R * 0.8;
-          const by = cy + (b.y - 0.5) * 2 * R * 0.8;
-          ctx.beginPath();
-          ctx.arc(bx, by, b.r, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(34,211,238,${alpha * 0.9})`;
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(bx, by, b.r + 4, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(34,211,238,${alpha * 0.3})`;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      });
-
-      angle += 0.015;
-      animId = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => cancelAnimationFrame(animId);
-  }, []);
-
+function BlindsBackground() {
   return (
-    <canvas
-      ref={canvasRef}
-      width={400} height={400}
-      style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.18, pointerEvents: 'none' }}
-    />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
+      <GradientBlinds
+        gradientColors={['#0f172a', '#1e293b', '#000000', '#1e1b4b']}
+        angle={20}
+        noise={0.4}
+        blindCount={20}
+        blindMinWidth={40}
+        spotlightRadius={0.7}
+        spotlightSoftness={0.8}
+        spotlightOpacity={0.6}
+        mouseDampening={0.1}
+        distortAmount={0.2}
+        shineDirection="left"
+        mixBlendMode="lighten"
+      />
+    </motion.div>
   );
 }
 
-/* ─── Floating hex grid decoration ─── */
-function HexGrid() {
-  const hexes = Array.from({ length: 18 }, (_, i) => ({
-    x: ((i * 137.508) % 100),
-    y: ((i * 97.3) % 100),
-    size: 8 + (i % 4) * 4,
-    delay: (i % 6) * 0.4,
-    duration: 6 + (i % 4),
-    opacity: 0.04 + (i % 3) * 0.03,
-  }));
+function BackgroundToggle({ mode, setMode }: { mode: 'orb' | 'blinds', setMode: (m: 'orb' | 'blinds') => void }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: -1 }}>
-      {hexes.map((h, i) => (
-        <motion.div
-          key={i}
-          animate={{ y: [0, -15, 0], rotate: [0, 60, 0], opacity: [h.opacity, h.opacity * 2.5, h.opacity] }}
-          transition={{ duration: h.duration, repeat: Number.POSITIVE_INFINITY, delay: h.delay, ease: 'easeInOut' }}
-          style={{
-            position: 'absolute',
-            left: `${h.x}%`, top: `${h.y}%`,
-            width: h.size, height: h.size,
-            background: 'none',
-            border: '1px solid rgba(34,211,238,0.5)',
-            clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-          }}
-        />
+    <div className="fixed top-6 right-6 md:top-6 md:right-6 bottom-6 md:bottom-auto left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 z-[100] flex gap-2 bg-[rgba(10,15,35,0.6)] p-1 rounded-xl border border-[rgba(80,140,255,0.15)] backdrop-blur-xl">
+      {(['orb', 'blinds'] as const).map((m) => (
+        <motion.button key={m} onClick={() => setMode(m)}
+          whileHover={{ scale: 1.05, background: mode === m ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.05)" }}
+          whileTap={{ scale: 0.95 }}
+          style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: mode === m ? "rgba(80,140,255,0.18)" : "transparent", color: mode === m ? "#fff" : "#64748b", fontSize: "0.6rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", transition: "all 0.2s" }}>
+          {m}
+        </motion.button>
       ))}
     </div>
   );
 }
 
-/* ─── Orbiting Planets ─── */
-function OrbitingPlanets() {
+/* ══════════════════════════════════════════════════════════
+   GLITCH TEXT
+══════════════════════════════════════════════════════════ */
+function GlitchText({ text, accent }: { text: string; accent?: string }) {
+  const [glitch, setGlitch] = useState(false);
+  useEffect(() => {
+    const i = setInterval(() => { setGlitch(true); setTimeout(() => setGlitch(false), 180 + Math.random() * 160); }, 4500 + Math.random() * 3000);
+    return () => clearInterval(i);
+  }, []);
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: -1, overflow: 'hidden' }}>
-      <motion.div
-        animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
-        transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
-        style={{
-          position: 'absolute',
-          top: '10%',
-          right: '-10%',
-          width: '350px',
-          height: '350px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle at 30% 30%, rgba(34,211,238,0.12), rgba(59,130,246,0.04), transparent)',
-          filter: 'blur(45px)',
-        }}
-      />
-      <motion.div
-        animate={{ y: [0, 15, 0], x: [0, -8, 0] }}
-        transition={{ duration: 25, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut', delay: 2 }}
-        style={{
-          position: 'absolute',
-          bottom: '-5%',
-          left: '-8%',
-          width: '400px',
-          height: '400px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle at 70% 70%, rgba(139,92,246,0.1), rgba(16,185,129,0.02), transparent)',
-          filter: 'blur(50px)',
-        }}
-      />
+    <h1 style={{ fontSize: "1.65rem", fontWeight: 800, letterSpacing: "0.18em", color: "#fff", marginBottom: "8px", position: "relative", display: "inline-block", fontFamily: "'General Sans','Inter',sans-serif" }}>
+      <span style={{ position: "relative" }}>
+        {text}
+        {glitch && <><span style={{ position: "absolute", left: "2px", top: 0, color: "#ff0055", clipPath: "inset(20% 0 60% 0)", opacity: 0.75 }}>{text}</span><span style={{ position: "absolute", left: "-2px", top: 0, color: "#00ffff", clipPath: "inset(60% 0 10% 0)", opacity: 0.75 }}>{text}</span></>}
+      </span>
+      {accent && <span style={{ background: "linear-gradient(135deg,#4f8fff,#7c5cff,#ff5cee)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", fontWeight: 300, marginLeft: "0.3em" }}>{accent}</span>}
+    </h1>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   NEURAL LOGO
+══════════════════════════════════════════════════════════ */
+function NeuralLogo() {
+  return (
+    <div style={{ width: 80, height: 80, position: "relative", margin: "0 auto 28px" }}>
+      <motion.div animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid transparent", borderTopColor: "#4f8fff", borderRightColor: "rgba(79,143,255,0.3)" }} />
+      <motion.div animate={{ rotate: -360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", inset: 9, borderRadius: "50%", border: "1px solid transparent", borderBottomColor: "#9c5cff", borderLeftColor: "rgba(156,92,255,0.3)" }} />
+      <motion.div animate={{ rotate: 360 }} transition={{ duration: 16, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", inset: 18, borderRadius: "50%", border: "1px solid rgba(0,200,255,0.2)", borderTopColor: "rgba(0,200,255,0.6)" }} />
+      <motion.div animate={{ scale: [0.8, 1.1, 0.8], opacity: [0.5, 1, 0.5] }} transition={{ duration: 2.2, repeat: Infinity }} style={{ position: "absolute", inset: 22, borderRadius: "50%", background: "radial-gradient(circle,rgba(79,143,255,0.5) 0%,rgba(120,80,255,0.2) 60%,transparent 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <motion.div animate={{ filter: ["drop-shadow(0 0 4px rgba(79,143,255,0.6))","drop-shadow(0 0 14px rgba(120,80,255,0.9))","drop-shadow(0 0 4px rgba(79,143,255,0.6))"] }} transition={{ duration: 2, repeat: Infinity }}><Zap size={22} color="#4f8fff" /></motion.div>
+      </div>
+      <motion.div animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", inset: 0 }}>
+        <div style={{ position: "absolute", top: 1, left: "50%", transform: "translateX(-50%)", width: 5, height: 5, borderRadius: "50%", background: "#4f8fff", boxShadow: "0 0 10px #4f8fff,0 0 20px #4f8fff80" }} />
+      </motion.div>
+      <motion.div animate={{ rotate: -360 }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }} style={{ position: "absolute", inset: 9 }}>
+        <div style={{ position: "absolute", bottom: 1, left: "50%", transform: "translateX(-50%)", width: 3, height: 3, borderRadius: "50%", background: "#9c5cff", boxShadow: "0 0 6px #9c5cff" }} />
+      </motion.div>
     </div>
   );
 }
 
-function useTransformLocal(val: any, fn: (v: number) => number) {
-  const out = useMotionValue(0);
-  useEffect(() => {
-    return val.on('change', (v: number) => out.set(fn(v)));
-  }, [val, fn, out]);
-  return out;
+function ScanLine({ active }: { active: boolean }) {
+  return (
+    <AnimatePresence>
+      {active && <motion.div key="scan" initial={{ top: 0, opacity: 1 }} animate={{ top: "100%" }} exit={{ opacity: 0 }} transition={{ duration: 1.1, ease: "linear" }}
+        style={{ position: "absolute", left: 0, right: 0, height: "2px", zIndex: 30, pointerEvents: "none", background: "linear-gradient(90deg,transparent,rgba(80,140,255,0.8) 20%,rgba(170,220,255,1) 50%,rgba(80,140,255,0.8) 80%,transparent)", boxShadow: "0 0 18px rgba(80,140,255,0.9),0 0 40px rgba(80,140,255,0.4)" }} />}
+    </AnimatePresence>
+  );
 }
 
+function HoloShimmer({ mousePos }: { mousePos: { x: number; y: number } | null }) {
+  if (!mousePos) return null;
+  return <div style={{ position: "absolute", inset: 0, borderRadius: "30px", pointerEvents: "none", zIndex: 5, background: `radial-gradient(circle 240px at ${mousePos.x}px ${mousePos.y}px, rgba(255,255,255,0.038) 0%, rgba(100,180,255,0.02) 40%, transparent 70%)` }} />;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MAIN LOGIN PAGE
+══════════════════════════════════════════════════════════ */
 export default function LoginPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -296,272 +135,218 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
+  const [cardHoverPos, setCardHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [bgMode, setBgMode] = useState<'orb' | 'blinds'>('orb');
+  const cardRef = useRef<HTMLDivElement>(null);
+  const mouseX = useMotionValue(0), mouseY = useMotionValue(0);
+  const sX = useSpring(mouseX, { stiffness: 70, damping: 18 });
+  const sY = useSpring(mouseY, { stiffness: 70, damping: 18 });
+  const rawTiltX = useMotionValue(0), rawTiltY = useMotionValue(0);
+  const tiltX = useSpring(rawTiltX, { stiffness: 100, damping: 25 });
+  const tiltY = useSpring(rawTiltY, { stiffness: 100, damping: 25 });
+  const rotateX = useTransform(tiltY, [-1, 1], [8, -8]);
+  const rotateY = useTransform(tiltX, [-1, 1], [-8, 8]);
 
-  // Cursor spotlight
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const sX = useSpring(mouseX, { stiffness: 100, damping: 25 });
-  const sY = useSpring(mouseY, { stiffness: 100, damping: 25 });
   useEffect(() => {
-    const h = (e: MouseEvent) => { mouseX.set(e.clientX); mouseY.set(e.clientY); };
-    window.addEventListener('mousemove', h);
-    return () => window.removeEventListener('mousemove', h);
-  }, [mouseX, mouseY]);
+    const h = (e: MouseEvent) => {
+      mouseX.set(e.clientX); mouseY.set(e.clientY);
+      if (cardRef.current) {
+        const rect = cardRef.current.getBoundingClientRect();
+        const dx = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
+        const dy = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
+        const prox = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) * 0.4);
+        rawTiltX.set(dx * prox); rawTiltY.set(dy * prox);
+        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) setCardHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        else setCardHoverPos(null);
+      }
+    };
+    window.addEventListener("mousemove", h);
+    return () => window.removeEventListener("mousemove", h);
+  }, [mouseX, mouseY, rawTiltX, rawTiltY]);
 
-  async function handleStandardLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !password) { setErrorMsg("Email and password are required."); return; }
     setScanActive(true);
     setTimeout(async () => {
-      try {
-        setLoading(true); setErrorMsg("");
-        await login(email, password);
-        router.push("/dashboard");
-      } catch (err: any) {
-        setErrorMsg(err.response?.data?.detail || "Authentication sequence failed.");
-        setScanActive(false);
-      } finally { setLoading(false); }
+      try { 
+        setLoading(true); 
+        setErrorMsg(""); 
+        const res = await login(email, password); 
+        
+        if (res?.verification_required) {
+          router.push(`/verify-email?email=${encodeURIComponent(res.email || email)}`);
+          return;
+        }
+
+        router.push("/onboarding"); 
+      }
+      catch (err: any) { setErrorMsg(err.response?.data?.detail || "Authentication failed."); setScanActive(false); }
+      finally { setLoading(false); }
     }, 1200);
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'transparent', color: '#e2e8f0', fontFamily: "'Inter', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-      <PremiumImageBackground imageUrl="/login-bg.png" variant="login" />
+    <div style={{ minHeight: "100vh", background: "#00000f", color: "#e2e8f0", fontFamily: "'General Sans','Inter',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+      <AnimatePresence mode="wait">
+        {bgMode === 'orb' ? <OrbBackground key="orb" /> : <BlindsBackground key="blinds" />}
+      </AnimatePresence>
+      <BackgroundToggle mode={bgMode} setMode={setBgMode} />
 
       {/* Cursor spotlight */}
-      <motion.div style={{
-        position: 'fixed', zIndex: 1, pointerEvents: 'none', width: '500px', height: '500px',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(34,211,238,0.05) 0%, transparent 70%)',
-        x: useTransformLocal(sX, v => v - 250),
-        y: useTransformLocal(sY, v => v - 250),
-      } as any} />
+      <motion.div style={{ position: "fixed", zIndex: 3, pointerEvents: "none", width: 650, height: 650, borderRadius: "50%", background: "radial-gradient(circle,rgba(80,140,255,0.07) 0%,transparent 60%)", x: sX, y: sY, translateX: "-50%", translateY: "-50%" } as any} />
 
-      {/* Radar background */}
-      {/* Kept wrapper for cursor spotlight above, removed RadarSweep */}
+      {/* 3D tilting card */}
+      <motion.div initial={{ opacity: 0, y: 60, scale: 0.92 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-[480px] px-4" style={{ perspective: "1000px" }}>
+        <motion.div ref={cardRef} style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}>
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+            style={{ position: "absolute", inset: "-1.5px", borderRadius: "30px", zIndex: -1, background: "conic-gradient(from 0deg,#0a1535,#4f8fff,#9c5cff,#ff5cee,#4f8fff,#0a1535)", opacity: 0.8 }} />
+          <motion.div animate={{ opacity: [0.25, 0.65, 0.25], scale: [1, 1.04, 1] }} transition={{ duration: 4, repeat: Infinity }}
+            style={{ position: "absolute", inset: "-28px", borderRadius: "50px", zIndex: -2, background: "radial-gradient(ellipse at center,rgba(79,143,255,0.22) 0%,rgba(120,80,255,0.1) 50%,transparent 80%)", filter: "blur(20px)" }} />
 
-      {/* ─── Card ─── */}
-      <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '460px', margin: '0 20px' }}>
-        <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          style={{ position: 'relative' }}
-        >
-          {/* Spinning holographic border */}
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 8, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-            style={{
-              position: 'absolute', inset: '-1px', borderRadius: '24px',
-              background: 'conic-gradient(from 0deg, #22d3ee, #3b82f6, #a78bfa, #f43f5e, #22d3ee)',
-              opacity: 0.5, zIndex: -1,
-            }}
-          />
-          {/* Static card body */}
-          <div suppressHydrationWarning style={{
-            background: 'rgba(6,10,24,0.96)',
-            border: '1px solid rgba(34,211,238,0.2)',
-            borderRadius: '24px',
-            backdropFilter: 'blur(60px)',
-            boxShadow: '0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.05)',
-            padding: '40px 36px 36px',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            {/* Biometric scan overlay */}
-            <AnimatePresence>
-              {scanActive && (
-                <motion.div
-                  initial={{ top: '-4px' }}
-                  animate={{ top: ['0%', '100%'] }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 1, ease: 'linear' }}
-                  style={{
-                    position: 'absolute', left: 0, right: 0, height: '4px', zIndex: 20,
-                    background: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.9), transparent)',
-                    boxShadow: '0 0 20px rgba(34,211,238,0.6)',
-                    pointerEvents: 'none',
-                  }}
-                />
-              )}
-            </AnimatePresence>
+          <div className="bg-[rgba(3,5,18,0.97)] border border-[rgba(80,140,255,0.12)] rounded-[30px] backdrop-blur-[60px] shadow-[0_70px_140px_rgba(0,0,0,0.97),0_0_0_1px_rgba(80,140,255,0.06),inset_0_1px_0_rgba(255,255,255,0.05)] p-8 md:p-12 relative overflow-hidden">
+            <HoloShimmer mousePos={cardHoverPos} />
+            <div style={{ position: "absolute", top: 0, left: "8%", right: "8%", height: "1px", background: "linear-gradient(90deg,transparent,rgba(79,143,255,0.6),rgba(180,160,255,0.9),rgba(79,143,255,0.6),transparent)" }} />
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "130px", background: "linear-gradient(to bottom,rgba(60,100,255,0.05) 0%,transparent 100%)", pointerEvents: "none" }} />
+            <ScanLine active={scanActive} />
 
-            {/* Top glow bars */}
-            <div style={{ position: 'absolute', top: 0, left: '15%', right: '15%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.6), transparent)' }} />
+            {([{ top: 16, right: 16 }, { top: 16, left: 16 }, { bottom: 16, right: 16 }, { bottom: 16, left: 16 }] as Record<string, number>[]).map((pos, i) => (
+              <motion.div key={i} animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.2, 0.8] }} transition={{ duration: 2.2, repeat: Infinity, delay: i * 0.55 }}
+                style={{ position: "absolute", ...pos, width: 4, height: 4, borderRadius: "50%", background: i % 2 === 0 ? "#4f8fff" : "#9c5cff", boxShadow: `0 0 8px ${i % 2 === 0 ? "#4f8fff" : "#9c5cff"}` }} />
+            ))}
 
-            {/* Header nav */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '36px' }}>
-              <Link href="/">
-                <motion.div whileHover={{ scale: 1.05, x: -2 }} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
-                  <ChevronLeft style={{ width: 14, height: 14 }} /> Back
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "40px" }}>
+              <Link href="/"><motion.div whileHover={{ x: -3, color: "#e2e8f0" }} style={{ display: "flex", alignItems: "center", gap: "6px", color: "#334155", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.12em", cursor: "pointer", transition: "color 0.2s" }}><ChevronLeft style={{ width: 13, height: 13 }} /> {t("auto.Back_4922") || "Back"}</motion.div></Link>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "0.56rem", fontWeight: 700, color: "#4f8fff", textTransform: "uppercase", letterSpacing: "0.14em" }}>
+                  <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 1.5, repeat: Infinity }} style={{ width: 5, height: 5, borderRadius: "50%", background: "#4f8fff", boxShadow: "0 0 10px #4f8fff" }} /> {t("auto.Secure_6383") || "Secure"}
                 </motion.div>
-              </Link>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ color: '#22d3ee', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Log In</span>
-                <motion.button whileHover={{ scale: 1.05 }} onClick={() => router.push("/register")}
-                  style={{ background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.25)', color: '#22d3ee', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '7px 16px', borderRadius: '999px', cursor: 'pointer' }}>
-                  Register
-                </motion.button>
+                <motion.button whileHover={{ scale: 1.05, borderColor: "rgba(80,140,255,0.7)", boxShadow: "0 0 20px rgba(80,140,255,0.2)" }} whileTap={{ scale: 0.97 }} onClick={() => router.push("/register")}
+                  style={{ background: "rgba(80,140,255,0.07)", border: "1px solid rgba(80,140,255,0.22)", color: "#7aabff", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", padding: "7px 18px", borderRadius: "999px", cursor: "pointer", transition: "all 0.25s", fontFamily: "inherit" }}>{t("auto.Register_3958") || "Register"}</motion.button>
               </div>
             </div>
 
-            {/* Brand */}
-            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <motion.div
-                style={{ width: '64px', height: '64px', position: 'relative', margin: '0 auto 20px' }}
-              >
-                {/* Rotating rings */}
-                <motion.div animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-                  style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(34,211,238,0.3)', borderTopColor: '#22d3ee' }} />
-                <motion.div animate={{ rotate: -360 }} transition={{ duration: 10, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-                  style={{ position: 'absolute', inset: 6, borderRadius: '50%', border: '1px solid rgba(34,211,238,0.15)', borderBottomColor: '#3b82f6' }} />
-                {/* Center icon */}
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Activity style={{ width: 28, height: 28, color: '#22d3ee' }} strokeWidth={1.5} />
-                </div>
-              </motion.div>
-
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 900, letterSpacing: '0.2em', color: '#fff', marginBottom: '6px' }}>
-                LAMINAR <span style={{ color: '#22d3ee', fontWeight: 300 }}>CONTROL</span>
-              </h1>
-              <p style={{ fontSize: '0.6rem', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.15em' }}>
-                <ShieldCheck style={{ width: 11, height: 11, color: '#334155' }} /> Restricted Operator Access
+            <div style={{ textAlign: "center", marginBottom: "40px" }}>
+              <NeuralLogo />
+              <GlitchText text="LAMINAR" accent="ACCESS" />
+              <p style={{ fontSize: "0.6rem", color: "#1e2d4a", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.18em", marginTop: "6px" }}>
+                <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 2.5, repeat: Infinity }} style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "#1e3a6b", boxShadow: "0 0 8px #4f8fff40" }} />
+                {t("auto.AIOperationsPor_9401") || "AI Operations Portal"}
+                <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 2.5, repeat: Infinity, delay: 1.25 }} style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: "#1e3a6b", boxShadow: "0 0 8px #4f8fff40" }} />
               </p>
             </div>
 
-            {/* Error */}
             <AnimatePresence>
-              {errorMsg && (
-                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  style={{ marginBottom: '16px', padding: '12px', borderRadius: '12px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                  <AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} /> {errorMsg}
-                </motion.div>
-              )}
+              {errorMsg && <motion.div initial={{ opacity: 0, y: -10, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                style={{ marginBottom: "18px", padding: "12px 16px", borderRadius: "14px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "10px" }}>
+                <AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} /> {errorMsg}
+              </motion.div>}
             </AnimatePresence>
 
-            {/* Form */}
-            <form onSubmit={handleStandardLogin} style={{ background: 'rgba(4,8,20,0.7)', border: '1px solid rgba(34,211,238,0.1)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              {/* Email */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '8px', color: focusedField === 'email' ? '#22d3ee' : '#475569', transition: 'color 0.3s' }}>
-                  Operator ID
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Mail style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: focusedField === 'email' ? '#22d3ee' : '#334155', transition: 'color 0.3s', pointerEvents: 'none' }} />
-                  <motion.input
-                    type="email" placeholder="administrator@laminar.ai"
-                    value={email} onChange={e => setEmail(e.target.value)}
-                    onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)}
-                    animate={{ boxShadow: focusedField === 'email' ? '0 0 0 1px rgba(34,211,238,0.5), 0 0 20px rgba(34,211,238,0.1)' : '0 0 0 0px rgba(34,211,238,0)' }}
-                    style={{
-                      width: '100%', background: 'rgba(8,14,32,0.9)',
-                      border: `1px solid ${focusedField === 'email' ? 'rgba(34,211,238,0.5)' : 'rgba(34,211,238,0.15)'}`,
-                      borderRadius: '12px', color: '#fff', fontSize: '0.875rem',
-                      padding: '13px 14px 13px 40px', outline: 'none', transition: 'all 0.3s',
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                </div>
-              </div>
+            <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                style={{ background: "rgba(6,9,24,0.9)", border: "1px solid rgba(80,140,255,0.1)", borderRadius: "20px", padding: "26px", display: "flex", flexDirection: "column", gap: "20px", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: "20%", right: "20%", height: "1px", background: "linear-gradient(90deg,transparent,rgba(80,140,255,0.18),transparent)", pointerEvents: "none" }} />
 
-              {/* Password */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '8px', color: focusedField === 'password' ? '#22d3ee' : '#475569', transition: 'color 0.3s' }}>
-                  Auth Key
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Key style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: focusedField === 'password' ? '#22d3ee' : '#334155', transition: 'color 0.3s', pointerEvents: 'none' }} />
-                  <motion.input
-                    type={showPassword ? 'text' : 'password'} placeholder="••••••••••••"
-                    value={password} onChange={e => setPassword(e.target.value)}
-                    onFocus={() => setFocusedField('password')} onBlur={() => setFocusedField(null)}
-                    animate={{ boxShadow: focusedField === 'password' ? '0 0 0 1px rgba(34,211,238,0.5), 0 0 20px rgba(34,211,238,0.1)' : '0 0 0 0px rgba(34,211,238,0)' }}
-                    style={{
-                      width: '100%', background: 'rgba(8,14,32,0.9)',
-                      border: `1px solid ${focusedField === 'password' ? 'rgba(34,211,238,0.5)' : 'rgba(34,211,238,0.15)'}`,
-                      borderRadius: '12px', color: '#fff', fontSize: '0.875rem',
-                      padding: '13px 44px 13px 40px', outline: 'none', transition: 'all 0.3s',
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)}
-                    style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#334155', display: 'flex', alignItems: 'center' }}>
-                    {showPassword ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}
-                  </button>
+                {/* Email */}
+                <div>
+                  <label style={{ display: "block", fontSize: "0.58rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: "9px", color: focusedField === "email" ? "#6aabff" : "#2d3f5a", transition: "color 0.35s" }}>{t("auto.OperatorID_5484") || "Operator ID"}</label>
+                  <div style={{ position: "relative" }}>
+                    <Mail style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: focusedField === "email" ? "#5a9fff" : "#2d3f5a", transition: "color 0.35s", pointerEvents: "none" }} />
+                    <motion.input type="email" placeholder="operator@laminar.ai" value={email} onChange={e => setEmail(e.target.value)} onFocus={() => setFocusedField("email")} onBlur={() => setFocusedField(null)}
+                      animate={{ boxShadow: focusedField === "email" ? "0 0 0 1px rgba(80,140,255,0.55),0 0 22px rgba(80,140,255,0.12)" : "0 0 0 0px rgba(80,140,255,0)" }}
+                      style={{ width: "100%", background: "rgba(6,9,28,0.9)", border: `1px solid ${focusedField === "email" ? "rgba(80,140,255,0.55)" : "rgba(80,140,255,0.1)"}`, borderRadius: "13px", color: "#e2e8f0", fontSize: "0.875rem", padding: "14px 15px 14px 42px", outline: "none", transition: "border-color 0.35s", fontFamily: "inherit" }} />
+                  </div>
                 </div>
-              </div>
 
-              {/* Submit */}
-              <motion.button
-                type="submit" disabled={loading || scanActive}
-                whileHover={{ scale: 1.02, y: -1 }} whileTap={{ scale: 0.97 }}
-                animate={scanActive ? { boxShadow: ['0 0 20px rgba(34,211,238,0.3)', '0 0 60px rgba(34,211,238,0.7)', '0 0 20px rgba(34,211,238,0.3)'] } : {}}
-                transition={scanActive ? { duration: 0.8, repeat: Number.POSITIVE_INFINITY } : {}}
-                style={{
-                  width: '100%', padding: '15px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-                  background: 'linear-gradient(135deg, #22d3ee, #3b82f6)',
-                  color: '#000', fontWeight: 900, fontSize: '0.72rem', letterSpacing: '0.15em', textTransform: 'uppercase',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                  boxShadow: '0 0 30px rgba(34,211,238,0.4)',
-                  opacity: loading ? 0.7 : 1, marginTop: '4px',
-                }}
-              >
-                {loading ? (
-                  <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: 'linear' }}
-                    style={{ width: 16, height: 16, border: '2px solid rgba(0,0,0,0.3)', borderTopColor: '#000', borderRadius: '50%' }} />
-                    Authenticating...</>
-                ) : scanActive ? (
-                  <><Fingerprint style={{ width: 16, height: 16 }} /> Scanning Biometrics...</>
-                ) : (
-                  <><Fingerprint style={{ width: 16, height: 16 }} /> Initialize Session</>
-                )}
-              </motion.button>
+                {/* Password */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "9px" }}>
+                    <label style={{ fontSize: "0.58rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.18em", color: focusedField === "password" ? "#6aabff" : "#2d3f5a", transition: "color 0.35s" }}>{t("auto.AuthKey_8910") || "Auth Key"}</label>
+                    <motion.span whileHover={{ color: "#5a9fff" }} style={{ fontSize: "0.58rem", color: "#243044", cursor: "pointer", fontWeight: 700 }}>{t("auto.Forgot_1358") || "Forgot?"}</motion.span>
+                  </div>
+                  <div style={{ position: "relative" }}>
+                    <Key style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: focusedField === "password" ? "#5a9fff" : "#2d3f5a", transition: "color 0.35s", pointerEvents: "none" }} />
+                    <motion.input type={showPassword ? "text" : "password"} placeholder="••••••••••••" value={password} onChange={e => setPassword(e.target.value)} onFocus={() => setFocusedField("password")} onBlur={() => setFocusedField(null)}
+                      animate={{ boxShadow: focusedField === "password" ? "0 0 0 1px rgba(80,140,255,0.55),0 0 22px rgba(80,140,255,0.12)" : "0 0 0 0px rgba(80,140,255,0)" }}
+                      style={{ width: "100%", background: "rgba(6,9,28,0.9)", border: `1px solid ${focusedField === "password" ? "rgba(80,140,255,0.55)" : "rgba(80,140,255,0.1)"}`, borderRadius: "13px", color: "#e2e8f0", fontSize: "0.875rem", padding: "14px 46px 14px 42px", outline: "none", transition: "border-color 0.35s", fontFamily: "inherit" }} />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#2d3f5a", display: "flex" }}>
+                      {showPassword ? <EyeOff style={{ width: 14, height: 14 }} /> : <Eye style={{ width: 14, height: 14 }} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Submit */}
+                <motion.button type="submit" disabled={loading || scanActive}
+                  whileHover={!loading && !scanActive ? { y: -2, boxShadow: "0 0 60px rgba(80,140,255,0.6),0 0 120px rgba(120,80,255,0.3)" } : {}}
+                  whileTap={{ scale: 0.97 }}
+                  animate={scanActive ? { boxShadow: ["0 0 30px rgba(80,140,255,0.5)","0 0 80px rgba(120,80,255,0.9)","0 0 30px rgba(80,140,255,0.5)"] } : {}}
+                  transition={scanActive ? { duration: 0.6, repeat: Infinity } : {}}
+                  style={{ width: "100%", padding: "16px", borderRadius: "14px", border: "none", cursor: "pointer", background: "linear-gradient(135deg,#1a50e8 0%,#4f8fff 45%,#9c5cff 100%)", color: "#fff", fontWeight: 800, fontSize: "0.7rem", letterSpacing: "0.15em", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "center", gap: "9px", boxShadow: "0 0 40px rgba(80,140,255,0.4),0 6px 24px rgba(0,0,0,0.5)", opacity: loading ? 0.75 : 1, marginTop: "6px", position: "relative", overflow: "hidden", fontFamily: "inherit", transition: "opacity 0.2s" }}>
+                  <motion.div animate={{ x: ["-200%","200%"] }} transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 1.8, ease: "easeInOut" }} style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)" }} />
+                  {loading ? (<><motion.div animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }} style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%" }} />{t("auto.Authenticating_2806") || "Authenticating..."}</>)
+                    : scanActive ? (<><Fingerprint style={{ width: 15, height: 15 }} /> {t("auto.Scanning_4915") || "Scanning..."}</>)
+                    : (<><Fingerprint style={{ width: 15, height: 15 }} /> {t("auto.InitializeSessi_3507") || "Initialize Session"}</>)}
+                </motion.button>
+              </motion.div>
             </form>
 
-            {/* Divider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '20px 0' }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(34,211,238,0.1)' }} />
-              <span style={{ fontSize: '0.6rem', color: '#334155', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Secure Link</span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(34,211,238,0.1)' }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "22px 0" }}>
+              <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right,transparent,rgba(80,140,255,0.14))" }} />
+              <span style={{ fontSize: "0.56rem", color: "#1e2d44", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.14em" }}>{t("auto.orcontinuewith_260") || "or continue with"}</span>
+              <div style={{ flex: 1, height: "1px", background: "linear-gradient(to left,transparent,rgba(80,140,255,0.14))" }} />
             </div>
 
-            {/* Google */}
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <GoogleLogin
-                onSuccess={async (cr) => {
-                  try {
-                    setLoading(true);
-                    if (cr.credential) { await loginWithGoogle(cr.credential); router.push("/dashboard"); }
-                  } catch (err: any) { setErrorMsg(err.response?.data?.detail || "OAuth failed."); setLoading(false); }
-                }}
-                onError={() => setErrorMsg("OAuth failed.")}
-                theme="filled_black" shape="rectangular" size="large" text="continue_with"
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <GoogleLogin 
+                onSuccess={async (cr) => { 
+                  try { 
+                    setLoading(true); 
+                    if (cr.credential) { 
+                      const res = await loginWithGoogle(cr.credential); 
+                      console.log("Laminar Auth (Google):", res);
+                      
+                      if (res?.verification_required) {
+                        const target = `/verify-email?email=${encodeURIComponent(res.email || "")}`;
+                        console.log("Verification required. Redirecting to:", target);
+                        router.push(target);
+                        return;
+                      }
+
+                      console.log("Login successful. Redirecting to onboarding.");
+                      router.push("/onboarding"); 
+                    } 
+                  } catch (err: any) { 
+                    console.error("Laminar Auth Error:", err);
+                    setErrorMsg(err.response?.data?.detail || "OAuth failed."); 
+                    setLoading(false); 
+                  } 
+                }} 
+                onError={() => setErrorMsg("OAuth failed.")} 
+                theme="filled_black" 
+                shape="rectangular" 
+                size="large" 
+                text="continue_with" 
               />
             </div>
 
-            <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#334155', marginTop: '20px' }}>
-              New operator?{' '}
-              <motion.button type="button" onClick={() => router.push("/register")} whileHover={{ scale: 1.05 }}
-                style={{ background: 'none', border: 'none', color: '#22d3ee', fontWeight: 700, cursor: 'pointer', fontSize: '0.75rem' }}>
-                Request Access
-              </motion.button>
+            <p style={{ textAlign: "center", fontSize: "0.75rem", color: "#1e2d44", marginTop: "24px" }}>
+              New operator?{" "}<motion.button type="button" onClick={() => router.push("/register")} whileHover={{ scale: 1.05, color: "#7aabff" }} style={{ background: "none", border: "none", color: "#4f8fff", fontWeight: 700, cursor: "pointer", fontSize: "0.75rem", fontFamily: "inherit" }}>Request Access →</motion.button>
             </p>
+
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }} style={{ marginTop: "26px", paddingTop: "18px", borderTop: "1px solid rgba(80,140,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", gap: "18px" }}>
+              {["256-bit AES","OAuth 2.0","Zero Trust"].map((label, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 2.2, repeat: Infinity, delay: i * 0.75 }} style={{ width: 4, height: 4, borderRadius: "50%", background: "#1a3568", boxShadow: "0 0 6px #4f8fff50" }} />
+                  <span style={{ fontSize: "0.52rem", color: "#1e2d44", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase" }}>{label}</span>
+                </div>
+              ))}
+            </motion.div>
           </div>
         </motion.div>
-      </div>
-
-      {/* AI Copilot FAB */}
-      <motion.button
-        initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 1, type: "spring", stiffness: 200 }}
-        whileHover={{ scale: 1.08, y: -2 }} whileTap={{ scale: 0.94 }}
-        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(8,16,36,0.95)', border: '1px solid rgba(34,211,238,0.4)', borderRadius: '999px', padding: '12px 22px', color: '#22d3ee', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', backdropFilter: 'blur(20px)', boxShadow: '0 0 30px rgba(34,211,238,0.3)' }}
-      >
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}>
-          <Sparkles style={{ width: 15, height: 15 }} />
-        </motion.div>
-        AI Copilot
-      </motion.button>
+      </motion.div>
+      <style>{`input::placeholder{color:#1e2d44}input::-webkit-autofill{-webkit-box-shadow:0 0 0 100px rgba(6,9,28,0.95) inset !important;-webkit-text-fill-color:#e2e8f0 !important}`}</style>
     </div>
   );
 }

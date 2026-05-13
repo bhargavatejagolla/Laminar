@@ -86,6 +86,15 @@ JOBS = [
         "enabled": True,
         "critical": True,
     },
+    {
+        "id": "predictive_surge",
+        "name": "Predictive Surge Scan",
+        "description": "AI-driven crowd anomaly and surge forecasting across all venues",
+        "trigger": "interval",
+        "interval_seconds": 300,
+        "enabled": True,
+        "critical": True,
+    },
 ]
 
 # Register all jobs

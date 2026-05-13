@@ -86,6 +86,12 @@ class HolidayService:
                 extra={"error": str(e)}
             )
 
-        # Cache negative result
-        self._cache[cache_key] = {"timestamp": current_utc_datetime, "data": None}
-        return None
+        # Cache negative result with "Temporal Stability" metadata
+        stability_result = {
+            "is_holiday": False,
+            "name": "Temporal Stability",
+            "type": "Standard",
+            "source": "calibration"
+        }
+        self._cache[cache_key] = {"timestamp": current_utc_datetime, "data": stability_result}
+        return stability_result

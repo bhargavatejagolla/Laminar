@@ -30,6 +30,7 @@ import asyncio
 import cv2
 import numpy as np
 from datetime import datetime,timezone
+import atexit
 
 from app.core.logging import get_logger
 
@@ -47,6 +48,22 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
 )
 
 logger = get_logger(__name__)
+
+# Global tracking for atexit cleanup
+_active_captures = []
+
+def cleanup_all_captures():
+    """Safety net to release all hardware handles on process exit."""
+    for cap in _active_captures:
+        try:
+            if cap and cap.isOpened():
+                cap.release()
+                logger.info("Atexit: Released a dangling camera handle")
+        except:
+            pass
+    _active_captures.clear()
+
+atexit.register(cleanup_all_captures)
 
 
 # ==========================================================
@@ -135,6 +152,8 @@ class CameraSource(ABC):
 
             # Create capture
             self._capture = self._create_capture()
+            if self._capture and self._capture.isOpened():
+                _active_captures.append(self._capture)
             self._configure_capture()
 
             # Reset state
@@ -177,9 +196,12 @@ class CameraSource(ABC):
                 },
             )
 
-            self._capture.release()
+            if self._capture:
+                if self._capture in _active_captures:
+                    _active_captures.remove(self._capture)
+                self._capture.release()
+                self._capture = None
             self._running = False
-            self._capture = None
 
     async def restart(self) -> None:
         """Restart camera capture with exponential backoff."""
@@ -194,9 +216,10 @@ class CameraSource(ABC):
 
             self.stop()
 
-            # Exponential backoff
-            wait_time = min(self.reconnect_interval * (2 **
-                            (self._frame_failures - self.max_failures)), 60)
+            # Exponential backoff: always at least 2s to avoid threadpool starvation,
+            # capped at 60s. failure_excess is >=0 so wait_time always grows.
+            failure_excess = max(0, self._frame_failures - self.max_failures)
+            wait_time = min(max(2.0, self.reconnect_interval * (2 ** failure_excess)), 60.0)
             
         await asyncio.sleep(wait_time)
         self.start()
@@ -298,12 +321,37 @@ class CameraSource(ABC):
         if not self._capture:
             return
 
-        # Set resolution
-        self._capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self._capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+        try:
+            # Set resolution
+            self._capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            self._capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
 
-        # Optional: Reduce buffer size for lower latency
-        self._capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            # Optional: Reduce buffer size for lower latency
+            self._capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            
+            # ✅ Windows Hardware Stabilization: Sleep briefly to let the hardware settle after opening
+            # Some laptop webcams return 'False' for the first few read() calls while auto-exposure kicks in.
+            import sys
+            if sys.platform == "win32":
+                time.sleep(1.0)
+                
+            # ✅ Proactive Test Read: Verify we can actually get a frame
+            ret, _ = self._capture.read()
+            if not ret:
+                logger.warning(
+                    f"Camera {self.source} opened but failed first read. Attempting one-time grab-flush...",
+                    extra={"source": str(self.source)}
+                )
+                for _ in range(5):
+                    self._capture.grab()
+                    time.sleep(0.1)
+                ret, _ = self._capture.read()
+                if not ret:
+                    logger.error(f"Camera {self.source} still failing to read after flush. This device may be busy or incompatible.")
+                else:
+                    logger.info(f"Camera {self.source} stabilized after grab-flush")
+        except Exception as e:
+            logger.warning(f"Could not apply some camera settings to source: {e}")
 
     async def set_resolution(self, width: int, height: int) -> None:
         """Change resolution (applies on next start)."""
@@ -446,13 +494,47 @@ class WebcamSource(CameraSource):
         super().__init__(device_index, **kwargs)
 
     def _create_capture(self) -> cv2.VideoCapture:
-        """Use DirectShow on Windows to avoid MSMF instability."""
+        """Avoid MSMF entirely on Windows — use DirectShow or default CAP_ANY."""
         import platform
+        source_id = self.source
+        
+        # Suppress verbose OpenCV MSMF/DSHOW warnings (they go to stderr regardless)
+        os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_MSMF", "0")
+
         if platform.system() == "Windows":
-            cap = cv2.VideoCapture(self.source, cv2.CAP_DSHOW)
+            # 1. Try DirectShow (most stable for USB webcams)
+            # We try with and without MJPG codec as some cameras require it for higher resolutions/FPS
+            for backend in [cv2.CAP_DSHOW, cv2.CAP_ANY]:
+                try:
+                    cap = cv2.VideoCapture(source_id, backend)
+                    if cap is not None and cap.isOpened():
+                        # Try to force MJPG codec — often fixes 'Failed to read frame' on Windows
+                        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                        
+                        # Verify we can actually read
+                        ret, _ = cap.read()
+                        if ret:
+                            logger.info(f"Camera {source_id} opened and verified via {cap.getBackendName()}")
+                            _active_captures.append(cap)
+                            return cap
+                        
+                        # If first read failed, try lower resolution
+                        logger.warning(f"Backend {backend} opened but first read failed. Trying default resolution...")
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                        ret, _ = cap.read()
+                        if ret:
+                            return cap
+                            
+                        cap.release()
+                except Exception as e:
+                    logger.debug(f"Backend {backend} failed for camera {source_id}: {e}")
+
+            # 3. Final fallback
+            logger.error(f"All backends failed for camera {source_id}. Return default capture.")
+            return cv2.VideoCapture(source_id)
         else:
-            cap = cv2.VideoCapture(self.source)
-        return cap
+            return cv2.VideoCapture(source_id)
 
     def get_type(self) -> str:
         return "webcam"
@@ -661,6 +743,88 @@ class NetworkStreamSource(CameraSource):
 
 
 # ==========================================================
+# WebSocket Push Camera (Browser Stream)
+# ==========================================================
+
+class WebSocketSource(CameraSource):
+    """
+    Receives frames pushed from the browser frontend via WebSocket.
+    """
+    def __init__(self, source_identifier: str, **kwargs):
+        kwargs.setdefault("timeout_seconds", 30)
+        super().__init__(source_identifier, **kwargs)
+        self._current_frame = None
+        self._frame_ready = False
+        self._buffer_lock = threading.Lock()
+
+    def start(self) -> None:
+        with self._lock:
+            if self._running:
+                return
+            logger.info(f"Starting WebSocket push ingestion source ({self.source})")
+            self._running = True
+            self._last_frame_time = None
+            self._frame_failures = 0
+            self._start_time = datetime.now(timezone.utc)
+            self._total_frames = 0
+            self._dropped_frames = 0
+            class DummyCapture:
+                def isOpened(self): return True
+            self._capture = DummyCapture()
+
+    def stop(self) -> None:
+        with self._lock:
+            self._running = False
+
+    def feed_frame(self, frame: np.ndarray) -> None:
+        """Called by the API when a frame is received over WebSocket"""
+        if not self._running:
+            return
+        with self._buffer_lock:
+            self._current_frame = frame
+            self._frame_ready = True
+            
+    async def read(self) -> Optional[Tuple[bool, np.ndarray]]:
+        if not self._running:
+            return None
+            
+        # Target FPS limiting
+        if self.target_fps:
+            elapsed = time.time() - self._last_read_time
+            if elapsed < self._frame_interval:
+                await asyncio.sleep(self._frame_interval - elapsed)
+                
+        self._last_read_time = time.time()
+        
+        frame = None
+        with self._buffer_lock:
+            if self._frame_ready and self._current_frame is not None:
+                frame = self._current_frame.copy()
+                self._frame_ready = False
+                
+        if frame is None:
+            await asyncio.sleep(0.05) # Prevent CPU spinning
+            return None
+            
+        if not self._is_frame_usable(frame):
+            self._dropped_frames += 1
+            return None
+            
+        self._last_frame_time = datetime.now(timezone.utc)
+        self._total_frames += 1
+        
+        if frame.shape[1] != self.width or frame.shape[0] != self.height:
+            frame = cv2.resize(frame, (self.width, self.height))
+            
+        return True, frame
+
+    def get_type(self) -> str:
+        return "browser_webcam"
+
+    def _create_capture(self):
+        return None
+
+# ==========================================================
 # Video File Source
 # ==========================================================
 
@@ -736,11 +900,15 @@ def create_camera_source(
         kwargs.pop("password", None)
 
     if source_type == "device":
-        return WebcamSource(
-            int(source_identifier) if isinstance(source_identifier, str)
-            else source_identifier,
-            **kwargs
-        )
+        # Handle string "0", "1" etc. securely, otherwise fall back to string
+        final_id = source_identifier
+        if isinstance(source_identifier, str) and source_identifier.isdigit():
+            final_id = int(source_identifier)
+        
+        return WebcamSource(final_id, **kwargs)
+
+    if source_type == "browser":
+        return WebSocketSource(str(source_identifier), **kwargs)
 
     if source_type in ("rtsp", "cctv", "http", "https", "rtmp"):
         return NetworkStreamSource(str(source_identifier), **kwargs)

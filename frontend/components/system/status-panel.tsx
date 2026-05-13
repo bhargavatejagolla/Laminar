@@ -4,8 +4,11 @@ import { useZoneIntelligenceSummary } from "@/hooks/useZoneIntelligence";
 import { Server, Activity, AlertTriangle, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { useSystemHealth } from "@/hooks/useSystemHealth";
+import { useTranslation } from "react-i18next";
 
 export default function SystemStatusPanel() {
+  const { t } = useTranslation();
+
   const { data, isLoading, isError } = useZoneIntelligenceSummary();
   const { data: healthData, isLoading: healthLoading } = useSystemHealth();
 
@@ -34,8 +37,8 @@ export default function SystemStatusPanel() {
             <Server className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-white font-bold tracking-widest uppercase text-xs">Node Telemetry</h2>
-            <p className="text-[10px] text-slate-500 tracking-widest uppercase">System Health</p>
+            <h2 className="text-white font-bold tracking-widest uppercase text-xs">{t("auto.NodeTelemetry_2853") || "Node Telemetry"}</h2>
+            <p className="text-[10px] text-slate-500 tracking-widest uppercase">{t("auto.SystemHealth_832") || "System Health"}</p>
           </div>
         </div>
         
@@ -52,13 +55,13 @@ export default function SystemStatusPanel() {
 
       <div className="grid grid-cols-2 gap-3 relative z-10">
         <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
-           <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-0.5">Active Workers</p>
+           <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-0.5">{t("auto.ActiveWorkers_1815") || "Active Workers"}</p>
            <p className="text-lg font-mono text-white flex items-center gap-2">
              {healthData?.components?.vision_workers ?? 0} Worker{healthData?.components?.vision_workers !== 1 ? 's' : ''}
            </p>
         </div>
         <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
-           <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-0.5">System Load</p>
+           <p className="text-[9px] uppercase tracking-widest text-slate-500 font-bold mb-0.5">{t("auto.SystemLoad_8673") || "System Load"}</p>
            <p className="text-lg font-mono text-blue-400 tracking-tight">CPU {healthData?.metrics?.cpu_usage ?? 0}%</p>
         </div>
       </div>

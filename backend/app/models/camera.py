@@ -35,13 +35,8 @@ from app.models.base import BaseModel
 class Camera(BaseModel):
     """
     Camera device connected to a venue.
-
-    Examples:
-        - CCTV RTSP camera
-        - IP camera
-        - Edge AI device
-        - Temporary event camera
     """
+    model_config = {"protected_namespaces": ()}
 
     __tablename__ = "cameras"
 
@@ -249,6 +244,21 @@ class Camera(BaseModel):
     )
 
     # ==========================================================
+    # Display Overrides
+    # ==========================================================
+
+    static_mode_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    static_image_url: Mapped[Optional[str]] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+
+    # ==========================================================
     # Relationships (future entities)
     # ==========================================================
 
@@ -331,7 +341,7 @@ class Camera(BaseModel):
         if not self.name:
             errors.append("Camera name is required.")
 
-        valid_stream_types = {"rtsp", "http", "https", "file", "edge", "device", "cctv", "rtmp"}
+        valid_stream_types = {"rtsp", "http", "https", "file", "edge", "device", "cctv", "rtmp", "browser"}
         if self.stream_type not in valid_stream_types:
             errors.append(
                 f"Invalid stream type. Must be one of: {valid_stream_types}")

@@ -46,12 +46,12 @@ class ConnectionManager:
     async def connect_global(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self._global.add(websocket)
-        logger.info(f"WS client connected (global). Total global: {len(self._global)}")
+        logger.debug(f"WS client connected (global). Total global: {len(self._global)}")
 
     async def connect_venue(self, websocket: WebSocket, venue_id: str) -> None:
         await websocket.accept()
         self._venue.setdefault(venue_id, set()).add(websocket)
-        logger.info(f"WS client connected to venue {venue_id}. Total: {len(self._venue[venue_id])}")
+        logger.debug(f"WS client connected to venue {venue_id}. Total: {len(self._venue[venue_id])}")
 
     def disconnect(self, websocket: WebSocket, venue_id: Optional[str] = None) -> None:
         self._global.discard(websocket)
@@ -129,7 +129,7 @@ async def ws_global_alerts(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "ping", "status": "alive"}))
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
-        logger.info("WS global client disconnected")
+        logger.debug("WS global client disconnected")
     except Exception as e:
         ws_manager.disconnect(websocket)
         logger.warning(f"WS global error: {e}")
@@ -149,7 +149,7 @@ async def ws_venue_alerts(websocket: WebSocket, venue_id: str):
                 await websocket.send_text(json.dumps({"type": "ping", "venue_id": venue_id}))
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, venue_id)
-        logger.info(f"WS venue {venue_id} client disconnected")
+        logger.debug(f"WS venue {venue_id} client disconnected")
     except Exception as e:
         ws_manager.disconnect(websocket, venue_id)
         logger.warning(f"WS venue {venue_id} error: {e}")

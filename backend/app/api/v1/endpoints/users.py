@@ -21,6 +21,9 @@ from app.models.venue import Venue
 from app.models.alert_contact import AlertContact
 from app.schemas.users import UserProfileUpdate, UserProfileResponse, UserAdminResponse, UserRoleUpdate, UserVenueUpdate
 from sqlalchemy.orm import selectinload
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -31,7 +34,45 @@ os.makedirs(PROFILE_PICS_DIR, exist_ok=True)
 @router.get("/profile", response_model=UserProfileResponse)
 async def get_profile(current_user: User = Depends(get_current_active_user)):
     """Fetch the current authenticated user's profile."""
-    return current_user
+    try:
+        # Use a fresh session to ensure the user object is not detached and attributes are accessible
+        async with db_manager.session() as session:
+            stmt = select(User).where(User.id == current_user.id)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                # Fallback to dependency user if DB re-fetch fails
+                user = current_user
+
+            # Defensive Role extraction
+            user_role = "user"
+            try:
+                if hasattr(user.role, "value"):
+                    user_role = user.role.value
+                else:
+                    user_role = str(user.role)
+            except Exception:
+                pass
+
+            return UserProfileResponse(
+                id=user.id,
+                email=user.email,
+                role=user_role,
+                is_active=user.is_active,
+                name=getattr(user, "name", None),
+                phone_number=getattr(user, "phone_number", None),
+                profile_picture=getattr(user, "profile_picture", None),
+                receive_sms_alerts=getattr(user, "receive_sms_alerts", False),
+                alert_email=getattr(user, "alert_email", None),
+                receive_email_alerts=getattr(user, "receive_email_alerts", False),
+                language_preference=getattr(user, "language_preference", "en"),
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"CRITICAL PROFILE FETCH ERROR for user {getattr(current_user, 'id', 'unknown')}")
+        raise HTTPException(status_code=500, detail=f"Internal Profile Engine Error: {str(e)}")
 
 @router.put("/profile/update", response_model=UserProfileResponse)
 async def update_profile(

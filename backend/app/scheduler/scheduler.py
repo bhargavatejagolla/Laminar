@@ -58,7 +58,7 @@ class LaminarScheduler:
         self._add_job_with_tracking(
             "minute_pipeline",
             minute_pipeline_job,
-            IntervalTrigger(seconds=30), # Increased frequency for "fast" alerts
+            IntervalTrigger(minutes=1), # Restored to 1-minute to prevent contention
         )
 
         self._add_job_with_tracking(
@@ -99,7 +99,7 @@ class LaminarScheduler:
         self._add_job_with_tracking(
             "predictive_surge",
             predictive_surge_job,
-            IntervalTrigger(minutes=5),
+            IntervalTrigger(minutes=15), # Increased from 5 to prevent Groq 429 rate limit
         )
 
         self._add_job_with_tracking(
@@ -121,7 +121,7 @@ class LaminarScheduler:
             job_metadata = JobRegistry.get(job_id)
 
             try:
-                logger.info(
+                logger.debug(
                     f"Starting job: {job_id}",
                     extra_fields={
                         "job_id": job_id,
@@ -135,7 +135,7 @@ class LaminarScheduler:
                 self._job_status[job_id] = "completed"
 
                 duration = (datetime.utcnow() - start_time).total_seconds()
-                logger.info(
+                logger.debug(
                     f"Job completed: {job_id}",
                     extra_fields={
                         "job_id": job_id,

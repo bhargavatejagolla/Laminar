@@ -13,6 +13,7 @@
 
 import * as React from "react";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 interface VoiceCommandButtonProps {
   onSpeechResult: (text: string) => void; // Called with recognized text
@@ -32,6 +33,8 @@ export function VoiceCommandButton({
   className = "",
   disabled = false,
 }: VoiceCommandButtonProps) {
+  const { t } = useTranslation();
+
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [transcript, setTranscript] = useState("");
@@ -186,7 +189,7 @@ export function VoiceCommandButton({
       {/* Modern Tooltip */}
       {!isListening && (
         <div className="absolute bottom-16 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-neutral-900/90 backdrop-blur-md border border-white/10 rounded-lg px-3 py-1.5 text-xs text-neutral-300 whitespace-nowrap pointer-events-none shadow-xl font-medium">
-          Voice input <span className="text-neutral-500 ml-1 font-mono">Ctrl+M</span>
+          {t("auto.Voiceinput_8711") || "Voice input"} <span className="text-neutral-500 ml-1 font-mono">Ctrl+M</span>
         </div>
       )}
     </div>

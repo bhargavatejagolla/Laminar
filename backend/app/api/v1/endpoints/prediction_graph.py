@@ -133,6 +133,8 @@ async def prediction_graph(
                 "risk_scores": historical_scores,
                 "crowd_counts": historical_crowd_counts,
                 "occupancy_percents": historical_occupancy_percents,
+                "transit_entries": prediction.get("historical", {}).get("transit_entries", []),
+                "transit_exits": prediction.get("historical", {}).get("transit_exits", []),
             },
 
             "forecast": {
@@ -143,12 +145,18 @@ async def prediction_graph(
                 "escalation_probs": forecast_escalation_probs,
             },
 
+            "peaks": prediction.get("peaks", []),
+
             # Dedicated escalation series — ALWAYS populated for chart rendering
             "escalation": {
                 "timestamps": escalation_timestamps,
                 "probabilities": escalation_probabilities,
                 "source": escalation_source,
             },
+
+            "weather_context": prediction.get("weather_context"),
+            "holiday_context": prediction.get("holiday_context"),
+            "forecast_explanation": prediction.get("forecast_explanation"),
 
             "meta": {
                 "model_used": prediction.get("model_used"),

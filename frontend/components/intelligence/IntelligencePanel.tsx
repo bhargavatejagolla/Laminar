@@ -4,7 +4,7 @@
  * IntelligencePanel - Laminar AI Intelligence Engine Component
  * 
  * Displays a structured operational intelligence report for a venue.
- * Powered by Llama 3.2 (via Ollama) with rule-based fallback.
+ * Powered by Randy AI with real-time crowd intelligence.
  * 
  * Shows:
  *  - Situation Analysis
@@ -27,6 +27,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   venueId: string;
@@ -47,6 +48,8 @@ const SEVERITY_DOT: Record<string, string> = {
 };
 
 export default function IntelligencePanel({ venueId }: Props) {
+  const { t } = useTranslation();
+
   const { data, isLoading, isFetching, refetch } = useVenueIntelligence(venueId);
   const [expanded, setExpanded] = useState(true);
 
@@ -66,7 +69,7 @@ export default function IntelligencePanel({ venueId }: Props) {
           </div>
           <div>
             <h3 className="text-sm font-bold text-white tracking-wide">
-              Laminar AI Intelligence Engine
+              {t("auto.LaminarAIIntell_5039") || "Laminar AI Intelligence Engine"}
             </h3>
             <p className="text-[10px] text-violet-400/70 font-mono uppercase tracking-widest">
               {data?.generated_by || "Initializing..."}
@@ -99,7 +102,7 @@ export default function IntelligencePanel({ venueId }: Props) {
           {isLoading ? (
             <div className="flex items-center gap-3 py-6 justify-center">
               <Brain className="w-5 h-5 text-violet-400 animate-pulse" />
-              <span className="text-sm text-slate-400 font-mono">Analyzing surveillance intelligence...</span>
+              <span className="text-sm text-slate-400 font-mono">{t("auto.Analyzingsurvei_8782") || "Analyzing surveillance intelligence..."}</span>
             </div>
           ) : data ? (
             <>
@@ -140,7 +143,7 @@ export default function IntelligencePanel({ venueId }: Props) {
                 <div className="flex items-center gap-2 mb-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
-                    Recommended Actions
+                    {t("auto.RecommendedActi_6227") || "Recommended Actions"}
                   </span>
                 </div>
                 <ul className="space-y-1.5">
@@ -161,7 +164,7 @@ export default function IntelligencePanel({ venueId }: Props) {
                   <div className="flex items-center gap-2 mb-1.5">
                     <Brain className="w-3.5 h-3.5 text-slate-400" />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                      Multi-Camera Correlation
+                      {t("auto.MultiCameraCorr_113") || "Multi-Camera Correlation"}
                     </span>
                   </div>
                   <pre className="text-[10px] text-slate-400 font-mono whitespace-pre-wrap leading-relaxed">
@@ -183,7 +186,7 @@ export default function IntelligencePanel({ venueId }: Props) {
             </>
           ) : (
             <div className="text-sm text-slate-500 text-center py-4">
-              No intelligence data available. Check system connectivity.
+              {t("auto.Nointelligenced_1500") || "No intelligence data available. Check system connectivity."}
             </div>
           )}
         </div>

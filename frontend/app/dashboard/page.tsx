@@ -25,28 +25,33 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } }
 }
 
+import SplashCursor from "@/components/react-bits/SplashCursor"
+
 // ─────────────────────────────────────────────────────────────────
 // Risk badge helper
 // ─────────────────────────────────────────────────────────────────
 function riskStyle(level: string) {
   switch (level) {
     case "critical": return { border: "border-rose-500/50", bg: "bg-rose-500/8", dot: "bg-rose-500", text: "text-rose-400", badge: "bg-rose-500/20 text-rose-400 border-rose-500/40" }
-    case "high":     return { border: "border-orange-500/50", bg: "bg-orange-500/8", dot: "bg-orange-500", text: "text-orange-400", badge: "bg-orange-500/20 text-orange-400 border-orange-500/40" }
-    case "medium":   return { border: "border-amber-500/40",  bg: "bg-amber-500/8",  dot: "bg-amber-500",  text: "text-amber-400",  badge: "bg-amber-500/20 text-amber-400 border-amber-500/40" }
-    default:         return { border: "border-emerald-500/30", bg: "bg-emerald-500/5", dot: "bg-emerald-500", text: "text-emerald-400", badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" }
+    case "high": return { border: "border-orange-500/50", bg: "bg-orange-500/8", dot: "bg-orange-500", text: "text-orange-400", badge: "bg-orange-500/20 text-orange-400 border-orange-500/40" }
+    case "medium": return { border: "border-amber-500/40", bg: "bg-amber-500/8", dot: "bg-amber-500", text: "text-amber-400", badge: "bg-amber-500/20 text-amber-400 border-amber-500/40" }
+    default: return { border: "border-emerald-500/30", bg: "bg-emerald-500/5", dot: "bg-emerald-500", text: "text-emerald-400", badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" }
   }
 }
 
 function TrendIcon({ trend }: { trend?: string }) {
+  const { t } = useTranslation();
   if (trend === "increasing") return <TrendingUp className="w-3.5 h-3.5 text-rose-400" />
   if (trend === "decreasing") return <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
-  return <Minus className="w-3.5 h-3.5 text-slate-400" />
+  { t("auto.return_3054") || "return" } <Minus className="w-3.5 h-3.5 text-slate-400" />
 }
 
 // ─────────────────────────────────────────────────────────────────
 // Per-camera intelligence card
 // ─────────────────────────────────────────────────────────────────
 function CameraIntelCard({ cam }: { cam: any }) {
+  const { t } = useTranslation();
+
   const snap = cam.snapshot
   const isLive = snap?.is_live === true
   const risk = snap?.intelligence?.overall_risk_level ?? "low"
@@ -57,7 +62,7 @@ function CameraIntelCard({ cam }: { cam: any }) {
   const flowDir = snap?.flow?.dominant_direction ?? "—"
   const flowIntensity = snap?.flow?.flow_intensity ?? "still"
   const trend = snap?.density?.trend ?? "stable"
-  const summary = snap?.intelligence?.summary ?? (cam.status === "offline" ? "Camera offline. No data available." : "Awaiting vision stream...")
+  const summary = snap?.intelligence?.summary ?? (cam.status === "offline" ? t("cameras.offlineNoData") || "Camera offline. No data available." : t("cameras.awaitingVisionStream") || "Awaiting vision stream...")
   const alertTriggered = snap?.intelligence?.alert_triggered ?? false
   const recommendedAction = snap?.intelligence?.recommended_action
   const factors = snap?.intelligence?.contributing_factors ?? []
@@ -87,9 +92,9 @@ function CameraIntelCard({ cam }: { cam: any }) {
         <div className="flex items-center gap-2 flex-shrink-0">
           {alertTriggered && <Zap className="w-3.5 h-3.5 text-rose-400 animate-pulse" />}
           {isLive && (
-             <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+            <span className="text-[7px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
               <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-              Live
+              {t("cameras.live") || "Live"}
             </span>
           )}
           <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${rs.badge}`}>
@@ -108,10 +113,10 @@ function CameraIntelCard({ cam }: { cam: any }) {
           <Activity className={`w-3 h-3 ${isWarming || !isLive ? "animate-spin" : ""}`} />
           {isWarming || !isLive ? (
             <div className="flex flex-col gap-0.5">
-              <span>Awaiting Stream Sync</span>
-              <span className="text-[8px] opacity-60 font-medium">Listening for frames...</span>
+              <span>{t("cameras.awaitingStream") || "Awaiting Stream Sync"}</span>
+              <span className="text-[8px] opacity-60 font-medium">{t("cameras.listeningFrames") || "Listening for frames..."}</span>
             </div>
-          ) : "Stream offline"}
+          ) : (t("cameras.streamOffline") || "Stream offline")}
         </div>
       ) : (
         <>
@@ -119,7 +124,7 @@ function CameraIntelCard({ cam }: { cam: any }) {
           <div className="grid grid-cols-3 gap-2 mb-3">
             <div className="bg-black/20 rounded-lg p-2 border border-white/5">
               <p className="text-[8px] uppercase tracking-wider text-slate-500 mb-0.5 flex items-center gap-1">
-                <Users className="w-2.5 h-2.5" /> Now
+                <Users className="w-2.5 h-2.5" /> {t("cameras.now") || "Now"}
               </p>
               <p className={`text-lg font-mono font-black ${rs.text}`}>{density}</p>
             </div>
@@ -131,7 +136,7 @@ function CameraIntelCard({ cam }: { cam: any }) {
             </div>
             <div className="bg-black/20 rounded-lg p-2 border border-white/5">
               <p className="text-[8px] uppercase tracking-wider text-slate-500 mb-0.5 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5" /> Dwell
+                <Clock className="w-2.5 h-2.5" /> {t("cameras.dwell") || "Dwell"}
               </p>
               <p className="text-lg font-mono font-black text-white">{avgDwell.toFixed(0)}s</p>
             </div>
@@ -177,6 +182,7 @@ function CameraIntelCard({ cam }: { cam: any }) {
 // Multi-camera live intelligence section
 // ─────────────────────────────────────────────────────────────────
 function LiveIntelligencePanel() {
+  const { t } = useTranslation();
   const { data, isLoading, isError, refetch } = useZoneIntelligenceSummary(3000)
   const { data: dashboardData } = useDashboardStats()
 
@@ -204,13 +210,13 @@ function LiveIntelligencePanel() {
     return (
       <div className="glass-panel rounded-2xl border border-rose-500/20 p-8 flex flex-col items-center justify-center text-center">
         <AlertTriangle className="w-10 h-10 text-rose-500 mb-3" />
-        <h3 className="text-slate-300 font-semibold mb-1">Intelligence Link Interrupted</h3>
-        <p className="text-slate-500 text-sm mb-4">The live data stream was disconnected.</p>
-        <button 
+        <h3 className="text-slate-300 font-semibold mb-1">{t("cameras.intelligenceLinkInterrupted") || "Intelligence Link Interrupted"}</h3>
+        <p className="text-slate-500 text-sm mb-4">{t("cameras.liveStreamDisconnected") || "The live data stream was disconnected."}</p>
+        <button
           onClick={() => refetch()}
           className="px-4 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-black uppercase tracking-widest hover:bg-rose-500/20 transition-all"
         >
-          Reconnect Stream
+          {t("cameras.reconnectStream") || "Reconnect Stream"}
         </button>
       </div>
     )
@@ -220,8 +226,8 @@ function LiveIntelligencePanel() {
     return (
       <div className="glass-panel rounded-2xl border border-dashed border-slate-700/60 p-10 flex flex-col items-center justify-center text-center">
         <Camera className="w-10 h-10 text-slate-600 mb-3" />
-        <h3 className="text-slate-300 font-semibold mb-1">No Cameras Configured</h3>
-        <p className="text-slate-500 text-sm">Add cameras in the Cameras page to see live intelligence here.</p>
+        <h3 className="text-slate-300 font-semibold mb-1">{t("cameras.noCamerasConfigured") || "No Cameras Configured"}</h3>
+        <p className="text-slate-500 text-sm">{t("cameras.addCamerasHint") || "Add cameras in the Cameras page to see live intelligence here."}</p>
       </div>
     )
   }
@@ -234,7 +240,7 @@ function LiveIntelligencePanel() {
           <div className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-cyan-400" />
             <span className="text-xs font-black tracking-widest uppercase text-white">
-              Mission Overview · {cameras.length} Camera{cameras.length !== 1 ? "s" : ""}
+              {t("dashboard.missionOverview") || "Mission Overview"} · {cameras.length} {cameras.length !== 1 ? (t("dashboard.cameras") || "Cameras") : (t("dashboard.camera") || "Camera")}
             </span>
           </div>
           <span className={`text-[9px] font-black uppercase px-2 py-1 rounded border ${rs.badge} flex items-center gap-1.5`}>
@@ -245,11 +251,11 @@ function LiveIntelligencePanel() {
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: "Active Cameras", value: activeCams.length, color: "text-emerald-400" },
-            { label: "Total People", value: totalPeople, color: "text-cyan-400" },
-            { label: "Predicted (5m)", value: totalPred5m, color: "text-indigo-400" },
-            { label: "Active Alerts", value: recentAlerts, color: recentAlerts > 0 ? "text-rose-400" : "text-slate-400" },
-            { label: "High+ Risk Cams", value: criticalCount + highCount, color: criticalCount > 0 ? "text-rose-400" : "text-orange-400" },
+            { label: t("dashboard.activeCameras") || "Active Cameras", value: activeCams.length, color: "text-emerald-400" },
+            { label: t("dashboard.totalPeople") || "Total People", value: totalPeople, color: "text-cyan-400" },
+            { label: t("dashboard.predicted5m") || "Predicted (5m)", value: totalPred5m, color: "text-indigo-400" },
+            { label: t("stats.activeAlerts") || "Active Alerts", value: recentAlerts, color: recentAlerts > 0 ? "text-rose-400" : "text-slate-400" },
+            { label: t("dashboard.highRiskCams") || "High+ Risk Cams", value: criticalCount + highCount, color: criticalCount > 0 ? "text-rose-400" : "text-orange-400" },
           ].map(stat => (
             <div key={stat.label} className="bg-black/25 rounded-xl p-2.5 border border-white/5 text-center">
               <p className="text-[8px] uppercase tracking-widest text-slate-500 font-bold mb-1">{stat.label}</p>
@@ -275,40 +281,50 @@ function LiveIntelligencePanel() {
 // Command Center Page
 // ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const { t } = useTranslation()
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-transparent text-white pb-12 relative overflow-hidden">
+      <SplashCursor
+        DENSITY_DISSIPATION={3.5}
+        VELOCITY_DISSIPATION={2}
+        PRESSURE={0.1}
+        CURL={3}
+        SPLAT_RADIUS={0.15}
+        SPLAT_FORCE={6000}
+        COLOR_UPDATE_SPEED={10}
+        SHADING
+        RAINBOW_MODE={false}
+        COLOR="#22d3ee"
+      />
+
       <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-cyan-900/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-[100px] pointer-events-none" />
 
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="relative z-10">
+      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="relative z-10 px-6 lg:px-12">
 
         {/* Header - Repositioned to Center for Impact */}
-        <motion.div variants={itemVariants} className="flex flex-col items-center justify-center text-center gap-6 mb-12 mt-6">
+        <motion.div variants={itemVariants} className="flex flex-col items-center justify-center text-center gap-6 mb-12 mt-6 relative">
           <div className="relative group">
             <div className="absolute -inset-4 rounded-full bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-cyan-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000 animate-spin-slow" />
             <div className="relative p-5 bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-full shadow-[0_0_40px_rgba(34,211,238,0.15)] ring-1 ring-white/10">
               <BarChart3 className="w-10 h-10 text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
             </div>
           </div>
-          
-          <div className="max-w-2xl">
-            <h1 className="text-5xl md:text-6xl font-black tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/60 mb-4 font-heading uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-              {t("dashboard.title") || "Command Center"}
-            </h1>
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              <p className="text-sm md:text-base font-bold text-cyan-400/80 tracking-[0.2em] uppercase flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 pulse-glow" />
-                {t("dashboard.subtitle") || "Global Operations Network"}
-              </p>
-              <div className="hidden sm:block w-px h-4 bg-white/20" />
-              <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-black text-emerald-400 tracking-widest uppercase">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+
+          <div className="max-w-4xl w-full flex flex-col items-center">
+            <div className="flex flex-col items-center">
+              <h1 className="text-4xl md:text-6xl font-black tracking-[0.15em] text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                {(t("dashboard.title") || "COMMAND CENTER").toUpperCase()}
+              </h1>
+              <div className="flex items-center gap-4 mt-3">
+                <h2 className="text-sm md:text-base font-bold tracking-[0.3em] text-cyan-400">
+                  {(t("dashboard.globalOperationsNetwork") || "GLOBAL OPERATIONS NETWORK").toUpperCase()}
+                </h2>
+                <span className="px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {t("dashboard.liveSync") || "LIVE SYNC"}
                 </span>
-                Live Sync
               </div>
             </div>
           </div>
@@ -333,12 +349,12 @@ export default function DashboardPage() {
                   <Activity className="w-5 h-5 text-cyan-400" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold tracking-widest text-white uppercase">Live Intelligence · All Cameras</h2>
-                  <p className="text-[10px] text-cyan-500/80 uppercase tracking-widest">Real-time crowd analysis · 3s refresh</p>
+                  <h2 className="text-base font-bold tracking-widest text-white uppercase">{t("dashboard.liveIntelligenceAllCams") || "Live Intelligence · All Cameras"}</h2>
+                  <p className="text-[10px] text-cyan-500/80 uppercase tracking-widest">{t("dashboard.realtimeCrowdAnalysis") || "Real-time crowd analysis · 3s refresh"}</p>
                 </div>
                 <span className="ml-auto flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live
+                  {t("cameras.live") || "Live"}
                 </span>
               </div>
               <LiveIntelligencePanel />
@@ -356,7 +372,7 @@ export default function DashboardPage() {
                 <div className="p-2 rounded-lg bg-slate-500/10 border border-slate-500/20">
                   <MapPin className="w-5 h-5 text-slate-400" />
                 </div>
-                <h2 className="text-base font-bold tracking-widest text-slate-300 uppercase">Registered Venues</h2>
+                <h2 className="text-base font-bold tracking-widest text-slate-300 uppercase">{t("dashboard.registeredVenues") || "Registered Venues"}</h2>
               </div>
               <VenueGrid />
             </div>

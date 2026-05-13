@@ -19,6 +19,8 @@ class ActionRule(BaseModel):
     name = Column(String(100), nullable=False)
     description = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, index=True)
+    is_dry_run = Column(Boolean, default=False)
+    priority_level = Column(String(20), default="low") # low, medium, critical
 
     # Trigger conditions
     trigger_type = Column(String(50), nullable=False)        # e.g., "alert_created", "critical_surge"
@@ -28,3 +30,6 @@ class ActionRule(BaseModel):
     action_type = Column(Enum(ActionType), nullable=False)
     action_target = Column(String(500), nullable=False)       # webhook URL, email, IoT topic, etc.
     action_payload_template = Column(JSON, nullable=True)     # JSON template to POST
+    
+    # Audit & Tracking
+    history_logs = Column(JSON, default=list) # List of last 5 runs: [{"id", "ts", "status", "details"}]

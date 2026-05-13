@@ -5,6 +5,7 @@ import { useZoneIntelligenceSummary } from "@/hooks/useZoneIntelligence";
 import { Loader2, AlertTriangle, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, ArrowUp, Activity } from "lucide-react";
 import ZoneDetailPanel from "./zone-detail-panel";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 function getDirectionIcon(direction: string) {
   switch (direction.toUpperCase()) {
@@ -36,6 +37,8 @@ function getRiskPulse(level: string) {
 }
 
 export default function LiveVenueMap() {
+  const { t } = useTranslation();
+
   const { data, isLoading, isError } = useZoneIntelligenceSummary();
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
 
@@ -43,7 +46,7 @@ export default function LiveVenueMap() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
-        <span className="ml-3 text-cyan-400 font-mono tracking-widest text-sm">INITIALIZING RADAR...</span>
+        <span className="ml-3 text-cyan-400 font-mono tracking-widest text-sm">{t("auto.INITIALIZINGRAD_7135") || "INITIALIZING RADAR..."}</span>
       </div>
     );
   }
@@ -55,7 +58,7 @@ export default function LiveVenueMap() {
       <div className="p-8 border border-rose-500/30 bg-rose-500/10 rounded-xl text-center">
         <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto mb-3" />
         <p className="text-rose-400 font-medium">Failed to reach Intelligence Engine — check backend connection</p>
-        <p className="text-slate-500 text-xs mt-1">Retrying automatically...</p>
+        <p className="text-slate-500 text-xs mt-1">{t("auto.Retryingautomat_8867") || "Retrying automatically..."}</p>
       </div>
     );
   }
@@ -97,9 +100,9 @@ export default function LiveVenueMap() {
     return (
       <div className="flex flex-col items-center justify-center p-16 bg-[#0f172a]/30 rounded-xl border border-slate-800/50 text-center border-dashed">
         <Activity className="w-10 h-10 text-slate-600 mb-4" />
-        <h3 className="text-slate-300 font-semibold mb-2">No Active Zones</h3>
+        <h3 className="text-slate-300 font-semibold mb-2">{t("auto.NoActiveZones_7685") || "No Active Zones"}</h3>
         <p className="text-slate-500 text-sm max-w-sm">
-          Awaiting stream data from connected camera nodes.
+          {t("auto.Awaitingstreamd_5094") || "Awaiting stream data from connected camera nodes."}
         </p>
       </div>
     );
@@ -152,7 +155,7 @@ export default function LiveVenueMap() {
                 {/* Live Stats */}
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div className="bg-black/20 p-2 rounded-lg">
-                    <p className="text-[10px] uppercase opacity-70 mb-1 tracking-wider">Current</p>
+                    <p className="text-[10px] uppercase opacity-70 mb-1 tracking-wider">{t("auto.Current_9100") || "Current"}</p>
                     <p className="text-xl font-bold font-mono">{node.density.current}</p>
                   </div>
                   <div className="bg-black/20 p-2 rounded-lg">

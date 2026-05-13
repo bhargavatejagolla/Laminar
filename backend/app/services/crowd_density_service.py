@@ -27,6 +27,7 @@ class CrowdDensityService:
         self.kernel_size = (91, 91)
         # Intensity multiplier for the blobs
         self.blob_intensity = 30
+        self.heatmap_accum = None
 
     def compute_density_status(self, bboxes: List[Dict[str, Any]], frame_shape: Tuple[int, int, int]) -> Dict[str, Any]:
         """
@@ -94,8 +95,14 @@ class CrowdDensityService:
         k = max(31, int(min(height, width) * 0.08) | 1)
         kernel = (k, k)
 
-        # 2. Create accumulation buffer
-        heatmap_accum = np.zeros((height, width), dtype=np.float32)
+        # 2. Create or Decay accumulation buffer
+        if not hasattr(self, "heatmap_accum") or self.heatmap_accum is None or self.heatmap_accum.shape != (height, width):
+            self.heatmap_accum = np.zeros((height, width), dtype=np.float32)
+        else:
+            # Decay existing heat to form trails instead of instant flashes
+            self.heatmap_accum *= 0.85
+            
+        heatmap_accum = self.heatmap_accum
 
         for item in bboxes:
             box = item.get("bbox")

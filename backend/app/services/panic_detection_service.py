@@ -26,13 +26,19 @@ class PanicDetectionService:
         self.trigger_cooldown = trigger_cooldown
         
         # Initialize the MediaPipe Pose Estimator for full-body tracking kinetics
-        from mediapipe.python.solutions import pose as mp_pose
-        self.mp_pose = mp_pose
-        self.pose = self.mp_pose.Pose(
-            static_image_mode=False,
-            min_detection_confidence=0.5,
-            model_complexity=0   # Fast processing mode!
-        )
+        try:
+            from mediapipe.python.solutions import pose as mp_pose
+            self.mp_pose = mp_pose
+            self.pose = self.mp_pose.Pose(
+                static_image_mode=False,
+                min_detection_confidence=0.5,
+                model_complexity=0   # Fast processing mode!
+            )
+            self._available = True
+        except (ImportError, ModuleNotFoundError):
+            logger.warning("MediaPipe not installed. Panic detection (velocity tracking) will be disabled.")
+            self.pose = None
+            self._available = False
         
         # Track 33 keypoints over consecutive frames to extract vector magnitudes
         self.prev_landmarks = None
@@ -61,7 +67,7 @@ class PanicDetectionService:
             "reason": None
         }
         
-        if frame is None or frame.size == 0:
+        if frame is None or frame.size == 0 or not self._available:
             return result
             
         # Resolve dynamic thresholds

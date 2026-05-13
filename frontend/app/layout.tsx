@@ -1,11 +1,13 @@
 import "./globals.css";
 import "@fontsource/inter";
 import "@fontsource/space-grotesk";
+import "@fontsource/outfit";
 import QueryProvider from "@/components/providers/query-provider"
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "sonner";
 import AIAssistantChat from "@/components/dashboard/ai-assistant-chat";
 import I18nProvider from "@/components/providers/i18n-provider";
+import { NotificationMesh } from "@/components/layout/NotificationMesh";
 
 export const metadata = {
   title: "Laminar — AI Crowd Intelligence",
@@ -37,9 +39,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link
+          href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700,800,900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
         style={{
-          fontFamily: "Inter, sans-serif",
+          fontFamily: "'General Sans', Inter, sans-serif",
           backgroundColor: "#050b14",
         }}
       >
@@ -54,6 +63,7 @@ export default function RootLayout({
                 }
               }} />
               {children}
+              <NotificationMesh />
               {/* Global AI Assistant Floating Widget */}
               <AIAssistantChat />
             </I18nProvider>

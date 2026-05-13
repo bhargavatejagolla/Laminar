@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { Camera } from "@/hooks/useCameras";
 import { useVenues } from "@/hooks/useVenues";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   camera: Camera | null;
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const { data: venues } = useVenues();
   const [formData, setFormData] = useState({
@@ -67,7 +70,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
       <div className="bg-[#0f172a] border border-cyan-500/20 rounded-2xl shadow-[0_0_50px_rgba(34,211,238,0.1)] w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="flex justify-between items-center p-6 border-b border-white/5 bg-slate-900/50">
           <h2 className="text-xl font-black text-white flex items-center gap-3 tracking-wider uppercase">
-            <Settings className="w-6 h-6 text-cyan-400" /> Edit Node Configuration
+            <Settings className="w-6 h-6 text-cyan-400" /> {t("auto.EditNodeConfigu_9869") || "Edit Node Configuration"}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-white/5 p-2 rounded-lg">
             <X className="w-5 h-5" />
@@ -78,7 +81,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
           {/* Basic Info */}
           <div className="grid grid-cols-1 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">Node Identity</label>
+              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">{t("auto.NodeIdentity_1928") || "Node Identity"}</label>
               <input 
                 type="text" 
                 placeholder="Node Name"
@@ -100,13 +103,13 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">Target Venue</label>
+              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">{t("auto.TargetVenue_2550") || "Target Venue"}</label>
               <select 
                 value={formData.venue_id}
                 onChange={(e) => setFormData({ ...formData, venue_id: e.target.value })}
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500/50 transition-all font-mono appearance-none"
               >
-                <option value="" disabled>Select Venue...</option>
+                <option value="" disabled>{t("auto.SelectVenue_7914") || "Select Venue..."}</option>
                 {Array.isArray(venues) && venues.map((v: any) => (
                    <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
@@ -127,7 +130,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
 
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">Transfer Protocol</label>
+              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">{t("auto.TransferProtoco_5305") || "Transfer Protocol"}</label>
               <select 
                 value={formData.stream_type}
                 onChange={(e) => setFormData({ ...formData, stream_type: e.target.value })}
@@ -156,7 +159,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
           {/* Resolution */}
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">Buffer Width</label>
+              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">{t("auto.BufferWidth_6338") || "Buffer Width"}</label>
               <input 
                 type="number" 
                 value={formData.resolution_width}
@@ -165,7 +168,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">Buffer Height</label>
+              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">{t("auto.BufferHeight_8549") || "Buffer Height"}</label>
               <input 
                 type="number" 
                 value={formData.resolution_height}
@@ -178,7 +181,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
           {/* Intelligence Toggles */}
           <div className="space-y-3 pt-4 bg-cyan-950/20 p-5 rounded-2xl border border-cyan-500/10 shadow-[inset_0_0_20px_rgba(34,211,238,0.05)]">
              <h3 className="text-[10px] uppercase tracking-[0.2em] text-cyan-400 font-black mb-4 flex items-center gap-2">
-                <ShieldCheck className="w-3 h-3" /> Engine Protocols
+                <ShieldCheck className="w-3 h-3" /> {t("auto.EngineProtocols_7100") || "Engine Protocols"}
              </h3>
              <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center justify-center">
@@ -186,7 +189,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
                   <div className="w-10 h-5 bg-slate-800 rounded-full border border-white/10 peer-checked:bg-cyan-500/50 peer-checked:border-cyan-400/50 transition-all"></div>
                   <div className="absolute left-1 w-3 h-3 bg-slate-400 rounded-full peer-checked:left-6 peer-checked:bg-white transition-all"></div>
                 </div>
-                <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors uppercase tracking-wider">Vision Pipeline Inference</span>
+                <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors uppercase tracking-wider">{t("auto.VisionPipelineI_7973") || "Vision Pipeline Inference"}</span>
              </label>
              <label className="flex items-center gap-4 cursor-pointer group">
                 <div className="relative flex items-center justify-center">
@@ -202,7 +205,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
                   <div className="w-10 h-5 bg-slate-800 rounded-full border border-white/10 peer-checked:bg-emerald-500/50 peer-checked:border-emerald-400/50 transition-all"></div>
                   <div className="absolute left-1 w-3 h-3 bg-slate-400 rounded-full peer-checked:left-6 peer-checked:bg-white transition-all"></div>
                 </div>
-                <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors uppercase tracking-wider">Node Hardware Active</span>
+                <span className="text-xs font-bold text-slate-400 group-hover:text-white transition-colors uppercase tracking-wider">{t("auto.NodeHardwareAct_8802") || "Node Hardware Active"}</span>
              </label>
           </div>
         </div>
@@ -212,14 +215,14 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
             onClick={onClose}
             className="px-6 py-3 text-xs font-black text-slate-400 hover:text-white transition-colors uppercase tracking-widest"
           >
-            Abort
+            {t("auto.Abort_8207") || "Abort"}
           </button>
           <button 
             onClick={() => mutation.mutate(formData)}
             disabled={mutation.isPending || !formData.name || !formData.stream_url}
             className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black rounded-xl flex items-center gap-2 transition-all shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] disabled:opacity-50 uppercase tracking-[0.1em]"
           >
-            {mutation.isPending ? "Syncing..." : <><Save className="w-4 h-4" /> Commit Changes</>}
+            {mutation.isPending ? "Syncing..." : <><Save className="w-4 h-4" /> {t("auto.CommitChanges_1611") || "Commit Changes"}</>}
           </button>
         </div>
       </div>

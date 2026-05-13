@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import { usePredictionGraph } from "@/hooks/usePredictionGraph";
 import { Loader2, TrendingUp, AlertTriangle, Activity } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   ComposedChart,
   Area,
@@ -42,6 +43,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function PredictionGraph({ venueId }: Props) {
+  const { t } = useTranslation();
+
   const { data, isLoading, error } = usePredictionGraph(venueId);
 
   // Merge historical + forecast into one unified chart dataset
@@ -100,7 +103,7 @@ export default function PredictionGraph({ venueId }: Props) {
       <div className="h-[360px] w-full flex flex-col items-center justify-center bg-[#0f172a]/50 border border-slate-800 rounded-xl relative overflow-hidden">
         <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent animate-pulse" />
         <Loader2 className="w-8 h-8 text-cyan-500 animate-spin mb-3" />
-        <p className="text-sm font-medium text-slate-400 tracking-wider">CALCULATING FORECAST MODEL...</p>
+        <p className="text-sm font-medium text-slate-400 tracking-wider">{t("auto.CALCULATINGFORE_6279") || "CALCULATING FORECAST MODEL..."}</p>
       </div>
     );
   }
@@ -110,10 +113,10 @@ export default function PredictionGraph({ venueId }: Props) {
       <div className="h-[360px] w-full flex flex-col items-center justify-center bg-[#0f172a]/30 border border-slate-800/50 rounded-xl border-dashed gap-3">
         <AlertTriangle className="w-8 h-8 text-amber-500" />
         <p className="text-sm text-slate-400 text-center max-w-xs">
-          Waiting for first crowd detection frame to build prediction model.
+          {t("auto.Waitingforfirst_3440") || "Waiting for first crowd detection frame to build prediction model."}
         </p>
         <p className="text-xs text-slate-600 font-mono">
-          Live data will appear automatically once the camera detects activity.
+          {t("auto.Livedatawillapp_301") || "Live data will appear automatically once the camera detects activity."}
         </p>
       </div>
     );
@@ -130,9 +133,9 @@ export default function PredictionGraph({ venueId }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-cyan-400" />
-          <h3 className="text-base font-semibold tracking-wide text-white">Risk & Escalation Forecast</h3>
+          <h3 className="text-base font-semibold tracking-wide text-white">{t("auto.RiskEscalationF_5530") || "Risk & Escalation Forecast"}</h3>
           <span className="text-xs bg-emerald-900/40 text-emerald-400 border border-emerald-800/50 px-2 py-0.5 rounded-full font-mono">
-            LIVE
+            {t("auto.LIVE_4994") || "LIVE"}
           </span>
         </div>
         <div className="text-xs font-mono text-slate-500 bg-slate-900 border border-slate-800 px-3 py-1 rounded">
@@ -143,22 +146,22 @@ export default function PredictionGraph({ venueId }: Props) {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5 text-center">
-          <p className="text-xs text-slate-500 mb-1">AI Confidence</p>
+          <p className="text-xs text-slate-500 mb-1">{t("auto.AIConfidence_1843") || "AI Confidence"}</p>
           <p className="text-sm font-bold font-mono text-cyan-400">{(confidence * 100).toFixed(0)}%</p>
         </div>
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5 text-center">
-          <p className="text-xs text-slate-500 mb-1">Peak Forecast</p>
+          <p className="text-xs text-slate-500 mb-1">{t("auto.PeakForecast_698") || "Peak Forecast"}</p>
           <p className="text-sm font-bold font-mono text-amber-400">{peak.toFixed(1)}</p>
         </div>
         <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2.5 text-center">
-          <p className="text-xs text-slate-500 mb-1">Data Points</p>
+          <p className="text-xs text-slate-500 mb-1">{t("auto.DataPoints_6870") || "Data Points"}</p>
           <p className="text-sm font-bold font-mono text-emerald-400">{historicalCount}</p>
         </div>
       </div>
 
       {/* Main Risk + Forecast Chart */}
       <div>
-        <p className="text-xs text-slate-500 font-medium mb-2 uppercase tracking-wider">Risk Score Over Time</p>
+        <p className="text-xs text-slate-500 font-medium mb-2 uppercase tracking-wider">{t("auto.RiskScoreOverTi_3290") || "Risk Score Over Time"}</p>
         <div className="h-[180px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -289,15 +292,15 @@ export default function PredictionGraph({ venueId }: Props) {
       <div className="pt-3 border-t border-slate-800/80 flex items-center gap-4 flex-wrap text-xs font-medium text-slate-500">
         <div className="flex items-center gap-1.5">
           <span className="w-5 h-0.5 bg-cyan-400 rounded" />
-          Historical
+          {t("auto.Historical_982") || "Historical"}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-5 h-0.5 border-t-2 border-dashed border-amber-400" />
-          Forecast
+          {t("auto.Forecast_1217") || "Forecast"}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-5 h-0.5 bg-rose-400 rounded" />
-          Escalation Prob
+          {t("auto.EscalationProb_2758") || "Escalation Prob"}
         </div>
         <div className="ml-auto text-xs text-slate-600 font-mono">
           Model: {data?.meta?.model_used?.toUpperCase() ?? "—"}

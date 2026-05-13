@@ -60,17 +60,11 @@ class LaminarAIMemory:
             logger.error(f"Failed to load AI memory index: {e}")
 
     async def _get_model(self):
-        """Asynchronously load embedding model."""
+        """Asynchronously load embedding model via ML Hub."""
         if not FAISS_AVAILABLE:
             return None
-        if self.model is None:
-            async with self._lock:
-                if self.model is None:
-                    try:
-                        logger.info("Loading SentenceTransformer for AI Memory...")
-                        self.model = await asyncio.to_thread(SentenceTransformer, "all-MiniLM-L6-v2")
-                    except Exception as e:
-                        logger.error(f"Error loading embedding model: {e}")
+        from app.core.ml_hub import ml_hub
+        self.model = await ml_hub.get_embedding_model()
         return self.model
 
     def _format_for_embedding(self, data: dict, insight: dict = None) -> str:
@@ -89,6 +83,32 @@ class LaminarAIMemory:
                 text += f"Risk: {insight.get('risk_level', '')} Summary: {insight.get('summary', '')}"
                 
         return text
+
+    async def retrieve_similar_context_string(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """Retrieve historical cases using a raw textual query (for chatbot)."""
+        if not FAISS_AVAILABLE or not self.documents:
+            return []
+
+        model = await self._get_model()
+        if not model or not self.index or self.index.ntotal == 0:
+            return []
+
+        def _search():
+            query_embedding = model.encode([query], convert_to_numpy=True)
+            distances, indices = self.index.search(query_embedding, min(top_k, self.index.ntotal))
+            
+            results = []
+            for i, idx in enumerate(indices[0]):
+                if 0 <= idx < len(self.documents):
+                    if distances[0][i] < 2.0:
+                        results.append(self.documents[idx])
+            return results
+
+        try:
+            return await asyncio.to_thread(_search)
+        except Exception as e:
+            logger.error(f"Failed to retrieve AI memory context for string: {e}")
+            return []
 
     async def store_event(self, data: dict, insight: dict):
         """Store a new event and its generated insight into memory asynchronously."""

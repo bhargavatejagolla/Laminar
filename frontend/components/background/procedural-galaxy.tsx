@@ -35,28 +35,36 @@ const galaxyFrag = `
   float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
   void main() {
-    float t = mod(uTime, 628.318);
+    float t = uTime * 0.1; // Majestic pacing
     vec2 c = vec2(0.5);
     vec2 off = vUv - c;
     float dist = length(off);
 
-    // Swirl logic with distance-based intensity
-    float safeZone = smoothstep(0.04, 0.12, dist);
-    float swirl = smoothstep(0.48, 0.0, dist) * safeZone;
-    float a = t * 0.025 * swirl;
+    // 8K MilkyWay Extreme Accretion Funnel: Rotation + Deep Squeeze
+    float safeZone = smoothstep(0.0, 0.4, dist); 
+    float swirl = exp(-dist * 8.0); // Spin extremely fast at singularity
+    float a = t * 1.5 * swirl; 
+    
+    // Deep 3D Funnel Squeeze (pulls the image continuously towards the center)
+    float continuousPull = (sin(dist * 25.0 - t * 6.0) * 0.5 + 0.5) * 0.06 * safeZone;
     float s = sin(a); float co = cos(a);
-    vec2 uv = c + mat2(co,-s,s,co) * off;
+    vec2 uv = c + mat2(co,-s,s,co) * (off * (1.0 - continuousPull));
 
     vec4 col = texture2D(uTexture, uv);
     
-    // === 8K SIMULATION: High-frequency stardust grain ===
-    float grain = hash(vUv * 1200.0 + t * 0.05);
+    // 8K Pristine Film Grain & Stardust
+    float grain = hash(vUv * 900.0 + t * 0.02);
     float grainMask = smoothstep(0.1, 0.9, col.r + col.g + col.b);
-    col.rgb += grain * 0.04 * grainMask;
+    col.rgb += grain * 0.04 * grainMask; 
 
     float lum = dot(col.rgb, vec3(0.299,0.587,0.114));
-    float twinkle = (lum > 0.65) ? sin(t*4.0 + dist*70.0)*0.3+0.75 : 1.0;
-    float vig = smoothstep(0.98,0.42,dist);
+    
+    // Absolute Black Space HDR Contrast
+    col.rgb = pow(col.rgb, vec3(1.25));
+
+    // Dynamic core twinkling
+    float twinkle = (lum > 0.4) ? sin(t*6.0 + dist*120.0)*0.3+0.8 : 1.0;
+    float vig = smoothstep(1.0, 0.35, dist); 
     
     gl_FragColor = vec4(col.rgb * twinkle * vig, 1.0);
   }
@@ -78,41 +86,42 @@ const coreFrag = `
     vec2 uv = vUv - 0.5;
     float d = length(uv);
     
-    // Gravitational swirl/distortion near core
+    // Gravitational swirl/distortion near core forming an accretion disk
     float angle = atan(uv.y, uv.x);
-    float strength = smoothstep(0.25, 0.0, d);
-    float distort = angle + t * 0.4 * strength;
+    float strength = smoothstep(0.3, 0.0, d);
+    float distort = angle + t * 1.5 * strength; // Spin fast near the singularity
     vec2 dUv = vec2(cos(distort), sin(distort)) * d;
 
-    // Structured core — looks like a dense star cluster
-    float core  = exp(-d * 22.0) * 1.5;
-    float halo1 = exp(-d *  6.0) * 0.6;
-    float halo2 = exp(-d *  2.2) * 0.25;
+    // Structured core — Gargantua style photon ring
+    float core  = exp(-d * 40.0) * 2.0; // Extreme bright singularity edge
+    float halo1 = exp(-d * 8.0) * 0.7;
+    float halo2 = exp(-d * 2.5) * 0.3;
     
-    // Accretion disk "noise"
-    float diskNoise = hash(dUv * 85.0 + t*0.2) * smoothstep(0.18, 0.08, d) * 0.2;
+    // Accretion disk "noise" spiraling inwards
+    float diskNoise = hash(dUv * 90.0 + t*0.4) * smoothstep(0.18, 0.02, d) * 0.4;
     
     float pulse = sin(t * 1.2) * 0.05 + 0.95;
-    float flare = pow(max(0.0, sin(angle*4.0 + t*0.5)), 12.0) * exp(-d*8.0) * 0.35;
+    float flare = pow(max(0.0, sin(angle*4.0 + t*1.5)), 12.0) * exp(-d*12.0) * 0.6;
     
-    float hole = smoothstep(0.015, 0.16, d); // Wider hole for better text backdrop
-    float total = (core * hole + halo1 + halo2 + diskNoise + flare) * pulse * 0.48; // Lower intensity
+    // Absolute black hole in the direct center
+    float blackHole = smoothstep(0.015, 0.025, d);
     
-    vec3 cWhite = vec3(1.0, 0.99, 0.95);
-    vec3 cGold  = vec3(1.0, 0.65, 0.25);
-    vec3 cDeep  = vec3(0.45, 0.05, 0.35);
+    float total = (core * blackHole + halo1 + halo2 + diskNoise + flare) * pulse * 0.7;
     
-    float m1 = smoothstep(0.01, 0.2, d);
-    float m2 = smoothstep(0.05, 0.6, d);
+    vec3 cWhite = vec3(1.0, 0.99, 1.0);
+    vec3 cGold  = vec3(1.0, 0.6, 0.15);
+    vec3 cDeep  = vec3(0.5, 0.05, 0.8);
+    
+    float m1 = smoothstep(0.01, 0.15, d);
+    float m2 = smoothstep(0.05, 0.5, d);
     vec3 col = mix(mix(cWhite, cGold, m1), cDeep, m2);
     
-    // Tint flares
-    col = mix(col, vec3(0.8, 0.9, 1.0), flare * 1.4);
+    // Relativistic jets (blue tint for extreme energy)
+    col = mix(col, vec3(0.5, 0.8, 1.0), flare * 1.8);
     
-    // === CLAMP AND TONE PREP ===
-    // Prevents "breaking" edges by ensuring values stay within safe HDR range
-    vec3 finalColor = clamp(col * total * 0.9, 0.0, 1.0);
-    float finalAlpha = clamp(total * 0.75, 0.0, 1.0);
+    // === 8K HDR CLAMP ===
+    vec3 finalColor = clamp(col * total, 0.0, 1.0);
+    float finalAlpha = clamp(total * 0.85, 0.0, 1.0);
     
     gl_FragColor = vec4(finalColor, finalAlpha);
   }
@@ -160,33 +169,44 @@ const nebulaFrag = `
 
   float hash(vec2 p){p=fract(p*vec2(234.34,435.345));p+=dot(p,p+34.23);return fract(p.x*p.y);}
   float n(vec2 p){vec2 i=floor(p);vec2 f=fract(p);vec2 u=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}
-  float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<7;i++){v+=a*n(p);p=p*2.1+vec2(1.7,9.2);a*=0.5;}return v;}
+  float fbm(vec2 p){float v=0.0,a=0.5;for(int i=0;i<4;i++){v+=a*n(p);p=p*2.1+vec2(1.7,9.2);a*=0.5;}return v;}
 
   void main(){
-    float t = mod(uTime, 314.159);
+    float t = uTime * 0.3; // Much faster flowing wisps falling in
     vec2 uv = vUv;
     vec2 c = vec2(0.5);
-    float dist = length(uv - c);
+    vec2 dir = uv - c;
+    float dist = length(dir);
+    vec2 normDir = normalize(dir);
     
-    // Enhanced multi-speed flow
-    vec2 flow1 = vec2(t * 0.012, t * 0.009);
-    vec2 flow2 = vec2(-t * 0.008, t * 0.015);
+    // Infinite Inward Spiral Vectors (pulls the noise into the black hole)
+    // flow1 and flow2 pull radially inwards over time
+    vec2 flow1 = normDir * (-t * 0.3);
+    vec2 flow2 = normDir * (-t * 0.2) + vec2(t * 0.02);
     
-    float n1 = fbm(uv * 2.5 + flow1);
-    float n2 = fbm(uv * 1.8 - flow2 + vec2(4.1, 2.3));
-    float n3 = fbm(uv * 4.0 + flow1 * 1.6 + vec2(9.8, 5.6));
+    // Dynamic twisting (Nebula wraps as it gets sucked)
+    float rotAmt = t * 0.2 + smoothstep(0.5, 0.0, dist) * 2.0;
+    float s = sin(rotAmt); float co = cos(rotAmt);
+    vec2 rotDir = mat2(co,-s,s,co) * dir;
     
-    // More complex color interpolation
-    vec3 col1 = vec3(0.40, 0.06, 0.85) * pow(n1, 1.8);  // Vibrant violet
-    vec3 col2 = vec3(0.05, 0.15, 0.70) * pow(n2, 2.2);  // Rich ocean blue
-    vec3 col3 = vec3(1.00, 0.35, 0.60) * pow(n3, 3.5) * 0.45; // Pink highlight
-    vec3 col4 = vec3(0.15, 0.65, 0.90) * pow(n1 * n2, 2.8) * 0.3; // Cyan wisps
+    float n1 = fbm((rotDir + c) * 3.5 + flow1);
+    float n2 = fbm((rotDir + c) * 2.0 + flow2 + vec2(14.1, 8.3));
+    float n3 = fbm((rotDir + c) * 5.0 + flow1 * 1.2);
+    
+    // Intense extreme contrast colors (8K deep style)
+    vec3 col1 = vec3(0.60, 0.08, 1.00) * pow(n1, 2.5);  // Electric violet
+    vec3 col2 = vec3(0.02, 0.18, 0.90) * pow(n2, 3.0);  // Deep abyssal blue
+    vec3 col3 = vec3(1.00, 0.25, 0.50) * pow(n3, 4.0) * 0.6; // Incandescent pink
+    vec3 col4 = vec3(0.20, 0.85, 1.00) * pow(n1 * n2, 2.8) * 0.5; // Relativistic cyan
     
     vec3 nc = col1 + col2 + col3 + col4;
     
-    // "Breathing" core mask
-    float pulse = sin(t * 0.18) * 0.12 + 0.88;
-    float mask = smoothstep(0.85, 0.05, dist) * 0.42;
+    // Pulse and vignette
+    float pulse = sin(t * 1.5) * 0.15 + 0.85;
+    float mask = smoothstep(0.85, 0.1, dist) * 0.6;
+    
+    // Very center fades out to let the pure core shine
+    mask *= smoothstep(0.05, 0.15, dist);
     
     gl_FragColor = vec4(nc * pulse, mask);
   }
@@ -215,7 +235,7 @@ function LivingGalaxy() {
 
   useFrame((state, delta) => {
     if (!matRef.current) return;
-    matRef.current.uniforms.uTime.value += delta;
+    matRef.current.uniforms.uTime.value += delta * 0.06; // Visible cinematic speed
     const { x, y } = state.pointer;
     matRef.current.uniforms.uMouseX.value = THREE.MathUtils.lerp(matRef.current.uniforms.uMouseX.value, x, 0.04);
     matRef.current.uniforms.uMouseY.value = THREE.MathUtils.lerp(matRef.current.uniforms.uMouseY.value, y, 0.04);
@@ -236,7 +256,7 @@ function LivingGalaxy() {
 function GalacticCore() {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
-  useFrame((_s, delta) => { if (matRef.current) matRef.current.uniforms.uTime.value += delta; });
+  useFrame((_s, delta) => { if (matRef.current) matRef.current.uniforms.uTime.value += delta * 0.05; });
   /* Make the core plane bigger so the wide halo always covers the centre */
   return (
     <mesh position={[0, 0, -1.5]}>
@@ -257,7 +277,7 @@ function NebulaOverlay() {
   const nW = viewport.width * 2.2;
   const nH = viewport.height * 2.2;
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
-  useFrame((_s, delta) => { if (matRef.current) matRef.current.uniforms.uTime.value += delta; });
+  useFrame((_s, delta) => { if (matRef.current) matRef.current.uniforms.uTime.value += delta * 0.05; });
   return (
     <mesh position={[0, 0, -2.5]}>
       <planeGeometry args={[nW, nH]} />
@@ -274,7 +294,7 @@ function StarSpikes({ texture }: { texture: THREE.Texture }) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const { size } = useThree();
   const uniforms = useMemo(() => ({ uTexture: { value: texture }, uTime: { value: 0 }, uAspect: { value: size.width / size.height } }), [texture, size]);
-  useFrame((_s, delta) => { if (matRef.current) matRef.current.uniforms.uTime.value += delta; });
+  useFrame((_s, delta) => { if (matRef.current) matRef.current.uniforms.uTime.value += delta * 0.05; });
   const geom = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array([-1,-1,0,1,-1,0,1,1,0,-1,-1,0,1,1,0,-1,1,0]), 3));
@@ -292,7 +312,7 @@ function StarSpikes({ texture }: { texture: THREE.Texture }) {
 // ─────────────────────────────────────────────────────────────
 
 function ShootingComets() {
-  const count = 8;
+  const count = 7; // Increased for motion
   const matsRef = useRef<(THREE.ShaderMaterial | null)[]>([]);
   const timersRef = useRef<number[]>(Array.from({ length: count }, () => Math.random() * 12));
 
@@ -305,21 +325,27 @@ function ShootingComets() {
     uniform float uProgress;
     uniform vec3 uColor;
     void main(){
-      float head = smoothstep(1.0,0.95,vUv.x) * smoothstep(0.0,0.4,vUv.x);
-      float trail = smoothstep(0.0, uProgress, vUv.x) * pow(1.0-vUv.x, 2.0);
-      float width = smoothstep(0.5,0.0,abs(vUv.y-0.5));
-      float glow = (head * 0.8 + trail * 0.3) * width;
-      gl_FragColor = vec4(uColor * glow, glow);
+      // Intense incandescent plasma head
+      float core = pow(smoothstep(1.0, 0.98, vUv.x) * smoothstep(0.94, 1.0, vUv.x), 1.5);
+      float head = smoothstep(1.0, 0.85, vUv.x) * smoothstep(0.0, 0.5, vUv.x);
+      // Sweeping long trail
+      float trail = smoothstep(0.0, uProgress, vUv.x) * pow(1.0-vUv.x, 3.5);
+      float width = smoothstep(0.5, 0.0, abs(vUv.y-0.5));
+      float coreWidth = smoothstep(0.15, 0.0, abs(vUv.y-0.5));
+      
+      float glow = (head * 0.9 + trail * 0.6) * width;
+      vec3 finalColor = uColor * glow + vec3(1.0, 1.0, 1.0) * core * coreWidth * 2.5; // Blinding white core
+      gl_FragColor = vec4(finalColor, glow + core);
     }
   `;
 
   const comets = useMemo(() => Array.from({ length: count }, (_, i) => ({
-    startX: (Math.random() - 0.5) * 38,
-    startY: (Math.random() - 0.5) * 22,
-    angle: (Math.random() * 0.4 - 0.6) * Math.PI,
-    length: 4 + Math.random() * 5,
-    speed: 0.8 + Math.random() * 0.6,
-    interval: 6 + Math.random() * 10,
+    startX: (Math.random() - 0.5) * 45,
+    startY: (Math.random() - 0.5) * 28,
+    angle: (Math.random() * 0.8 - 0.9) * Math.PI,
+    length: 8 + Math.random() * 12, // Longer epic trails
+    speed: 1.0 + Math.random() * 1.5, // Much faster
+    interval: 5 + Math.random() * 15, // Variable respawn
     color: new THREE.Color().setHSL(0.55 + Math.random() * 0.15, 1, 0.9),
   })), []);
 
@@ -334,15 +360,16 @@ function ShootingComets() {
       const interval = comets[i].interval;
       const newT = t + delta;
       if (newT > interval) { return 0; }
-      const progress = newT / (interval * 0.15);
+      const progress = newT / (interval * 0.12);
       if (uniformsArr[i]) uniformsArr[i].uProgress.value = Math.min(progress, 1.0);
       const mesh = meshRefs.current[i];
       if (mesh) {
-        const p = Math.min(newT / (interval * 0.12), 1.0);
+        // Fast visceral entry
+        const p = Math.min(newT / (interval * 0.08) * comets[i].speed, 1.0);
         const comet = comets[i];
-        mesh.position.x = comet.startX + Math.cos(comet.angle) * p * 25;
-        mesh.position.y = comet.startY + Math.sin(comet.angle) * p * 25;
-        mesh.visible = newT < interval * 0.16;
+        mesh.position.x = comet.startX + Math.cos(comet.angle) * p * 40; // Travel far
+        mesh.position.y = comet.startY + Math.sin(comet.angle) * p * 40;
+        mesh.visible = newT < interval * 0.15;
       }
       return newT;
     });
@@ -379,36 +406,36 @@ function ShootingComets() {
 
 function AsteroidBelt() {
   const groupRef = useRef<THREE.Group>(null);
-  const count = 1800;
+  const count = 1200; // Restored to rich count
 
-  const { positions, scales, colors, speeds } = useMemo(() => {
+  const { positions, scales, colors, speeds, radii } = useMemo(() => {
     const pos = new Float32Array(count * 3);
     const scl = new Float32Array(count);
     const col = new Float32Array(count * 3);
     const spd = new Float32Array(count);
+    const rad = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
-      // Orbital ring: radius 11-17, slight inclination
-      const r = 11 + Math.random() * 6;
+      const r = 2 + Math.random() * 16;
+      rad[i] = r;
       const theta = Math.random() * Math.PI * 2;
       const inclination = (Math.random() - 0.5) * 1.5;
       pos[i * 3]     = Math.cos(theta) * r;
-      pos[i * 3 + 1] = Math.sin(theta) * r * 0.25 + inclination; // flattened orbit
+      pos[i * 3 + 1] = Math.sin(theta) * r * 0.25 + inclination; 
       pos[i * 3 + 2] = Math.sin(theta) * r * 0.15 + (Math.random() - 0.5) * 2;
 
-      scl[i] = Math.random() * 1.6 + 0.3;
-      spd[i] = (0.005 + Math.random() * 0.012) * (Math.random() > 0.5 ? 1 : -1);
+      scl[i] = Math.random() * 1.8 + 0.3;
+      spd[i] = 0.05 + Math.random() * 0.15; // Fast orbital speeds
 
-      // Rocky grey-brown colors with occasional orange/blue specks
       const t = Math.random();
-      if (t < 0.1) { col[i*3]=0.9; col[i*3+1]=0.5; col[i*3+2]=0.2; }        // orange mineral
-      else if (t < 0.18) { col[i*3]=0.3; col[i*3+1]=0.4; col[i*3+2]=0.8; }  // blue ice
+      if (t < 0.1) { col[i*3]=0.9; col[i*3+1]=0.5; col[i*3+2]=0.2; }        
+      else if (t < 0.18) { col[i*3]=0.3; col[i*3+1]=0.4; col[i*3+2]=0.8; }  
       else {
         const g = Math.random() * 0.3 + 0.3;
-        col[i*3] = g + 0.05; col[i*3+1] = g; col[i*3+2] = g - 0.05;          // grey rock
+        col[i*3] = g + 0.05; col[i*3+1] = g; col[i*3+2] = g - 0.05;          
       }
     }
-    return { positions: pos, scales: scl, colors: col, speeds: spd };
+    return { positions: pos, scales: scl, colors: col, speeds: spd, radii: rad };
   }, []);
 
   const beltVert = `
@@ -426,7 +453,6 @@ function AsteroidBelt() {
     void main(){
       float d = distance(gl_PointCoord, vec2(0.5));
       if(d > 0.5) discard;
-      // Rocky look: not perfectly round, darken center slightly
       float edge = smoothstep(0.5,0.35,d);
       float inner = smoothstep(0.15,0.0,d)*0.25;
       float shape = edge - inner;
@@ -435,22 +461,33 @@ function AsteroidBelt() {
   `;
 
   const anglesRef = useRef(Array.from({ length: count }, (_, i) => Math.atan2(positions[i * 3 + 1], positions[i * 3])));
+  const radiiRef = useRef(Array.from(radii));
   const posRef = useRef<THREE.BufferAttribute | null>(null);
 
   useFrame((state, delta) => {
     if (!groupRef.current || !posRef.current) return;
-    groupRef.current.rotation.y += delta * 0.003; // very slow belt rotation
+    groupRef.current.rotation.y += delta * 0.05; // Sweeping panoramic
     const { x, y } = state.pointer;
     groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, y * -0.15, 0.03);
     groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, x * 0.1, 0.03);
 
-    // Individual asteroid orbital motion
     for (let i = 0; i < count; i++) {
-      anglesRef.current[i] += speeds[i] * delta * 0.3;  // individual asteroid orbits much slower
+      // Rotate faster as it gets closer to core
+      anglesRef.current[i] += speeds[i] * delta * (18.0 / Math.max(radiiRef.current[i], 0.5)); 
+      // Physical spiral into the supermassive core
+      radiiRef.current[i] -= delta * 0.2 * speeds[i] * (20.0 / Math.max(radiiRef.current[i], 0.5)); 
+
+      if (radiiRef.current[i] < 0.6) {
+         radiiRef.current[i] = 17 + Math.random() * 3; // Respawn at the galaxy edge
+         anglesRef.current[i] = Math.random() * Math.PI * 2;
+      }
+      
       const a = anglesRef.current[i];
-      const r = Math.sqrt(positions[i*3]**2 + positions[i*3+2]**2);
+      const r = radiiRef.current[i];
+      const inclination = positions[i*3+1] / (Math.sqrt(positions[i*3]**2 + positions[i*3+2]**2) || 1);
       posRef.current.array[i*3]     = Math.cos(a) * r;
-      posRef.current.array[i*3 + 2] = Math.sin(a) * r;
+      posRef.current.array[i*3 + 1] = Math.sin(a) * r * 0.25 + inclination; 
+      posRef.current.array[i*3 + 2] = Math.sin(a) * r * 0.15;
     }
     posRef.current.needsUpdate = true;
   });
@@ -482,23 +519,27 @@ function AsteroidBelt() {
 
 function VolumetricDust() {
   const ref = useRef<THREE.Points>(null);
-  const count = 6000;
+  const count = 4000; // Rich depth
 
-  const { positions, scales, colors } = useMemo(() => {
+  const { positions, scales, colors, radii } = useMemo(() => {
     const pos = new Float32Array(count * 3);
     const scl = new Float32Array(count);
     const col = new Float32Array(count * 3);
+    const rad = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      pos[i*3]   = (Math.random()-0.5)*100;  // very wide to fill all sides and bottom
+      const r = 2 + Math.random() * 85;
+      rad[i] = r;
+      const theta = Math.random() * Math.PI * 2;
+      pos[i*3]   = Math.cos(theta) * r;
       pos[i*3+1] = (Math.random()-0.5)*90;
-      pos[i*3+2] = (Math.random()-0.5)*35;
+      pos[i*3+2] = Math.sin(theta) * r;
       scl[i] = Math.random() * 2.0 + 0.3;
       const t = Math.random();
-      if (t < 0.35) { col[i*3]=1.0; col[i*3+1]=0.96; col[i*3+2]=0.85; }     // warm white
-      else if (t < 0.65) { col[i*3]=0.35; col[i*3+1]=0.45; col[i*3+2]=1.0; } // blue
-      else { col[i*3]=0.65; col[i*3+1]=0.18; col[i*3+2]=0.95; }               // purple
+      if (t < 0.35) { col[i*3]=1.0; col[i*3+1]=0.96; col[i*3+2]=0.85; }     
+      else if (t < 0.65) { col[i*3]=0.35; col[i*3+1]=0.45; col[i*3+2]=1.0; } 
+      else { col[i*3]=0.65; col[i*3+1]=0.18; col[i*3+2]=0.95; }               
     }
-    return { positions: pos, scales: scl, colors: col };
+    return { positions: pos, scales: scl, colors: col, radii: rad };
   }, []);
 
   const dVert = `
@@ -521,19 +562,39 @@ function VolumetricDust() {
     }
   `;
 
+  const anglesRef = useRef(Array.from({ length: count }, (_, i) => Math.atan2(positions[i * 3 + 2], positions[i * 3])));
+  const radiiRef = useRef(Array.from(radii));
+  const posRef = useRef<THREE.BufferAttribute | null>(null);
+
   useFrame((state, delta) => {
-    if (!ref.current) return;
-    ref.current.rotation.y += delta * 0.008;   // much slower dust rotation
-    ref.current.rotation.z -= delta * 0.003;
+    if (!ref.current || !posRef.current) return;
+    ref.current.rotation.y += delta * 0.03;   
+    ref.current.rotation.z -= delta * 0.015;
     const {x,y} = state.pointer;
     ref.current.position.x = THREE.MathUtils.lerp(ref.current.position.x, x*-2.5, 0.02);
     ref.current.position.y = THREE.MathUtils.lerp(ref.current.position.y, y*-2.5, 0.02);
+
+    for (let i = 0; i < count; i++) {
+        anglesRef.current[i] += delta * 0.15 * (40.0 / Math.max(radiiRef.current[i], 1.0));
+        radiiRef.current[i] -= delta * 0.4;
+        
+        if (radiiRef.current[i] < 0.2) {
+            radiiRef.current[i] = 40 + Math.random() * 40;
+            anglesRef.current[i] = Math.random() * Math.PI * 2;
+        }
+
+        const a = anglesRef.current[i];
+        const r = radiiRef.current[i];
+        posRef.current.array[i*3] = Math.cos(a) * r;
+        posRef.current.array[i*3+2] = Math.sin(a) * r;
+    }
+    posRef.current.needsUpdate = true;
   });
 
   return (
     <points ref={ref}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute ref={posRef} attach="attributes-position" args={[positions, 3]} />
         <bufferAttribute attach="attributes-color"    args={[colors,    3]} />
         <bufferAttribute attach="attributes-aScale"   args={[scales,    1]} />
       </bufferGeometry>
@@ -644,8 +705,8 @@ function Planet({
   const atmMat = useMemo(() => makeAtmMat(atmosphereColor), [atmosphereColor]);
 
   useFrame((_s, delta) => {
-    if (groupRef.current) groupRef.current.rotation.y += delta * 0.035;
-    if (planetMat.uniforms.uTime) planetMat.uniforms.uTime.value += delta;
+    if (groupRef.current) groupRef.current.rotation.y += delta * 0.0035;
+    if (planetMat.uniforms.uTime) planetMat.uniforms.uTime.value += delta * 0.05;
   });
 
   return (
@@ -686,7 +747,7 @@ function DeepSpaceBackground() {
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
 
   useFrame((_s, delta) => {
-    if (matRef.current) matRef.current.uniforms.uTime.value += delta;
+    if (matRef.current) matRef.current.uniforms.uTime.value += delta * 0.04;
   });
 
   const vert = `varying vec2 vPos; void main(){ vPos = position.xy; gl_Position = vec4(position.xy, 0.999, 1.0); }`;
@@ -696,75 +757,62 @@ function DeepSpaceBackground() {
 
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 
-    float noise(vec2 p){
-      vec2 i = floor(p); vec2 f = fract(p);
-      vec2 u = f*f*(3.0-2.0*f);
-      return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
-    }
-    float fbm(vec2 p){ float v=0.0,a=0.5; for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.1+vec2(1.7,9.2);a*=0.5;} return v; }
-
     void main(){
       vec2 uv = vPos * 0.5 + 0.5;
-      // Wrap time to prevent ALL precision issues over long sessions
       float t = mod(uTime, 628.318);
 
-      // === BASE: very dark deep navy ===
+      // === BASE: Real HDR Dark Space ===
       vec3 bg = mix(
-        vec3(0.006, 0.001, 0.022),
-        vec3(0.010, 0.003, 0.032),
+        vec3(0.0002, 0.0001, 0.001), 
+        vec3(0.0015, 0.0005, 0.006), 
         uv.y
       );
 
-      // === SUBTLE MILKY WAY DUST BAND ===
-      float band = fbm(vec2(uv.x*1.6, uv.y*0.8 + t*0.002));
-      float diagDist = abs((uv.x - 0.5) - (uv.y - 0.5)*0.75);
-      float mwMask = smoothstep(0.45, 0.0, diagDist) * 0.3;
-      bg += vec3(0.04, 0.01, 0.12) * band * mwMask;
+      // Aurora glow modified to be fainter to let stars pop
+      float glowX = sin(t*0.5 + uv.x * 2.5);
+      float glowY = cos(t*0.4 + uv.y * 3.0);
+      float flowGlow = (glowX * glowY) * 0.5 + 0.5;
+      bg += vec3(0.015, 0.002, 0.04) * flowGlow * 1.5;
 
-      // === CORNER FILLS — match the subtle blue-purple of the galaxy photo edges ===
-      // These should blend seamlessly, not pop as bright blobs
-      float tl = length(uv - vec2(0.0, 1.0));
-      bg += vec3(0.025, 0.005, 0.065) * exp(-tl*1.8) * (fbm(uv*2.5)*0.4+0.3);
-
-      float tr = length(uv - vec2(1.0, 1.0));
-      bg += vec3(0.010, 0.008, 0.055) * exp(-tr*2.0) * (fbm(uv*2.2+vec2(3.0))*0.3+0.2);
-
-      float bl = length(uv - vec2(0.0, 0.0));
-      bg += vec3(0.015, 0.005, 0.045) * exp(-bl*1.6) * (fbm(uv*2.8+vec2(6.0))*0.4+0.3);
-
-      float br = length(uv - vec2(1.0, 0.0));
-      bg += vec3(0.018, 0.010, 0.060) * exp(-br*1.8) * (fbm(uv*3.0+vec2(5.0))*0.3+0.3);
-
-      // === REALISTIC STAR FIELD — natural density and brightness ===
-      // Tiny background stars (very dim) — use wrapped time
-      for(int i = 0; i < 5; i++){
+      // Infinite 3D Falling Star Tunnel (Log-Polar Coordinate Mapping)
+      // This mathematically pulls matter from the edges DIRECTLY into a singularity.
+      vec2 off = uv - vec2(0.5);
+      float r = length(off);
+      float theta = atan(off.y, off.x);
+      
+      float radialFlow = -t * 0.35; // Intense falling velocity
+      
+      float stars = 0.0;
+      for(int i = 0; i < 3; i++) {
         float fi = float(i) * 1.618;
-        vec2 cell = floor(uv * (90.0 + fi*25.0));
-        vec2 h2 = vec2(hash(cell+fi), hash(cell+fi+vec2(33.0)));
-        float brightness = pow(hash(cell+fi+vec2(77.0)), 6.5);
-        float twinkle = sin(t*(0.5+h2.x*1.2) + h2.y*6.28) * 0.2 + 0.8;  // bounded t
-        float d = length(fract(uv*(90.0+fi*25.0)) - vec2(0.5));
-        float glow = exp(-d*25.0) * brightness * twinkle * 1.8;
-        vec3 sc = mix(vec3(0.95,0.95,1.0), vec3(0.75,0.85,1.0), h2.x*0.4);
-        bg += sc * glow;
+        // Transform the UV into a log-polar space to create a funnel
+        vec2 polarUv = vec2(log(r) * 14.0 + radialFlow * (15.0 + fi*5.0), theta * 10.0 + fi);
+        
+        vec2 cell = floor(polarUv * (3.0 + fi*0.6));
+        vec2 h2 = vec2(hash(cell+fi), hash(cell+fi+33.0));
+        float brightness = pow(hash(cell+77.0), 12.0); 
+        float twinkle = sin(t*(0.3+h2.x*0.5) + h2.y*6.28) * 0.2 + 0.8;
+        float d = length(fract(polarUv * (3.0 + fi*0.6)) - vec2(0.5));
+        
+        // Squeeze brightness for depth fade
+        float depthFade = smoothstep(0.01, 0.2, r) * smoothstep(0.8, 0.35, r);
+        stars += exp(-d*(22.0+fi*10.0)) * brightness * twinkle * 2.0 * depthFade;
       }
+      bg += vec3(0.95, 0.98, 1.0) * stars;
 
-      // Sparse bright stars with diffraction spikes — use bounded t
-      vec2 bigCell = floor(uv * 15.0);
+      // Rare bright stars
+      vec2 bigCell = floor(uv * 12.0);
       float bigH = hash(bigCell + 99.0);
-      if(bigH > 0.82){
+      if(bigH > 0.92) {
         vec2 bPos = vec2(hash(bigCell+11.0), hash(bigCell+22.0));
-        float bd = length(fract(uv*15.0) - bPos);
-        float bTwink = sin(t*0.9 + bigH*6.28)*0.2+0.8;  // bounded
-        float bs = exp(-bd*40.0)*pow(bigH,2.0)*bTwink * 3.0;
-        bg += vec3(1.0,0.97,0.92) * bs;
-        float hSpike = exp(-abs(fract(uv.x*15.0)-bPos.x)*80.0)*exp(-abs(fract(uv.y*15.0)-bPos.y)*600.0);
-        float vSpike = exp(-abs(fract(uv.y*15.0)-bPos.y)*80.0)*exp(-abs(fract(uv.x*15.0)-bPos.x)*600.0);
-        bg += vec3(0.6,0.7,1.0)*(hSpike+vSpike)*bigH*bTwink*0.3;
+        float bd = length(fract(uv*12.0) - bPos);
+        float bTwink = sin(t*0.5 + bigH*6.28) * 0.2 + 0.8;
+        float bs = exp(-bd*40.0) * pow(bigH, 2.0) * bTwink * 2.0;
+        bg += vec3(1.0, 0.97, 0.92) * bs;
       }
 
-      // Clamp so we don't clip but can accumulate naturally
-      bg = min(bg, vec3(0.4));
+      // Clamp max brightness to avoid white screen burn out
+      bg = min(bg, vec3(0.6));
       gl_FragColor = vec4(bg, 1.0);
     }
   `;
@@ -1019,11 +1067,11 @@ function Scene() {
         hasRing
       />
 
-      {/* Lights: subtler core + purple & blue accent */}
-      <pointLight position={[0, 0, 4]}   intensity={45}  color="#ffddaa" distance={50} decay={2.2} />
-      <pointLight position={[-6, 4, -2]} intensity={35}  color="#cc33ff" distance={28} decay={2} />
-      <pointLight position={[6, -4, -2]} intensity={35}  color="#3377ff" distance={28} decay={2} />
-      <ambientLight intensity={0.12} color="#220044" />
+      {/* High-contrast majestic lighting for the accretion disk effect */}
+      <pointLight position={[0, 0, 4]}   intensity={80}  color="#ffe8cc" distance={60} decay={2.2} />
+      <pointLight position={[-6, 4, -2]} intensity={20}  color="#aa22ff" distance={30} decay={2} />
+      <pointLight position={[6, -4, -2]} intensity={25}  color="#1133ff" distance={30} decay={2} />
+      <ambientLight intensity={0.02} color="#05001a" />
     </>
   );
 }

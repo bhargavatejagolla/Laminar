@@ -206,6 +206,7 @@ class ZoneIntelligenceOrchestrator:
         capacity: Optional[int] = None,
         warning_threshold: Optional[int] = None,
         critical_threshold: Optional[int] = None,
+        model_metadata:     Optional[Dict[str, Any]] = None,
     ) -> ZoneIntelligenceSnapshot:
         """
         Run one intelligence cycle and return a unified snapshot.
@@ -239,7 +240,8 @@ class ZoneIntelligenceOrchestrator:
             count,
             capacity=capacity,
             warning_threshold=warning_threshold,
-            critical_threshold=critical_threshold
+            critical_threshold=critical_threshold,
+            model_metadata=model_metadata
         )
 
         # ── Step 2: Dwell ────────────────────────────────────────────────────

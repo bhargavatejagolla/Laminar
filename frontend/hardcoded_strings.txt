@@ -1,0 +1,636 @@
+AI Action  ||  app\reports\page.tsx
+AI Certainty  ||  components\reports\analytics-charts.tsx
+AI Command  ||  app\system\fleet\page.tsx
+AI Confidence  ||  components\venues\prediction-graph.tsx
+AI INTELLIGENCE  ||  app\page.tsx
+AI Key Insight  ||  app\reports\page.tsx
+AI Operations Center  ||  components\dashboard\ai-operations-dashboard.tsx
+AI Operations Portal  ||  app\login\page.tsx
+AI Platform  ||  components\layout\sidebar.tsx
+AI SECURITY  ||  app\page.tsx
+AI Video Search  ||  app\ai-search\page.tsx
+AI Video Search  ||  components\intelligence\SemanticSearch.tsx
+AI-POWERED REAL-TIME CROWD SAFETY & RISK ANALYTICS  ||  app\reports\page.tsx
+AI-READY  ||  components\layout\sidebar.tsx
+AR1-Enabled  ||  app\prediction\page.tsx
+AWAITING SIGNAL...  ||  app\verify-email\page.tsx
+AWARENESS  ||  app\onboarding\page.tsx
+Abort  ||  components\cameras\edit-camera-modal.tsx
+Abort Mission  ||  app\settings\access-control\page.tsx
+Abort Mission  ||  app\system\actions\page.tsx
+Access Control  ||  app\settings\access-control\page.tsx
+Access Denied: No Operators Found  ||  app\settings\access-control\page.tsx
+Accuracy  ||  app\system\fleet\page.tsx
+Acknowledge  ||  app\system\actions\page.tsx
+Acknowledge  ||  components\alerts\alert-card.tsx
+Action Payload  ||  app\system\actions\page.tsx
+Active  ||  components\cameras\camera-grid.tsx
+Active  ||  components\venues\venue-camera-list.tsx
+Active Nodes  ||  app\system\actions\page.tsx
+Active Nodes  ||  components\map\IntelligenceMapCore.tsx
+Active Security v2.1  ||  app\system\actions\page.tsx
+Active Session  ||  app\settings\page.tsx
+Active Upstream Links  ||  components\cameras\camera-stats.tsx
+Active Workers  ||  components\system\status-panel.tsx
+Add Node  ||  app\venues\[id]\page.tsx
+Add a phone number above to receive alerts  ||  app\profile\page.tsx
+Admin  ||  app\settings\access-control\page.tsx
+Advanced Neural Trajectory & Object Core  ||  app\ai-search\page.tsx
+Aggregated Operations Trend  ||  components\analytics\intelligence-graphs.tsx
+Alert  ||  app\person-wait-monitoring\page.tsx
+Alert Preferences  ||  app\profile\page.tsx
+All Nodes Operational  ||  app\system\fleet\page.tsx
+Analyzing surveillance intelligence...  ||  components\intelligence\IntelligencePanel.tsx
+Anomaly Thresholds  ||  app\person-wait-monitoring\page.tsx
+Approximates physical movement directionality utilizing crowd deltas and bounding box velocity vectors. Helps identify bottlenecks in entry and exit queues.  ||  components\reports\analytics-charts.tsx
+Area Survey  ||  app\dashboard\area-survey\page.tsx
+As the camera rotates, the system remembers the highest count seen in each sector, ensuring that people are counted even when they move out of the current frame.  ||  app\dashboard\area-survey\page.tsx
+Ask natural language questions about your video history.  ||  components\intelligence\SemanticSearch.tsx
+Assign Operational Boundaries  ||  app\settings\access-control\page.tsx
+Assign Operator ID  ||  app\register\page.tsx
+Assign Security Key  ||  app\register\page.tsx
+Atmospheric Mod  ||  app\prediction\page.tsx
+Auth Key  ||  app\login\page.tsx
+Authenticating...  ||  app\login\page.tsx
+Authentication Required  ||  app\verify-email\page.tsx
+Authorize & Pulse  ||  app\system\actions\page.tsx
+Auto-recovery in progress...  ||  app\monitor\page.tsx
+Automated Protocol Intelligence Layer  ||  app\system\actions\page.tsx
+Available Sectors  ||  app\settings\access-control\page.tsx
+Average Vol. In  ||  components\reports\analytics-charts.tsx
+Average Vol. Out  ||  components\reports\analytics-charts.tsx
+Average time spent in zones  ||  components\dashboard\ai-operations-dashboard.tsx
+Avg Acknowledgment  ||  components\dashboard\SlaDashboardCard.tsx
+Avg Dwell  ||  components\intelligence\zone-detail-panel.tsx
+Avg Response  ||  app\system\actions\page.tsx
+Awaiting Mission Directives.  ||  app\system\actions\page.tsx
+Awaiting Search Query  ||  app\ai-search\page.tsx
+Awaiting Signal Synchronization  ||  app\monitor\page.tsx
+Awaiting Telemetry  ||  app\prediction\page.tsx
+Awaiting Telemetry  ||  components\SurveyScene3D.tsx
+Awaiting Telemetry Initialization...  ||  components\reports\analytics-charts.tsx
+Awaiting primary telemetry feed...  ||  components\reports\analytics-charts.tsx
+Awaiting secure handshake...  ||  app\system\fleet\page.tsx
+Awaiting stream data from connected camera nodes.  ||  components\intelligence\live-venue-map.tsx
+BEST VALUE  ||  components\landing\sections.tsx
+BUILDING  ||  app\ai-search\page.tsx
+Back  ||  app\login\page.tsx
+Back  ||  app\register\page.tsx
+Back to Command Center  ||  app\venues\[id]\page.tsx
+Back to Network  ||  app\cameras\[id]\page.tsx
+Bind coordinate node to the Live Prediction Core. The ML subsystem synchronizes active spatial feeds and projects high-fidelity trajectory models.  ||  app\prediction\page.tsx
+Biometric Authentication  ||  app\system\actions\page.tsx
+Blank History  ||  components\alerts\alert-panel.tsx
+Browser webcam access requires a secure connection. Because you are accessing this server over an insecure HTTP network IP, the browser has blocked camera permissions. To broadcast remotely, you must access the platform via HTTPS using Ngrok!  ||  components\cameras\browser-uploader.tsx
+Buffer Height  ||  components\cameras\edit-camera-modal.tsx
+Buffer Width  ||  components\cameras\edit-camera-modal.tsx
+CALCULATING FORECAST MODEL...  ||  components\venues\prediction-graph.tsx
+CAM-04-A  ||  app\system\fleet\page.tsx
+CASE STUDY  ||  components\landing\sections.tsx
+CLEARANCE  ||  app\register\page.tsx
+CLIENT PORTAL  ||  components\landing\sections.tsx
+Calculates local maxima over the given timeline to pinpoint congestion events. Valuable for optimizing staffing and operation routing during high-density bursts.  ||  components\reports\analytics-charts.tsx
+Calculating...  ||  app\venues\[id]\page.tsx
+Camera Contributions  ||  app\dashboard\area-survey\page.tsx
+Cameras Synced  ||  app\venues\[id]\page.tsx
+Cancel  ||  app\person-wait-monitoring\page.tsx
+Cancel  ||  app\profile\page.tsx
+Cancel  ||  components\layout\navbar.tsx
+Cancel  ||  components\venues\add-camera-modal.tsx
+Cancel  ||  components\venues\add-venue-modal.tsx
+Cancel  ||  components\venues\edit-venue-modal.tsx
+Capacity  ||  components\dashboard\venue-cards.tsx
+Capacity Logistics  ||  components\venues\add-venue-modal.tsx
+Capacity Logistics  ||  components\venues\edit-venue-modal.tsx
+Change  ||  app\profile\page.tsx
+Check ingestion nodes to start the census  ||  app\dashboard\area-survey\page.tsx
+Choose the level of intelligence your infrastructure requires. No hidden costs.  ||  components\landing\sections.tsx
+City  ||  components\venues\add-venue-modal.tsx
+City  ||  components\venues\edit-venue-modal.tsx
+Clear  ||  app\dashboard\area-survey\page.tsx
+Clear Event  ||  components\alerts\alert-card.tsx
+Clearance Denied  ||  app\verify-email\page.tsx
+Clearance Granted  ||  app\verify-email\page.tsx
+Click  ||  app\profile\page.tsx
+Click  ||  components\Onboarding\RandyAssistant.tsx
+Click map to pinpoint location  ||  components\map\MapPickerCore.tsx
+Commit Changes  ||  components\cameras\edit-camera-modal.tsx
+Common  ||  components\landing\sections.tsx
+Compiling Analytics Matrix...  ||  app\reports\page.tsx
+Concert Hall  ||  components\venues\add-venue-modal.tsx
+Concert Hall  ||  components\venues\edit-venue-modal.tsx
+Condition Resolved  ||  components\alerts\alert-card.tsx
+Condition: Critical Surge Velocity  ||  app\system\actions\page.tsx
+Condition: New Alert Anomaly  ||  app\system\actions\page.tsx
+Configure FPS and resolution  ||  components\Onboarding\RandyAssistant.tsx
+Configure Venue  ||  app\venues\[id]\page.tsx
+Configure automated alert dispatches across channels. Rules apply globally to all monitored venues.  ||  app\settings\page.tsx
+Configure expected staffing based on live threat levels.  ||  components\venues\add-venue-modal.tsx
+Configure expected staffing based on live threat levels.  ||  components\venues\edit-venue-modal.tsx
+Confirm Security Key  ||  app\register\page.tsx
+Connect  ||  components\Onboarding\RandyAssistant.tsx
+Connect Video Source  ||  components\venues\add-camera-modal.tsx
+Connect your first sensor node via RTSP or ONVIF protocol to initialize the intelligence grid.  ||  components\cameras\camera-grid.tsx
+Connected Nodes  ||  app\venues\[id]\page.tsx
+Core Capabilities  ||  components\landing\sections.tsx
+Country  ||  components\venues\add-venue-modal.tsx
+Country  ||  components\venues\edit-venue-modal.tsx
+Critical  ||  app\system\actions\page.tsx
+Critical  ||  app\venues\[id]\page.tsx
+Critical  ||  components\venues\add-venue-modal.tsx
+Critical  ||  components\venues\edit-venue-modal.tsx
+Critical SMS Alerts  ||  app\profile\page.tsx
+Cross-Site Operations  ||  components\cameras\camera-stats.tsx
+Crowd Trends Today  ||  app\venues\[id]\page.tsx
+Crowd Velocity  ||  app\cameras\[id]\page.tsx
+Current  ||  components\intelligence\live-venue-map.tsx
+Current Usage vs Total Capacity  ||  app\venues\[id]\page.tsx
+DEFENSE  ||  app\page.tsx
+DEPLOY  ||  app\page.tsx
+Data Points  ||  components\venues\prediction-graph.tsx
+Data Stream Missing  ||  app\ai-search\page.tsx
+Decrypting Rule Matrix...  ||  app\system\actions\page.tsx
+Delta Summary  ||  components\reports\analytics-charts.tsx
+Density Heatmap Active  ||  app\cameras\[id]\page.tsx
+Deploy Intelligence  ||  app\page.tsx
+Detected  ||  components\map\IntelligenceMapCore.tsx
+Detected People  ||  app\cameras\[id]\page.tsx
+Diagnostic Payload Unavailable  ||  app\settings\page.tsx
+Differential Privacy  ||  app\system\fleet\page.tsx
+Dispatch Medical Array Response  ||  app\reports\page.tsx
+Dispatch Secure Email  ||  app\system\actions\page.tsx
+Documentation  ||  components\landing\sections.tsx
+Dry Run  ||  app\system\actions\page.tsx
+Duration  ||  app\person-wait-monitoring\page.tsx
+Dwell Metrics  ||  components\intelligence\zone-detail-panel.tsx
+Dwell Time  ||  components\dashboard\ai-operations-dashboard.tsx
+EMA-Native  ||  app\prediction\page.tsx
+EXPLORE FULL DASHBOARD  ||  components\landing\sections.tsx
+Edge Compute Nodes  ||  app\system\fleet\page.tsx
+Edge Fleet  ||  app\system\fleet\page.tsx
+Edit Node Configuration  ||  components\cameras\edit-camera-modal.tsx
+Edit Profile  ||  app\profile\page.tsx
+Eight dimensions of AI-native security, unified in a single high-performance platform.  ||  components\landing\sections.tsx
+Email Alerts  ||  app\profile\page.tsx
+Emergency SMS Protocol  ||  app\system\actions\page.tsx
+Encoding...  ||  app\cameras\[id]\page.tsx
+Encryption Target  ||  app\system\actions\page.tsx
+Engine Protocols  ||  components\cameras\edit-camera-modal.tsx
+Ensure Encryption Targets use secure HTTPS certificates.  ||  app\system\actions\page.tsx
+Enter Command Center  ||  app\onboarding\page.tsx
+Enter a query to search semantic events.  ||  components\intelligence\SemanticSearch.tsx
+Enter stream URL or device source  ||  components\Onboarding\RandyAssistant.tsx
+Enter the 6-digit verification code sent to  ||  app\verify-email\page.tsx
+Enterprise Rules Engine  ||  app\settings\page.tsx
+Entries  ||  app\cameras\[id]\page.tsx
+Entry  ||  app\person-wait-monitoring\page.tsx
+Error  ||  components\cameras\browser-uploader.tsx
+Escalation Prob  ||  components\venues\prediction-graph.tsx
+Escalation Threat Matrix  ||  components\reports\analytics-charts.tsx
+Establish  ||  app\person-wait-monitoring\page.tsx
+Establishing Secure Link  ||  app\verify-email\page.tsx
+Establishing Uplink...  ||  app\loading.tsx
+Estimated Waiting Time  ||  app\venues\[id]\page.tsx
+Everything you need.  ||  components\landing\sections.tsx
+Evidence Capture  ||  components\alerts\alert-card.tsx
+Evidence Clips  ||  app\cameras\[id]\page.tsx
+Execute  ||  app\reports\page.tsx
+Executing pattern recognition against FAISS indexes...  ||  app\ai-search\page.tsx
+Executive AI Summary  ||  app\reports\page.tsx
+Exit  ||  app\person-wait-monitoring\page.tsx
+Exits  ||  app\cameras\[id]\page.tsx
+Explore Plans  ||  app\settings\page.tsx
+Export AI PDF  ||  app\reports\page.tsx
+Failed to load venues. Please refresh.  ||  app\venues\page.tsx
+Federated  ||  app\system\fleet\page.tsx
+Fleet Uptime  ||  app\system\fleet\page.tsx
+Flow Analysis Mode  ||  components\Onboarding\WhyLaminarMatters.tsx
+Flow Differential Metrics  ||  components\reports\analytics-charts.tsx
+Flow Gates  ||  app\cameras\[id]\page.tsx
+Forecast  ||  components\venues\prediction-graph.tsx
+Forgot?  ||  app\login\page.tsx
+Frame Rate  ||  app\cameras\[id]\page.tsx
+From  ||  components\Onboarding\RandyAssistant.tsx
+From camera to  ||  components\landing\sections.tsx
+Full Name  ||  app\profile\page.tsx
+GENERATED BY LAMINAR AI PLATFORM V2.4  ||  app\reports\page.tsx
+GENERATING HEATMAP...  ||  app\cameras\[id]\page.tsx
+GENESIS V2.0 READY FOR DEPLOYMENT  ||  components\landing\sections.tsx
+GLOBAL DISTRIBUTED INTELLIGENCE NETWORK  ||  app\system\fleet\page.tsx
+GLOBAL SECURITY  ||  app\page.tsx
+GLOBAL.MATRIX  ||  app\surge\page.tsx
+Generate Secure Token  ||  app\settings\page.tsx
+Geo-Coordinates  ||  app\prediction\page.tsx
+Geo-Link Offline  ||  app\prediction\page.tsx
+Get Intel  ||  components\alerts\alert-card.tsx
+Ghost Operator  ||  app\settings\access-control\page.tsx
+Global Architecture &amp; Operations  ||  app\settings\page.tsx
+Global Area Saturation  ||  app\dashboard\area-survey\page.tsx
+Global Intelligence  ||  app\system\fleet\page.tsx
+Global Lockout  ||  app\system\actions\page.tsx
+Global Operations  ||  components\layout\navbar.tsx
+Global Version  ||  app\system\fleet\page.tsx
+Go to Dashboard  ||  components\Onboarding\RandyAssistant.tsx
+Gross Nodes Config  ||  components\cameras\camera-stats.tsx
+HTTP Video  ||  components\venues\add-camera-modal.tsx
+Health Check  ||  app\cameras\[id]\page.tsx
+Heartbeat  ||  app\cameras\health\page.tsx
+High  ||  components\venues\add-venue-modal.tsx
+High  ||  components\venues\edit-venue-modal.tsx
+High-Flow Zone Events  ||  components\reports\analytics-charts.tsx
+Highest density concentration  ||  components\dashboard\ai-operations-dashboard.tsx
+Highest predicted capacity traffic  ||  components\dashboard\ai-operations-dashboard.tsx
+Historical  ||  components\venues\prediction-graph.tsx
+History  ||  app\alerts\page.tsx
+Horizon Prediction  ||  components\reports\analytics-charts.tsx
+Hotspot Zone  ||  components\dashboard\ai-operations-dashboard.tsx
+How it works  ||  app\dashboard\area-survey\page.tsx
+INFERENCE GAP  ||  components\landing\sections.tsx
+INITIALIZE FIRST PROTOCOL  ||  app\system\actions\page.tsx
+INITIALIZING RADAR...  ||  components\intelligence\live-venue-map.tsx
+INTELLIGENCE  ||  app\page.tsx
+If set, system alerts will be sent here instead of your login email.  ||  app\profile\page.tsx
+In Queue  ||  app\venues\[id]\page.tsx
+Incident Probability Spline  ||  components\reports\analytics-charts.tsx
+Infrastructure-wide intelligence. Real-time ReID. Predictive anomaly detection. Everything you need to secure the future.  ||  components\landing\sections.tsx
+Initialising SECURE-LINK...  ||  app\system\fleet\page.tsx
+Initialize Erasure  ||  app\system\actions\page.tsx
+Initialize Profile  ||  app\register\page.tsx
+Initialize Protocol  ||  app\system\actions\page.tsx
+Initialize Session  ||  app\login\page.tsx
+Initialize Target Locale in Header  ||  app\reports\page.tsx
+Initialize Target Node...  ||  app\prediction\page.tsx
+Initialize a coordinate node from the matrix selector to inject live telemetry into the deep learning core.  ||  components\reports\analytics-charts.tsx
+Initializing GPS Link  ||  components\map\MapPicker.tsx
+Initializing Intelligence Matrix  ||  components\map\IntelligenceMap.tsx
+Initializing Node...  ||  app\cameras\[id]\page.tsx
+Initializing...  ||  app\register\page.tsx
+Inspect Camera  ||  components\layout\camera-health-banner.tsx
+Intel Brief  ||  app\venues\[id]\page.tsx
+Intelligence Insight  ||  app\prediction\page.tsx
+Intelligence Pipeline, Real-time Monitoring, and Deep Tracking statuses will bind immediately to this Node.  ||  components\venues\add-camera-modal.tsx
+Intelligence Reason  ||  components\alerts\alert-card.tsx
+Intelligence Report  ||  app\reports\page.tsx
+Intelligence for  ||  components\landing\sections.tsx
+Intelligence that  ||  components\landing\sections.tsx
+Intelligence you trust.  ||  components\landing\sections.tsx
+Intensity  ||  components\intelligence\zone-detail-panel.tsx
+Intermittent Issues  ||  app\cameras\health\page.tsx
+IoT MQTT Command  ||  app\system\actions\page.tsx
+Keys do not match  ||  app\register\page.tsx
+LAMINAR  ||  app\page.tsx
+LAMINAR AI  ||  app\loading.tsx
+LIVE  ||  app\alerts\page.tsx
+LIVE  ||  app\cameras\[id]\page.tsx
+LIVE  ||  app\cameras\health\page.tsx
+LIVE  ||  components\SurveyScene3D.tsx
+LIVE  ||  components\cameras\camera-stats.tsx
+LIVE  ||  components\venues\prediction-graph.tsx
+LIVE INTELLIGENCE FEED  ||  components\landing\sections.tsx
+LIVE SYNTHETIC FORECAST  ||  app\prediction\page.tsx
+LOCK ON  ||  app\ai-search\page.tsx
+LOG IN  ||  app\page.tsx
+LVL: NOMINAL  ||  app\monitor\page.tsx
+Laminar AI Intelligence Engine  ||  components\intelligence\IntelligencePanel.tsx
+Laminar Core  ||  components\map\IntelligenceMapCore.tsx
+Laminar Enterprise  ||  app\settings\page.tsx
+Laminar Federated AI is compliant with GDPR, HIPAA, and CCPA by design.  ||  app\system\fleet\page.tsx
+Laminar Intelligence Network  ||  app\register\page.tsx
+Laminar Platform  ||  app\settings\page.tsx
+Laminar Profile Initialization  ||  app\onboarding\page.tsx
+Laminar lets you monitor live activity, predict crowd risks, and take action before situations escalate.  ||  components\Onboarding\RandyAssistant.tsx
+Laminar scales across any physical infrastructure, delivering actionable insights in seconds.  ||  components\landing\sections.tsx
+Last Frame  ||  app\cameras\health\page.tsx
+Latency Heatmap  ||  app\person-wait-monitoring\page.tsx
+Latest Pulses  ||  app\system\actions\page.tsx
+Link Node  ||  components\venues\add-camera-modal.tsx
+Linking directly to venue matrix...  ||  app\venues\[id]\page.tsx
+Live  ||  app\alerts\page.tsx
+Live  ||  app\dashboard\area-survey\page.tsx
+Live AI Context  ||  app\cameras\[id]\page.tsx
+Live AI Telemetry  ||  app\cameras\[id]\page.tsx
+Live Browser Webcam  ||  components\venues\add-camera-modal.tsx
+Live Data  ||  app\person-wait-monitoring\page.tsx
+Live Feed  ||  components\map\IntelligenceMapCore.tsx
+Live Forecast  ||  app\venues\[id]\page.tsx
+Live Identification Matrix  ||  app\person-wait-monitoring\page.tsx
+Live Insight Engine v2.0  ||  app\person-wait-monitoring\page.tsx
+Live Intelligence Dashboard  ||  components\landing\sections.tsx
+Live Kinetics  ||  app\cameras\[id]\page.tsx
+Live Link  ||  components\layout\navbar.tsx
+Live Occupancy  ||  app\venues\[id]\page.tsx
+Live Status  ||  components\intelligence\zone-detail-panel.tsx
+Live Traffic Analytics  ||  app\cameras\[id]\page.tsx
+Live Traffic Load  ||  app\venues\[id]\page.tsx
+Live Uplink  ||  components\cameras\browser-uploader.tsx
+Live data will appear automatically once the camera detects activity.  ||  components\venues\prediction-graph.tsx
+Login Email Address  ||  app\profile\page.tsx
+Low  ||  app\system\actions\page.tsx
+Low  ||  components\venues\add-venue-modal.tsx
+Low  ||  components\venues\edit-venue-modal.tsx
+Manage external integrations and API tokens for automated ingestion pipelines and third-party vision systems.  ||  app\settings\page.tsx
+Manage your account and SMS alert preferences  ||  app\profile\page.tsx
+Matrix  ||  app\settings\access-control\page.tsx
+Matrix Link Severed  ||  app\monitor\page.tsx
+Matrix Target Required  ||  components\reports\analytics-charts.tsx
+Matrix Trigger  ||  app\system\actions\page.tsx
+Max Crowd  ||  app\venues\[id]\page.tsx
+Max Load  ||  components\reports\analytics-charts.tsx
+Maximum Fire Capacity  ||  components\venues\add-venue-modal.tsx
+Maximum Fire Capacity  ||  components\venues\edit-venue-modal.tsx
+Medium  ||  app\system\actions\page.tsx
+Medium  ||  components\venues\add-venue-modal.tsx
+Medium  ||  components\venues\edit-venue-modal.tsx
+Members Detected  ||  app\dashboard\area-survey\page.tsx
+Mission Best Practices  ||  app\system\actions\page.tsx
+Mission Control  ||  app\system\actions\page.tsx
+Mobile Number  ||  app\profile\page.tsx
+Monitoring  ||  components\Onboarding\RandyAssistant.tsx
+Motion Flow  ||  components\intelligence\zone-detail-panel.tsx
+Multi-Camera Correlation  ||  components\intelligence\IntelligencePanel.tsx
+My Profile  ||  app\profile\page.tsx
+NO SECTOR ACCESS ASSIGNED  ||  app\settings\access-control\page.tsx
+Network Idle  ||  app\system\fleet\page.tsx
+Network Score  ||  app\system\fleet\page.tsx
+Neural Arch  ||  app\onboarding\page.tsx
+Neural Heatmap v2.4  ||  components\Onboarding\WhyLaminarMatters.tsx
+Neural Insights  ||  app\prediction\page.tsx
+Neural Trajectory Extrapolation & Live Telemetry  ||  app\prediction\page.tsx
+Neural-Proj  ||  app\prediction\page.tsx
+Next  ||  components\Onboarding\RandyAssistant.tsx
+No Active Camera Data  ||  app\dashboard\area-survey\page.tsx
+No Active Telemetry Streams  ||  components\analytics\intelligence-graphs.tsx
+No Active Zones  ||  components\intelligence\live-venue-map.tsx
+No Deployments Active  ||  components\cameras\camera-grid.tsx
+No Evidence Captured  ||  app\person-wait-monitoring\page.tsx
+No Matrix Selected  ||  app\reports\page.tsx
+No active alerts detected across all monitored venues. Automated threat detection is actively running.  ||  components\alerts\alert-panel.tsx
+No alerts triggered in this period.  ||  app\reports\page.tsx
+No cameras connected to this sector.  ||  components\venues\venue-camera-list.tsx
+No historical traces found.  ||  app\system\actions\page.tsx
+No intelligence data available. Check system connectivity.  ||  components\intelligence\IntelligencePanel.tsx
+No sectors identified in database.  ||  app\settings\access-control\page.tsx
+No significant peaks detected in current interval.  ||  components\reports\analytics-charts.tsx
+No venues found. Create your first venue to get started.  ||  components\dashboard\venue-cards.tsx
+Node  ||  app\person-wait-monitoring\page.tsx
+Node Hardware Active  ||  components\cameras\edit-camera-modal.tsx
+Node Hardware Active  ||  components\venues\add-camera-modal.tsx
+Node Identity  ||  components\cameras\edit-camera-modal.tsx
+Node Name  ||  components\venues\add-camera-modal.tsx
+Node Telemetry  ||  components\system\status-panel.tsx
+Node Type  ||  components\cameras\camera-grid.tsx
+Normal Moving  ||  app\cameras\[id]\page.tsx
+OFF  ||  app\profile\page.tsx
+OFFLINE  ||  app\ai-search\page.tsx
+OFFLINE  ||  app\cameras\[id]\page.tsx
+Occupancy Efficiency  ||  components\landing\sections.tsx
+Offline  ||  components\cameras\camera-grid.tsx
+Offline  ||  components\venues\venue-camera-list.tsx
+Omni-V3  ||  components\dashboard\ai-assistant-chat.tsx
+On the left, you can see the main sections of Laminar.  ||  components\Onboarding\RandyAssistant.tsx
+On-Device Learning  ||  app\system\fleet\page.tsx
+Open  ||  app\register\page.tsx
+Open Service Corridors 1-3  ||  app\reports\page.tsx
+Operational Efficacy  ||  components\Onboarding\WhyLaminarMatters.tsx
+Operational Intel  ||  components\map\IntelligenceMapCore.tsx
+Operational Peaks  ||  components\reports\analytics-charts.tsx
+Operational Sectors  ||  app\settings\access-control\page.tsx
+Operator ID  ||  app\login\page.tsx
+Operator Manual  ||  app\system\actions\page.tsx
+Operator Name  ||  app\register\page.tsx
+Ops Map Active  ||  components\map\MapPickerCore.tsx
+Other  ||  components\venues\add-venue-modal.tsx
+Other  ||  components\venues\edit-venue-modal.tsx
+Overview Panel.  ||  components\Onboarding\RandyAssistant.tsx
+PAX  ||  app\cameras\[id]\page.tsx
+PEAK  ||  components\SurveyScene3D.tsx
+PRIVACY-CORE LEDGER  ||  app\system\fleet\page.tsx
+Panoramic  ||  app\dashboard\area-survey\page.tsx
+Peak Detected  ||  app\dashboard\area-survey\page.tsx
+Peak Events  ||  components\reports\analytics-charts.tsx
+Peak Forecast  ||  components\venues\prediction-graph.tsx
+Peak Prediction  ||  components\dashboard\ai-operations-dashboard.tsx
+Peak Time  ||  app\venues\[id]\page.tsx
+Personal Information  ||  app\profile\page.tsx
+Phase 2 AI Fusion  ||  components\intelligence\zone-detail-panel.tsx
+Phase 2 Prediction  ||  components\intelligence\zone-detail-panel.tsx
+Precision  ||  app\dashboard\area-survey\page.tsx
+Predicted Matrix Evolution  ||  app\reports\page.tsx
+Prediction Engine  ||  app\prediction\page.tsx
+Predictive Maximum  ||  components\reports\analytics-charts.tsx
+Predicts  ||  components\alerts\alert-card.tsx
+Preview Offline  ||  components\cameras\browser-uploader.tsx
+Pricing Plans  ||  components\landing\sections.tsx
+Priority  ||  app\system\actions\page.tsx
+Privacy Protocol  ||  app\system\fleet\page.tsx
+Process  ||  components\landing\sections.tsx
+Profile Initialized  ||  app\register\page.tsx
+Profile Strength  ||  app\profile\page.tsx
+Profile initialized. Redirecting to mission control...  ||  app\register\page.tsx
+Profile updated successfully!  ||  app\profile\page.tsx
+Promise  ||  app\settings\access-control\page.tsx
+Protocol Deployment Grid  ||  app\system\actions\page.tsx
+Protocol Operating Manual  ||  app\system\actions\page.tsx
+Pulse Check  ||  components\cameras\camera-grid.tsx
+REAL-TIME ANALYTICS  ||  components\landing\sections.tsx
+REAL-TIME INTELLIGENCE  ||  app\page.tsx
+Randy  ||  components\Onboarding\RandyAssistant.tsx
+Randy AI  ||  components\dashboard\ai-assistant-chat.tsx
+Raw CSV  ||  app\reports\page.tsx
+Re-ID  ||  components\Onboarding\RandyAssistant.tsx
+Readings  ||  app\reports\page.tsx
+Real-time Panoramic Fusion  ||  app\dashboard\area-survey\page.tsx
+Real-time Scene Understanding & Analytics  ||  components\dashboard\ai-operations-dashboard.tsx
+Real-time incident evaluation  ||  components\dashboard\ai-operations-dashboard.tsx
+Receive instant text messages for critical crowd events, even without internet. Requires a valid Indian mobile number.  ||  app\profile\page.tsx
+Receive rich HTML emails with embedded snapshots for critical crowd events.  ||  app\profile\page.tsx
+Recent Alert Matrix  ||  app\reports\page.tsx
+Recommended Action  ||  app\cameras\[id]\page.tsx
+Recommended Action  ||  components\alerts\alert-card.tsx
+Recommended Actions  ||  components\intelligence\IntelligencePanel.tsx
+Recommended Staffing  ||  app\venues\[id]\page.tsx
+Record 10s Clip  ||  app\cameras\[id]\page.tsx
+Redirecting to Control Panel...  ||  app\verify-email\page.tsx
+Refresh Rate  ||  app\dashboard\area-survey\page.tsx
+Regional Events  ||  app\prediction\page.tsx
+Register  ||  app\login\page.tsx
+Register New Venue  ||  components\venues\add-venue-modal.tsx
+Registered  ||  app\system\fleet\page.tsx
+Reload Stream  ||  app\cameras\[id]\page.tsx
+Required Actions  ||  app\reports\page.tsx
+Res Height  ||  components\venues\add-camera-modal.tsx
+Res Width  ||  components\venues\add-camera-modal.tsx
+Resource Planning  ||  app\venues\[id]\page.tsx
+Restart  ||  app\dashboard\area-survey\page.tsx
+Retry Connection  ||  app\cameras\[id]\page.tsx
+Retrying automatically...  ||  components\intelligence\live-venue-map.tsx
+Return to Hub  ||  app\monitor\page.tsx
+Return to Hub  ||  app\prediction\page.tsx
+Return to Login  ||  app\verify-email\page.tsx
+Revoke  ||  app\settings\page.tsx
+Risk & Escalation Forecast  ||  components\venues\prediction-graph.tsx
+Risk Distribution  ||  app\reports\page.tsx
+Risk Intelligence  ||  components\Onboarding\WhyLaminarMatters.tsx
+Risk Level  ||  app\cameras\[id]\page.tsx
+Risk Level  ||  app\reports\page.tsx
+Risk Level  ||  components\map\IntelligenceMapCore.tsx
+Risk Score Over Time  ||  components\venues\prediction-graph.tsx
+Risk Trajectory Projection  ||  components\reports\analytics-charts.tsx
+Risk Trend Velocity  ||  app\reports\page.tsx
+Rule Designation  ||  app\system\actions\page.tsx
+SEEN  ||  components\alerts\alert-card.tsx
+STABLE  ||  app\system\fleet\page.tsx
+START DEPLOYMENT  ||  components\landing\sections.tsx
+STREAM  ||  app\cameras\[id]\page.tsx
+SYNCING...  ||  app\ai-search\page.tsx
+SYSTEM  ||  app\onboarding\page.tsx
+SYSTEM ONLINE  ||  app\ai-search\page.tsx
+Safety Context  ||  components\dashboard\ai-operations-dashboard.tsx
+Safety Mode  ||  app\system\actions\page.tsx
+Safety: Dry Run  ||  app\system\actions\page.tsx
+Saturation Insights  ||  components\reports\analytics-charts.tsx
+Save  ||  app\person-wait-monitoring\page.tsx
+Save Profile  ||  app\settings\page.tsx
+Saved  ||  app\settings\page.tsx
+Scan This Sector  ||  components\map\IntelligenceMapCore.tsx
+Scan area for nodes  ||  components\map\IntelligenceMapCore.tsx
+Scanning for anomalies...  ||  components\alerts\alert-panel.tsx
+Scanning...  ||  app\login\page.tsx
+Score  ||  app\person-wait-monitoring\page.tsx
+Secure  ||  app\login\page.tsx
+Secure  ||  app\venues\[id]\page.tsx
+Secure Link  ||  app\onboarding\page.tsx
+Securely disconnect from the Laminar AI Platform? Active monitoring alerts will pause.  ||  components\layout\navbar.tsx
+Security Policy Blocked  ||  components\cameras\browser-uploader.tsx
+Security Uplink  ||  app\system\actions\page.tsx
+See Beyond  ||  components\landing\sections.tsx
+Select Target Matrix  ||  app\reports\page.tsx
+Select Venue...  ||  components\cameras\edit-camera-modal.tsx
+Select Venue...  ||  components\venues\add-camera-modal.tsx
+Semantic Matrix Offline  ||  app\ai-search\page.tsx
+Severity  ||  app\reports\page.tsx
+Shopping Mall  ||  components\venues\add-venue-modal.tsx
+Shopping Mall  ||  components\venues\edit-venue-modal.tsx
+Sign In  ||  app\register\page.tsx
+Sign Out  ||  components\layout\navbar.tsx
+Signal Offline  ||  app\monitor\page.tsx
+Signal Processing Error  ||  app\monitor\page.tsx
+Spatial Grid  ||  app\ai-search\page.tsx
+Stadium  ||  components\venues\add-venue-modal.tsx
+Stadium  ||  components\venues\edit-venue-modal.tsx
+Standard Procedure v4.0.12  ||  app\system\actions\page.tsx
+Start Area Survey  ||  app\dashboard\area-survey\page.tsx
+Start Broadcast  ||  components\cameras\browser-uploader.tsx
+Status  ||  app\reports\page.tsx
+Status  ||  components\intelligence\zone-detail-panel.tsx
+Status: Encrypted  ||  app\system\actions\page.tsx
+Stop  ||  app\dashboard\area-survey\page.tsx
+Stop Broadcast  ||  components\cameras\browser-uploader.tsx
+Strategic Forecast & Actions  ||  app\reports\page.tsx
+Strategic Intelligence  ||  components\Onboarding\WhyLaminarMatters.tsx
+Stream Type  ||  components\venues\add-camera-modal.tsx
+Success Stories  ||  components\landing\sections.tsx
+Suggested questions  ||  components\dashboard\ai-assistant-chat.tsx
+Super Admin  ||  app\settings\access-control\page.tsx
+Supports high-speed 120 FPS ingestion  ||  components\venues\add-camera-modal.tsx
+Surge Alerts  ||  components\Onboarding\RandyAssistant.tsx
+Surveillance.  ||  components\landing\sections.tsx
+Sync Synthesis  ||  app\person-wait-monitoring\page.tsx
+Synchronized Telemetry  ||  components\reports\analytics-charts.tsx
+Synchronizing Cryptographic Ledger...  ||  app\settings\access-control\page.tsx
+Synchronizing Global Spatial Data...  ||  components\map\IntelligenceMap.tsx
+Synchronizing Neural Core  ||  components\reports\analytics-charts.tsx
+Synthesizing Spectral Log...  ||  app\person-wait-monitoring\page.tsx
+System Health  ||  components\system\status-panel.tsx
+System Idle  ||  app\ai-search\page.tsx
+System Load  ||  app\system\actions\page.tsx
+System Load  ||  components\system\status-panel.tsx
+System Preferences  ||  app\settings\page.tsx
+System Secure  ||  components\alerts\alert-panel.tsx
+System Settings  ||  app\settings\access-control\page.tsx
+TRUSTED BY LEADERS IN  ||  app\page.tsx
+Target End Point  ||  app\system\actions\page.tsx
+Target FPS  ||  components\venues\add-camera-modal.tsx
+Target Isolation Null  ||  app\person-wait-monitoring\page.tsx
+Target Lock Visualized  ||  components\alerts\alert-card.tsx
+Target Sub-Matrix  ||  app\prediction\page.tsx
+Target Venue  ||  components\cameras\edit-camera-modal.tsx
+Target Venue  ||  components\venues\add-camera-modal.tsx
+Target: &lt;5 mins  ||  components\dashboard\SlaDashboardCard.tsx
+Telemetry Feed  ||  components\intelligence\zone-detail-panel.tsx
+Telemetry Feed Offline  ||  components\reports\analytics-charts.tsx
+Temporal Match  ||  app\ai-search\page.tsx
+Temporal Shift  ||  app\prediction\page.tsx
+Terminate Session  ||  components\layout\navbar.tsx
+The ML pipeline failed to resolve a continuous data stream. Confirm connected edge nodes are actively transmitting valid arrays.  ||  components\reports\analytics-charts.tsx
+The Panoramic Area Survey uses temporal peak-fusion to calculate the total number of unique individuals in an area across camera sweeps.  ||  app\dashboard\area-survey\page.tsx
+The visual recognition engine requires active bounding box detections to map semantic vectors. Ensure camera feeds are active.  ||  app\ai-search\page.tsx
+There are no resolved alerts existing in the telemetry memory index right now.  ||  components\alerts\alert-panel.tsx
+This camera node is configured to receive a direct upload from your browser. 
+            Clicking  ||  components\cameras\browser-uploader.tsx
+Threat Level  ||  app\venues\[id]\page.tsx
+Threat Quantification  ||  components\reports\analytics-charts.tsx
+Throughput  ||  app\person-wait-monitoring\page.tsx
+Throughput  ||  app\venues\[id]\page.tsx
+Time  ||  app\person-wait-monitoring\page.tsx
+Time  ||  app\reports\page.tsx
+Time to Critical  ||  components\intelligence\zone-detail-panel.tsx
+Total Deployable Capacity  ||  app\venues\[id]\page.tsx
+Total People in Area  ||  app\dashboard\area-survey\page.tsx
+Total allowed physical entities deployed in sector.  ||  components\venues\add-venue-modal.tsx
+Trajectory Projection Insights  ||  components\reports\analytics-charts.tsx
+Transfer Protocol  ||  components\cameras\edit-camera-modal.tsx
+Transit Flow Diagnostics  ||  components\reports\analytics-charts.tsx
+Transit Hub  ||  components\venues\add-venue-modal.tsx
+Transit Hub  ||  components\venues\edit-venue-modal.tsx
+Transit Intelligence  ||  components\reports\analytics-charts.tsx
+Trigger Matrix  ||  app\system\actions\page.tsx
+Trusted by the  ||  components\landing\sections.tsx
+Try Again  ||  app\verify-email\page.tsx
+UNRESTRICTED GLOBAL ACCESS  ||  app\settings\access-control\page.tsx
+Uplink Operational  ||  app\system\actions\page.tsx
+Use Cases  ||  components\landing\sections.tsx
+User  ||  app\settings\access-control\page.tsx
+V-INTEL: ACTIVE  ||  app\monitor\page.tsx
+Velocity  ||  components\intelligence\zone-detail-panel.tsx
+Venue Construct  ||  app\venues\[id]\page.tsx
+Venue Construct  ||  components\venues\add-venue-modal.tsx
+Venue Construct  ||  components\venues\edit-venue-modal.tsx
+Venue Matrix  ||  components\alerts\alert-card.tsx
+Verify  ||  app\verify-email\page.tsx
+Verify your search query or refresh the operational roster.  ||  app\settings\access-control\page.tsx
+View Feed  ||  components\cameras\camera-grid.tsx
+View Feed  ||  components\venues\venue-camera-list.tsx
+View Live Demo  ||  app\page.tsx
+Vision Pipeline Inference  ||  components\cameras\edit-camera-modal.tsx
+Voice input  ||  components\advanced\VoiceCommandButton.tsx
+Wait  ||  app\person-wait-monitoring\page.tsx
+Waiting for asset detection nodes...  ||  app\person-wait-monitoring\page.tsx
+Waiting for first crowd detection frame to build prediction model.  ||  components\venues\prediction-graph.tsx
+YES  ||  app\person-wait-monitoring\page.tsx
+Zero Assets In Sight  ||  app\person-wait-monitoring\page.tsx
+Zero Matches  ||  app\ai-search\page.tsx
+Zone Density Heatmap  ||  app\dashboard\area-survey\page.tsx
+analyzing data...  ||  components\dashboard\ai-assistant-chat.tsx
+and tracking individuals using our  ||  components\Onboarding\RandyAssistant.tsx
+engine.  ||  components\Onboarding\RandyAssistant.tsx
+every environment  ||  components\landing\sections.tsx
+in 4 steps  ||  components\landing\sections.tsx
+intelligence  ||  components\landing\sections.tsx
+live feeds to processing  ||  components\Onboarding\RandyAssistant.tsx
+mins  ||  components\dashboard\SlaDashboardCard.tsx
+or continue with  ||  app\login\page.tsx
+or continue with  ||  app\register\page.tsx
+per min  ||  app\venues\[id]\page.tsx
+personnel  ||  app\venues\[id]\page.tsx
+persons  ||  app\venues\[id]\page.tsx
+powered by next-gen AI  ||  app\page.tsx
+questions  ||  components\landing\sections.tsx
+return  ||  app\dashboard\page.tsx
+scales with you  ||  components\landing\sections.tsx
+teams  ||  components\landing\sections.tsx
+to modify your preferences  ||  app\profile\page.tsx
+to start monitoring  ||  components\Onboarding\RandyAssistant.tsx
+upperThresh && currentDprRef.current  ||  components\animations\laser-flow.tsx
+v2.1  ||  components\layout\sidebar.tsx
+v2.4.1-enterprise  ||  app\settings\page.tsx

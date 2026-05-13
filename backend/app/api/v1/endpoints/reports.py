@@ -90,3 +90,32 @@ async def download_pdf_report(
     except Exception as e:
         logger.error(f"PDF generation failed: {e}")
         raise HTTPException(status_code=500, detail="PDF generation failed")
+
+@router.get("/waiting/{camera_id}")
+async def download_waiting_report(
+    camera_id: UUID,
+    hours: int = 24,
+    session: AsyncSession = Depends(get_db),
+    user=Depends(get_current_active_user),
+):
+    """
+    Download a specialized Waiting Intelligence Report for a camera.
+    Includes face snapshots of flagged individuals and wait-time insights.
+    """
+    try:
+        from app.services.waiting_report_service import WaitingReportService
+        svc = WaitingReportService()
+        pdf_bytes = await svc.generate_waiting_pdf(session, camera_id, hours=hours)
+
+        date_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename=waiting_intelligence_{camera_id}_{date_str}.pdf",
+                "Content-Length": str(len(pdf_bytes)),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Waiting report generation failed: {e}")
+        raise HTTPException(status_code=500, detail="Waiting report generation failed")

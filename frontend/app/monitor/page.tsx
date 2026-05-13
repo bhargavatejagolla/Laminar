@@ -1,11 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useCameras } from "@/hooks/useCameras";
-import { LayoutGrid, Activity, Video, AlertTriangle, Maximize2, ShieldAlert, Search, X } from "lucide-react";
+import { LayoutGrid, Activity, Video, AlertTriangle, Maximize2, ShieldAlert, Search, X, ChevronLeft } from "lucide-react";
 import { useState, useMemo } from "react";
 import { getToken } from "@/services/auth";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 export default function MonitorWallPage() {
   const { data: cameras, isLoading } = useCameras();
@@ -13,6 +14,7 @@ export default function MonitorWallPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [fullscreenCamera, setFullscreenCamera] = useState<any>(null);
   const { t } = useTranslation();
+  const router = useRouter();
   
   const activeCameras = useMemo(() => {
     const safeCameras = Array.isArray(cameras) ? cameras : [];
@@ -42,27 +44,46 @@ export default function MonitorWallPage() {
   }, [gridSize]);
 
   return (
-    <div className="min-h-screen bg-transparent text-white pb-12 flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#020617] text-white pb-12 flex flex-col relative overflow-hidden font-sans px-6 xl:px-12 pt-6">
       
-      {/* Background Matrix Effect */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.02)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none -z-10 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,#000_70%,transparent_100%)]"></div>
+      {/* Immersive Glassmorphism Background Elements */}
+      <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-indigo-900/10 rounded-full blur-[150px] pointer-events-none -z-10"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[1000px] h-[1000px] bg-cyan-900/10 rounded-full blur-[120px] pointer-events-none -z-10"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-900/5 rounded-full blur-[150px] pointer-events-none -z-10"></div>
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none -z-10 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,#000_80%,transparent_100%)]"></div>
+
+      {/* Navigation Bar */}
+      <div className="flex items-center justify-between mb-8 w-full relative z-10">
+        <button 
+          onClick={() => router.back()}
+          className="group flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-400/30 transition-all backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.02)] hover:shadow-[0_0_20px_rgba(34,211,238,0.2)]"
+        >
+          <div className="p-1 rounded-full bg-white/10 group-hover:bg-cyan-500/20 text-slate-400 group-hover:text-cyan-400 transition-colors">
+            <ChevronLeft className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-300 group-hover:text-white transition-colors">{t("auto.ReturntoHub_2354") || "Return to Hub"}</span>
+        </button>
+      </div>
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 mt-2 relative z-10 w-full">
         <div className="flex items-center gap-5">
           <div className="p-3 bg-cyan-950/40 backdrop-blur-md border border-cyan-500/30 rounded-2xl flex-shrink-0 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
             <LayoutGrid className="w-8 h-8 text-cyan-400" />
           </div>
-          <div>
-             <h1 className="text-3xl font-black tracking-[0.1em] text-white flex items-center gap-4 font-heading uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
-               {t("monitor.title") || "Global Matrix"}
-               <span className="px-2.5 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase tracking-[0.2em] shadow-[inset_0_0_10px_rgba(244,63,94,0.2)] flex items-center gap-2">
-                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                 {t("monitor.livemultiplex") || "LIVE MULTIPLEX"}
-               </span>
-             </h1>
-             <p className="text-sm font-bold text-slate-400 mt-2 tracking-widest uppercase">
-               {t("monitor.subtitle") || "Synchronized Grid Processing"}
-             </p>
+          <div className="flex flex-col">
+             <div className="flex flex-col items-start gap-1">
+                <div className="flex items-center gap-4">
+                  <h1 className="text-3xl md:text-4xl font-black tracking-[0.1em] text-white">
+                    {(t("monitor.title") || "GLOBAL MATRIX").toUpperCase()}
+                  </h1>
+                  <span className="px-3 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] shadow-[0_0_15px_rgba(244,63,94,0.1)]">
+                    {t("monitor.livemultiplex") || "LIVE MULTIPLEX"}
+                  </span>
+                </div>
+                <h2 className="text-xs md:text-sm font-bold tracking-[0.3em] text-slate-400">
+                  {(t("monitor.subtitle") || "Synchronized Grid Processing").toUpperCase()}
+                </h2>
+             </div>
           </div>
         </div>
 
@@ -122,7 +143,6 @@ export default function MonitorWallPage() {
                      <div className="absolute inset-0 bg-transparent rounded-2xl ring-2 ring-cyan-500/0 group-hover/feed:ring-cyan-500/50 transition-all duration-500 pointer-events-none z-30"></div>
 
                      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-10 mix-blend-overlay"></div>
-                     <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent scan-line pointer-events-none z-20"></div>
                      
                      <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-[#020202] overflow-hidden">
                        {/* Try to load the stream, fallback to icon if it fails */}
@@ -142,9 +162,9 @@ export default function MonitorWallPage() {
                                <div className="absolute inset-0 bg-rose-500/10 blur-[20px] rounded-full animate-pulse"></div>
                                <ShieldAlert className="w-16 h-16 text-rose-500/60 relative z-10" />
                             </div>
-                            <span className="text-[10px] font-mono font-black text-rose-500/80 uppercase tracking-[0.3em] mb-2">Matrix Link Severed</span>
+                            <span className="text-[10px] font-mono font-black text-rose-500/80 uppercase tracking-[0.3em] mb-2">{t("auto.MatrixLinkSever_2110") || "Matrix Link Severed"}</span>
                             <div className="flex flex-col items-center gap-1 opacity-40">
-                               <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">Awaiting Signal Synchronization</span>
+                               <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest">{t("auto.AwaitingSignalS_9954") || "Awaiting Signal Synchronization"}</span>
                                <span className="text-[8px] font-mono text-slate-600 uppercase tracking-widest">Ref: SYS_CONN_DROP_{cam.id.substring(0,4)}</span>
                             </div>
                           </div>
@@ -154,8 +174,8 @@ export default function MonitorWallPage() {
                              <div className="absolute inset-0 bg-rose-500/10 blur-[20px] rounded-full animate-pulse"></div>
                              <ShieldAlert className="w-16 h-16 text-rose-500/60 relative z-10" />
                           </div>
-                          <span className="text-[10px] font-mono font-black text-rose-500/80 uppercase tracking-[0.3em] mb-2">Signal Processing Error</span>
-                          <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest opacity-40">Auto-recovery in progress...</span>
+                          <span className="text-[10px] font-mono font-black text-rose-500/80 uppercase tracking-[0.3em] mb-2">{t("auto.SignalProcessin_3256") || "Signal Processing Error"}</span>
+                          <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest opacity-40">{t("auto.Autorecoveryinp_6373") || "Auto-recovery in progress..."}</span>
                         </div>
                      </div>
   
@@ -168,7 +188,7 @@ export default function MonitorWallPage() {
                          </div>
                          <div className="flex items-center gap-2 text-[8px] text-slate-400 font-bold tracking-tighter">
                             <Activity className="w-2.5 h-2.5" />
-                            <span>V-INTEL: ACTIVE</span>
+                            <span>{t("auto.VINTELACTIVE_8923") || "V-INTEL: ACTIVE"}</span>
                             <span className="text-cyan-500">YOLO11s_CORE</span>
                          </div>
                        </div>
@@ -179,7 +199,7 @@ export default function MonitorWallPage() {
                             <span>{cam.fps || 30} FPS</span>
                           </div>
                           <div className="bg-rose-500/10 backdrop-blur-md px-2 py-1 rounded border border-rose-500/20 text-rose-400 text-[8px] font-black uppercase tracking-widest">
-                            LVL: NOMINAL
+                            {t("auto.LVLNOMINAL_7875") || "LVL: NOMINAL"}
                           </div>
                        </div>
                      </div>
@@ -271,12 +291,12 @@ export default function MonitorWallPage() {
                 ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <ShieldAlert className="w-24 h-24 text-rose-500 mb-4 drop-shadow-[0_0_20px_rgba(244,63,94,0.5)]" />
-                    <span className="text-sm font-mono font-bold text-rose-500 uppercase tracking-[0.3em]">Signal Offline</span>
+                    <span className="text-sm font-mono font-bold text-rose-500 uppercase tracking-[0.3em]">{t("auto.SignalOffline_8858") || "Signal Offline"}</span>
                   </div>
                 )}
                 <div className="hidden absolute inset-0 flex flex-col items-center justify-center">
                   <ShieldAlert className="w-24 h-24 text-rose-500 mb-4 drop-shadow-[0_0_20px_rgba(244,63,94,0.5)]" />
-                  <span className="text-sm font-mono font-bold text-rose-500 uppercase tracking-[0.3em]">Signal Offline</span>
+                  <span className="text-sm font-mono font-bold text-rose-500 uppercase tracking-[0.3em]">{t("auto.SignalOffline_8858") || "Signal Offline"}</span>
                 </div>
               </div>
             </div>

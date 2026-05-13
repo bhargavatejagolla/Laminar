@@ -1,0 +1,10 @@
+﻿components/animations/laser-flow.tsx(473,30): error TS1003: Identifier expected.
+components/animations/laser-flow.tsx(473,58): error TS1005: '{' expected.
+components/animations/laser-flow.tsx(473,99): error TS1005: ')' expected.
+components/animations/laser-flow.tsx(473,101): error TS1005: ',' expected.
+components/animations/laser-flow.tsx(473,107): error TS1003: Identifier expected.
+components/animations/laser-flow.tsx(473,109): error TS1005: ';' expected.
+components/animations/laser-flow.tsx(545,3): error TS1128: Declaration or statement expected.
+components/animations/laser-flow.tsx(545,4): error TS1128: Declaration or statement expected.
+components/animations/laser-flow.tsx(545,11): error TS1005: ';' expected.
+components/animations/laser-flow.tsx(589,1): error TS1128: Declaration or statement expected.

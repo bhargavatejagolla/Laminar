@@ -34,32 +34,42 @@ logger = get_logger(__name__)
 MULTI_TENANT_ENABLED = os.getenv("MULTI_TENANT_ENABLED", "false").lower() == "true"
 
 
-class TenantMiddleware(BaseHTTPMiddleware):
+class TenantMiddleware:
     """
-    Extracts tenant_id from JWT and injects into request.state.
-    Runs on every request — lightweight (no DB call).
-
-    If multi-tenant mode is disabled → request.state.tenant_id = None
-    If JWT parsing fails → request.state.tenant_id = None (fail open)
+    Extracts tenant_id from JWT and injects into request scope.
+    ASGI-compatible: skips non-HTTP requests (like WebSockets) to avoid handshake timeouts.
     """
 
-    async def dispatch(self, request: Request, call_next):
-        request.state.tenant_id = None  # Default: single-tenant
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            # Skip for WebSockets and other protocols
+            await self.app(scope, receive, send)
+            return
+
+        # Initialize tenant_id in scope state
+        if "state" not in scope:
+            scope["state"] = {}
+        scope["state"]["tenant_id"] = None
 
         if MULTI_TENANT_ENABLED:
             try:
-                auth = request.headers.get("Authorization", "")
+                # Extract headers from ASGI scope
+                headers = dict(scope.get("headers", []))
+                auth = headers.get(b"authorization", b"").decode()
+                
                 if auth.startswith("Bearer "):
                     token = auth[7:]
                     payload = decode_token(token)
                     tenant_id_str = payload.get("tenant_id")
                     if tenant_id_str:
-                        request.state.tenant_id = str(tenant_id_str)
+                        scope["state"]["tenant_id"] = str(tenant_id_str)
             except Exception:
-                pass  # Fail open — authentication is handled by dependency injection
+                pass  # Fail open
 
-        response = await call_next(request)
-        return response
+        await self.app(scope, receive, send)
 
 
 def get_tenant_id(request: Request) -> Optional[str]:

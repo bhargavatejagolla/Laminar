@@ -3,8 +3,11 @@
 import { useMemo, useState, useEffect } from "react";
 import { BrainCircuit, Clock, Activity, Users, ShieldAlert, Cpu } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { useTranslation } from "react-i18next";
 
 export default function AIOperationsDashboard() {
+  const { t } = useTranslation();
+
   const { data: stats, isLoading } = useDashboardStats();
   const insightData = stats?.ai_insights;
 
@@ -17,8 +20,8 @@ export default function AIOperationsDashboard() {
           <BrainCircuit className="w-5 h-5 text-cyan-400" />
         </div>
         <div>
-          <h2 className="text-lg font-bold text-white tracking-wide">AI Operations Center</h2>
-          <p className="text-xs text-slate-400 font-mono">Real-time Scene Understanding & Analytics</p>
+          <h2 className="text-lg font-bold text-white tracking-wide">{t("auto.AIOperationsCen_8180") || "AI Operations Center"}</h2>
+          <p className="text-xs text-slate-400 font-mono">{t("auto.RealtimeSceneUn_566") || "Real-time Scene Understanding & Analytics"}</p>
         </div>
       </div>
 
@@ -27,48 +30,48 @@ export default function AIOperationsDashboard() {
         <div className="bg-[#020617]/50 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between group hover:border-cyan-500/30 transition-colors">
           <div className="flex items-center gap-2 mb-2 text-slate-500">
             <Clock className="w-4 h-4" />
-            <span className="text-xs font-semibold uppercase tracking-widest">Peak Prediction</span>
+            <span className="text-xs font-semibold uppercase tracking-widest">{t("auto.PeakPrediction_2848") || "Peak Prediction"}</span>
           </div>
           <p className="text-xl font-mono text-cyan-400 font-bold group-hover:scale-105 transition-transform origin-left">
             {insightData ? insightData.peak_time : "Processing..."}
           </p>
-          <p className="text-[10px] text-slate-500 mt-2">Highest predicted capacity traffic</p>
+          <p className="text-[10px] text-slate-500 mt-2">{t("auto.Highestpredicte_3677") || "Highest predicted capacity traffic"}</p>
         </div>
 
         {/* Insight 2 */}
         <div className="bg-[#020617]/50 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between group hover:border-violet-500/30 transition-colors">
           <div className="flex items-center gap-2 mb-2 text-slate-500">
             <Users className="w-4 h-4" />
-            <span className="text-xs font-semibold uppercase tracking-widest">Hotspot Zone</span>
+            <span className="text-xs font-semibold uppercase tracking-widest">{t("auto.HotspotZone_9090") || "Hotspot Zone"}</span>
           </div>
           <p className="text-xl font-bold text-violet-400 group-hover:scale-105 transition-transform origin-left">
             {insightData ? insightData.most_crowded : "Analyzing..."}
           </p>
-          <p className="text-[10px] text-slate-500 mt-2">Highest density concentration</p>
+          <p className="text-[10px] text-slate-500 mt-2">{t("auto.Highestdensityc_2853") || "Highest density concentration"}</p>
         </div>
 
         {/* Insight 3 */}
         <div className="bg-[#020617]/50 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between group hover:border-emerald-500/30 transition-colors">
           <div className="flex items-center gap-2 mb-2 text-slate-500">
             <Activity className="w-4 h-4" />
-            <span className="text-xs font-semibold uppercase tracking-widest">Dwell Time</span>
+            <span className="text-xs font-semibold uppercase tracking-widest">{t("auto.DwellTime_5897") || "Dwell Time"}</span>
           </div>
           <p className="text-xl font-mono text-emerald-400 font-bold group-hover:scale-105 transition-transform origin-left">
             {insightData ? insightData.avg_dwell : "Tracking..."}
           </p>
-          <p className="text-[10px] text-slate-500 mt-2">Average time spent in zones</p>
+          <p className="text-[10px] text-slate-500 mt-2">{t("auto.Averagetimespen_3686") || "Average time spent in zones"}</p>
         </div>
 
         {/* Insight 4 */}
         <div className="bg-[#020617]/50 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between group hover:border-rose-500/30 transition-colors">
           <div className="flex items-center gap-2 mb-2 text-slate-500">
             <ShieldAlert className="w-4 h-4" />
-            <span className="text-xs font-semibold uppercase tracking-widest">Safety Context</span>
+            <span className="text-xs font-semibold uppercase tracking-widest">{t("auto.SafetyContext_1068") || "Safety Context"}</span>
           </div>
           <p className={`text-lg font-bold group-hover:scale-105 transition-transform origin-left ${insightData?.safety_index === "Elevated Risk" ? 'text-rose-400' : 'text-emerald-400'}`}>
             {insightData ? insightData.safety_index : "Scanning..."}
           </p>
-          <p className="text-[10px] text-slate-500 mt-2">Real-time incident evaluation</p>
+          <p className="text-[10px] text-slate-500 mt-2">{t("auto.Realtimeinciden_3855") || "Real-time incident evaluation"}</p>
         </div>
       </div>
       

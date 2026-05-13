@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, File, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select, func
@@ -107,7 +107,7 @@ async def _dwell_frame_generator(camera_id: UUID):
 
 @router.get("/stream/{camera_id}", tags=["Dwell Monitor"])
 async def dwell_stream(
-    camera_id: UUID,
+    camera_id: str,
     token: Optional[str] = Query(None, description="JWT token for MJPEG auth (img tags cannot set headers)"),
 ):
     """
@@ -115,10 +115,17 @@ async def dwell_stream(
     Accepts token as query param because browser img tags cannot send Authorization headers.
     Each person shows: ID{n} | Xs · ZoneName
     """
-    # Lightweight token validation — just ensure it's a non-empty string if provided.
-    # Full JWT decode can be added here if needed.
+    # Sanitize camera_id (handle cases like 'people/UUID' or 'dwelling/UUID')
+    if "/" in camera_id:
+        camera_id = camera_id.split("/")[-1]
+
+    try:
+        cam_uuid = UUID(camera_id)
+    except Exception:
+        raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
+
     return StreamingResponse(
-        _dwell_frame_generator(camera_id),
+        _dwell_frame_generator(cam_uuid),
         media_type="multipart/x-mixed-replace; boundary=frame",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
@@ -129,23 +136,27 @@ async def dwell_stream(
 # ==============================================================
 
 @router.get("/stats/{camera_id}", tags=["Dwell Monitor"])
-async def dwell_stats(camera_id: UUID):
+async def dwell_stats(camera_id: str):
     """
-    Returns live in-memory tracking stats for a camera:
-    - people_tracked
-    - avg_dwell_seconds
-    - max_dwell_seconds
-    - tracks list: [{track_id, dwell_seconds, zone, bbox}]
+    Returns live in-memory tracking stats for a camera.
     """
+    # Sanitize camera_id
+    if "/" in camera_id:
+        camera_id = camera_id.split("/")[-1]
+
+    try:
+        cam_uuid = UUID(camera_id)
+    except Exception:
+        raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
+
     # First try to get the live dwell_service from the running stream worker
-    # (it maintains real-time in-memory state from the YOLO detection loop)
     from app.vision.manager import vision_manager
-    worker = vision_manager._workers.get(camera_id)
+    worker = vision_manager._workers.get(cam_uuid)
     if worker and hasattr(worker, 'dwell_service') and worker.dwell_service:
         return worker.dwell_service.get_live_stats()
 
     # Fallback: create/fetch from registry (will be empty if worker not running)
-    service = get_dwell_service(camera_id)
+    service = get_dwell_service(cam_uuid)
     return service.get_live_stats()
 
 
@@ -217,6 +228,38 @@ async def wait_time_analytics(
     # Queue efficiency: records processed / avg wait (higher = better)
     efficiency = round(len(records) / (avg_dwell + 1), 2) if avg_dwell > 0 else None
 
+    # Fetch latest intelligence brief from alerts
+    latest_insight = None
+    from app.models.crowd_alert import CrowdAlert
+    from app.models.crowd_metric import CrowdMetric
+    async with db_manager.session() as session:
+        alert_stmt = (
+            select(CrowdAlert)
+            .where(CrowdAlert.status.in_(["new", "open"]))
+            .order_by(CrowdAlert.created_at.desc())
+            .limit(1)
+        )
+        if camera_id:
+            # Join with CrowdMetric to filter by camera_id
+            alert_stmt = (
+                select(CrowdAlert)
+                .join(CrowdMetric, CrowdAlert.metric_id == CrowdMetric.id)
+                .where(CrowdAlert.status.in_(["new", "open"]))
+                .where(CrowdMetric.camera_id == camera_id)
+                .order_by(CrowdAlert.created_at.desc())
+                .limit(1)
+            )
+        
+        alert_res = await session.execute(alert_stmt)
+        latest_alert = alert_res.scalar_one_or_none()
+        if latest_alert:
+            latest_insight = {
+                "brief": latest_alert.explanation,
+                "severity": latest_alert.severity,
+                "created_at": latest_alert.created_at.isoformat(),
+                "type": latest_alert.risk_level
+            }
+
     return {
         "avg_wait_seconds": avg_dwell,
         "max_wait_seconds": max_dwell,
@@ -225,6 +268,7 @@ async def wait_time_analytics(
         "queue_efficiency_score": efficiency,
         "top_zones": top_zones,
         "period_hours": hours,
+        "active_insight": latest_insight
     }
 
 
@@ -234,17 +278,26 @@ async def wait_time_analytics(
 
 @router.get("/records", tags=["Dwell Monitor"])
 async def dwell_records(
-    camera_id: Optional[UUID] = Query(None),
+    camera_id: Optional[str] = Query(None),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
 ):
     """Paginated historical dwell time records."""
+    cam_uuid = None
+    if camera_id:
+        if "/" in camera_id:
+            camera_id = camera_id.split("/")[-1]
+        try:
+            cam_uuid = UUID(camera_id)
+        except Exception:
+            raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
+
     async with db_manager.session() as session:
         query = select(PersonDwellTime).order_by(
             PersonDwellTime.created_at.desc()
         ).limit(limit).offset(offset)
-        if camera_id:
-            query = query.where(PersonDwellTime.camera_id == camera_id)
+        if cam_uuid:
+            query = query.where(PersonDwellTime.camera_id == cam_uuid)
         result = await session.execute(query)
         records = result.scalars().all()
 
@@ -256,8 +309,12 @@ async def dwell_records(
             "zone_name": r.zone_name,
             "enter_time": r.enter_time.isoformat() if r.enter_time else None,
             "last_seen_time": r.last_seen_time.isoformat() if r.last_seen_time else None,
+            "exit_time": r.exit_time.isoformat() if r.exit_time else None,
             "dwell_seconds": round(r.dwell_seconds, 1),
             "alert_triggered": r.alert_triggered,
+            "snapshot_enter_path": r.snapshot_enter_path,
+            "snapshot_mid_path": r.snapshot_mid_path,
+            "snapshot_exit_path": r.snapshot_exit_path,
         }
         for r in records
     ]
@@ -291,12 +348,21 @@ async def create_zone(payload: ZoneCreate):
 
 
 @router.get("/zones/{camera_id}", tags=["Dwell Monitor"])
-async def get_zones(camera_id: UUID):
+async def get_zones(camera_id: str):
     """Get all active monitoring zones for a camera."""
+    # Sanitize camera_id
+    if "/" in camera_id:
+        camera_id = camera_id.split("/")[-1]
+
+    try:
+        cam_uuid = UUID(camera_id)
+    except Exception:
+        raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
+
     async with db_manager.session() as session:
         result = await session.execute(
             select(MonitoringZone).where(
-                MonitoringZone.camera_id == camera_id,
+                MonitoringZone.camera_id == cam_uuid,
                 MonitoringZone.is_active.is_(True),
             )
         )
@@ -332,22 +398,26 @@ async def delete_zone(zone_id: UUID):
 # ==============================================================
 
 @router.get("/metrics/{camera_id}", tags=["Dwell Monitor"])
-async def queue_metrics(camera_id: UUID):
+async def queue_metrics(camera_id: str):
     """
-    Advanced Queue Intelligence metrics for a camera:
-    - current_people_waiting
-    - avg_zone_wait_seconds, max_zone_wait_seconds
-    - throughput_per_minute
-    - queue_health_score (0–100)
-    - congestion_status: IDLE | GOOD | SLOW | CRITICAL
+    Advanced Queue Intelligence metrics for a camera.
     """
+    # Sanitize camera_id
+    if "/" in camera_id:
+        camera_id = camera_id.split("/")[-1]
+
+    try:
+        cam_uuid = UUID(camera_id)
+    except Exception:
+        raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
+
     from app.vision.manager import vision_manager
-    worker = vision_manager._workers.get(camera_id)
+    worker = vision_manager._workers.get(cam_uuid)
     if worker and hasattr(worker, 'dwell_service') and worker.dwell_service:
         return worker.dwell_service.get_queue_metrics()
 
     # Fallback: use registry service (may be empty if no worker active)
-    service = get_dwell_service(camera_id)
+    service = get_dwell_service(cam_uuid)
     return service.get_queue_metrics()
 
 
@@ -357,23 +427,29 @@ async def queue_metrics(camera_id: UUID):
 
 @router.get("/history/hourly", tags=["Dwell Monitor"])
 async def hourly_history(
-    camera_id: Optional[UUID] = Query(None),
+    camera_id: Optional[str] = Query(None),
     hours: int = Query(default=24, ge=1, le=168),
 ):
     """
-    Returns hourly-bucketed dwell time averages for the past N hours.
-    Suitable for a 24-hour bar/area chart.
-
-    Response: list of {hour_label, avg_wait_seconds, count}
+    Returns hourly-bucketed dwell time averages.
     """
-    from collections import defaultdict
+    cam_uuid = None
+    if camera_id:
+        # Sanitize camera_id
+        if "/" in camera_id:
+            camera_id = camera_id.split("/")[-1]
+        try:
+            cam_uuid = UUID(camera_id)
+        except Exception:
+            raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
 
+    from collections import defaultdict
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     async with db_manager.session() as session:
         query = select(PersonDwellTime).where(PersonDwellTime.created_at >= since)
-        if camera_id:
-            query = query.where(PersonDwellTime.camera_id == camera_id)
+        if cam_uuid:
+            query = query.where(PersonDwellTime.camera_id == cam_uuid)
         result = await session.execute(query)
         records = result.scalars().all()
 
@@ -415,31 +491,75 @@ _active_queue_sessions: set = set()
 
 
 @router.post("/activate/{camera_id}", tags=["Dwell Monitor"], status_code=200)
-async def activate_queue(camera_id: UUID):
+async def activate_queue(camera_id: str):
     """
     Called by the frontend when the queue monitoring page is opened.
-    Registers interest so the backend knows the dashboard is live.
-    The actual tracking continues via the vision stream worker — this is
-    a lightweight lifecycle flag, not a heavy compute toggle.
     """
-    _active_queue_sessions.add(str(camera_id))
+    if "/" in camera_id:
+        camera_id = camera_id.split("/")[-1]
+
+    _active_queue_sessions.add(camera_id)
     logger.info(f"Queue Intelligence activated for camera {camera_id}")
-    return {"status": "activated", "camera_id": str(camera_id), "active_sessions": len(_active_queue_sessions)}
+    return {"status": "activated", "camera_id": camera_id, "active_sessions": len(_active_queue_sessions)}
 
 
 @router.post("/deactivate/{camera_id}", tags=["Dwell Monitor"], status_code=200)
-async def deactivate_queue(camera_id: UUID):
+async def deactivate_queue(camera_id: str):
     """
     Called by the frontend when the user navigates away from the queue page.
-    Removes the lifecycle flag.
     """
-    _active_queue_sessions.discard(str(camera_id))
+    if "/" in camera_id:
+        camera_id = camera_id.split("/")[-1]
+
+    _active_queue_sessions.discard(camera_id)
     logger.info(f"Queue Intelligence deactivated for camera {camera_id}")
-    return {"status": "deactivated", "camera_id": str(camera_id), "active_sessions": len(_active_queue_sessions)}
+    return {"status": "deactivated", "camera_id": camera_id, "active_sessions": len(_active_queue_sessions)}
 
 
 @router.get("/active-sessions", tags=["Dwell Monitor"])
 async def active_queue_sessions():
     """Returns which cameras currently have an active queue monitoring session."""
     return {"active_camera_ids": list(_active_queue_sessions)}
+
+
+# ==============================================================
+# Image Injection (MVP Demo)
+# ==============================================================
+
+@router.post("/upload", tags=["Dwell Monitor"])
+async def upload_dwell_image(
+    camera_id: str = Query(...),
+    file: UploadFile = File(...)
+):
+    """
+    Accept an image, inject it into the active StreamWorker for crowd analysis.
+    This allows "Live" feed demonstration even without a physical camera.
+    """
+    import cv2
+    import numpy as np
+    from app.vision.manager import vision_manager
+
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if img is None:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    # Sync with active worker if it exists
+    worker = vision_manager._workers.get(camera_id)
+    if worker:
+        # StreamWorker now supports injected_frame
+        worker.injected_frame = img.copy()
+        return {
+            "status": "success",
+            "message": f"Frame injected into active worker for camera {camera_id}",
+            "worker_active": True
+        }
+
+    return {
+        "status": "warning",
+        "message": f"No active worker found for camera {camera_id}. Frame not injected.",
+        "worker_active": False
+    }
 

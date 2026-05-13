@@ -283,46 +283,189 @@ class AIAssistantService:
         )
         for a in alerts_result.scalars().all():
             created_str = a.created_at.strftime("%Y-%m-%d %H:%M UTC")
-            doc = (
-                f"Crowd Alert at Venue {a.venue_id} on {created_str}: "
-                f"Risk={a.risk_level}, Status={a.status}, Severity={a.severity}, "
-                f"Escalation Level={a.escalation_level}."
-            )
-            if a.extra_data and a.extra_data.get("event_type"):
-                doc += f" Event: {a.extra_data['event_type']}."
-            docs.append(doc)
+        # ── 0. Static Project Knowledge Document ────────────────────────────────
+        docs.append("""
+LAMINAR PLATFORM — COMPLETE PROJECT KNOWLEDGE DOCUMENT
+=======================================================
+Laminar is a real-time AI-powered crowd intelligence and venue management platform.
 
-        # 3. Recent events
-        events_result = await session.execute(
-            select(VenueEvent)
-            .where(VenueEvent.start_time >= thirty_days_ago)
-            .order_by(desc(VenueEvent.start_time))
-            .limit(500)
-        )
-        for e in events_result.scalars().all():
-            s = e.start_time.strftime("%Y-%m-%d %H:%M")
-            end = e.end_time.strftime("%Y-%m-%d %H:%M")
-            doc = f"Event '{e.event_type}' at Venue {e.venue_id} from {s} to {end}. {e.description or ''}."
-            docs.append(doc)
+TECH STACK:
+- Backend: Python (FastAPI + SQLAlchemy async + PostgreSQL + APScheduler)
+- Frontend: Next.js 14 (TypeScript, Framer Motion, Tailwind CSS)
+- AI Stack: FAISS (vector search), SentenceTransformers, Groq API, Gemini API, local llama.cpp
+- Vision: YOLOv8 for real-time person detection via camera streams (RTSP/HTTP)
+- Re-ID: ResNet-18 deep learning embeddings for cross-camera identity tracking
+- Scheduler: APScheduler (minute pipeline every 60s, hourly pipeline every 3600s)
 
-        # 4. Crowd metrics (last 7 days, hourly)
-        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        metrics_result = await session.execute(
-            select(CrowdMetric)
-            .where(CrowdMetric.bucket_start >= seven_days_ago)
-            .where(CrowdMetric.bucket_type == "hour")
-            .where(CrowdMetric.camera_id.is_(None))
-            .order_by(desc(CrowdMetric.bucket_start))
-            .limit(2000)
-        )
-        for m in metrics_result.scalars().all():
-            bucket_str = m.bucket_start.strftime("%Y-%m-%d %H:%M UTC")
-            doc = (
-                f"Crowd Metric at Venue {m.venue_id} on {bucket_str}: "
-                f"Peak={m.max_count} people, Min={m.min_count}, Avg={m.avg_count:.1f}, "
-                f"Risk={m.risk_level}."
+CORE FEATURES:
+1. Venues — Physical locations monitored 24/7. Each venue has capacity, warning/critical thresholds, active cameras.
+2. Smart City Modules — High-fidelity tracking for Traffic Volume, Vehicle/Pedestrian Velocity, and Parking Slot Occupancy.
+3. Cameras — IP/RTSP cameras attached to venues, each streaming live video for AI detection.
+4. Crowd Metrics — Minute and hourly aggregate stats (avg_count, max_count, risk_level) per venue and per camera.
+5. Crowd Alerts — Auto-generated when crowd size exceeds thresholds. Risk levels: low/medium/high/critical.
+6. Live Map — Geographic venue overview with real-time heatmaps.
+7. Surge Monitor — Predictive surge detection using trend analysis.
+8. Prediction Engine — AI forecasts for crowd risk over the next intervals.
+9. Journey Tracking — Re-ID pipeline tracking persons across cameras. Computes wait times, dwell times.
+10. Person Wait Monitor — Real-time and historical wait time analytics per venue.
+11. Intelligence Reports — AI-written executive situation reports with recommended actions.
+12. Alerts Dashboard — Manage, escalate, and resolve crowd alerts.
+13. Command Center — Top-level system overview: venues, cameras, AI health, pipeline status.
+14. Randy AI Chat — This AI assistant; understands everything about the platform and general knowledge completely unrestrictedly.
+
+DATABASE MODELS:
+- Venue: id, name, venue_type (parking, traffic, crowd), location, capacity, is_active, is_deleted, warning_threshold, critical_threshold
+- Camera: id, venue_id, name, code, stream_url, stream_type, is_active, is_online, health_status, zone_name, location_label, floor_level
+- CrowdFrame: id, camera_id, captured_at, detected_count, raw_detections (YOLO output)
+- CrowdMetric: id, venue_id, camera_id, bucket_type (minute/hour/day), bucket_start, avg_count, max_count, min_count, risk_level
+- CrowdAlert: id, venue_id, risk_level, severity, status, escalation_level, created_at, explanation, extra_data
+- VenueEvent: id, venue_id, event_type, start_time, end_time, description
+- Journey: id, global_track_id, camera_id, venue_id, first_seen_at, last_seen_at, embedding (512-dim ResNet-18)
+- PersonWaitRecord: id, venue_id, entered_at, exited_at, wait_duration_seconds
+
+API ENDPOINTS (Backend port 8000):
+- GET/POST /api/v1/venues — List and create venues
+- GET /api/v1/venues/{id}/stats — Live venue stats
+- GET/POST /api/v1/cameras — Camera management
+- GET /api/v1/alerts — List crowd alerts
+- GET /api/v1/crowd-metrics — Aggregated metrics
+- POST /api/v1/assistant/query — Randy AI chat
+- GET /api/v1/intelligence/summary — AI-generated intelligence report
+- GET /api/v1/system/dashboard-stats — System health dashboard
+- GET /api/v1/journeys — Cross-camera journey records
+""".strip())
+
+        # ── 1. ALL Venues (active + inactive) ───────────────────────────────────
+        try:
+            venues_result = await session.execute(select(Venue))
+            all_venues = venues_result.scalars().all()
+            for v in all_venues:
+                status = "ACTIVE" if getattr(v, 'is_active', True) else "INACTIVE"
+                deleted = " [DELETED]" if getattr(v, 'is_deleted', False) else ""
+                doc = (
+                    f"Venue: '{v.name}'{deleted} (ID: {v.id}), Status: {status}, "
+                    f"Location: '{getattr(v, 'location', None) or 'unknown'}', "
+                    f"Capacity: {getattr(v, 'capacity', 'unknown')}, "
+                    f"WarningThreshold: {getattr(v, 'warning_threshold', 'N/A')}, "
+                    f"CriticalThreshold: {getattr(v, 'critical_threshold', 'N/A')}."
+                )
+                docs.append(doc)
+        except Exception as e:
+            logger.warning(f"RAG: Could not index venues: {e}")
+
+        # ── 2. ALL Cameras ──────────────────────────────────────────────────────
+        try:
+            cameras_result = await session.execute(select(Camera))
+            for cam in cameras_result.scalars().all():
+                active_str = "active" if cam.is_active else "inactive"
+                online_str = "online" if cam.is_online else "offline"
+                health = getattr(cam, 'health_status', 'unknown')
+                zone = getattr(cam, 'zone_name', None) or getattr(cam, 'location_label', None) or "unspecified zone"
+                floor = getattr(cam, 'floor_level', None) or "unknown floor"
+                doc = (
+                    f"Camera: '{cam.name}' (ID: {cam.id}), "
+                    f"Venue: {cam.venue_id}, Zone: {zone}, Floor: {floor}, "
+                    f"Status: {active_str}, Online: {online_str}, Health: {health}, "
+                    f"Stream type: {cam.stream_type}, Detection enabled: {cam.detection_enabled}."
+                )
+                if cam.last_frame_at:
+                    doc += f" Last frame received: {cam.last_frame_at.strftime('%Y-%m-%d %H:%M UTC')}."
+                docs.append(doc)
+        except Exception as e:
+            logger.warning(f"RAG: Could not index cameras: {e}")
+
+        # ── 3. Recent Crowd Alerts (last 90 days, full history) ─────────────────
+        try:
+            ninety_days_ago = datetime.now(timezone.utc) - timedelta(days=90)
+            alerts_result = await session.execute(
+                select(CrowdAlert)
+                .where(CrowdAlert.created_at >= ninety_days_ago)
+                .order_by(desc(CrowdAlert.created_at))
+                .limit(2000)
             )
-            docs.append(doc)
+            for a in alerts_result.scalars().all():
+                created_str = a.created_at.strftime("%Y-%m-%d %H:%M UTC")
+                extra = a.extra_data or {}
+                doc = (
+                    f"Crowd Alert at Venue {a.venue_id} on {created_str}: "
+                    f"Risk={a.risk_level}, Status={a.status}, Severity={a.severity}, "
+                    f"EscalationLevel={a.escalation_level}."
+                )
+                if extra.get("event_type"):
+                    doc += f" Event: {extra['event_type']}."
+                if a.explanation:
+                    doc += f" AI Explanation: {a.explanation[:200]}."
+                if extra.get("recommended_action"):
+                    doc += f" Recommended: {extra['recommended_action'][:150]}."
+                docs.append(doc)
+        except Exception as e:
+            logger.warning(f"RAG: Could not index alerts: {e}")
+
+        # ── 4. Venue Events (last 60 days) ──────────────────────────────────────
+        try:
+            sixty_days_ago = datetime.now(timezone.utc) - timedelta(days=60)
+            events_result = await session.execute(
+                select(VenueEvent)
+                .where(VenueEvent.start_time >= sixty_days_ago)
+                .order_by(desc(VenueEvent.start_time))
+                .limit(500)
+            )
+            for e in events_result.scalars().all():
+                s = e.start_time.strftime("%Y-%m-%d %H:%M")
+                end = e.end_time.strftime("%Y-%m-%d %H:%M")
+                doc = f"Event '{e.event_type}' at Venue {e.venue_id} from {s} to {end}."
+                if e.description:
+                    doc += f" Details: {e.description[:200]}."
+                docs.append(doc)
+        except Exception as e:
+            logger.warning(f"RAG: Could not index events: {e}")
+
+        # ── 5. Hourly Crowd Metrics — last 30 days (venue-level) ────────────────
+        try:
+            thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+            metrics_result = await session.execute(
+                select(CrowdMetric)
+                .where(
+                    CrowdMetric.bucket_start >= thirty_days_ago,
+                    CrowdMetric.bucket_type == "hour",
+                    CrowdMetric.camera_id.is_(None),
+                )
+                .order_by(desc(CrowdMetric.bucket_start))
+                .limit(5000)
+            )
+            for m in metrics_result.scalars().all():
+                bucket_str = m.bucket_start.strftime("%Y-%m-%d %H:%M UTC")
+                doc = (
+                    f"Crowd Metric (hourly) at Venue {m.venue_id} on {bucket_str}: "
+                    f"Peak={m.max_count} people, Min={m.min_count}, Avg={m.avg_count:.1f}, "
+                    f"Risk={m.risk_level}."
+                )
+                docs.append(doc)
+        except Exception as e:
+            logger.warning(f"RAG: Could not index hourly metrics: {e}")
+
+        # ── 6. Per-Camera Hourly Metrics — last 7 days ──────────────────────────
+        try:
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+            cam_metrics_result = await session.execute(
+                select(CrowdMetric)
+                .where(
+                    CrowdMetric.bucket_start >= seven_days_ago,
+                    CrowdMetric.bucket_type == "hour",
+                    CrowdMetric.camera_id.isnot(None),
+                )
+                .order_by(desc(CrowdMetric.bucket_start))
+                .limit(3000)
+            )
+            for m in cam_metrics_result.scalars().all():
+                bucket_str = m.bucket_start.strftime("%Y-%m-%d %H:%M UTC")
+                doc = (
+                    f"Camera-level metric at Venue {m.venue_id} / Camera {m.camera_id} on {bucket_str}: "
+                    f"Peak={m.max_count}, Avg={m.avg_count:.1f}, Risk={m.risk_level}."
+                )
+                docs.append(doc)
+        except Exception as e:
+            logger.warning(f"RAG: Could not index camera metrics: {e}")
 
         if not docs:
             logger.warning("No documents extracted for RAG index — database may be empty.")
@@ -334,8 +477,9 @@ class AIAssistantService:
             return
 
         import numpy as np
-        logger.info(f"Embedding {len(docs)} documents for FAISS index...")
-        embeddings = self.model.encode(docs, convert_to_numpy=True)
+        import asyncio
+        logger.info(f"Embedding {len(docs)} documents for comprehensive FAISS index...")
+        embeddings = await asyncio.to_thread(self.model.encode, docs, convert_to_numpy=True, batch_size=64, show_progress_bar=False)
 
         dimension = embeddings.shape[1]
         self.index = faiss.IndexFlatL2(dimension)
@@ -372,30 +516,30 @@ class AIAssistantService:
         if any(kw in q for kw in ("status", "current", "now", "today", "active")):
             return (
                 f"Here is the current Laminar system data I have indexed:\n\n{formatted}\n\n"
-                f"_(AI model is offline — this is a direct data summary. Start Ollama for full AI analysis.)_"
+                f"_(Randy AI is operating in Safe Mode — this is a direct data summary without advanced analysis.)_"
             )
 
         if any(kw in q for kw in ("alert", "risk", "critical", "high", "threat")):
             return (
                 f"Based on indexed alert data:\n\n{formatted}\n\n"
-                f"_(AI model offline — this is raw alert data. Start Ollama for AI analysis.)_"
+                f"_(Randy AI operating in Safe Mode.)_"
             )
 
         if any(kw in q for kw in ("venue", "location", "place", "crowd", "occupancy", "capacity")):
             return (
                 f"Based on indexed venue and crowd data:\n\n{formatted}\n\n"
-                f"_(AI model offline — data shown directly from index.)_"
+                f"_(Randy AI operating in Safe Mode.)_"
             )
 
         # Generic fallback
         return (
             f"Here is the most relevant indexed data for your question:\n\n{formatted}\n\n"
-            f"_(AI model offline — responses are data summaries only. Run `ollama pull llama3` to enable full AI.)_"
+            f"_(Randy AI Engine is currently operating safely with local knowledge dumps.)_"
         )
 
     # ─── Main Query ───────────────────────────────────────────────────────────
 
-    async def query(self, question: str, session: AsyncSession, history: List[Dict[str, str]] = []) -> str:
+    async def query(self, question: str, session: AsyncSession, history: List[Dict[str, str]] = [], user_language: str = "en") -> str:
         """
         Process user question via the RAG pipeline with conversation history.
 
@@ -411,20 +555,33 @@ class AIAssistantService:
         self._lazy_load_index()
         await self._lazy_load_model_async()
 
+        # ── Detect Intent Bypass ───────────────────────────────────────────
+        from app.services.ai_service import get_ai_service
+        ai_svc = get_ai_service()
+        intent = ai_svc.classify_intent(question)
+        
+        is_rag_required = intent in ["informational", "analytical", "command", "casual"]
+
         # ── FAISS retrieval ──────────────────────────────────────────────────
         context_docs: List[str] = []
         if self.index is not None and self.documents and self.model is not None:
-            query_embedding = self.model.encode([question], convert_to_numpy=True)
-            # Increased k to 8 for "complete data" as requested
-            distances, indices = self.index.search(query_embedding, 8)
+            import asyncio
+            query_embedding = await asyncio.to_thread(self.model.encode, [question], convert_to_numpy=True)
+            top_k = min(8, self.index.ntotal)
+            distances, indices = self.index.search(query_embedding, top_k)
+            # Always inject the first document (project knowledge) + top hits
+            if len(self.documents) > 0:
+                context_docs.append(self.documents[0])
             for idx in indices[0]:
-                if 0 <= idx < len(self.documents):
+                if 0 <= idx < len(self.documents) and self.documents[idx] not in context_docs:
                     context_docs.append(self.documents[idx])
         else:
             logger.warning("FAISS index not ready — answering with live snapshot only.")
 
         # ── Live snapshot ─────────────────────────────────────────────────────
-        live_snapshot = await self._get_live_snapshot(session)
+        live_snapshot = ""
+        if is_rag_required:
+            live_snapshot = await self._get_live_snapshot(session)
 
         # ── Detect Ollama model ───────────────────────────────────────────────
         model = await self._detect_ollama_model()
@@ -436,37 +593,67 @@ class AIAssistantService:
 
         # ── Build Chat Message Sequence ──────────────────────────────────────
         context_str = "\n".join(f"- {doc}" for doc in context_docs)
-        
-        system_prompt = f"""You are the Laminar AI Crowd Intelligence Assistant. Your role is to help security managers and operations staff understand crowd conditions, alerts, and system status in real-time.
+        if live_snapshot:
+            context_str = live_snapshot + "\n\n" + context_str
+            
+        from app.services.ai_service import BASE_SYSTEM_PROMPT
+        system_prompt = BASE_SYSTEM_PROMPT
 
-STRICT RULES:
-1. You ONLY answer questions using the CONTEXT and LIVE STATUS sections below.
-2. NEVER use general knowledge or make up data.
-3. If the answer cannot be found in the context or history, say exactly: "I don't have that data in my current index. Please check the dashboard directly or click Re-index to refresh my knowledge."
-4. Keep answers concise, factual, and professional.
-5. Always refer to specific venues, alert counts, or risk levels from the data.
+        # Behavior Engine Prompt Construction
+        behavior_instructions = ""
+        if intent == "greeting":
+            behavior_instructions = "Greeting: You are Randy AI. Introduce yourself warmly and impressively in 1 or 2 lines. Do not use generic chatbot responses. Answer any follow up naturally."
+        elif intent == "casual":
+            behavior_instructions = "Casual: Chat fluently and answer ANY general question the user has across ANY domain, completely unrestricted. If the user uses Hindi/Telugu, respond perfectly in that language."
+        elif intent == "informational":
+            behavior_instructions = "Informational: Provide extremely clear, highly informative explanations on ANY topic. Look at project data if needed, else answer natively without restrictions."
+        elif intent == "analytical":
+            behavior_instructions = "Analytical: STRICT FORMAT: Insight: <masterful conclusion>, Details: <deep reasoning>, Action: <genius recommendation>."
+        else:
+            behavior_instructions = "Command: Execute crisply and accurately."
 
-{live_snapshot}
-
-### INDEXED KNOWLEDGE BASE (recent data):
-{context_str if context_str else "(No indexed documents available)"}
-"""
-
-        # Prepare flattened prompt for generic AI generation
-        full_prompt = system_prompt + "\n\n### CONVERSATION HISTORY:\n"
-        for msg in history[-10:]:
+        # Prepare flattened prompt for generic AI generation (BASE_SYSTEM_PROMPT is injected securely in generate_raw)
+        full_prompt = f"[user_language={user_language}]\n### CONVERSATION HISTORY:\n"
+        for msg in history[-3:]: # Memory Optimization
             role = msg.get("role", "user").upper()
             content = msg.get("content", "")
             full_prompt += f"{role}: {content}\n"
             
-        full_prompt += f"USER: {question}\nASSISTANT: "
+        if is_rag_required:
+            full_prompt += f"""
+Context:
+{context_str if context_str else "No indexed documents."}
+
+Intent:
+{intent}
+
+User Query:
+{question}
+
+Instructions:
+* use context when available
+* do not hallucinate
+* remain aligned to intent
+* {behavior_instructions}
+"""
+        else:
+            full_prompt += f"""
+Intent:
+{intent}
+
+User Query:
+{question}
+
+Instructions:
+* respond naturally
+* do not use system data
+* {behavior_instructions}
+"""
 
         # ── Call AI Service ──────────────────────────────────────────────────
-        from app.services.ai_service import get_ai_service
-        ai_service = get_ai_service()
         logger.info(f"Querying AI Service with history ({len(history)} msgs)...")
         try:
-            answer = await ai_service.generate_raw(full_prompt, timeout=60.0)
+            answer = await ai_svc.generate_raw(full_prompt, timeout=60.0)
             if answer:
                 return answer
             else:

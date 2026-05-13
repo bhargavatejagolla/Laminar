@@ -86,6 +86,7 @@ class YOLODetector:
 
     _instance = None
     _lock = threading.Lock()
+    _inference_lock = threading.Lock()  # Lock for thread-safe inference
 
     def __new__(cls, *args, **kwargs):
         """Ensure single instance across all workers."""
@@ -97,23 +98,23 @@ class YOLODetector:
 
     def __init__(
         self,
-        model_name: str = "yolo11s.pt",      # ✅ UPGRADED to YOLOv11 Small for superior accuracy & speed
-        confidence_threshold: float = 0.20,  # ✅ LOWERED from 0.30 to catch people in dense crowds
-        iou_threshold: float = 0.40,         # ✅ LOWERED from 0.45 for tighter NMS in dense crowds
+        model_name: str = "yolo11m.pt",      # ✅ Medium version for surgical accuracy
+        confidence_threshold: float = 0.28,  # ✅ TUNED: 0.28 cuts false positives whilst keeping dense crowd recall
+        iou_threshold: float = 0.35,         # ✅ TIGHTENED: 0.35 for sharper NMS in dense crowds
         image_size: int = 640,
         warmup: bool = False,
         cpu_threads: int = 8,
         static_diff_threshold: float = 0.8,  # ✅ LOWERED to ensure almost all live movement is processed
     ):
         """Initialize detector with configuration."""
-        if hasattr(self, "_initialized"):
+        if getattr(self, "_initialized", False):
             return
 
         self.model_name = model_name
         self.conf_threshold = confidence_threshold
         self.iou_threshold = iou_threshold
         self.image_size = image_size
-        self.cpu_threads = cpu_threads
+        self.cpu_threads = 1  # Forced to 1 to prevent Windows uvicorn deadlocks
         self.static_diff_threshold = static_diff_threshold
         self.device = self._get_device()
         self.model: Optional[YOLO] = None
@@ -153,12 +154,16 @@ class YOLODetector:
 
             # CPU optimizations - critical for multi-camera performance
             if self.device == "cpu":
-                torch.set_num_threads(self.cpu_threads)
-                torch.set_num_interop_threads(6)  # ✅ Increased from 4 for better parallelism on modern CPUs
-                logger.info(
-                    "CPU optimizations applied",
-                    extra={"threads": self.cpu_threads, "interop_threads": 6}
-                )
+                try:
+                    torch.set_num_threads(self.cpu_threads)
+                    torch.set_num_interop_threads(6)  # ✅ Increased from 4 for better parallelism on modern CPUs
+                    logger.info(
+                        "CPU optimizations applied",
+                        extra={"threads": self.cpu_threads, "interop_threads": 6}
+                    )
+                except RuntimeError:
+                    # Torch may already have started parallel work; settings cannot be changed
+                    logger.warning("Torch thread configuration skipped as parallel work is already active")
 
             self.model = YOLO(self.model_name)
             self.model.to(self.device)
@@ -180,6 +185,8 @@ class YOLODetector:
             )
 
         except Exception as e:
+            self._initialized = False
+            self.model = None
             logger.error(
                 "Failed to load YOLO model",
                 extra={"error": str(e)},
@@ -225,9 +232,10 @@ class YOLODetector:
         return_boxes: bool = False,
         max_boxes: int = 500,
         _prev_frame: Optional[np.ndarray] = None,
+        classes: Optional[List[int]] = None,
     ) -> Tuple[int, float]:
         """
-        Detect persons in a single frame.
+        Detect persons (or other specified classes) in a single frame.
 
         Accuracy improvements:
         - Letterbox resize (aspect-ratio-preserving) instead of squash resize
@@ -263,16 +271,18 @@ class YOLODetector:
             # ✅ PERFORMANCE FIX: inference_mode is a strict superset of no_grad
             # It skips even more overhead (version counter tracking, etc.)
             with torch.inference_mode():
-                results = self.model.predict(
-                    source=frame_lb,
-                    conf=self.conf_threshold,
-                    iou=self.iou_threshold,
-                    imgsz=self.image_size,
-                    device=self.device,
-                    verbose=False,
-                    classes=[0],       # PERSON class only
-                    agnostic_nms=True, # ✅ ACCURACY FIX: class-agnostic NMS keeps overlapping people
-                )
+                # ✅ THREAD-SAFETY FIX: Prevent race conditions in native YOLO engine
+                with self._inference_lock:
+                    results = self.model.predict(
+                        source=frame_lb,
+                        conf=self.conf_threshold,
+                        iou=self.iou_threshold,
+                        imgsz=self.image_size,
+                        device=self.device,
+                        verbose=False,
+                        classes=classes or [0],       # Dynamic class filtering (v6)
+                        agnostic_nms=True, # ✅ ACCURACY FIX: class-agnostic NMS keeps overlapping people
+                    )
 
             result = results[0]
             inference_time = (time.time() - start_time) * 1000  # ms

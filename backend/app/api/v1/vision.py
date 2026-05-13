@@ -8,16 +8,24 @@ Exposes VisionManager health, control, and live MJPEG streaming endpoints.
 from typing import Dict, Any, Optional
 from uuid import UUID
 import asyncio
+import base64
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status, WebSocket, WebSocketDisconnect, Body
 from fastapi.responses import StreamingResponse, Response
+from pydantic import BaseModel
 
 from app.vision.manager import vision_manager
+from app.vision.orchestrator import ORCHESTRATOR
 from app.core.logging import get_logger
 from app.core.security import decode_token
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["Vision"])
+
+
+def get_worker(camera_id: UUID) -> Optional[Any]:
+    """Helper to find a worker in either the standard manager or orchestrator."""
+    return vision_manager._workers.get(camera_id) or ORCHESTRATOR._workers.get(camera_id)
 
 
 @router.get("/health")
@@ -106,7 +114,19 @@ async def restart_camera(camera_id: UUID) -> Dict[str, Any]:
     Manually restart a specific camera.
     """
     try:
+        # Check standard manager
         success = await vision_manager.restart_camera(camera_id)
+        if not success:
+            # Check orchestrator (specialized workers don't have restart method yet, so we just stop/start via registry trigger usually)
+            # but for now we look for the worker to confirm existence
+            worker = ORCHESTRATOR._workers.get(camera_id)
+            if worker:
+                # Specialized workers are more complex, but we can at least return 400 for now or implement generic restart logic
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Restart not implemented for specialized Smart City workers"
+                )
+        
         if success:
             return {
                 "success": True,
@@ -191,9 +211,9 @@ async def video_feed(
         consecutive_empty = 0
         try:
             while True:
-                worker = vision_manager._workers.get(camera_id)
+                worker = get_worker(camera_id)
                 # If worker is missing, or not running, yield offline frame and poll
-                if not worker or not worker.is_running():
+                if not worker or not getattr(worker, "_running", False):
                     yield (
                         b"--frame\r\n"
                         b"Content-Type: image/jpeg\r\n\r\n"
@@ -204,11 +224,12 @@ async def video_feed(
                     continue
 
                 # Get latest annotated frame (non-blocking)
-                frame_bytes = worker.get_latest_frame_jpeg(quality=72)
+                # Both StreamWorker and ParkingWorker cache JPEG bytes in _cached_frame_bytes
+                frame_bytes = getattr(worker, "_cached_frame_bytes", None)
 
                 if frame_bytes is None:
                     consecutive_empty += 1
-                    if consecutive_empty > 15: # 1.5 seconds of no frames
+                    if consecutive_empty > 50: # 5 seconds of no frames (increased for slow AI on Windows)
                         yield (
                             b"--frame\r\n"
                             b"Content-Type: image/jpeg\r\n\r\n"
@@ -228,8 +249,8 @@ async def video_feed(
                     + b"\r\n"
                 )
 
-                # Max 15fps serving rate to save bandwidth
-                await asyncio.sleep(1 / 15.0)
+                # Up to 30fps serving rate — encoding is cached so this is cheap
+                await asyncio.sleep(1 / 30.0)
 
         except asyncio.CancelledError:
             logger.info(f"Client disconnected from feed: camera {camera_id}")
@@ -264,14 +285,14 @@ async def camera_snapshot(
             detail="Valid token required"
         )
 
-    worker = vision_manager._workers.get(camera_id)
+    worker = get_worker(camera_id)
     if not worker:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera {camera_id} not found"
         )
 
-    frame_bytes = worker.get_latest_frame_jpeg(quality=85)
+    frame_bytes = getattr(worker, "_cached_frame_bytes", None)
     if frame_bytes is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -284,3 +305,54 @@ async def camera_snapshot(
         headers={"Cache-Control": "max-age=1"}
     )
 
+class FrameUpload(BaseModel):
+    data: str
+
+@router.post("/upload/{camera_id}")
+async def http_video_upload(camera_id: UUID, payload: FrameUpload):
+    """
+    Receive browser webcam frames via standard HTTP POST chunking.
+    This safely passes through the Next.js `rewrites()` proxy over Ngrok.
+    """
+    worker = get_worker(camera_id)
+    if not worker:
+        raise HTTPException(status_code=400, detail="Camera worker not open")
+    
+    # Generic frame injection support
+    if hasattr(worker, "injected_frame"):
+        # This is for specialized workers (ParkingWorker)
+        pass
+    elif not getattr(worker, "source", None) or getattr(worker.source, "get_type", lambda: "")() != "browser_webcam":
+        raise HTTPException(status_code=400, detail="Camera not configured for browser upload")
+
+    import base64
+    import numpy as np
+    import cv2
+        
+    try:
+        data = payload.data
+        if data.startswith("data:image/jpeg;base64,"):
+            data = data.split(",")[1]
+        
+        # Decode JPEG
+        img_bytes = base64.b64decode(data)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
+        if frame is not None:
+            # Route to either specialized 'injected_frame' or source 'feed_frame'
+            if hasattr(worker, "injected_frame"):
+                worker.injected_frame = frame
+                # Reset detection timer to trigger immediate processing
+                if hasattr(worker, "_last_detection_time"):
+                    worker._last_detection_time = 0 
+            elif hasattr(worker, "source") and hasattr(worker.source, "feed_frame"):
+                worker.source.feed_frame(frame)
+                
+            return {"status": "ok"}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid frame data")
+            
+    except Exception as e:
+        logger.error(f"Error in http upload for {camera_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

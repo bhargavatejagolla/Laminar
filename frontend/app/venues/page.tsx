@@ -7,11 +7,13 @@ import { VenueService } from "@/services/venue.service";
 import { Venue } from "@/types/venue";
 import VenueCard from "@/components/venues/venue-card";
 import AddVenueModal from "@/components/venues/add-venue-modal";
+import EditVenueModal from "@/components/venues/edit-venue-modal";
 import { MapPin, Search, Filter, Plus, X, Loader2, Map, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import SplashCursor from "@/components/react-bits/SplashCursor";
+import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 export default function VenuesPage() {
   const [isAddMode, setIsAddMode] = useState(false);
@@ -19,6 +21,7 @@ export default function VenuesPage() {
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
   const [showFilter, setShowFilter] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
   const { t } = useTranslation();
   const { user, isAdmin } = useAuth();
 
@@ -56,7 +59,19 @@ export default function VenuesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent text-white pb-12 relative">
+    <div className="min-h-screen bg-transparent text-white pb-12 relative overflow-hidden">
+      <SplashCursor
+        DENSITY_DISSIPATION={3.5}
+        VELOCITY_DISSIPATION={2}
+        PRESSURE={0.1}
+        CURL={3}
+        SPLAT_RADIUS={0.15}
+        SPLAT_FORCE={6000}
+        COLOR_UPDATE_SPEED={10}
+        SHADING
+        RAINBOW_MODE={false}
+        COLOR="#22d3ee"
+      />
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -109,11 +124,10 @@ export default function VenuesPage() {
           <div className="relative">
             <button
               onClick={() => setShowFilter(f => !f)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl border transition-all whitespace-nowrap backdrop-blur-md ${
-                filterActive !== "all"
-                  ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400"
-                  : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl border transition-all whitespace-nowrap backdrop-blur-md ${filterActive !== "all"
+                ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400"
+                : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                }`}
             >
               <Filter className="w-4 h-4" />
               {filterActive === "all" ? t("venues.filter") : filterActive === "active" ? t("venues.active") : t("venues.inactive")}
@@ -131,11 +145,10 @@ export default function VenuesPage() {
                     <button
                       key={opt}
                       onClick={() => { setFilterActive(opt); setShowFilter(false); }}
-                      className={`w-full text-left px-5 py-3 text-sm font-bold capitalize transition-colors uppercase tracking-widest text-[11px] ${
-                        filterActive === opt
-                          ? "bg-cyan-500/10 text-cyan-400"
-                          : "text-slate-400 hover:bg-white/5 hover:text-white"
-                      }`}
+                      className={`w-full text-left px-5 py-3 text-sm font-bold capitalize transition-colors uppercase tracking-widest text-[11px] ${filterActive === opt
+                        ? "bg-cyan-500/10 text-cyan-400"
+                        : "text-slate-400 hover:bg-white/5 hover:text-white"
+                        }`}
                     >
                       {opt === "all" ? "All Venues" : opt === "active" ? "✓ Active" : "✗ Inactive"}
                     </button>
@@ -147,15 +160,15 @@ export default function VenuesPage() {
 
           {/* Add — Admin/Manager only */}
           {isAdmin && (
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setIsAddMode(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-black rounded-xl bg-cyan-500 text-black hover:bg-cyan-400 transition-colors whitespace-nowrap shadow-[0_0_20px_rgba(34,211,238,0.4)] uppercase tracking-widest"
-          >
-            <Plus className="w-4 h-4" />
-            {t("venues.addVenue")}
-          </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setIsAddMode(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-black rounded-xl bg-cyan-500 text-black hover:bg-cyan-400 transition-colors whitespace-nowrap shadow-[0_0_20px_rgba(34,211,238,0.4)] uppercase tracking-widest"
+            >
+              <Plus className="w-4 h-4" />
+              {t("venues.addVenue")}
+            </motion.button>
           )}
         </div>
       </motion.div>
@@ -170,7 +183,7 @@ export default function VenuesPage() {
           </div>
         ) : isError ? (
           <div className="p-8 text-center glass-panel border border-rose-500/30 rounded-3xl">
-            <p className="text-rose-400 font-bold uppercase tracking-widest text-sm">Failed to load venues. Please refresh.</p>
+            <p className="text-rose-400 font-bold uppercase tracking-widest text-sm">{t("auto.Failedtoloadven_2491") || "Failed to load venues. Please refresh."}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 glass-panel rounded-3xl border border-dashed border-white/10 text-center">
@@ -202,20 +215,20 @@ export default function VenuesPage() {
                 variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
                 className="relative group/wrap"
               >
-                <VenueCard venue={venue} />
+                <VenueCard venue={venue} onEdit={() => setEditingVenue(venue)} />
                 {isAdmin && (
-                <button
-                  onClick={e => { e.stopPropagation(); handleDelete(venue); }}
-                  disabled={deletingId === venue.id}
-                  title="Delete venue"
-                  className="absolute -top-2 -right-2 opacity-0 group-hover/wrap:opacity-100 transition-opacity p-2 rounded-full bg-rose-500/20 text-rose-400 hover:bg-rose-500/40 border border-rose-500/50 disabled:opacity-50 z-10 backdrop-blur-md shadow-[0_0_10px_rgba(244,63,94,0.3)]"
-                >
-                  {deletingId === venue.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDelete(venue); }}
+                    disabled={deletingId === venue.id}
+                    title="Delete venue"
+                    className="absolute -top-2 -right-2 opacity-0 group-hover/wrap:opacity-100 transition-opacity p-2 rounded-full bg-rose-500/20 text-rose-400 hover:bg-rose-500/40 border border-rose-500/50 disabled:opacity-50 z-10 backdrop-blur-md shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+                  >
+                    {deletingId === venue.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
                 )}
               </motion.div>
             ))}
@@ -224,6 +237,9 @@ export default function VenuesPage() {
       </div>
 
       <AddVenueModal isOpen={isAddMode} onClose={() => { setIsAddMode(false); queryClient.invalidateQueries({ queryKey: ["venues"] }); }} />
+      {editingVenue && (
+        <EditVenueModal venue={editingVenue} isOpen={!!editingVenue} onClose={() => setEditingVenue(null)} />
+      )}
     </div>
   );
 }

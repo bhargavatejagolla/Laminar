@@ -178,10 +178,10 @@ export default function SystemHealthPage() {
               <td className="px-6 py-4">
                  <div className="flex items-center gap-3">
                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
-                   <span className="font-medium text-slate-200">Postgres Cluster (Primary)</span>
+                   <span className="font-medium text-slate-200">{t("system.postgresCluster") || "Postgres Cluster (Primary)"}</span>
                  </div>
               </td>
-              <td className="px-6 py-4"><span className="text-emerald-400 font-mono">ONLINE</span></td>
+              <td className="px-6 py-4"><span className="text-emerald-400 font-mono">{t("system.online") || "ONLINE"}</span></td>
               <td className="px-6 py-4 font-mono text-slate-300">{health?.components.database.latency}</td>
               <td className="px-6 py-4 font-mono text-slate-500">-</td>
             </tr>
@@ -191,12 +191,12 @@ export default function SystemHealthPage() {
               <td className="px-6 py-4">
                  <div className="flex items-center gap-3">
                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
-                   <span className="font-medium text-slate-200">YOLOv8 Processing Cores</span>
+                   <span className="font-medium text-slate-200">{t("system.yoloCores") || "YOLOv8 Processing Cores"}</span>
                  </div>
               </td>
-              <td className="px-6 py-4"><span className="text-emerald-400 font-mono">ONLINE</span></td>
+              <td className="px-6 py-4"><span className="text-emerald-400 font-mono">{t("system.online") || "ONLINE"}</span></td>
               <td className="px-6 py-4 font-mono text-slate-300">{health?.components.ml_pipeline.latency}</td>
-              <td className="px-6 py-4 font-mono text-amber-400">{health?.components.ml_pipeline.queue_size} frames</td>
+              <td className="px-6 py-4 font-mono text-amber-400">{health?.components.ml_pipeline.queue_size} {t("system.frames") || "frames"}</td>
             </tr>
 
             {/* Redis Row */}
@@ -204,11 +204,11 @@ export default function SystemHealthPage() {
               <td className="px-6 py-4">
                  <div className="flex items-center gap-3">
                    <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
-                   <span className="font-medium text-slate-200">Redis High-Speed Cache</span>
+                   <span className="font-medium text-slate-200">{t("system.redisCache") || "Redis High-Speed Cache"}</span>
                  </div>
               </td>
-              <td className="px-6 py-4"><span className="text-emerald-400 font-mono">ONLINE</span></td>
-              <td className="px-6 py-4 font-mono text-slate-300">Hit Rate: {health?.components.redis_cache.hit_rate}</td>
+              <td className="px-6 py-4"><span className="text-emerald-400 font-mono">{t("system.online") || "ONLINE"}</span></td>
+              <td className="px-6 py-4 font-mono text-slate-300">{t("system.hitRate") || "Hit Rate:"} {health?.components.redis_cache.hit_rate}</td>
               <td className="px-6 py-4 font-mono text-slate-500">-</td>
             </tr>
           </tbody>

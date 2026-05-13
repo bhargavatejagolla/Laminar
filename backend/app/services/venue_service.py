@@ -59,6 +59,7 @@ class VenueService:
         critical_threshold: int = 900,
         venue_type: Optional[str] = None,
         staffing_config: Optional[Dict[str, Any]] = None,
+        model_metadata: Optional[Dict[str, Any]] = None,
         tenant_id: Optional[UUID] = None,
         created_by: Optional[UUID] = None,
     ) -> Venue:
@@ -108,6 +109,7 @@ class VenueService:
             critical_threshold_percent=int(critical_threshold * 100 / capacity) if capacity else 90,
             venue_type=venue_type,
             staffing_config=staffing_config,
+            model_metadata=model_metadata,
             tenant_id=tenant_id,
             created_by=created_by,
             updated_by=created_by,
@@ -212,6 +214,7 @@ class VenueService:
         critical_threshold: Optional[int] = None,
         venue_type: Optional[str] = None,
         staffing_config: Optional[Dict[str, Any]] = None,
+        model_metadata: Optional[Dict[str, Any]] = None,
         is_active: Optional[bool] = None,
         monitoring_enabled: Optional[bool] = None,
         tenant_id: Optional[UUID] = None,
@@ -296,6 +299,8 @@ class VenueService:
             update_data["venue_type"] = venue_type
         if staffing_config is not None:
             update_data["staffing_config"] = staffing_config
+        if model_metadata is not None:
+            update_data["model_metadata"] = model_metadata
         if is_active is not None:
             update_data["is_active"] = is_active
         if monitoring_enabled is not None:
@@ -568,11 +573,39 @@ class VenueService:
             current_risk = float(latest_metric.dynamic_risk_score or 0)
             capacity_usage = float(latest_metric.occupancy_percent or 0)
             risk_level = latest_metric.risk_level or "unknown"
+            avg_velocity = float(latest_metric.avg_velocity or 0.0)
         else:
             current_occupancy = 0.0
             current_risk = 0.0
             capacity_usage = 0.0
             risk_level = "low"
+            avg_velocity = 0.0
+
+        if current_occupancy == 0.0:
+            # 🔥 SMART CITY SYNC: Check all live telemetry domains for this venue
+            try:
+                from app.core.global_state import GLOBAL_STATE
+                for check_domain in ["traffic", "parking", "people", "crowd"]:
+                    v_payload = GLOBAL_STATE.get_venue_state(check_domain, venue_id)
+                    if v_payload:
+                        # Extract count based on domain conventions
+                        if check_domain == "parking":
+                            current_occupancy = v_payload.get("occupied_spots") or v_payload.get("count", 0)
+                        else:
+                            current_occupancy = v_payload.get("count") or v_payload.get("vehicle_count") or v_payload.get("occupied_spots", 0)
+                        
+                        if current_occupancy > 0:
+                            avg_velocity = v_payload.get("avg_velocity") or v_payload.get("flow_speed", 0.0)
+                            if venue.capacity and venue.capacity > 0:
+                                capacity_usage = (current_occupancy / venue.capacity) * 100
+                                # Dynamic risk classification
+                                if capacity_usage >= (venue.critical_threshold / venue.capacity * 100): risk_level = "critical"
+                                elif capacity_usage >= (venue.warning_threshold / venue.capacity * 100): risk_level = "high"
+                                elif capacity_usage > 20: risk_level = "medium"
+                                else: risk_level = "stable"
+                            break # Found active data
+            except Exception as e:
+                logger.warning(f"Global state sync failed for venue {venue_id}: {e}")
 
         if current_occupancy == 0.0:
             try:
@@ -615,12 +648,15 @@ class VenueService:
             "active_cameras": active_cameras,
             "is_active": venue.is_active,
             "monitoring_enabled": venue.monitoring_enabled,
+            "avg_velocity": avg_velocity,
             "warning_threshold": venue.warning_threshold,
             "critical_threshold": venue.critical_threshold,
             "venue_type": venue.venue_type,
             "created_at": venue.created_at.isoformat() if venue.created_at else None,
             "city": venue.city,
             "country": venue.country,
+            "latitude": float(venue.latitude) if venue.latitude is not None else None,
+            "longitude": float(venue.longitude) if venue.longitude is not None else None,
         }
 
     # ==========================================================

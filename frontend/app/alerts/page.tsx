@@ -12,7 +12,8 @@ export default function AlertsPage() {
   const { t } = useTranslation();
 
   return (
-    <div className="min-h-screen bg-transparent text-white pb-12 relative">
+    <div className="min-h-screen bg-transparent text-white pb-12 relative overflow-hidden">
+      {/* Premium Global Neural Streams */}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -33,7 +34,7 @@ export default function AlertsPage() {
               </h1>
               <span className="px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-                LIVE
+                {t("auto.LIVE_4994") || "LIVE"}
               </span>
             </div>
             <p className="text-sm font-bold text-slate-400 tracking-widest uppercase">
@@ -47,12 +48,12 @@ export default function AlertsPage() {
             <button 
               onClick={() => setActiveTab("live")}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${activeTab === "live" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400 hover:text-white"}`}>
-              <Activity className="w-4 h-4" /> Live
+              <Activity className="w-4 h-4" /> {t("auto.Live_5047") || "Live"}
             </button>
             <button 
               onClick={() => setActiveTab("history")}
               className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${activeTab === "history" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400 hover:text-white"}`}>
-              <History className="w-4 h-4" /> History
+              <History className="w-4 h-4" /> {t("auto.History_7257") || "History"}
             </button>
           </div>
           <div className="relative">

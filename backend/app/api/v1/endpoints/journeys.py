@@ -18,24 +18,43 @@ async def _get_camera_name_map(session: AsyncSession) -> dict:
     return {str(row.id): row.name for row in result}
 
 
-@router.get("/", summary="Get active cross-camera journeys")
+@router.get("", summary="Get active cross-camera journeys")
 async def get_journeys():
     """
     Returns all in-progress journeys enriched with real camera names.
     Each journey contains a path of (camera_id, camera_name, timestamp) entries.
     """
     try:
-        async with db_manager.session() as session:
-            cam_names = await _get_camera_name_map(session)
-    except Exception:
-        cam_names = {}
+        # Ensure manager is initialized from DB before returning data
+        await journey_manager._ensure_initialized()
+        
+        try:
+            async with db_manager.session() as session:
+                cam_names = await _get_camera_name_map(session)
+        except Exception:
+            cam_names = {}
 
-    raw_journeys = journey_manager.get_active_journeys_for_api()
+        raw_journeys = journey_manager.get_active_journeys_for_api()
 
-    # Enrich paths with camera names
-    for journey in raw_journeys:
-        for step in journey.get("path", []):
-            cam_id = step.get("camera_id", "")
-            step["camera_name"] = cam_names.get(cam_id, cam_id[:8] if len(cam_id) > 8 else cam_id)
+        # Enrich paths with camera names
+        for journey in raw_journeys:
+            for step in journey.get("path", []):
+                cam_id = step.get("camera_id", "")
+                step["camera_name"] = cam_names.get(cam_id, cam_id[:8] if len(cam_id) > 8 else cam_id)
 
-    return {"journeys": raw_journeys}
+        return {"journeys": raw_journeys}
+    except Exception as e:
+        # Non-fatal — return empty list so the dashboard still loads
+        return {"journeys": [], "error": str(e)}
+
+@router.delete("/{global_id}", summary="Delete a specific journey/evidence (GDPR compliance)")
+async def delete_journey(global_id: str):
+    """Manually purges a track and its evidence from live memory."""
+    success = journey_manager.delete_journey(global_id)
+    return {"success": success, "message": f"Evidence {global_id} purged" if success else "Not found"}
+
+@router.post("/clear", summary="Clear all active journeys/evidences")
+async def clear_all_journeys():
+    """Purges all intelligence traces (Panic/Reset button)."""
+    count = journey_manager.clear_all_journeys()
+    return {"success": True, "cleared_count": count, "message": f"Cleared {count} streams"}

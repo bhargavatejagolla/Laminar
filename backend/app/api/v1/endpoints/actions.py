@@ -19,6 +19,8 @@ class ActionRuleCreate(BaseModel):
     action_type: str
     action_target: str
     action_payload_template: Optional[Dict[str, Any]] = None
+    is_dry_run: Optional[bool] = False
+    priority_level: Optional[str] = "low"
 
 
 class ActionRuleResponse(BaseModel):
@@ -29,6 +31,9 @@ class ActionRuleResponse(BaseModel):
     action_type: str
     action_target: str
     is_active: bool
+    is_dry_run: Optional[bool] = False
+    priority_level: Optional[str] = "low"
+    history_logs: Optional[List[Dict[str, Any]]] = []
 
     class Config:
         from_attributes = True
@@ -36,7 +41,7 @@ class ActionRuleResponse(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=List[ActionRuleResponse])
+@router.get("", response_model=List[ActionRuleResponse])
 async def get_rules():
     async with db_manager.session() as db:
         result = await db.execute(select(ActionRule))
@@ -44,7 +49,7 @@ async def get_rules():
     return rules
 
 
-@router.post("/", response_model=ActionRuleResponse)
+@router.post("", response_model=ActionRuleResponse)
 async def create_rule(rule_in: ActionRuleCreate):
     async with db_manager.session() as db:
         # Map string action_type to proper Enum value
@@ -64,6 +69,8 @@ async def create_rule(rule_in: ActionRuleCreate):
             action_type=action_type_enum,
             action_target=rule_in.action_target,
             action_payload_template=rule_in.action_payload_template,
+            is_dry_run=rule_in.is_dry_run,
+            priority_level=rule_in.priority_level or "low"
         )
         db.add(db_rule)
         await db.commit()

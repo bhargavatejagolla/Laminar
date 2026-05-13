@@ -23,10 +23,14 @@ import { api } from "@/services/api";
 import { getToken } from "@/services/auth";
 import { toast } from "sonner";
 import { useAlertStream } from "@/src/hooks/useAlertStream";
+import BrowserBroadcaster from "@/components/cameras/browser-uploader";
+import { useTranslation } from "react-i18next";
 
 const BACKEND_BASE = "/api/v1";
 
 export default function CameraStreamPage() {
+  const { t } = useTranslation();
+
   const { id } = useParams() as { id: string };
   const router = useRouter();
   const [streamError, setStreamError] = useState(false);
@@ -46,25 +50,27 @@ export default function CameraStreamPage() {
     },
   });
 
-  // Fetch camera health — polls every 3 seconds
+  // Fetch camera health — polls every 8 seconds (health changes slowly)
   const { data: health } = useQuery({
     queryKey: ["cameraHealth", id],
     queryFn: async () => {
       const res = await api.get(`/cameras/${id}/health`);
       return res.data;
     },
-    refetchInterval: 3000,
+    refetchInterval: 8000,
+    staleTime: 6000,
     retry: false,
   });
 
-  // Fetch real live intelligence snapshot — polls every 2 seconds
+  // Fetch real live intelligence snapshot — polls every 5 seconds (WS covers real-time)
   const { data: metrics } = useQuery({
     queryKey: ["cameraIntelligence", id],
     queryFn: async () => {
       const res = await api.get(`/intelligence/camera/${id}`);
       return res.data;
     },
-    refetchInterval: 2000,
+    refetchInterval: 5000,
+    staleTime: 4000,
   });
 
   // Fetch recorded clips
@@ -135,7 +141,7 @@ export default function CameraStreamPage() {
   const reloadStream = () => {
     setStreamError(false);
     if (imgRef.current && streamUrl) {
-      const url = new URL(streamUrl);
+      const url = new URL(streamUrl, window.location.origin);
       url.searchParams.set("_t", Date.now().toString());
       imgRef.current.src = url.toString();
     }
@@ -168,7 +174,7 @@ export default function CameraStreamPage() {
       };
       
       fetchHeatmap();
-      interval = setInterval(fetchHeatmap, 1000);
+      interval = setInterval(fetchHeatmap, 2000);  // 2s is plenty for a density overlay
     } else {
       setHeatmapUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -205,7 +211,7 @@ export default function CameraStreamPage() {
         onClick={() => router.back()}
         className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-6 text-sm font-medium"
       >
-        <ArrowLeft className="w-4 h-4" /> Back to Network
+        <ArrowLeft className="w-4 h-4" /> {t("auto.BacktoNetwork_2301") || "Back to Network"}
       </button>
 
       {/* Header */}
@@ -217,7 +223,7 @@ export default function CameraStreamPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
               {cameraLoading ? (
-                <span className="text-slate-400">Initializing Node...</span>
+                <span className="text-slate-400">{t("auto.InitializingNod_9427") || "Initializing Node..."}</span>
               ) : (
                 camera?.name ?? "Unknown Camera"
               )}
@@ -227,11 +233,11 @@ export default function CameraStreamPage() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                   </span>
-                  LIVE
+                  {t("auto.LIVE_4994") || "LIVE"}
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-700/50 border border-slate-600/30 text-[10px] font-semibold text-slate-400 tracking-widest uppercase mt-1">
-                  <WifiOff className="w-3 h-3" /> OFFLINE
+                  <WifiOff className="w-3 h-3" /> {t("auto.OFFLINE_5013") || "OFFLINE"}
                 </span>
               )}
             </h1>
@@ -262,6 +268,11 @@ export default function CameraStreamPage() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Live Stream */}
         <div className="lg:col-span-3 space-y-4">
+          
+          {camera?.stream_type === "browser" && (
+             <BrowserBroadcaster cameraId={id} />
+          )}
+
           <div
             ref={containerRef}
             className={`relative aspect-video bg-black rounded-xl border overflow-hidden group transition-all duration-500 ${
@@ -302,7 +313,7 @@ export default function CameraStreamPage() {
                     onClick={reloadStream}
                     className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 rounded-lg text-sm font-medium transition-all"
                   >
-                    <RefreshCw className="w-4 h-4" /> Retry Connection
+                    <RefreshCw className="w-4 h-4" /> {t("auto.RetryConnection_8106") || "Retry Connection"}
                   </button>
                 )}
                 {/* Grid overlay for visual interest even when offline */}
@@ -327,7 +338,7 @@ export default function CameraStreamPage() {
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
                        <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-2" />
-                       <span className="text-indigo-300 font-mono text-xs">GENERATING HEATMAP...</span>
+                       <span className="text-indigo-300 font-mono text-xs">{t("auto.GENERATINGHEATM_7136") || "GENERATING HEATMAP..."}</span>
                     </div>
                   )}
                 </div>
@@ -336,7 +347,7 @@ export default function CameraStreamPage() {
                 <div className="relative p-4 lg:mt-12 mt-16 flex justify-between items-start">
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur border border-indigo-500 text-xs font-mono shadow-[0_0_15px_rgba(99,102,241,0.3)]">
                     <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                    <span className="text-indigo-300 tracking-widest uppercase font-bold">Density Heatmap Active</span>
+                    <span className="text-indigo-300 tracking-widest uppercase font-bold">{t("auto.DensityHeatmapA_4107") || "Density Heatmap Active"}</span>
                   </div>
                   
                   {/* Dynamic Density Pill */}
@@ -445,7 +456,7 @@ export default function CameraStreamPage() {
           {clips && clips.length > 0 && (
             <div className="bg-[#0f172a]/80 border border-slate-800 rounded-xl p-5 mt-6">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Film className="w-4 h-4 text-purple-400" /> Evidence Clips
+                <Film className="w-4 h-4 text-purple-400" /> {t("auto.EvidenceClips_1397") || "Evidence Clips"}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {clips.map((clip: any) => (
@@ -461,7 +472,7 @@ export default function CameraStreamPage() {
                     <div className="p-2 border-t border-slate-800 bg-slate-900/90 flex justify-between items-center text-xs">
                       <span className="text-slate-400 font-mono truncate">{clip.filename.split('_')[2]}</span>
                       <a
-                        href={`http://localhost:8000${clip.download_url || clip.url}?token=${encodeURIComponent(token || '')}`}
+                        href={`${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '')}${clip.download_url || clip.url}?token=${encodeURIComponent(token || '')}`}
                         download
                         target="_blank"
                         rel="noreferrer"
@@ -473,7 +484,7 @@ export default function CameraStreamPage() {
                     {clip.status === "recording" && (
                       <div className="absolute top-2 right-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-rose-500/20 border border-rose-500/30 text-[9px] font-semibold text-rose-400 uppercase">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-                        Encoding...
+                        {t("auto.Encoding_7055") || "Encoding..."}
                       </div>
                     )}
                   </div>
@@ -488,7 +499,7 @@ export default function CameraStreamPage() {
           {/* Live AI Telemetry */}
           <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 rounded-xl p-5">
             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Activity className="w-4 h-4" /> Live AI Telemetry
+              <Activity className="w-4 h-4" /> {t("auto.LiveAITelemetry_3") || "Live AI Telemetry"}
             </h3>
 
             <div className="space-y-5">
@@ -496,11 +507,11 @@ export default function CameraStreamPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <span className="text-sm font-medium text-slate-300">
-                    Detected People
+                    {t("auto.DetectedPeople_1455") || "Detected People"}
                   </span>
                   <span className="font-mono text-xl font-bold text-white tracking-tight">
                     {peopleCount}{" "}
-                    <span className="text-[10px] text-slate-500">PAX</span>
+                    <span className="text-[10px] text-slate-500">{t("auto.PAX_8868") || "PAX"}</span>
                   </span>
                 </div>
                 <div className="w-full bg-slate-800 rounded-full h-1.5">
@@ -517,7 +528,7 @@ export default function CameraStreamPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <span className="text-sm font-medium text-slate-300">
-                    Risk Level
+                    {t("auto.RiskLevel_7186") || "Risk Level"}
                   </span>
                   <span
                     className={`font-mono font-semibold tracking-tight text-${riskColor}-400`}
@@ -540,7 +551,7 @@ export default function CameraStreamPage() {
               <div>
                 <div className="flex justify-between items-end mb-1">
                   <span className="text-sm font-medium text-slate-300">
-                    Frame Rate
+                    {t("auto.FrameRate_6364") || "Frame Rate"}
                   </span>
                   <span className="font-mono text-slate-200 font-semibold">
                     {frameRate} fps
@@ -562,14 +573,14 @@ export default function CameraStreamPage() {
           {/* New Live Traffic Analytics Card */}
           <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 rounded-xl p-5">
             <h3 className="text-xs font-semibold text-cyan-500 uppercase tracking-widest mb-4 flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2"><Map className="w-4 h-4" /> Live Traffic Analytics</span>
-              <span className="text-[9px] text-cyan-400 font-mono bg-cyan-400/10 px-1.5 py-0.5 rounded border border-cyan-400/20 animate-pulse">STREAM</span>
+              <span className="flex items-center gap-2"><Map className="w-4 h-4" /> {t("auto.LiveTrafficAnal_728") || "Live Traffic Analytics"}</span>
+              <span className="text-[9px] text-cyan-400 font-mono bg-cyan-400/10 px-1.5 py-0.5 rounded border border-cyan-400/20 animate-pulse">{t("auto.STREAM_8594") || "STREAM"}</span>
             </h3>
 
             {/* Live Velocity Badge */}
             {liveVelocity !== null && (
               <div className="mb-4 flex items-center justify-between bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
-                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Crowd Velocity</span>
+                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">{t("auto.CrowdVelocity_2102") || "Crowd Velocity"}</span>
                 <span className={`font-mono text-sm font-black ${
                   liveVelocity > 20 ? 'text-rose-400' : liveVelocity > 8 ? 'text-amber-400' : 'text-emerald-400'
                 }`}>
@@ -583,16 +594,16 @@ export default function CameraStreamPage() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                    Flow Gates
+                    {t("auto.FlowGates_1029") || "Flow Gates"}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-900/50 rounded-lg p-2.5 border border-emerald-500/10 shadow-[inset_0_0_10px_rgba(16,185,129,0.05)]">
-                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider uppercase">Entries</p>
+                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider uppercase">{t("auto.Entries_6249") || "Entries"}</p>
                     <p className="text-2xl font-black font-mono text-emerald-400">{entries}</p>
                   </div>
                   <div className="bg-slate-900/50 rounded-lg p-2.5 border border-rose-500/10 shadow-[inset_0_0_10px_rgba(244,63,94,0.02)]">
-                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider uppercase">Exits</p>
+                    <p className="text-[10px] text-slate-500 font-bold mb-1 tracking-wider uppercase">{t("auto.Exits_8120") || "Exits"}</p>
                     <p className="text-2xl font-black font-mono text-rose-400">{exits}</p>
                   </div>
                 </div>
@@ -602,7 +613,7 @@ export default function CameraStreamPage() {
               <div className="pt-4 border-t border-slate-800/80">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                    Live Kinetics
+                    {t("auto.LiveKinetics_4224") || "Live Kinetics"}
                   </span>
                 </div>
                 <div className="space-y-4">
@@ -626,7 +637,7 @@ export default function CameraStreamPage() {
                   </div>
                   <div>
                     <div className="flex justify-between text-[11px] mb-1.5 font-mono font-medium">
-                      <span className="text-emerald-400">Normal Moving</span>
+                      <span className="text-emerald-400">{t("auto.NormalMoving_6223") || "Normal Moving"}</span>
                       <span className="text-emerald-300">{actNormal}%</span>
                     </div>
                     <div className="w-full bg-slate-800 rounded-full h-1.5">
@@ -650,7 +661,7 @@ export default function CameraStreamPage() {
           {/* Health Summary */}
           <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-slate-800 rounded-xl p-5">
             <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Shield className="w-4 h-4" /> Health Check
+              <Shield className="w-4 h-4" /> {t("auto.HealthCheck_411") || "Health Check"}
             </h3>
             <div className="space-y-2 text-xs font-mono">
               {[
@@ -702,7 +713,7 @@ export default function CameraStreamPage() {
           {snapshot?.intelligence?.summary && (
              <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)] rounded-xl p-5">
               <h3 className="text-xs font-semibold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Activity className="w-4 h-4" /> Live AI Context
+                <Activity className="w-4 h-4" /> {t("auto.LiveAIContext_6735") || "Live AI Context"}
               </h3>
               <p className="text-sm font-mono text-slate-300 leading-relaxed mb-4">
                 {snapshot.intelligence.summary}
@@ -710,7 +721,7 @@ export default function CameraStreamPage() {
               
               {snapshot.intelligence.recommended_action && (
                 <div className="bg-indigo-950/30 border border-indigo-500/20 p-3 rounded-lg">
-                  <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider mb-1">Recommended Action</p>
+                  <p className="text-[10px] text-indigo-400 uppercase font-bold tracking-wider mb-1">{t("auto.RecommendedActi_6991") || "Recommended Action"}</p>
                   <p className="text-xs text-indigo-200">{snapshot.intelligence.recommended_action}</p>
                 </div>
               )}
@@ -722,7 +733,7 @@ export default function CameraStreamPage() {
             onClick={reloadStream}
             className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-300 rounded-lg transition-all font-semibold tracking-wide text-sm flex items-center justify-center gap-2"
           >
-            <RefreshCw className="w-4 h-4" /> Reload Stream
+            <RefreshCw className="w-4 h-4" /> {t("auto.ReloadStream_9620") || "Reload Stream"}
           </button>
           
           <button
@@ -758,7 +769,7 @@ export default function CameraStreamPage() {
               </>
             ) : (
               <>
-                <PlayCircle className="w-4 h-4" /> Record 10s Clip
+                <PlayCircle className="w-4 h-4" /> {t("auto.Record10sClip_5979") || "Record 10s Clip"}
               </>
             )}
           </button>

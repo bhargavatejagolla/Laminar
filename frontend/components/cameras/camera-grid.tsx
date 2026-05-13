@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { HeatmapOverlay } from "@/components/advanced/HeatmapOverlay";
 import EditCameraModal from "./edit-camera-modal";
 import { Edit } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   cameras: Camera[];
@@ -31,6 +32,8 @@ const itemVariants = {
 }
 
 export default function CameraGrid({ cameras, isLoading }: Props) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
 
@@ -74,9 +77,9 @@ export default function CameraGrid({ cameras, isLoading }: Props) {
          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 mb-5 shadow-[0_0_30px_rgba(255,255,255,0.05)]">
            <Video className="w-12 h-12 text-slate-500" />
          </div>
-         <h3 className="text-white text-xl font-black mb-2 tracking-widest uppercase">No Deployments Active</h3>
+         <h3 className="text-white text-xl font-black mb-2 tracking-widest uppercase">{t("auto.NoDeploymentsAc_9207") || "No Deployments Active"}</h3>
          <p className="text-slate-500 text-sm max-w-md font-mono">
-           Connect your first sensor node via RTSP or ONVIF protocol to initialize the intelligence grid.
+           {t("auto.Connectyourfirs_7873") || "Connect your first sensor node via RTSP or ONVIF protocol to initialize the intelligence grid."}
          </p>
        </div>
      );
@@ -129,11 +132,11 @@ export default function CameraGrid({ cameras, isLoading }: Props) {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
                       </span>
-                      Active
+                      {t("auto.Active_3416") || "Active"}
                    </div>
                 ) : (
                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-[10px] font-black text-rose-400 tracking-[0.2em] uppercase flex-shrink-0 shadow-[inset_0_0_10px_rgba(244,63,94,0.1)]">
-                      <WifiOff className="w-3 h-3" /> Offline
+                      <WifiOff className="w-3 h-3" /> {t("auto.Offline_6760") || "Offline"}
                    </div>
                 )}
              </div>
@@ -141,11 +144,11 @@ export default function CameraGrid({ cameras, isLoading }: Props) {
              {/* Metrics */}
              <div className="grid grid-cols-2 gap-4 mb-4 pt-4 border-t border-white/10 text-xs">
                 <div className="flex flex-col gap-1.5">
-                   <span className="text-slate-500/80 uppercase tracking-widest text-[10px] font-black">Node Type</span>
+                   <span className="text-slate-500/80 uppercase tracking-widest text-[10px] font-black">{t("auto.NodeType_2736") || "Node Type"}</span>
                    <span className="text-cyan-100 uppercase font-mono font-bold">{camera.stream_type || "UNKNOWN"}</span>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                   <span className="text-slate-500/80 uppercase tracking-widest text-[10px] font-black">Pulse Check</span>
+                   <span className="text-slate-500/80 uppercase tracking-widest text-[10px] font-black">{t("auto.PulseCheck_6350") || "Pulse Check"}</span>
                    <span className="text-slate-300 font-mono text-[11px]">
                      {camera.last_heartbeat_at 
                        ? formatDistanceToNow(new Date(camera.last_heartbeat_at), { addSuffix: true }) 
@@ -157,7 +160,7 @@ export default function CameraGrid({ cameras, isLoading }: Props) {
              {/* Action Buttons */}
              <div className="flex items-center gap-3 mt-auto">
                 <Link href={`/cameras/${camera.id}`} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-cyan-500/10 hover:border-cyan-500/30 hover:text-cyan-400 transition-all group/btn shadow-[inset_0_0_10px_rgba(255,255,255,0.02)]">
-                   <Activity className="w-4 h-4" /> View Feed <ArrowRight className="w-3.5 h-3.5 ml-1 opacity-50 group-hover/btn:opacity-100 group-hover/btn:translate-x-1 transition-all" />
+                   <Activity className="w-4 h-4" /> {t("auto.ViewFeed_6065") || "View Feed"} <ArrowRight className="w-3.5 h-3.5 ml-1 opacity-50 group-hover/btn:opacity-100 group-hover/btn:translate-x-1 transition-all" />
                 </Link>
                 <button 
                   onClick={() => toggleMutation.mutate({ id: camera.id, isActive: camera.is_active })}

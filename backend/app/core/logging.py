@@ -19,6 +19,11 @@ import logging.config
 import logging.handlers
 import sys
 import os
+try:
+    from asyncio import CancelledError
+except ImportError:
+    CancelledError = type('CancelledError', (BaseException,), {})  # Fallback
+import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional
 from uuid import uuid4, UUID
@@ -86,6 +91,29 @@ class RequestIdFilter(logging.Filter):
         if not request_id:
             request_id = str(uuid4())
         record.request_id = request_id
+        return True
+
+
+class ShutdownNoiseFilter(logging.Filter):
+    """
+    Suppresses noisy stack traces during application shutdown or reload.
+    Targets asyncio.CancelledError and KeyboardInterrupt which are standard
+    during Uvicorn reload but clutter the console.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Ignore common shutdown noise from uvicorn and asyncio
+        if record.levelno >= logging.ERROR and record.exc_info:
+            exc_type, exc_val, _ = record.exc_info
+            if exc_type in [KeyboardInterrupt, CancelledError]:
+                return False
+            
+            # Also check message content for CancelledError strings
+            msg = record.getMessage()
+            if "CancelledError" in msg or "KeyboardInterrupt" in msg:
+                if record.name.startswith(("uvicorn", "asyncio", "multiprocessing")):
+                    return False
+        
         return True
 
 
@@ -217,6 +245,9 @@ def build_logging_config() -> Dict[str, Any]:
         "filters": {
             "request_id_filter": {
                 "()": RequestIdFilter,
+            },
+            "shutdown_noise_filter": {
+                "()": ShutdownNoiseFilter,
             }
         },
         "formatters": {
@@ -228,7 +259,7 @@ def build_logging_config() -> Dict[str, Any]:
                 "class": "logging.StreamHandler",
                 "stream": sys.stdout,
                 "formatter": "verbose" if is_development else "json",
-                "filters": ["request_id_filter"],
+                "filters": ["request_id_filter", "shutdown_noise_filter"],
                 "level": settings.LOG_LEVEL,
             }
         },
@@ -244,8 +275,9 @@ def build_logging_config() -> Dict[str, Any]:
                 "propagate": False,
             },
             "uvicorn.error": {
-                "level": settings.LOG_LEVEL,
+                "level": "ERROR",
                 "handlers": ["console"],
+                "filters": ["shutdown_noise_filter"],
                 "propagate": False,
             },
             "uvicorn.access": {
@@ -348,6 +380,8 @@ def setup_logging() -> None:
     logging.getLogger("asyncio").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> StructuredLoggerAdapter:

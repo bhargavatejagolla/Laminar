@@ -195,7 +195,7 @@ class DatabaseManager:
         self._session_factories: Dict[DatabaseRole, async_sessionmaker] = {}
         self._circuit_breaker = CircuitBreaker()
         self._metrics = PoolMetrics()
-        self._slow_query_threshold_ms = 2000  # Log queries > 2000ms
+        self._slow_query_threshold_ms = 5000  # Log queries > 5000ms
         self._initialized = False
         self._lock = asyncio.Lock()
 
@@ -290,7 +290,7 @@ class DatabaseManager:
             connect_args={
                 "server_settings": {
                     "application_name": f"laminar_{role}",
-                    "statement_timeout": "30000",
+                    "statement_timeout": "20000",
                 }
             },
         )
@@ -307,7 +307,7 @@ class DatabaseManager:
                 duration_ms = (time.time() - start_time) * 1000
                 if duration_ms > self._slow_query_threshold_ms:
                     self._metrics.slow_queries += 1
-                    logger.warning(
+                    logger.debug(
                         "Slow query detected",
                         extra_fields={
                             "duration_ms": duration_ms,
@@ -376,12 +376,21 @@ class DatabaseManager:
         Raises:
             Exception: If circuit breaker is open or database unavailable
         """
+        # Wait for initialization if in progress, or trigger if not started
         if not self._initialized:
-            raise RuntimeError(
-                "Database manager not initialized. Call initialize() first.")
+            async with self._lock:
+                if not self._initialized:
+                    await self.initialize()
 
         if not self._circuit_breaker.can_execute():
-            raise Exception("Circuit breaker is open - database unavailable")
+            last_fail = self._circuit_breaker.last_failure_time.isoformat() if self._circuit_breaker.last_failure_time else "unknown"
+            msg = (
+                f"Database circuit breaker is OPEN (state: {self._circuit_breaker.state.value}). "
+                f"Last failure at: {last_fail}. Failure count: {self._circuit_breaker.failure_count}. "
+                "Rejecting requests to prevent system overload."
+            )
+            logger.error(msg)
+            raise Exception(msg)
 
         try:
             session = self._session_factories[role](**kwargs)
@@ -416,10 +425,16 @@ class DatabaseManager:
         try:
             yield session
         except Exception as e:
-            await session.rollback()
+            try:
+                await session.rollback()
+            except Exception as rollback_err:
+                logger.debug(f"Error during rollback: {rollback_err}")
             raise
         finally:
-            await session.close()
+            try:
+                await session.close()
+            except Exception as close_err:
+                logger.debug(f"Failed to smoothly close session: {close_err}")
 
     async def execute_with_retry(
         self,

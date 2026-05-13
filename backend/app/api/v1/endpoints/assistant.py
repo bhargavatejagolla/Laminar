@@ -27,6 +27,7 @@ class AssistantQueryRequest(BaseModel):
     question: str
     history: List[Dict[str, str]] = []
     use_memory: bool = True  # Whether to load/save long-term memory
+    user_language: str = "en"  # Language code from the frontend language switcher
 
 
 class AssistantQueryResponse(BaseModel):
@@ -74,7 +75,7 @@ async def query_assistant(
         history_turn_count = len(memory_history)
 
         # ── Query AI ──────────────────────────────────────────────────────
-        answer = await ai_service.query(request.question, db, combined_history)
+        answer = await ai_service.query(request.question, db, combined_history, user_language=request.user_language)
 
         # ── Save to long-term memory ──────────────────────────────────────
         if request.use_memory:

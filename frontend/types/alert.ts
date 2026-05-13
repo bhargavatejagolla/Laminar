@@ -14,4 +14,7 @@ export interface Alert {
   explanation?: string;
   predicted_level?: string;
   escalation_probability?: number;
+  snapshot_url?: string;
+  download_url?: string;
+  clip_url?: string;
 }

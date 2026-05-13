@@ -1,9 +1,13 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { toast } from "sonner";
-import { Settings, X, Building, Users, AlertTriangle, Save } from "lucide-react";
+import { Settings, X, Building, Users, AlertTriangle, Save, CloudLightning, Car, Activity, Flame } from "lucide-react";
 import { Venue } from "@/types/venue";
+import { MapPicker } from "@/components/map/MapPicker";
+import { useTranslation } from "react-i18next";
+import { useVenues } from "@/hooks/useVenues";
 
 interface Props {
   venue: Venue;
@@ -12,40 +16,62 @@ interface Props {
 }
 
 export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
+  const { t } = useTranslation();
+  const { data: venues = [] } = useVenues();
+
   const queryClient = useQueryClient();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [formData, setFormData] = useState({
     name: venue.name,
+    location: venue.location || "",
     city: venue.city || "",
     country: venue.country || "",
     capacity: venue.capacity,
     warning_threshold: venue.warning_threshold,
     critical_threshold: venue.critical_threshold,
-    venue_type: venue.venue_type || "Stadium",
-    staffing_config: venue.staffing_config || {
+    venue_type: venue.venue_type || "people",
+    staffing_config: (venue as any).staffing_config || {
       low: 5,
       medium: 10,
       high: 20,
       critical: 50
-    }
+    },
+    model_metadata: (venue as any).model_metadata || {
+      surge_rate: 5.0,
+      velocity_threshold: 15.0
+    },
+    latitude: venue.latitude || 17.3850,
+    longitude: venue.longitude || 78.4867
   });
 
   useEffect(() => {
     if (isOpen) {
       setFormData({
         name: venue.name,
+        location: venue.location || "",
         city: venue.city || "",
         country: venue.country || "",
         capacity: venue.capacity,
         warning_threshold: venue.warning_threshold,
         critical_threshold: venue.critical_threshold,
-        venue_type: venue.venue_type || "Stadium",
-        staffing_config: venue.staffing_config || {
+        venue_type: venue.venue_type || "people",
+        staffing_config: (venue as any).staffing_config || {
           low: 5,
           medium: 10,
           high: 20,
           critical: 50
-        }
+        },
+        model_metadata: (venue as any).model_metadata || {
+          surge_rate: 5.0,
+          velocity_threshold: 15.0
+        },
+        latitude: venue.latitude || 17.3850,
+        longitude: venue.longitude || 78.4867
       });
     }
   }, [isOpen, venue]);
@@ -72,10 +98,46 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
     },
   });
 
-  if (!isOpen) return null;
+  const getDomainLabels = (type: string) => {
+    switch (type) {
+      case "parking":
+        return {
+          capacity: "Total Available Slots",
+          threshold: "Slots",
+          unit: "Vehicles",
+          density: "Occupancy Rate"
+        };
+      case "traffic":
+        return {
+          capacity: "Sector Road Capacity",
+          threshold: "Vehicles",
+          unit: "Vehicles",
+          density: "Traffic Flow Rate"
+        };
+      case "incident":
+        return {
+          capacity: "Zone Monitor Capacity",
+          threshold: "Hazards",
+          unit: "Hazards",
+          density: "Event Intensity"
+        };
+      default:
+        return {
+          capacity: "Maximum Fire Capacity",
+          threshold: "Persons",
+          unit: "People",
+          density: "Crowd Surge Rate"
+        };
+    }
+  };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+  const labels = getDomainLabels(formData.venue_type);
+
+  if (!isOpen) return null;
+  if (!isMounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-[#0f172a] border border-cyan-500/30 rounded-xl w-full max-w-lg shadow-[0_0_40px_rgba(34,211,238,0.1)] overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
@@ -107,7 +169,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">City</label>
+                <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">{t("auto.City_5999") || "City"}</label>
                 <input 
                   type="text"
                   className="w-full bg-[#020617] border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
@@ -116,7 +178,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Country</label>
+                <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">{t("auto.Country_5749") || "Country"}</label>
                 <input 
                   type="text"
                   className="w-full bg-[#020617] border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
@@ -126,29 +188,71 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Venue Construct</label>
-              <select 
-                className="w-full bg-[#020617] border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors"
-                value={formData.venue_type}
-                onChange={(e) => setFormData({ ...formData, venue_type: e.target.value })}
-              >
-                <option value="Stadium">Stadium</option>
-                <option value="Mall">Shopping Mall</option>
-                <option value="Concert">Concert Hall</option>
-                <option value="Transit">Transit Hub</option>
-                <option value="Street">City Street / Plaza</option>
-                <option value="Other">Other</option>
-              </select>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Geo-Coordinate Link (Live Map)</label>
+                <div className="w-full relative rounded-xl border border-slate-700/50 overflow-hidden bg-[#020617] h-[350px]">
+                  <MapPicker 
+                    initialLat={formData.latitude} 
+                    initialLng={formData.longitude}
+                    venues={venues}
+                    onLocationSelect={(lat, lng, address, city, country) => {
+                       setFormData({
+                          ...formData, 
+                          latitude: lat, 
+                          longitude: lng,
+                          city: city || formData.city,
+                          country: country || formData.country,
+                          location: address
+                       });
+                    }} 
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono">Current Coordinates: [{formData.latitude?.toFixed(6)}, {formData.longitude?.toFixed(6)}]</p>
+                <div className="flex items-center gap-2 mt-1 px-2 py-1 rounded bg-cyan-500/5 border border-cyan-500/20 w-fit">
+                  <CloudLightning className="w-3 h-3 text-cyan-400 animate-pulse" />
+                  <span className="text-[9px] font-black uppercase tracking-tighter text-cyan-300">Geo-Telemetry & Climate Sync Active</span>
+                </div>
+                <p className="text-[9px] text-slate-600 italic leading-none mt-1">Linked to Prediction Engine for live weather & temperature ingestion.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-xs uppercase tracking-widest text-cyan-400 font-bold mb-2 block">Laminar AI Domain (Processing Engine)</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { id: "people", label: "People Intelligence", icon: Users, color: "text-blue-400", desc: "Crowd, Security & Flow" },
+                  { id: "parking", label: "Smart Parking", icon: Car, color: "text-emerald-400", desc: "Vehicles & Occupancy" },
+                  { id: "traffic", label: "Smart Traffic", icon: Activity, color: "text-amber-400", desc: "Congestion & Signals" },
+                  { id: "incident", label: "Incident Detection", icon: Flame, color: "text-rose-400", desc: "Accident & Fire Alert" },
+                ].map((domain) => (
+                  <button
+                    key={domain.id}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, venue_type: domain.id })}
+                    className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left group ${
+                      formData.venue_type === domain.id 
+                      ? "bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]" 
+                      : "bg-[#020617] border-slate-700 hover:border-slate-500"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <domain.icon className={`w-4 h-4 ${formData.venue_type === domain.id ? "text-cyan-400" : domain.color}`} />
+                      <span className={`text-xs font-bold ${formData.venue_type === domain.id ? "text-white" : "text-slate-400"}`}>{domain.label}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">{domain.desc}</p>
+                  </button>
+                ))}
+              </div>
             </div>
             
             <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
                <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
-                 <Users className="w-4 h-4" /> Capacity Logistics
+                 <Users className="w-4 h-4" /> {labels.capacity} Logistics
                </h3>
                
                <div className="space-y-2">
-                 <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Maximum Fire Capacity</label>
+                 <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">{labels.capacity}</label>
                  <input 
                    type="number"
                    min="1"
@@ -156,11 +260,12 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                    value={formData.capacity}
                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
                  />
+                 <p className="text-[10px] text-slate-500 font-mono mt-1">Total allowed {labels.unit.toLowerCase()} deployed in sector.</p>
                </div>
 
                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Warning Threshold (Persons)</label>
+                    <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Warning Threshold ({labels.threshold})</label>
                     <input 
                       type="number"
                       min="1"
@@ -173,7 +278,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Critical Threshold (Persons)</label>
+                    <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Critical Threshold ({labels.threshold})</label>
                     <input 
                       type="number"
                       min="1"
@@ -188,15 +293,16 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                </div>
             </div>
 
+            {formData.venue_type !== 'parking' && (
             <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
                <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
                  <Users className="w-4 h-4" /> Manual Staffing Requirements (Personnel Count)
                </h3>
-               <p className="text-[10px] text-slate-500 font-mono mb-2">Configure expected staffing based on live threat levels.</p>
+               <p className="text-[10px] text-slate-500 font-mono mb-2">{t("auto.Configureexpect_963") || "Configure expected staffing based on live threat levels."}</p>
 
                <div className="grid grid-cols-4 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Low</label>
+                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{t("auto.Low_8115") || "Low"}</label>
                     <input 
                       type="number" min="0"
                       className="w-full bg-[#020617] border border-slate-700 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-cyan-500 transition-colors text-sm"
@@ -208,7 +314,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Medium</label>
+                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{t("auto.Medium_6687") || "Medium"}</label>
                     <input 
                       type="number" min="0"
                       className="w-full bg-[#020617] border border-slate-700 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-cyan-500 transition-colors text-sm"
@@ -220,7 +326,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">High</label>
+                    <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">{t("auto.High_288") || "High"}</label>
                     <input 
                       type="number" min="0"
                       className="w-full bg-[#020617] border border-amber-900/40 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-amber-500 transition-colors text-sm"
@@ -232,7 +338,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold">Critical</label>
+                    <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold">{t("auto.Critical_6118") || "Critical"}</label>
                     <input 
                       type="number" min="0"
                       className="w-full bg-[#020617] border border-rose-900/40 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-rose-500 transition-colors text-sm"
@@ -245,6 +351,34 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                   </div>
                </div>
             </div>
+            )}
+
+             <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
+                <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> AI Dynamic Response Settings
+                </h3>
+                <p className="text-[10px] text-slate-500 font-mono mb-2">Override AI trigger thresholds specific to this venue layout.</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">{labels.density} ({labels.unit}/min)</label>
+                    <input type="number" step="0.5" min="0"
+                      className="w-full bg-[#020617] border border-amber-900/40 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 transition-colors text-sm"
+                      value={formData.model_metadata?.surge_rate ?? 5.0}
+                      onChange={(e) => setFormData({ ...formData, model_metadata: { ...formData.model_metadata, surge_rate: parseFloat(e.target.value) || 5.0 } })}
+                    />
+                    <p className="text-[10px] text-slate-500 font-mono">Growth above this rate/min triggers a surge alert. Default: 5.0</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold">Panic/Hazard Velocity Limit (px/sec)</label>
+                    <input type="number" step="1" min="0"
+                      className="w-full bg-[#020617] border border-rose-900/40 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors text-sm"
+                      value={formData.model_metadata?.velocity_threshold ?? 15.0}
+                      onChange={(e) => setFormData({ ...formData, model_metadata: { ...formData.model_metadata, velocity_threshold: parseFloat(e.target.value) || 15.0 } })}
+                    />
+                    <p className="text-[10px] text-slate-500 font-mono">Movement speed above this triggers an immediate threat detection.</p>
+                  </div>
+                </div>
+             </div>
 
           </div>
         </div>
@@ -255,7 +389,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent"
           >
-            Cancel
+            {t("auto.Cancel_9092") || "Cancel"}
           </button>
           <button 
             onClick={() => mutation.mutate(formData)}
@@ -272,6 +406,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

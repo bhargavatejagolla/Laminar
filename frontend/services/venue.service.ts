@@ -38,6 +38,7 @@ export interface VenueStats {
   city?: string
 
   country?: string
+  avg_velocity?: number
 }
 
 export interface CapacityStatus {

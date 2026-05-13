@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getToken } from "@/services/auth";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   alert: any;
@@ -56,11 +57,13 @@ const SEVERITY_CONFIG: Record<string, {
 };
 
 export default function AlertCard({ alert }: Props) {
+  const { t } = useTranslation();
+
   const queryClient = useQueryClient();
   const [ackLoading, setAckLoading] = useState(false);
   const [resolveLoading, setResolveLoading] = useState(false);
   const token = getToken();
-  const BACKEND = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '') || 'http://localhost:8000';
+  const BACKEND = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '');
 
   const rawSeverity = (alert.risk_level ?? alert.severity ?? "medium").toLowerCase();
   const cfg = SEVERITY_CONFIG[rawSeverity] ?? SEVERITY_CONFIG["medium"];
@@ -142,7 +145,7 @@ export default function AlertCard({ alert }: Props) {
                 </span>
                 {alert.status === "acknowledged" && (
                   <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-widest bg-slate-800/60 border border-slate-700/50 text-slate-300 flex items-center gap-1 shadow-inner">
-                    <Eye className="w-3 h-3" /> SEEN
+                    <Eye className="w-3 h-3" /> {t("auto.SEEN_6769") || "SEEN"}
                   </span>
                 )}
               </div>
@@ -161,13 +164,13 @@ export default function AlertCard({ alert }: Props) {
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between mb-3 border-b border-[#1e3a5f]/50 pb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Venue Matrix</span>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{t("auto.VenueMatrix_1706") || "Venue Matrix"}</span>
                   <span className="text-xs font-mono font-bold text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.5)] bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">{alert.venue_id?.slice(0, 8) ?? "GLOBAL_NET"}</span>
                 </div>
               
               {alert.predicted_level && alert.predicted_level !== rawSeverity && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-fuchsia-500/10 border border-fuchsia-500/30 shadow-[0_0_10px_rgba(217,70,239,0.15)]">
-                  <span className="text-[9px] font-black text-fuchsia-500 uppercase tracking-widest">Predicts</span>
+                  <span className="text-[9px] font-black text-fuchsia-500 uppercase tracking-widest">{t("auto.Predicts_2609") || "Predicts"}</span>
                   <span className="text-[10px] font-bold text-fuchsia-300 uppercase">{alert.predicted_level}</span>
                 </div>
               )}
@@ -190,7 +193,7 @@ export default function AlertCard({ alert }: Props) {
                   <div className="bg-gradient-to-r from-cyan-950/40 to-transparent pl-4 py-2 pr-2 text-[11px] text-slate-300 leading-relaxed rounded-r border-y border-r border-[#1e3a5f]/20">
                     <span className="text-cyan-400 font-bold mb-1.5 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1v-1.27c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2Z"/><path d="M9 16v-1a3 3 0 0 1 6 0v1"/></svg>
-                      Intelligence Reason
+                      {t("auto.IntelligenceRea_3909") || "Intelligence Reason"}
                     </span>
                     {alert.extra_data?.reason || alert.explanation || alert.extra_data?.explanation}
                   </div>
@@ -217,7 +220,7 @@ export default function AlertCard({ alert }: Props) {
                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_5px_rgba(16,185,129,1)]"></div>
                     </div>
                     <strong className="text-emerald-400 flex items-center gap-1.5 mb-1.5 uppercase tracking-widest text-[10px] font-black">
-                      Recommended Action
+                      {t("auto.RecommendedActi_6991") || "Recommended Action"}
                     </strong>
                     <span className="text-[11px] text-emerald-100/90 font-medium">{alert.extra_data.recommended_action}</span>
                   </div>
@@ -235,7 +238,7 @@ export default function AlertCard({ alert }: Props) {
                 <div className="p-1.5 bg-cyan-500/10 rounded">
                    <Camera className="w-3 h-3 text-cyan-400" />
                 </div>
-                <span className="text-[10px] text-slate-300 uppercase tracking-widest font-bold">Evidence Capture</span>
+                <span className="text-[10px] text-slate-300 uppercase tracking-widest font-bold">{t("auto.EvidenceCapture_5503") || "Evidence Capture"}</span>
               </div>
               
               {alert.clip_url && (
@@ -250,7 +253,7 @@ export default function AlertCard({ alert }: Props) {
                   className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500 hover:text-white transition-all shadow-[0_0_10px_rgba(99,102,241,0.2)]"
                   download={`evidence_${alert.id}.mp4`}
                 >
-                  <Download className="w-3 h-3" /> Get Intel
+                  <Download className="w-3 h-3" /> {t("auto.GetIntel_4627") || "Get Intel"}
                 </a>
               )}
             </div>
@@ -265,7 +268,7 @@ export default function AlertCard({ alert }: Props) {
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/snap:opacity-100 transition-opacity duration-300 pointer-events-none flex items-end p-2">
-                   <span className="text-[9px] text-white font-mono tracking-widest uppercase">Target Lock Visualized</span>
+                   <span className="text-[9px] text-white font-mono tracking-widest uppercase">{t("auto.TargetLockVisua_2300") || "Target Lock Visualized"}</span>
                 </div>
               </div>
             )}
@@ -282,7 +285,7 @@ export default function AlertCard({ alert }: Props) {
             >
               <div className="absolute inset-0 bg-white/5 translate-y-full group-hover:translate-y-0 transition-transform"></div>
               {ackLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Eye className="w-3.5 h-3.5" />}
-              <span className="relative z-10">Acknowledge</span>
+              <span className="relative z-10">{t("auto.Acknowledge_7155") || "Acknowledge"}</span>
             </button>
           )}
 
@@ -294,14 +297,14 @@ export default function AlertCard({ alert }: Props) {
             >
               <div className="absolute inset-0 bg-emerald-400 translate-y-full group-hover:translate-y-0 transition-transform"></div>
               {resolveLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin relative z-10" /> : <CheckCircle2 className="w-3.5 h-3.5 relative z-10" />}
-              <span className="relative z-10">Clear Event</span>
+              <span className="relative z-10">{t("auto.ClearEvent_7872") || "Clear Event"}</span>
             </button>
           )}
 
           {alert.status === "resolved" && (
             <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-lg border border-emerald-900/50 bg-emerald-950/30 text-emerald-600/80">
               <CheckCircle2 className="w-4 h-4" />
-              Condition Resolved
+              {t("auto.ConditionResolv_736") || "Condition Resolved"}
             </div>
           )}
         </div>

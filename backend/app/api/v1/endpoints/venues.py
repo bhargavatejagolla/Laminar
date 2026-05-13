@@ -41,6 +41,9 @@ from app.schemas.venue import (
 from app.schemas.camera import CameraCreate, CameraResponse
 
 from app.core.dependencies import require_role, get_current_active_user, verify_venue_access
+from app.services.prediction_service import PredictionService
+
+prediction_service = PredictionService()
 from app.models.user import UserRole
 from app.models.crowd_metric import CrowdMetric
 from app.services.geocoding_service import GeocodingService
@@ -117,6 +120,7 @@ async def create_venue(
             lat, lon = await geo_service.get_coordinates(
                 city=request.city,
                 country=request.country,
+                venue_name=request.name or "",
             )
 
             # Update request with geocoded coordinates
@@ -152,8 +156,12 @@ async def create_venue(
             city=request.city,
             country=request.country,
             latitude=request.latitude,
+            longitude=request.longitude,
             warning_threshold=request.warning_threshold,
             critical_threshold=request.critical_threshold,
+            venue_type=request.venue_type,
+            staffing_config=request.staffing_config,
+            model_metadata=request.model_metadata,
             tenant_id=tenant_id,
             created_by=user_id,
         )
@@ -172,7 +180,7 @@ async def create_venue(
 
 @router.get(
     "",
-    response_model=List[VenueResponse],
+    response_model=List[VenueStatsResponse],
 )
 async def list_venues(
     is_active: Optional[bool] = None,
@@ -201,10 +209,19 @@ async def list_venues(
         skip=skip,
         limit=limit,
     )
-    if not user.is_super_admin:
-        allowed_ids = {str(v.id) for v in user.venues}
-        venues = [v for v in venues if str(v.id) in allowed_ids]
-    return venues
+    # 🔥 SMART CITY SYNC: Enrich venues with live stats for map visualization
+    result = []
+    for v in venues:
+        try:
+            stats = await venue_service.get_venue_stats(db, v.id, tenant_id=tenant_id)
+            result.append(stats)
+        except Exception as e:
+            logger.warning(f"Failed to fetch stats for venue {v.id}: {e}")
+            # Fallback to basic venue info if stats fail
+            from app.schemas.venue import VenueStatsResponse
+            result.append(VenueStatsResponse.from_orm(v))
+            
+    return result
 
 
 # ==========================================================
@@ -351,14 +368,21 @@ async def update_venue(
             city=request.city,
             country=request.country,
             latitude=request.latitude,
+            longitude=request.longitude,
             warning_threshold=request.warning_threshold,
             critical_threshold=request.critical_threshold,
             is_active=request.is_active,
             monitoring_enabled=request.monitoring_enabled,
+            venue_type=request.venue_type,
+            staffing_config=request.staffing_config,
+            model_metadata=request.model_metadata,
             tenant_id=tenant_id,
             updated_by=user_id,
             expected_version=request.expected_version,
         )
+        # Invalidate the prediction cache so the fresh lat/lng is picked up immediately
+        prediction_service._prediction_cache.pop(str(venue_id), None)
+        prediction_service._last_compute_time.pop(str(venue_id), None)
         return venue
 
     except ValueError as e:

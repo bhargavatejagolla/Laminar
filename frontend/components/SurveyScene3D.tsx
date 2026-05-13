@@ -4,6 +4,7 @@ import React, { useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Html, Grid, Environment } from "@react-three/drei";
 import * as THREE from "three";
+import { useTranslation } from "react-i18next";
 
 // Simulated fixed positions for cameras since we don't have real GPS coords in db
 const CAMERA_POSITIONS = [
@@ -29,7 +30,8 @@ function CameraNode({
   position: [number, number, number],
   index: number
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const { t } = useTranslation();
+const meshRef = useRef<THREE.Mesh>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   
   const isTargeted = current > 0;
@@ -82,11 +84,11 @@ function CameraNode({
             </div>
             <div className="flex gap-4 w-full justify-between items-end mt-2">
                <div className="flex flex-col items-center">
-                 <span className="text-[8px] text-cyan-500 uppercase font-black">LIVE</span>
+                 <span className="text-[8px] text-cyan-500 uppercase font-black">{t("auto.LIVE_4994") || "LIVE"}</span>
                  <span className="text-xl font-black text-white">{current}</span>
                </div>
                <div className="flex flex-col items-center">
-                 <span className="text-[8px] text-slate-500 uppercase font-black">PEAK</span>
+                 <span className="text-[8px] text-slate-500 uppercase font-black">{t("auto.PEAK_1780") || "PEAK"}</span>
                  <span className="text-sm font-bold text-slate-400">{peak}</span>
                </div>
             </div>
@@ -103,6 +105,7 @@ function CameraNode({
 }
 
 export function SurveyScene3D({ activeCameras = [], cameraMemory = {} }: { activeCameras: any[], cameraMemory: Record<string, number> }) {
+  const { t } = useTranslation();
   // Memoize positions to avoid jumping around on re-renders, mapped by camera ID
   const positionsMap = useMemo(() => {
     const map: Record<string, [number, number, number]> = {};
@@ -173,7 +176,7 @@ export function SurveyScene3D({ activeCameras = [], cameraMemory = {} }: { activ
       {activeCameras.length === 0 && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="bg-black/60 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 text-center">
-            <p className="text-cyan-500 font-black tracking-[0.2em] uppercase text-sm mb-1">Awaiting Telemetry</p>
+            <p className="text-cyan-500 font-black tracking-[0.2em] uppercase text-sm mb-1">{t("auto.AwaitingTelemet_9207") || "Awaiting Telemetry"}</p>
             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">3D Command Center Offline</p>
           </div>
         </div>

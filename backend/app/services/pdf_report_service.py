@@ -1,17 +1,14 @@
 """
-Laminar - PDF Report Service
------------------------------
+Laminar - Premium PDF Report Service
+---------------------------------------
 Generates professional AI-powered PDF intelligence reports using reportlab.
+Features a clean, premium Light Mode SaaS aesthetic (white background, sleek borders).
 
 Report Contents:
   1. Executive summary header (venue, date range, branding)
-  2. Crowd trend time-series chart (rendered as embedded image)
+  2. Crowd trend KPI stats and AI logic
   3. Alert summary table (risk level, time, severity, status)
-  4. AI-generated intelligence narrative (from existing LLM pipeline)
-  5. SLA compliance summary
-  6. Prediction & forecast section
-
-Zero regression: wraps existing report_service.py data — only adds PDF rendering.
+  4. Camera Feed Connectivity Status (Detailed telemetry from feeds)
 """
 
 import io
@@ -27,29 +24,32 @@ from app.models.crowd_metric import CrowdMetric
 from app.models.crowd_alert import CrowdAlert
 from app.models.venue import Venue
 from app.models.camera import Camera
+from app.models.journey import Journey
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-# ─── Color palette (Laminar brand: dark navy + electric blue + alert reds) ────
+# ─── Premium Light Mode Palette ────
 COLORS = {
-    "primary": (0.05, 0.08, 0.16),           # #0D1429
-    "accent": (0.24, 0.58, 1.0),             # #3D94FF
-    "success": (0.18, 0.84, 0.53),           # #2DD988
-    "warning": (1.0, 0.72, 0.0),             # #FFB800
-    "danger": (1.0, 0.22, 0.22),             # #FF3838
-    "light_bg": (0.95, 0.97, 1.0),           # #F3F7FF
-    "white": (1.0, 1.0, 1.0),
-    "gray": (0.5, 0.5, 0.5),
-    "dark_text": (0.1, 0.1, 0.15),
+    "bg": (1.0, 1.0, 1.0),                 # #FFFFFF Background
+    "card": (0.97, 0.98, 0.99),            # #F8FAFC Card BG
+    "brand_blue": (0.01, 0.40, 0.84),      # #0369A1 (Primary Laminar Blue)
+    "blue_dim": (0.88, 0.93, 0.97),        # #E0F2FE (Light Blue BG)
+    "rose": (0.88, 0.15, 0.15),            # #E11D48 (Critical Red)
+    "rose_dim": (1.0, 0.92, 0.93),         # #FFE4E6 (Light Red BG)
+    "amber": (0.85, 0.45, 0.0),            # #D97706 (Warning Orange)
+    "emerald": (0.04, 0.65, 0.35),         # #059669 (Success Green)
+    "text_main": (0.06, 0.09, 0.16),       # #0F172A (Primary Text - Black/Slate)
+    "text_sub": (0.39, 0.45, 0.55),        # #64748B (Secondary Text - Gray)
+    "border": (0.89, 0.91, 0.94),          # #E2E8F0 (Borders/Lines)
 }
 
 RISK_COLORS = {
-    "low": COLORS["success"],
-    "medium": COLORS["warning"],
-    "high": (1.0, 0.5, 0.0),
-    "critical": COLORS["danger"],
-    "unknown": COLORS["gray"],
+    "low": COLORS["emerald"],
+    "medium": COLORS["amber"],
+    "high": (0.85, 0.35, 0.10),
+    "critical": COLORS["rose"],
+    "unknown": COLORS["text_sub"],
 }
 
 
@@ -65,16 +65,14 @@ class PDFReportService:
         days: int = 7,
     ) -> bytes:
         """
-        Generate a full venue intelligence PDF report.
-
-        Returns: PDF bytes (suitable for streaming as application/pdf)
+        Generate a full venue intelligence PDF report in clean Light Mode format.
         """
         try:
             from reportlab.lib.pagesizes import A4
             from reportlab.lib.units import cm, mm
             from reportlab.platypus import (
                 SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-                HRFlowable, KeepTogether
+                HRFlowable
             )
             from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
             from reportlab.lib import colors as rl_colors
@@ -85,6 +83,7 @@ class PDFReportService:
 
         # ── Fetch data ────────────────────────────────────────────────────────
         venue_data = await self._fetch_venue_data(session, venue_id, days)
+        journey_data = await self._fetch_journey_data(session, days)
         if not venue_data:
             raise ValueError(f"Venue {venue_id} not found")
 
@@ -99,120 +98,122 @@ class PDFReportService:
             author="Laminar AI Platform",
         )
 
+        def draw_bg(canvas, doc):
+            canvas.saveState()
+            canvas.setFillColorRGB(*COLORS["bg"])
+            canvas.rect(0, 0, A4[0], A4[1], fill=True, stroke=False)
+            canvas.restoreState()
+
         styles = getSampleStyleSheet()
         story = []
 
         # ── Define custom styles ──────────────────────────────────────────────
         title_style = ParagraphStyle(
-            "LaminarTitle",
+            "MainTitle",
             parent=styles["Title"],
             fontSize=22,
-            textColor=rl_colors.HexColor("#0D1429"),
+            textColor=rl_colors.Color(*COLORS["text_main"]),
             spaceAfter=4,
             fontName="Helvetica-Bold",
         )
         subtitle_style = ParagraphStyle(
-            "LaminarSubtitle",
+            "SubTitle",
             parent=styles["Normal"],
-            fontSize=11,
-            textColor=rl_colors.HexColor("#3D94FF"),
+            fontSize=10,
+            textColor=rl_colors.Color(*COLORS["text_sub"]),
             spaceAfter=2,
+            fontName="Courier-Bold",
+            textTransform="uppercase",
         )
         section_style = ParagraphStyle(
-            "LaminarSection",
+            "SectionHeader",
             parent=styles["Heading2"],
             fontSize=14,
-            textColor=rl_colors.HexColor("#0D1429"),
+            textColor=rl_colors.Color(*COLORS["brand_blue"]),
             spaceBefore=16,
             spaceAfter=8,
             fontName="Helvetica-Bold",
             borderPad=4,
         )
         body_style = ParagraphStyle(
-            "LaminarBody",
+            "BodyText",
             parent=styles["Normal"],
             fontSize=10,
-            textColor=rl_colors.HexColor("#1A1A24"),
+            textColor=rl_colors.Color(*COLORS["text_main"]),
             spaceAfter=4,
             leading=14,
         )
+        highlight_style = ParagraphStyle(
+            "HighlightBox",
+            parent=styles["Normal"],
+            fontSize=10,
+            textColor=rl_colors.Color(*COLORS["text_main"]),
+            spaceAfter=4,
+            leading=14,
+            backColor=rl_colors.Color(*COLORS["card"]),
+            borderPadding=10,
+            borderColor=rl_colors.Color(*COLORS["border"]),
+            borderWidth=1,
+            borderRadius=4,
+        )
         small_style = ParagraphStyle(
-            "LaminarSmall",
+            "SmallFooter",
             parent=styles["Normal"],
             fontSize=8,
-            textColor=rl_colors.gray,
+            textColor=rl_colors.Color(*COLORS["text_sub"]),
+            fontName="Courier",
+            alignment=TA_CENTER
         )
 
         # ── Header ────────────────────────────────────────────────────────────
-        story.append(Paragraph("⬛ LAMINAR AI", subtitle_style))
-        story.append(Paragraph("Crowd Intelligence Report", title_style))
-        story.append(HRFlowable(width="100%", thickness=2, color=rl_colors.HexColor("#3D94FF")))
+        story.append(Paragraph("LAMINAR AI // TARGET V2.4", subtitle_style))
+        story.append(Paragraph("CROWD INTELLIGENCE REPORT", title_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["border"])))
         story.append(Spacer(1, 8))
 
         # Meta table
-        now_str = datetime.now(timezone.utc).strftime("%B %d, %Y %H:%M UTC")
-        since_str = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%B %d, %Y")
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        since_str = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
         meta_data = [
-            ["Venue", venue_data["venue_name"]],
-            ["Report Period", f"{since_str} — {now_str}"],
-            ["Generated", now_str],
-            ["Capacity", str(venue_data.get("capacity", "N/A"))],
+            ["MATRIX TARGET", venue_data["venue_name"].upper()],
+            ["TEMPORAL WINDOW", f"{since_str} to {now_str}"],
+            ["GENERATED TIMESTAMP", now_str],
+            ["MAX CAPACITY", str(venue_data.get("capacity", "N/A"))],
         ]
-        meta_table = Table(meta_data, colWidths=[4*cm, 13*cm])
+        meta_table = Table(meta_data, colWidths=[5*cm, 12*cm])
         meta_table.setStyle(TableStyle([
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 10),
-            ("TEXTCOLOR", (0, 0), (0, -1), rl_colors.HexColor("#3D94FF")),
-            ("TEXTCOLOR", (1, 0), (1, -1), rl_colors.HexColor("#1A1A24")),
+            ("FONTNAME", (0, 0), (0, -1), "Courier-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("TEXTCOLOR", (0, 0), (0, -1), rl_colors.Color(*COLORS["text_sub"])),
+            ("TEXTCOLOR", (1, 0), (1, -1), rl_colors.Color(*COLORS["text_main"])),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ]))
         story.append(meta_table)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 16))
 
-        # 🚨 PROACTIVE HEALTH ALERT: Show offline cameras at the very top
+        # 🚨 PROACTIVE HEALTH ALERT
         health_data = venue_data.get("health", {})
         offline_cams = health_data.get("offline_list", [])
         if offline_cams:
-            story.append(Paragraph("⚠️ Operational Health Alert: Partial Coverage", section_style))
-            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#FF3838")))
+            story.append(Paragraph("SYSTEM ALERT: SENSOR OUTAGE", section_style))
+            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["rose"])))
             story.append(Spacer(1, 4))
             
             cams_str = ", ".join(offline_cams)
             health_msg = (
-                f"<font color='#FF3838'><b>CRITICAL:</b></font> The following sensors are currently <b>OFFLINE</b>: {cams_str}. "
-                f"Data for these zones is currently unavailable. Autonomous monitoring for these areas is suspended until connectivity is restored."
+                f"<font color='#E11D48'><b>CRITICAL:</b></font> The following spatial sensors are <b>OFFLINE</b>: {cams_str}. "
+                f"Data for associated sectors is unverified. Neural synthesis suspended for affected zones until uplink is restored."
             )
-            story.append(Paragraph(health_msg, body_style))
+            story.append(Paragraph(health_msg, highlight_style))
             story.append(Spacer(1, 16))
 
-        # ── Executive Summary ────────────────────────────────────────────────
-        story.append(Paragraph("Executive Summary", section_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
-        story.append(Spacer(1, 6))
-
-        metrics = venue_data.get("metrics", {})
-        summary_text = (
-            f"During the {days}-day period analyzed, <b>{venue_data['venue_name']}</b> recorded "
-            f"<b>{metrics.get('total_readings', 0)} crowd readings</b> with a peak attendance of "
-            f"<b>{metrics.get('peak_crowd', 0):.0f} people</b> "
-            f"(avg: {metrics.get('avg_crowd', 0):.0f}). "
-            f"A total of <b>{metrics.get('total_alerts', 0)} alerts</b> were triggered, "
-            f"with the highest risk level reaching "
-            f"<b>{metrics.get('max_risk_level', 'N/A').upper()}</b>. "
-        )
-        if metrics.get("avg_risk_score"):
-            summary_text += (
-                f"The average risk score was <b>{metrics['avg_risk_score']:.1f}</b>/100. "
-            )
-        story.append(Paragraph(summary_text, body_style))
-        story.append(Spacer(1, 8))
-
         # ── KPI Cards row ────────────────────────────────────────────────────
+        metrics = venue_data.get("metrics", {})
         kpi_data = [
-            ["📊 Peak Crowd", "🚨 Total Alerts", "⚡ Avg Risk", "📈 Risk Events"],
+            ["PEAK CROWD", "TOTAL ALERTS", "AVG RISK", "RISK EVENTS"],
             [
-                f"{metrics.get('peak_crowd', 0):.0f} people",
+                f"{metrics.get('peak_crowd', 0):.0f}",
                 str(metrics.get("total_alerts", 0)),
                 f"{metrics.get('avg_risk_score', 0):.1f}/100",
                 str(metrics.get("high_risk_events", 0)),
@@ -220,31 +221,89 @@ class PDFReportService:
         ]
         kpi_table = Table(kpi_data, colWidths=[4.25*cm]*4)
         kpi_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor("#0D1429")),
-            ("BACKGROUND", (0, 1), (-1, 1), rl_colors.HexColor("#F3F7FF")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
-            ("TEXTCOLOR", (0, 1), (-1, 1), rl_colors.HexColor("#0D1429")),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica"),
+            ("BACKGROUND", (0, 0), (-1, 0), rl_colors.Color(*COLORS["blue_dim"])),
+            ("BACKGROUND", (0, 1), (-1, -1), rl_colors.Color(*COLORS["card"])),
+            ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.Color(*COLORS["brand_blue"])),
+            ("TEXTCOLOR", (0, 1), (-1, 1), rl_colors.Color(*COLORS["text_main"])),
+            ("FONTNAME", (0, 0), (-1, 0), "Courier-Bold"),
             ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 9),
-            ("FONTSIZE", (0, 1), (-1, 1), 14),
+            ("FONTSIZE", (0, 0), (-1, 0), 8),
+            ("FONTSIZE", (0, 1), (-1, 1), 16),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ("GRID", (0, 0), (-1, -1), 0.5, rl_colors.HexColor("#D0DCF0")),
-            ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+            ("TOPPADDING", (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("GRID", (0, 0), (-1, -1), 0.5, rl_colors.Color(*COLORS["border"])),
         ]))
         story.append(kpi_table)
         story.append(Spacer(1, 16))
 
+        # ── Executive Summary ────────────────────────────────────────────────
+        story.append(Paragraph("EXECUTIVE AI SUMMARY", section_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["border"])))
+        story.append(Spacer(1, 6))
+
+        summary_text = (
+            f"The visual telemetry array successfully ingested temporal spatial data for <b>{venue_data['venue_name']}</b> "
+            f"over a {days}-day cycle. The peak detected crowd reached <b>{metrics.get('peak_crowd', 0):.0f} individuals</b>, "
+            f"correlating with an average environmental risk score of <b>{metrics.get('avg_risk_score', 0):.1f}/100</b>. "
+            f"Analysis indicates <b>{metrics.get('total_alerts', 0)} distinct security alerts</b> were raised by the automated vision processor. "
+            f"All telemetry was dynamically aggregated from connected operational camera feed vectors."
+        )
+        story.append(Paragraph(summary_text, body_style))
+        story.append(Spacer(1, 12))
+
+        # ── Camera Feeds Database (NEW INFORMATIVE SECTION) ───────────────────
+        story.append(Paragraph("CONNECTIVITY & CAMERA FEED HEALTH", section_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["border"])))
+        story.append(Spacer(1, 6))
+
+        cams = venue_data.get("cameras_data", [])
+        if cams:
+            cam_rows = [["FEED NAME", "MAC/IP ADDRESS", "ZONE ASSIGNMENT", "STATUS"]]
+            for c in cams:
+                status_txt = "ONLINE" if c.get("is_online") else "OFFLINE"
+                cam_rows.append([
+                    c.get("name") or "Unknown Feed",
+                    str(c.get("id", ""))[:12],
+                    c.get("zone") or "General",
+                    status_txt,
+                ])
+            
+            cam_table = Table(cam_rows, colWidths=[4*cm, 4*cm, 4*cm, 3*cm])
+            cam_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.Color(*COLORS["blue_dim"])),
+                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.Color(*COLORS["brand_blue"])),
+                ("FONTNAME", (0, 0), (-1, 0), "Courier-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("GRID", (0, 0), (-1, -1), 0.3, rl_colors.Color(*COLORS["border"])),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("TEXTCOLOR", (0, 1), (-1, -1), rl_colors.Color(*COLORS["text_main"])),
+            ]
+            for i, c in enumerate(cams, start=1):
+                if not c.get("is_online"):
+                    cam_style.append(("TEXTCOLOR", (3, i), (3, i), rl_colors.Color(*COLORS["rose"])))
+                    cam_style.append(("FONTNAME", (3, i), (3, i), "Helvetica-Bold"))
+                else:
+                    cam_style.append(("TEXTCOLOR", (3, i), (3, i), rl_colors.Color(*COLORS["emerald"])))
+            cam_table.setStyle(TableStyle(cam_style))
+            story.append(cam_table)
+        else:
+            story.append(Paragraph("No connected camera feeds found in database. Telemetry generation relies on legacy datasets or simulation protocols.", body_style))
+        story.append(Spacer(1, 16))
+
+
         # ── Alert Table ───────────────────────────────────────────────────────
         if venue_data.get("recent_alerts"):
-            story.append(Paragraph("Recent Alerts", section_style))
-            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
+            story.append(Paragraph("RECENT ALERT MATRIX", section_style))
+            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["border"])))
             story.append(Spacer(1, 6))
 
-            alert_rows = [["Time (UTC)", "Risk Level", "Severity", "Status", "Action"]]
+            alert_rows = [["TIME (UTC)", "RISK LEVEL", "SEVERITY", "STATUS", "AI ACTION"]]
             for a in venue_data["recent_alerts"][:15]:
                 risk_col = a.get("risk_level", "N/A").upper()
                 row = [
@@ -252,145 +311,124 @@ class PDFReportService:
                     risk_col,
                     str(a.get("severity", "N/A")),
                     a.get("status", "").title(),
-                    (a.get("action", "") or "")[:60],
+                    (a.get("action", "") or "")[:40],
                 ]
                 alert_rows.append(row)
 
-            alert_table = Table(alert_rows, colWidths=[3*cm, 2.5*cm, 2*cm, 2.5*cm, 7*cm])
+            alert_table = Table(alert_rows, colWidths=[2.5*cm, 2.5*cm, 2.3*cm, 2.7*cm, 7*cm])
             alert_style = [
-                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor("#0D1429")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.Color(*COLORS["card"])),
+                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.Color(*COLORS["text_sub"])),
+                ("FONTNAME", (0, 0), (-1, 0), "Courier-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("ALIGN", (0, 0), (-1, -1), "LEFT"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("GRID", (0, 0), (-1, -1), 0.3, rl_colors.HexColor("#D0DCF0")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor("#F8FAFF")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("GRID", (0, 0), (-1, -1), 0.3, rl_colors.Color(*COLORS["border"])),
+                ("TEXTCOLOR", (0, 1), (0, -1), rl_colors.Color(*COLORS["text_main"])),
+                ("TEXTCOLOR", (2, 1), (-1, -1), rl_colors.Color(*COLORS["text_main"])),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
             ]
             # Color-code risk level column
             for i, a in enumerate(venue_data["recent_alerts"][:15], start=1):
                 lvl = a.get("risk_level", "unknown").lower()
-                r, g, b = RISK_COLORS.get(lvl, COLORS["gray"])
-                alert_style.append(
-                    ("TEXTCOLOR", (1, i), (1, i), rl_colors.Color(r, g, b))
-                )
-                alert_style.append(
-                    ("FONTNAME", (1, i), (1, i), "Helvetica-Bold")
-                )
+                r, g, b = RISK_COLORS.get(lvl, COLORS["text_sub"])
+                bg_color = rl_colors.Color(*COLORS["rose_dim"]) if lvl == "critical" else rl_colors.Color(*COLORS["bg"])
+                alert_style.append(("BACKGROUND", (0, i), (-1, i), bg_color))
+                alert_style.append(("TEXTCOLOR", (1, i), (1, i), rl_colors.Color(r, g, b)))
+                alert_style.append(("FONTNAME", (1, i), (1, i), "Helvetica-Bold"))
+                
             alert_table.setStyle(TableStyle(alert_style))
             story.append(alert_table)
             story.append(Spacer(1, 16))
 
-        # ── Risk Distribution ────────────────────────────────────────────────
-        if venue_data.get("risk_distribution"):
-            story.append(Paragraph("Risk Level Distribution", section_style))
-            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
-            story.append(Spacer(1, 6))
+        # ── Cross-Camera Journey Insights ────────────────────────────────────
+        if journey_data and journey_data.get("top_journeys"):
+            story.append(Paragraph("CROSS-CAMERA TRAVERSAL INTELLIGENCE", section_style))
+            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["border"])))
+            story.append(Spacer(1, 8))
 
-            dist = venue_data["risk_distribution"]
-            total = sum(dist.values()) or 1
-            dist_rows = [["Risk Level", "Count", "Percentage"]]
-            for level in ["low", "medium", "high", "critical"]:
-                count = dist.get(level, 0)
-                pct = count / total * 100
-                dist_rows.append([level.upper(), str(count), f"{pct:.1f}%"])
+            journey_msg = (
+                f"Laminar AI successfully correlated <b>{journey_data['total_unique']} unique subjects</b> across the "
+                f"camera matrix. Detected <b>{journey_data['multicam_count']} cross-camera traversals</b>. "
+                "Significant movement patterns are tracked for security perimeter analysis."
+            )
+            story.append(Paragraph(journey_msg, body_style))
+            story.append(Spacer(1, 8))
 
-            dist_table = Table(dist_rows, colWidths=[5*cm, 5*cm, 7*cm])
-            dist_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor("#0D1429")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 10),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                ("GRID", (0, 0), (-1, -1), 0.3, rl_colors.HexColor("#D0DCF0")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor("#F8FAFF")]),
-            ]))
-            story.append(dist_table)
+            # Journey Table
+            j_rows = [["SUBJECT ID", "PATH TAKEN", "CAMERAS", "LAST SEEN"]]
+            for j in journey_data["top_journeys"][:8]:
+                path_str = " → ".join([p.get("camera_name", "???") for p in j.get("path", [])[:3]])
+                if len(j.get("path", [])) > 3: path_str += " ..."
+                
+                j_rows.append([
+                    f"#{j['global_id'][:8]}",
+                    path_str,
+                    str(len(set(p.get("camera_id") for p in j.get("path", [])))),
+                    j.get("last_seen_str", "")
+                ])
+            
+            j_table = Table(j_rows, colWidths=[3*cm, 8.5*cm, 2.5*cm, 3*cm])
+            j_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.Color(*COLORS["blue_dim"])),
+                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.Color(*COLORS["brand_blue"])),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTNAME", (0, 0), (-1, 0), "Courier-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.3, rl_colors.Color(*COLORS["border"])),
+                ("ALIGN", (0, 1), (0, -1), "CENTER"),
+            ]
+            j_table.setStyle(TableStyle(j_style))
+            story.append(j_table)
             story.append(Spacer(1, 16))
 
-        # ── Zone Hotspot Analysis ──────────────────────────────────────────
-        if venue_data.get("hotspots"):
-            story.append(Paragraph("Zone Hotspot Analysis", section_style))
-            story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
-            story.append(Spacer(1, 6))
-
-            hotspot_rows = [["Zone / Sensor ID", "Peak Count", "Avg Count", "Risk Intensity"]]
-            for h in venue_data["hotspots"]:
-                hotspot_rows.append([
-                    h["camera_id"][:12],
-                    f"{h['peak_count']:.0f}",
-                    f"{h['avg_count']:.1f}",
-                    f"{h['avg_risk']:.1f}%",
-                ])
-
-            hotspot_table = Table(hotspot_rows, colWidths=[6*cm, 3.5*cm, 3.5*cm, 4*cm])
-            hotspot_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor("#3D94FF")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("GRID", (0, 0), (-1, -1), 0.3, rl_colors.HexColor("#D0DCF0")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor("#F8FAFF")]),
-            ]))
-            story.append(hotspot_table)
-            story.append(Spacer(1, 12))
-
         # ── AI Intelligence Summary ───────────────────────────────────────────
-        story.append(Paragraph("AI Intelligence Summary & Strategic Forecast", section_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#E0E8F0")))
+        story.append(Paragraph("STRATEGIC FORECAST & ACTIONS", section_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["brand_blue"])))
         story.append(Spacer(1, 6))
 
         ai_summary = self._generate_ai_narrative(venue_data)
-        story.append(Paragraph(ai_summary, body_style))
-        story.append(Spacer(1, 12))
+        story.append(Paragraph(ai_summary, highlight_style))
+        story.append(Spacer(1, 24))
 
         # ── Footer ────────────────────────────────────────────────────────────
-        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.HexColor("#D0DCF0")))
+        story.append(HRFlowable(width="100%", thickness=1, color=rl_colors.Color(*COLORS["border"])))
         story.append(Spacer(1, 4))
         footer_text = (
-            f"Generated by <b>Laminar AI Platform</b> — {now_str} | "
-            f"Confidential — For authorized personnel only"
+            f"GENERATED BY LAMINAR AI PLATFORM V2.4 — {now_str} | "
+            f"CONFIDENTIAL — AUTHORIZED EYES ONLY"
         )
         story.append(Paragraph(footer_text, small_style))
 
         # ── Build PDF ─────────────────────────────────────────────────────────
-        doc.build(story)
+        doc.build(story, onFirstPage=draw_bg, onLaterPages=draw_bg)
         pdf_bytes = buffer.getvalue()
         buffer.close()
 
-        logger.info(
-            f"PDFReportService: Generated {len(pdf_bytes)/1024:.1f}KB PDF "
-            f"for venue {venue_id}"
-        )
+        logger.info(f"Premium Clean PDF generated ({len(pdf_bytes)/1024:.1f}KB) for {venue_id}")
         return pdf_bytes
 
     # ── Data Fetching ─────────────────────────────────────────────────────────
-
     async def _fetch_venue_data(
         self,
         session: AsyncSession,
         venue_id: UUID,
         days: int,
     ) -> Optional[Dict[str, Any]]:
-        """Fetch all data needed for the PDF report."""
+        """Fetch all dynamic data directly from operational databases."""
         from app.services.report_service import ReportService
         mgr_report = await ReportService().management_report(session, venue_id)
         
         since = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # Venue
         venue_stmt = select(Venue).where(Venue.id == venue_id)
         venue_result = await session.execute(venue_stmt)
         venue = venue_result.scalar_one_or_none()
         if not venue:
             return None
 
-        # Metrics
         metric_stmt = (
             select(CrowdMetric)
             .where(CrowdMetric.venue_id == venue_id)
@@ -401,7 +439,6 @@ class PDFReportService:
         metric_result = await session.execute(metric_stmt)
         metrics = metric_result.scalars().all()
 
-        # Alerts
         alert_stmt = (
             select(CrowdAlert)
             .where(CrowdAlert.venue_id == venue_id)
@@ -412,15 +449,13 @@ class PDFReportService:
         alert_result = await session.execute(alert_stmt)
         alerts = alert_result.scalars().all()
 
-        # Camera Health
         cam_stmt = select(Camera).where(Camera.venue_id == venue_id)
-        cam_result = await session.execute(cam_stmt)
-        cameras = cam_result.scalars().all()
+        cameras = (await session.execute(cam_stmt)).scalars().all()
         
         offline_cameras = [c.name for c in cameras if not c.is_online]
         degraded_cameras = [c.name for c in cameras if c.health_status == "degraded"]
+        cams_data = [{"id": c.id, "name": c.name, "is_online": c.is_online, "zone": c.zone_name} for c in cameras]
 
-        # Compute aggregates
         counts = [float(m.avg_count or 0) for m in metrics]
         risk_scores = [float(m.dynamic_risk_score or 0) for m in metrics]
         risk_distribution: Dict[str, int] = {}
@@ -428,9 +463,7 @@ class PDFReportService:
             lvl = m.risk_level or "unknown"
             risk_distribution[lvl] = risk_distribution.get(lvl, 0) + 1
 
-        high_risk_events = sum(
-            1 for m in metrics if m.risk_level in ("high", "critical")
-        )
+        high_risk_events = sum(1 for m in metrics if m.risk_level in ("high", "critical"))
         max_risk_lvl = "low"
         for lvl in ["critical", "high", "medium", "low"]:
             if risk_distribution.get(lvl, 0) > 0:
@@ -447,6 +480,7 @@ class PDFReportService:
                 "offline_list": offline_cameras,
                 "degraded_list": degraded_cameras,
             },
+            "cameras_data": cams_data,
             "metrics": {
                 "total_readings": len(metrics),
                 "peak_crowd": max(counts) if counts else 0,
@@ -459,61 +493,71 @@ class PDFReportService:
             "risk_distribution": risk_distribution,
             "recent_alerts": [
                 {
-                    "created_at_str": a.created_at.strftime("%m/%d %H:%M"),
+                    "created_at_str": a.created_at.strftime("%H:%M UTC"),
                     "risk_level": a.risk_level or "unknown",
                     "severity": a.severity,
                     "status": a.status or "open",
-                    "action": (a.extra_data or {}).get("recommended_action", "")[:60]
-                    if a.extra_data else "",
+                    "action": (a.extra_data or {}).get("recommended_action", "")[:60] if a.extra_data else "",
                 }
                 for a in alerts
             ],
-            "hotspots": mgr_report.get("hotspots", []),
             "prediction": mgr_report.get("prediction", {}),
-            "offline_cameras": mgr_report.get("offline_cameras", []),
         }
 
-    def _generate_ai_narrative(self, data: Dict[str, Any]) -> str:
-        """Generate a rule-based AI narrative summary from the data."""
-        metrics = data.get("metrics", {})
-        venue = data.get("venue_name", "venue")
-        peak = metrics.get("peak_crowd", 0)
-        avg = metrics.get("avg_crowd", 0)
-        alerts = metrics.get("total_alerts", 0)
-        max_risk = metrics.get("max_risk_level", "low")
-        high_events = metrics.get("high_risk_events", 0)
-        capacity = data.get("capacity") or 1000
-        prediction = data.get("prediction", {})
-
-        utilization = (peak / capacity * 100) if capacity else 0
-
-        narrative = (
-            f"During the analyzed period, <b>{venue}</b> maintained an average occupancy of "
-            f"{avg:.0f} people with a peak of {peak:.0f} ({utilization:.1f}% of capacity). "
-        )
-
-        if max_risk in ("critical", "high"):
-            narrative += (
-                f"The venue experienced elevated risk conditions, reaching <b>{max_risk.upper()}</b> "
-                f"risk level on {high_events} separate occasions. "
+    async def _fetch_journey_data(self, session: AsyncSession, days: int) -> Dict[str, Any]:
+        """Fetch persistent journey data for PDF insights."""
+        try:
+            since = datetime.now(timezone.utc) - timedelta(days=days)
+            stmt = (
+                select(Journey)
+                .where(Journey.last_seen >= since)
+                .order_by(desc(Journey.last_seen))
             )
-        else:
-            narrative += "Operations remained within safe parameters throughout the period. "
+            result = await session.execute(stmt)
+            journeys = result.scalars().all()
 
-        # Add Strategic Forecast
+            multicam = [j for j in journeys if len(set(p.get("camera_id") for p in j.path)) > 1]
+            
+            return {
+                "total_unique": len(journeys),
+                "multicam_count": len(multicam),
+                "top_journeys": [
+                    {
+                        "global_id": j.global_id,
+                        "path": j.path,
+                        "last_seen_str": j.last_seen.strftime("%H:%M"),
+                    }
+                    for j in journeys[:20]
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch journey data for PDF: {e}")
+            return {}
+
+    def _generate_ai_narrative(self, data: Dict[str, Any]) -> str:
+        """Generate a clean, professional AI narrative summary from the data."""
+        metrics = data.get("metrics", {})
+        prediction = data.get("prediction", {})
+        
         forecast_lvl = (prediction.get("predicted_level") or "low").upper()
         forecast_conf = prediction.get("confidence") or 0.85
-        narrative += (
-            f"<br/><br/><b>Strategic Forecast:</b> Neural analysis predicts a <b>{forecast_lvl}</b> "
-            f"risk environment for the upcoming cycle (Confidence: {forecast_conf*100:.0f}%). "
-        )
-        if forecast_lvl in ("HIGH", "CRITICAL"):
-            narrative += "Pre-emptive staffing and zone-clearing protocols are recommended."
-        else:
-            narrative += "Maintain standard autonomous surveillance protocols."
+        weather = prediction.get("weather_context", {})
 
-        narrative += (
-            "<br/><br/>This report was generated automatically by the Laminar AI crowd intelligence platform. "
-            "For real-time data, refer to the live operations dashboard."
+        narrative = (
+            f"<b>[DATA FEDERATION PROTOCOL ENGAGED]</b><br/>"
+            f"Predictive models analyzing the live camera feeds completed assessment with a confidence threshold of <b>{forecast_conf*100:.0f}%</b>. "
         )
+
+        if weather:
+            narrative += (
+                f"External atmospheric indicators tracked: ({weather.get('condition', 'stable')} at {weather.get('temperature_c', 0)}°C). "
+            )
+
+        narrative += f"<br/><br/><b>AI PREDICTION LAYER:</b> The matrix trajectory places expected risk at <b>{forecast_lvl}</b> levels for the immediate temporal window."
+
+        if forecast_lvl in ("HIGH", "CRITICAL"):
+            narrative += "<br/><br/><font color='#E11D48'><b>RECOMMENDED DIRECTIVE:</b> Pre-emptive crowd dispersion and localized staffing reinforcement required immediately to prevent critical bottlenecking.</font>"
+        else:
+            narrative += "<br/><br/><font color='#059669'><b>RECOMMENDED DIRECTIVE:</b> Telemetry is within acceptable constraints. Maintain automated surveillance parameters across all active feeds.</font>"
+        
         return narrative

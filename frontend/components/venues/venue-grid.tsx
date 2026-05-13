@@ -2,10 +2,15 @@
 
 import { useVenues } from "@/hooks/useVenues"
 import VenueCard from "./venue-card"
+import EditVenueModal from "./edit-venue-modal"
 import { Map, Loader2 } from "lucide-react"
+import { useState } from "react"
+import { useTranslation } from "react-i18next"
 
 export default function VenueGrid() {
+  const { t } = useTranslation()
   const { data: venues, isLoading, isError } = useVenues()
+  const [editingVenue, setEditingVenue] = useState<any>(null)
 
   if (isLoading) {
     return (
@@ -23,7 +28,7 @@ export default function VenueGrid() {
   if (isError) {
     return (
       <div className="p-8 text-center bg-rose-950/20 border border-rose-900/30 rounded-xl">
-        <p className="text-rose-400 font-medium">System Error: Failed to establish uplink with Venue registry.</p>
+        <p className="text-rose-400 font-medium">{t("venues.systemErrorUplink") || "System Error: Failed to establish uplink with Venue registry."}</p>
       </div>
     )
   }
@@ -32,19 +37,28 @@ export default function VenueGrid() {
     return (
       <div className="flex flex-col items-center justify-center p-16 bg-[#0f172a]/30 rounded-xl border border-slate-800/50 text-center border-dashed">
         <Map className="w-10 h-10 text-slate-600 mb-4" />
-        <h3 className="text-slate-300 font-semibold mb-2">No Active Venues</h3>
+        <h3 className="text-slate-300 font-semibold mb-2">{t("venues.noActiveVenues") || "No Active Venues"}</h3>
         <p className="text-slate-500 text-sm max-w-sm">
-          Connect your first venue mapping to begin processing Crowd Intelligence streams.
+          {t("venues.connectFirstVenue") || "Connect your first venue mapping to begin processing Crowd Intelligence streams."}
         </p>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-      {venues.map((venue: any) => (
-        <VenueCard key={venue.id} venue={venue} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {venues.map((venue: any) => (
+          <VenueCard key={venue.id} venue={venue} onEdit={() => setEditingVenue(venue)} />
+        ))}
+      </div>
+      {editingVenue && (
+        <EditVenueModal 
+          venue={editingVenue} 
+          isOpen={!!editingVenue} 
+          onClose={() => setEditingVenue(null)} 
+        />
+      )}
+    </>
   )
 }

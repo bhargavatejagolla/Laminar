@@ -176,6 +176,25 @@ class ReportService:
                 "avg_risk": float(r.risk or 0)
             })
 
+        # Recent Alerts (Last 20)
+        recent_alert_stmt = (
+            select(CrowdAlert)
+            .where(CrowdAlert.venue_id == venue_id)
+            .order_by(desc(CrowdAlert.created_at))
+            .limit(20)
+        )
+        recent_alert_result = await session.execute(recent_alert_stmt)
+        recent_alerts = []
+        for a in recent_alert_result.scalars().all():
+            recent_alerts.append({
+                "id": str(a.id),
+                "created_at_str": a.created_at.strftime("%H:%M:%S") if a.created_at else "---",
+                "risk_level": a.risk_level,
+                "severity": a.severity,
+                "status": a.status,
+                "action": a.notes[:30] + "..." if a.notes and len(a.notes) > 30 else (a.notes or "Monitor Pattern")
+            })
+
         # Prediction
         prediction = await self.prediction_service.forecast_risk(
             session=session,
@@ -187,6 +206,7 @@ class ReportService:
             "report_generated_at": datetime.now(timezone.utc).isoformat(),
             "daily_summary": summary,
             "alerts_today": alert_count,
+            "recent_alerts": recent_alerts,
             "offline_cameras": offline_cameras,
             "hotspots": hotspots,
             "prediction": {
@@ -197,6 +217,7 @@ class ReportService:
                 "holiday_context": prediction.get("holiday_context"),
                 "weather_context": prediction.get("weather_context"),
                 "event_type": prediction.get("event_type"),
+                "incident_explanation": prediction.get("incident_explanation"),
             },
         }
 

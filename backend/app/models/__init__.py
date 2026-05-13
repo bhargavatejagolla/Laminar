@@ -32,6 +32,9 @@ from .alert import Alert
 from .alert_contact import AlertContact
 from .action_rule import ActionRule
 from app.models.dwell_monitor import MonitoringZone, PersonDwellTime
+from app.models.journey import Journey
+
+from app.models.ticket import Ticket, TicketMessage
 
 # ==========================================================
 # Public Exports
@@ -48,6 +51,9 @@ __all__ = [
     "EvidenceClip",
     "QueueEstimate",
     "AlertContact",
+    "Journey",
+    "Ticket",
+    "TicketMessage",
 ]
 
 

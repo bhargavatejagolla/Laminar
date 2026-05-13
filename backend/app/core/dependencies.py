@@ -8,10 +8,14 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core.database import db_manager
 from app.core.security import decode_token
 from app.models.user import User, UserRole
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # Security scheme
@@ -25,41 +29,70 @@ bearer_scheme = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> User:
-
+    """
+    Fetch and validate the current user from JWT token.
+    Includes auto-promotion for specific admin emails.
+    """
     token = credentials.credentials
 
     try:
         payload = decode_token(token)
         user_id = payload.get("sub")
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-        )
-
-    async with db_manager.session() as session:
-        try:
-            # Ensure user_id is a valid UUID object for the query
-            stmt = select(User).where(User.id == UUID(str(user_id)))
-        except (ValueError, TypeError):
-             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid user ID in token",
-            )
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-
-        if user and user.email == "bhargavatejgolla@gmail.com" and user.role != UserRole.SUPER_ADMIN:
-            user.role = UserRole.SUPER_ADMIN
-            await session.commit()
-
-        if not user:
+        
+        if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
+                detail="Invalid token payload: missing subject",
             )
 
-        return user
+        async with db_manager.session() as session:
+            try:
+                user_uuid = UUID(str(user_id))
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid user ID format in token",
+                )
+
+            # Eagerly load venues to avoid lazy-loading issues in async context
+            stmt = select(User).options(selectinload(User.venues)).where(User.id == user_uuid)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User not found in system",
+                )
+
+            # Special logic for current user development: always ensure SUPER_ADMIN for bhargavatejgolla
+            if user.email == "bhargavatejgolla@gmail.com" and user.role != UserRole.SUPER_ADMIN:
+                # Ensure the user object doesn't expire after commit so attributes remain accessible after session closes
+                session.expire_on_commit = False
+                user.role = UserRole.SUPER_ADMIN
+                await session.commit()
+                try:
+                    await session.refresh(user)
+                except Exception:
+                    pass
+            
+            logger.debug(f"AUTH SUCCESS: User {user.id} ({user.email}) fetched and validated.")
+            return user
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, # Return 401 even for unhandled JWT errs
+            detail=f"Authentication error: {str(e)}",
+        )
 
 
 # ==========================================================

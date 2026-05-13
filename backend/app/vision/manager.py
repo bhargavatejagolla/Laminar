@@ -41,6 +41,7 @@ from app.models.camera import Camera
 from app.vision.stream_worker import StreamWorker
 from app.vision.detector import detector
 from app.vision.sources import create_camera_source, CameraSource
+from app.vision.registry import camera_registry
 
 logger = get_logger(__name__)
 
@@ -180,6 +181,9 @@ class VisionManager:
         # This prevents the sync loop from constantly retrying bad RTSP URLs and blocking
         self._failed_cameras: Dict[UUID, datetime] = {}
         self._backoff_duration = timedelta(seconds=60)
+        
+        # Lock to prevent duplicate starts for the same camera (race condition)
+        self._starting_cameras: set[UUID] = set()
 
     # ==========================================================
     # Lifecycle
@@ -190,7 +194,21 @@ class VisionManager:
         if self._running:
             return
 
-        logger.info("Starting VisionManager")
+        logger.info("Starting VisionManager (Enhanced Stability Mode)")
+        
+        # ✅ PERFORMANCE FIX: Increase default thread pool size to prevent blocking CV2 calls from starving the loop
+        import concurrent.futures
+        import os
+        # Use more threads for I/O bound camera connection handshakes (win32-friendly)
+        thread_count = (os.cpu_count() or 4) * 8
+        self._executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=thread_count,
+            thread_name_prefix="VisionIO"
+        )
+        loop = asyncio.get_event_loop()
+        loop.set_default_executor(self._executor)
+        logger.info(f"VisionManager initialized with {thread_count} worker threads for I/O operations")
+
         self._running = True
         self._start_time = datetime.now(timezone.utc)
 
@@ -247,7 +265,7 @@ class VisionManager:
                     self._last_sync_time = datetime.now(
                         timezone.utc).isoformat()
                 await asyncio.sleep(self.sync_interval)
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, KeyboardInterrupt):
                 break
             except Exception as e:
                 logger.error(
@@ -259,18 +277,22 @@ class VisionManager:
 
     async def _sync_cameras(self) -> None:
         """Sync DB camera state with active workers."""
-
+        from app.models.venue import Venue, VenueDomain
+        
         try:
             # Use db_manager to correctly obtain session
+            from app.models.venue import Venue, VenueDomain
             from app.core.database import db_manager
             
             async with db_manager.session() as session:
-                # Get active cameras from DB
+                # Get active cameras belonging to 'people' venues
+                # This ensures the standard VisionManager only handles crowd intelligence
                 result = await session.execute(
-                    select(Camera).where(
+                    select(Camera).join(Venue).where(
                         Camera.is_active == True,
                         Camera.monitoring_enabled == True,
                         Camera.deleted_at.is_(None),
+                        (Venue.venue_type == VenueDomain.PEOPLE) | (Venue.venue_type.is_(None))
                     )
                 )
                 cameras = result.scalars().all()
@@ -301,18 +323,22 @@ class VisionManager:
         for camera in cameras:
             config = self._camera_to_config(camera)
             
-            if camera.id not in running_camera_ids:
-                logger.info(f"Starting worker for new camera {camera.id}")
-                await self._start_worker(camera)
-                self._worker_configs[camera.id] = config
-            else:
-                # Check for config changes
-                old_config = self._worker_configs.get(camera.id)
-                if old_config and self._config_changed(old_config, config):
-                    logger.info(f"Config changed for camera {camera.id}, restarting worker")
-                    await self._stop_worker(camera.id)
+            try:
+                if camera.id not in running_camera_ids:
+                    logger.info(f"Starting worker for new camera {camera.id}")
                     await self._start_worker(camera)
                     self._worker_configs[camera.id] = config
+                else:
+                    # Check for config changes
+                    old_config = self._worker_configs.get(camera.id)
+                    if old_config and self._config_changed(old_config, config):
+                        logger.info(f"Config changed for camera {camera.id}, restarting worker")
+                        await self._stop_worker(camera.id)
+                        await self._start_worker(camera)
+                        self._worker_configs[camera.id] = config
+            except Exception as loop_err:
+                logger.error(f"Failed to process worker state for camera {camera.id}: {loop_err}")
+                continue
 
         # Stop removed/disabled cameras
         for camera_id in running_camera_ids - active_camera_ids:
@@ -336,40 +362,53 @@ class VisionManager:
     def _camera_to_config(self, camera: Camera) -> Dict[str, Any]:
         """Convert camera model to source configuration."""
 
+        stream_url = camera.stream_url or ""
+        stream_type = (camera.stream_type or "device").lower()
+
+        # If a user chose "webcam/device" but entered a network URL, override the type
+        if "://" in stream_url:
+            if stream_url.startswith("rtsp://"):
+                stream_type = "rtsp"
+            elif stream_url.startswith("http://") or stream_url.startswith("https://"):
+                stream_type = "http"
+            elif stream_url.startswith("rtmp://"):
+                stream_type = "rtmp"
+            else:
+                stream_type = "network"
+
         # Determine source identifier based on stream_type
-        if camera.stream_type in ["device", "usb", "webcam"]:
+        if stream_type in ["device", "usb", "webcam"]:
             # Convert to int for device indices with safety
             try:
-                source_identifier = int(camera.stream_url or 0)
+                source_identifier = int(stream_url or 0)
             except ValueError:
                 logger.warning(
                     f"Invalid device index for camera {camera.id}, using default 0",
                     extra={"camera_id": str(camera.id),
-                           "stream_url": camera.stream_url}
+                           "stream_url": stream_url}
                 )
                 source_identifier = 0
 
-        elif camera.stream_type in ["rtsp", "http", "https", "rtmp"]:
-            if not camera.stream_url:
+        elif stream_type in ["rtsp", "http", "https", "rtmp", "network"]:
+            if not stream_url:
                 raise ValueError("Stream URL required for network streams")
-            source_identifier = camera.stream_url
+            source_identifier = stream_url
 
-        elif camera.stream_type == "file":
-            if not camera.stream_url:
+        elif stream_type == "file":
+            if not stream_url:
                 raise ValueError("File path required for file stream")
-            source_identifier = camera.stream_url
+            source_identifier = stream_url
 
-        elif camera.stream_type == "cctv":
+        elif stream_type == "cctv":
             # CCTV typically uses RTSP
-            if not camera.stream_url:
+            if not stream_url:
                 raise ValueError("Stream URL required for CCTV")
-            source_identifier = camera.stream_url
+            source_identifier = stream_url
 
         else:
             # Default to treating as direct source (works with universal opener)
             try:
-                source_identifier = int(camera.stream_url) if camera.stream_url and camera.stream_url.isdigit(
-                ) else (camera.stream_url or 0)
+                source_identifier = int(stream_url) if stream_url and stream_url.isdigit() else (stream_url or 0)
             except (ValueError, TypeError):
                 source_identifier = 0
 
@@ -383,7 +422,7 @@ class VisionManager:
             target_fps = self.max_fps
 
         return {
-            "source_type": camera.stream_type,
+            "source_type": stream_type,
             "source_identifier": source_identifier,
             "width": camera.resolution_width or 640,
             "height": camera.resolution_height or 480,
@@ -430,12 +469,29 @@ class VisionManager:
     async def _start_worker(self, camera: Camera) -> None:
         """Create and start worker for camera using async connection."""
         try:
-            # Check backoff one last time before starting
             now = datetime.now(timezone.utc)
+            
+            # Check if camera is already starting or running
+            if camera.id in self._starting_cameras:
+                logger.warning(f"Aborting start for camera {camera.id}: Already starting")
+                return
+            
+            if camera.id in self._workers:
+                logger.warning(f"Aborting start for camera {camera.id}: Already running")
+                return
+
             if camera.id in self._failed_cameras:
                 if now - self._failed_cameras[camera.id] < self._backoff_duration:
                     logger.warning(f"Aborting start for camera {camera.id}: Still in backoff")
                     return
+
+            # Lock the starting state
+            self._starting_cameras.add(camera.id)
+
+            # 0. Register camera globally to prevent contention
+            if not camera_registry.register(camera.id):
+                logger.warning(f"Aborting start for camera {camera.id}: Already registered globally")
+                return
 
             logger.info(
                 "Starting worker for camera",
@@ -502,6 +558,19 @@ class VisionManager:
             await worker.start()
             self._workers[camera.id] = worker
             
+            # 🚨 PROACTIVE HEALTH SYNC: Mark online in DB immediately instead of waiting for health loop
+            try:
+                from app.services.camera_health_service import CameraHealthService
+                health_service = CameraHealthService()
+                async with db_manager.session() as health_session:
+                    db_camera = await health_session.get(Camera, camera.id)
+                    if db_camera:
+                        await health_service.update_camera_health(health_session, db_camera, "healthy")
+                        await health_session.commit()
+                        logger.info(f"Camera {camera.id} marked online immediately via _start_worker")
+            except Exception as health_err:
+                logger.warning(f"Failed to proactive sync online health for {camera.id}: {health_err}")
+
             # Clear any failure history on successful start
             if camera.id in self._failed_cameras:
                 del self._failed_cameras[camera.id]
@@ -512,6 +581,18 @@ class VisionManager:
             )
 
         except Exception as e:
+            # Clean up the camera source if it started but worker failed!
+            if 'source' in locals() and source is not None:
+                try:
+                    logger.info(f"Worker start failed. Stopping orchestrated source for {camera.id} to release resources.")
+                    if hasattr(source, 'stop'):
+                        source.stop()
+                except Exception as cleanup_err:
+                    logger.error(f"Failed to cleanup source after worker crash: {cleanup_err}")
+            
+            # Always unregister on failure
+            camera_registry.unregister(camera.id)
+
             # Record failure for backoff
             self._failed_cameras[camera.id] = datetime.now(timezone.utc)
             logger.error(
@@ -524,6 +605,10 @@ class VisionManager:
                 },
                 exc_info=True,
             )
+        finally:
+            # Always release the lock
+            if camera.id in self._starting_cameras:
+                self._starting_cameras.remove(camera.id)
 
     async def _stop_worker(self, camera_id: UUID) -> None:
         """Stop and remove worker."""
@@ -538,6 +623,7 @@ class VisionManager:
 
         await worker.stop()
         del self._workers[camera_id]
+        camera_registry.unregister(camera_id)
 
         logger.info(
             "Worker stopped",
@@ -554,7 +640,7 @@ class VisionManager:
             try:
                 await self._check_health()
                 await asyncio.sleep(self.health_check_interval)
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, KeyboardInterrupt):
                 break
             except Exception as e:
                 logger.error(
@@ -952,12 +1038,14 @@ class VisionManager:
     # ==========================================================
 
     async def notify_camera_created(self, camera: Camera) -> None:
-        """Called by API after camera creation for instant startup."""
-        if camera.id in self._workers:
+        """Called by API after camera creation for instant startup with debouncing."""
+        if camera.id in self._workers or camera.id in self._starting_cameras:
             return
             
         if camera.is_active and camera.monitoring_enabled:
-            logger.info(f"Instant start triggered for new camera {camera.id}")
+            logger.info(f"Instant start triggered for camera {camera.id}")
+            # Ensure we mark it as starting immediately to debounce rapid-fire API calls
+            self._starting_cameras.add(camera.id)
             asyncio.create_task(self._start_worker(camera))
 
     async def notify_camera_deleted(self, camera_id: UUID) -> None:

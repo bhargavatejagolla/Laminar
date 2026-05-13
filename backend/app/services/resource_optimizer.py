@@ -99,9 +99,21 @@ class ResourceOptimizerService:
             if mapped_staff is not None:
                 staff_needed = int(mapped_staff)
 
-        # Default ratio: 1 staff per 100 people (min 1 when anyone is present)
+        # Dynamic formula based on thresholds if config is missing
         if staff_needed == 0 and crowd_size > 0:
-            staff_needed = max(1, crowd_size // self.STAFF_TO_CROWD_RATIO)
+            if venue_data and venue_data.capacity:
+                capacity = venue_data.capacity
+                warn = venue_data.warning_threshold or int(capacity * 0.70)
+                crit = venue_data.critical_threshold or int(capacity * 0.90)
+                
+                if crowd_size >= crit:
+                    staff_needed = max(5, crowd_size // 40)
+                elif crowd_size >= warn:
+                    staff_needed = max(3, crowd_size // 60)
+                else:
+                    staff_needed = max(1, crowd_size // self.STAFF_TO_CROWD_RATIO)
+            else:
+                staff_needed = max(1, crowd_size // self.STAFF_TO_CROWD_RATIO)
 
         logger.info(
             "Computed resource deployment",

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Clock, Users, ArrowRight, Activity, Zap } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { api } from "@/services/api"
 
 export default function QueueWaitTimeCard() {
   const [data, setData] = useState<any>(null)
@@ -17,14 +18,9 @@ export default function QueueWaitTimeCard() {
   useEffect(() => {
     const fetchEstimate = async () => {
       try {
-        const res = await fetch(`/api/v1/venues/${VENUE_ID}/queue-estimate`)
-        if (res.ok) {
-          const json = await res.json()
-          setData(json)
-          setError(false)
-        } else {
-          setError(true)
-        }
+        const res = await api.get(`/venues/${VENUE_ID}/queue-estimate`)
+        setData(res.data)
+        setError(false)
       } catch (e) {
         setError(true)
       } finally {

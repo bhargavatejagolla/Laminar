@@ -68,19 +68,22 @@ class BatchProcessor:
 async def minute_pipeline_job():
     """
     Every minute:
-    - Aggregate minute metrics for active cameras
+    - Aggregate minute metrics for active cameras (Parallelized)
     - Evaluate risk for each metric
     - Process alert decisions
+    - Aggregate per-venue metrics
     """
     metric_service = get_metric_service()
     risk_engine = get_risk_engine()
     alert_engine = get_alert_engine()
     
-    logger.warning("🔥MINUTE JOB TRIGGERED🔥")
+    # ✅ PERFORMANCE FIX: Add random jitter to prevent synchronized spikes
+    import random
+    await asyncio.sleep(random.uniform(0, 2.0))
+
     start_time = datetime.now(timezone.utc)
     logger.info("Starting minute pipeline job")
 
-    from app.core.database import db_manager
     async with db_manager.session() as session:
         try:
             # Get all active cameras
@@ -94,114 +97,104 @@ async def minute_pipeline_job():
             cameras: List[Camera] = result.scalars().all()
 
             if not cameras:
-                logger.info("No active cameras found")
-                return
+                # Count total cameras to provide context
+                total_res = await session.execute(select(Camera).where(Camera.deleted_at.is_(None)))
+                total_count = len(total_res.scalars().all())
+                logger.info(
+                    "No active monitoring cameras found",
+                    extra_fields={
+                        "total_registered_cameras": total_count,
+                        "reason": "is_active=False or monitoring_enabled=False"
+                    }
+                )
 
-            logger.info(f"Processing {len(cameras)} cameras")
+            logger.debug(f"Processing {len(cameras)} cameras in parallel")
 
+            async def process_single_camera(camera_obj):
+                camera_id_str = str(camera_obj.id)
+                # Each parallel task needs its own session to avoid contention
+                async with db_manager.session() as sub_session:
+                    try:
+                        # Step 1: Aggregate minute metric
+                        metric = await metric_service.aggregate_minute(
+                            sub_session,
+                            camera_id=camera_obj.id,
+                        )
+                        if not metric:
+                            return {"metric": False, "alert": False, "success": False, "reason": "no_data"}
+
+                        # Step 2: Evaluate risk
+                        decision = await risk_engine.evaluate_metric(
+                            sub_session,
+                            metric_id=metric.id,
+                        )
+
+                        # Step 3: AI Live-Feed Auto-Resolution or Alert Creation
+                        alert_fired = False
+                        if not decision.get("should_alert"):
+                            from uuid import UUID as _UUID
+                            _venue_id = decision.get("venue_id")
+                            _camera_id = decision.get("camera_id")
+                            if _venue_id:
+                                await alert_engine.live_feed_auto_resolve(
+                                    sub_session,
+                                    venue_id=_UUID(_venue_id),
+                                    camera_id=_camera_id,
+                                    reason=f"Live AI feed: crowd risk dropped to '{decision.get('current_level', 'safe')}'",
+                                )
+                        else:
+                            alert = await alert_engine.process_decision(
+                                sub_session,
+                                decision=decision,
+                            )
+                            if alert:
+                                alert_fired = True
+
+                        return {"metric": True, "alert": alert_fired, "success": True}
+                    except Exception as e:
+                        logger.error(f"Camera {camera_id_str} pipeline failed: {e}")
+                        return {"metric": False, "alert": False, "success": False, "error": str(e)}
+
+            # Parallel camera processing with relaxed concurrency (Prevent pool/CPU exhaustion)
+            processor = BatchProcessor(concurrency=3)
+            camera_tasks = [
+                processor.process_item(
+                    str(cam.id), 
+                    process_single_camera, 
+                    camera_obj=cam
+                ) for cam in cameras
+            ]
+            cam_results = await asyncio.gather(*camera_tasks)
+            # Remove any None results from failed batch processing
+            cam_results = [r for r in cam_results if r is not None]
+
+            # Compile stats
             stats = {
                 "total_cameras": len(cameras),
-                "processed": 0,
-                "failed": 0,
-                "metrics_created": 0,
-                "alerts_created": 0,
+                "processed": sum(1 for r in cam_results if r["success"]),
+                "failed": sum(1 for r in cam_results if not r["success"] and r.get("reason") != "no_data"),
+                "metrics_created": sum(1 for r in cam_results if r["metric"]),
+                "alerts_created": sum(1 for r in cam_results if r["alert"]),
             }
 
-            # Process each camera
-            for camera in cameras:
-                camera_id_str = str(camera.id)
-                try:
-                    # Step 1: Aggregate minute metric
-                    metric = await metric_service.aggregate_minute(
-                        session,
-                        camera_id=camera.id,
-                    )
-                    if not metric:
-                        logger.warning(
-                            "No metric generated for camera",
-                            extra={"camera_id": camera_id_str}
-                        )
-                        continue
-
-                    stats["metrics_created"] += 1
-
-                    # Step 2: Evaluate risk
-                    decision = await risk_engine.evaluate_metric(
-                        session,
-                        metric_id=metric.id,
-                    )
-
-                    # ── Step 3: AI Live-Feed Auto-Resolution ───────────────────
-                    # If the AI says crowd is safe, instantly resolve any active
-                    # alert for this venue/camera — no scheduler delay needed.
-                    if not decision.get("should_alert"):
-                        from uuid import UUID as _UUID
-                        _venue_id = decision.get("venue_id")
-                        _camera_id = decision.get("camera_id")
-                        if _venue_id:
-                            resolved = await alert_engine.live_feed_auto_resolve(
-                                session,
-                                venue_id=_UUID(_venue_id),
-                                camera_id=_camera_id,
-                                reason=(
-                                    f"Live AI feed: crowd risk dropped to "
-                                    f"'{decision.get('current_level', 'safe')}' — "
-                                    "conditions are within safe thresholds."
-                                ),
-                            )
-                            if resolved:
-                                logger.info(
-                                    f"🟢 Live-feed resolved {resolved} alert(s) for venue {_venue_id}",
-                                )
-                    else:
-                        # Step 3: Process alert (open or escalate)
-                        alert = await alert_engine.process_decision(
-                            session,
-                            decision=decision,
-                        )
-                        if alert:
-                            stats["alerts_created"] += 1
-
-                    stats["processed"] += 1
-
-                except Exception as e:
-
-                        await session.rollback()   # 🔥 important
-
-                        stats["failed"] += 1
-
-                        logger.error(
-                            "Minute pipeline failed for camera",
-                            extra_fields={
-                                "camera_id": camera_id_str,
-                                "error": str(e),
-                            },
-                            exc_info=True,
-                        )
-
-            # Step 4: After all cameras are processed, aggregate per-venue metrics
-            # This ensures Peak Time and Max Crowd analytics are available
-            venue_result = await session.execute(
-                select(Venue).where(Venue.deleted_at.is_(None))
-            )
-            venues = venue_result.scalars().all()
+            # Step 4: After cameras, aggregate per-venue metrics in parallel
+            result_v = await session.execute(select(Venue).where(Venue.deleted_at.is_(None)))
+            venues = result_v.scalars().all()
             
-            for venue in venues:
-                try:
-                    await metric_service.aggregate_venue_minute(
-                        session,
-                        venue_id=venue.id,
-                        timestamp=start_time
-                    )
-                except Exception as e:
-                    logger.error(
-                        "Venue minute aggregation failed",
-                        extra={"venue_id": str(venue.id), "error": str(e)}
-                    )
+            async def process_venue_agg(v_obj):
+                async with db_manager.session() as sub_session:
+                    try:
+                        await metric_service.aggregate_venue_minute(sub_session, venue_id=v_obj.id, timestamp=start_time)
+                        return True
+                    except Exception as e:
+                        logger.error(f"Venue {v_obj.id} aggregation failed: {e}")
+                        return False
 
-            duration = (datetime.now(timezone.utc) -
-                        start_time).total_seconds()
-            logger.info(
+            venue_tasks = [process_venue_agg(v) for v in venues]
+            await asyncio.gather(*venue_tasks)
+
+            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            logger.debug(
                 "Minute pipeline completed",
                 extra_fields={
                     "duration_seconds": round(duration, 2),
@@ -210,11 +203,7 @@ async def minute_pipeline_job():
             )
 
         except Exception as e:
-            logger.error(
-                "Minute pipeline job failed",
-                extra_fields={"error": str(e)},
-                exc_info=True,
-            )
+            logger.error("Minute pipeline job failed fatal", extra_fields={"error": str(e)}, exc_info=True)
 
 
 # ==========================================================
@@ -228,7 +217,7 @@ async def escalation_job():
     - Log escalation statistics
     """
     start_time = datetime.now(timezone.utc)
-    logger.info("Starting escalation check job")
+    logger.debug("Starting escalation check job")
 
     alert_engine = get_alert_engine()
     async with db_manager.session() as session:
@@ -239,7 +228,7 @@ async def escalation_job():
 
             duration = (datetime.now(timezone.utc) -
                         start_time).total_seconds()
-            logger.info(
+            logger.debug(
                 "Escalation check completed",
                 extra_fields={
                     "duration_seconds": round(duration, 2),
@@ -268,7 +257,7 @@ async def auto_resolve_job():
     - Log statistics
     """
     start_time = datetime.now(timezone.utc)
-    logger.info("Starting auto-resolve + auto-acknowledge job")
+    logger.debug("Starting auto-resolve + auto-acknowledge job")
 
     alert_engine = get_alert_engine()
     async with db_manager.session() as session:
@@ -282,7 +271,7 @@ async def auto_resolve_job():
 
             duration = (datetime.now(timezone.utc) -
                         start_time).total_seconds()
-            logger.info(
+            logger.debug(
                 "Auto-lifecycle job completed",
                 extra_fields={
                     "duration_seconds": round(duration, 2),
@@ -316,7 +305,7 @@ async def hourly_aggregation_job():
     async with db_manager.session() as session:
         try:
             # Get all venues
-            result = await session.execute(select(Venue))
+            result = await session.execute(select(Venue).where(Venue.deleted_at.is_(None)))
             venues = result.scalars().all()
 
             if not venues:
@@ -385,7 +374,7 @@ async def system_health_job():
     - Can be extended to send alerts
     """
     start_time = datetime.now(timezone.utc)
-    logger.info("Starting system health check")
+    logger.debug("Starting system health check")
 
     from app.services.camera_health_service import CameraHealthService
     async with db_manager.session() as session:
@@ -436,7 +425,7 @@ async def system_health_job():
 
             duration = (datetime.now(timezone.utc) -
                         start_time).total_seconds()
-            logger.info(
+            logger.debug(
                 "System health check completed",
                 extra_fields={
                     "duration_seconds": round(duration, 2),
@@ -560,6 +549,10 @@ async def predictive_surge_job():
     - Analyzes statistical trends in sqlite using PredictionService
     - Generates proactive 'Predictive Surge' alerts if critical bottleneck forecasted
     """
+    # ✅ PERFORMANCE FIX: Add random jitter to prevent synchronized spikes
+    import random
+    await asyncio.sleep(random.uniform(0, 3.0))
+
     start_time = datetime.now(timezone.utc)
     logger.info("Starting AI Predictive Surge scanning job")
 
@@ -580,57 +573,81 @@ async def predictive_surge_job():
                 logger.info("No venues found for predictive scanning")
                 return
 
-            stats = {"scanned": 0, "predictive_alerts_fired": 0, "failed": 0}
-
-            for venue in venues:
+            processor = BatchProcessor(concurrency=2)
+            
+            async def process_venue_prediction(v):
                 try:
-                    stats["scanned"] += 1
-                    
-                    # Generate forecast
-                    forecast = await prediction_service.forecast_risk(session, venue.id)
-                    
-                    if not forecast:
-                        continue
-                        
-                    predicted_level = forecast.get("predicted_level")
-                    escalation_prob = forecast.get("escalation_probability", 0.0)
-                    
-                    # If AI predicts a critical or high event with strong probability
-                    if predicted_level in ["critical", "high"] and escalation_prob > 0.4:
-                        
-                        logger.warning(
-                            f"🔮 PREDICTIVE AI: Upcoming surge forecasted at venue {venue.name}",
-                            extra_fields={"predicted_level": predicted_level, "prob": escalation_prob}
+                    # We need a fresh session per task to avoid concurrent usage of the same session
+                    async with db_manager.session() as sub_session:
+                        # Safety: Skip predictive scanning if no cameras are online for this venue
+                        from sqlalchemy import select, func
+                        from app.models.camera import Camera
+                        online_count = await sub_session.scalar(
+                            select(func.count()).select_from(Camera).where(
+                                Camera.venue_id == v.id,
+                                Camera.is_active == True,
+                                Camera.is_online == True
+                            )
                         )
-
-                        # We format it as a decision to be consumed by alert engine
-                        decision = {
-                            "should_alert": True,
-                            "venue_id": str(venue.id),
-                            "venue_name": venue.name,
-                            "camera_id": None, # Venue-wide
-                            "metric_id": "00000000-0000-0000-0000-000000000000", # System-level
-                            "current_level": predicted_level,
-                            "severity": 95 if predicted_level == "critical" else 75,
-                            "early_warning_triggered": True,
-                            "reason": forecast.get("forecast_explanation", "AI predicted upcoming surge based on compounding spatial trends."),
-                            "alert_type": "AI Predictive Surge Warning",
-                            "recommended_action": "Proactively assign staff to gates to disperse crowding before it forms.",
-                            "predicted_level": predicted_level,
-                            "predicted_risk_score": forecast.get("predicted_risk_score"),
-                            "escalation_probability": escalation_prob
-                        }
                         
-                        alert_engine = get_alert_engine()
-                        await alert_engine.process_decision(session, decision=decision)
-                        stats["predictive_alerts_fired"] += 1
+                        if online_count == 0:
+                            # Log more details to help debug "stuck" cameras
+                            logger.info(
+                                f"⏭️ Skipping predictive scan for {v.name}",
+                                extra_fields={
+                                    "reason": "No online cameras detected in DB",
+                                    "venue_id": str(v.id)
+                                }
+                            )
+                            return False
 
-                except Exception as e:
-                    stats["failed"] += 1
-                    logger.error(
-                        f"Predictive scan failed for venue {venue.id}",
-                        extra_fields={"error": str(e)}
-                    )
+                        forecast = await prediction_service.forecast_risk(sub_session, v.id)
+                        if not forecast:
+                            return False
+                            
+                        predicted_level = forecast.get("predicted_level")
+                        escalation_prob = forecast.get("escalation_probability", 0.0)
+                        
+                        if predicted_level in ["critical", "high"] and escalation_prob > 0.4:
+                            logger.warning(
+                                f"🔮 PREDICTIVE AI: Upcoming surge forecasted at venue {v.name}",
+                                extra_fields={"predicted_level": predicted_level, "prob": escalation_prob}
+                            )
+
+                            decision = {
+                                "should_alert": True,
+                                "venue_id": str(v.id),
+                                "venue_name": v.name,
+                                "camera_id": None,
+                                "metric_id": "00000000-0000-0000-0000-000000000000",
+                                "current_level": predicted_level,
+                                "severity": 95 if predicted_level == "critical" else 75,
+                                "early_warning_triggered": True,
+                                "reason": forecast.get("forecast_explanation", "AI predicted upcoming surge."),
+                                "alert_type": "AI Predictive Surge Warning",
+                                "recommended_action": "Proactively assign staff to gates.",
+                                "predicted_level": predicted_level,
+                                "predicted_risk_score": forecast.get("predicted_risk_score"),
+                                "escalation_probability": escalation_prob
+                            }
+                            
+                            alert_engine = get_alert_engine()
+                            await alert_engine.process_decision(sub_session, decision=decision)
+                            return True
+                    return False
+                except Exception as ex:
+                    logger.error(f"Error in venue {v.id} predictive scan: {ex}", exc_info=True)
+                    return False
+
+            # Run in batches
+            tasks = [processor.process_item(str(venue.id), process_venue_prediction, v=venue) for venue in venues]
+            results = await asyncio.gather(*tasks)
+
+            stats = {
+                "scanned": len(venues),
+                "predictive_alerts_fired": sum(1 for r in results if r is True),
+                "failed": sum(1 for r in results if r is None)
+            }
 
             duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             logger.info(
