@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Car, AlertTriangle, Zap, Activity, BrainCircuit, Users, Upload, Thermometer, Video, FileText, Download, Globe, RotateCw } from "lucide-react";
+import { ArrowLeft, Car, AlertTriangle, Zap, Activity, BrainCircuit, Users, Upload, Thermometer, Video, FileText, Download, Globe, RotateCw, ShieldCheck, Shield } from "lucide-react";
 import { api } from "@/services/api";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,10 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   traffic: Activity,
   incident: AlertTriangle,
   people: Users,
+  kinetic: BrainCircuit,
+  greenwave: Zap,
+  liability: ShieldCheck,
+  guardian: Shield,
   hub: Globe,
 };
 
@@ -92,6 +96,10 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
   const streamUrl = () => {
     if (sectionType === "parking") return `/api/v1/parking/stream/${camera.id}`;
     if (sectionType === "people") return `/api/v1/dwell/stream/${camera.id}`;
+    if (sectionType === "kinetic") return `/api/v1/kinetic/stream/${camera.id}`;
+    if (sectionType === "liability") return `/api/v1/kinetic/stream/${camera.id}`;
+    if (sectionType === "greenwave") return `/api/v1/greenwave/stream/${camera.id}`;
+    if (sectionType === "guardian") return `/api/v1/guardian/stream/${camera.id}`;
     // traffic and incident both use the TrafficWorker stream
     return `/api/v1/traffic/stream/${camera.id}`;
   };
@@ -337,6 +345,90 @@ const THEMES: Record<string, any> = {
     textSecondary: "text-violet-400",
     barCell: "bg-indigo-500/20",
   },
+  kinetic: {
+    primary: "indigo",
+    secondary: "fuchsia",
+    bgClass: "from-indigo-950/40 to-[#0c0c14]",
+    borderClass: "border-indigo-500/20",
+    textClass: "text-indigo-400",
+    glowClass: "bg-indigo-500/5",
+    cardHover: "hover:border-indigo-500/40 hover:shadow-[0_0_40px_rgba(99,102,241,0.15)]",
+    pulseLive: "bg-indigo-400 animate-pulse shadow-[0_0_10px_rgba(129,140,248,0.5)]",
+    scanLine: "bg-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.6)]",
+    cornerAccent: "border-indigo-500/40",
+    pulseSecondary: "bg-fuchsia-500 animate-pulse",
+    iconBg: "bg-indigo-500/10 border-indigo-500/20 group-hover:bg-indigo-500/20",
+    headerIconBg: "bg-indigo-500/10",
+    headerBadge: "bg-fuchsia-500/10 border-fuchsia-500/30 text-fuchsia-400 shadow-[0_0_30px_rgba(217,70,239,0.1)]",
+    headerBadgeDot: "bg-fuchsia-400 shadow-[0_0_10px_rgba(232,121,249,0.8)]",
+    spinner: "border-indigo-500/20 border-t-indigo-500",
+    barFill: "from-indigo-400 via-indigo-500 to-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.4)]",
+    textSecondary: "text-fuchsia-400",
+    barCell: "bg-indigo-500/20",
+  },
+  greenwave: {
+    primary: "emerald",
+    secondary: "lime",
+    bgClass: "from-emerald-950/40 to-[#0c0c14]",
+    borderClass: "border-emerald-500/20",
+    textClass: "text-emerald-400",
+    glowClass: "bg-emerald-500/5",
+    cardHover: "hover:border-emerald-500/40 hover:shadow-[0_0_40px_rgba(16,185,129,0.15)]",
+    pulseLive: "bg-emerald-400 animate-pulse shadow-[0_0_10px_rgba(52,211,153,0.5)]",
+    scanLine: "bg-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.6)]",
+    cornerAccent: "border-emerald-500/40",
+    pulseSecondary: "bg-lime-500 animate-pulse",
+    iconBg: "bg-emerald-500/10 border-emerald-500/20 group-hover:bg-emerald-500/20",
+    headerIconBg: "bg-emerald-500/10",
+    headerBadge: "bg-lime-500/10 border-lime-500/30 text-lime-400 shadow-[0_0_30px_rgba(132,204,22,0.1)]",
+    headerBadgeDot: "bg-lime-400 shadow-[0_0_10px_rgba(163,230,53,0.8)]",
+    spinner: "border-emerald-500/20 border-t-emerald-500",
+    barFill: "from-emerald-400 via-emerald-500 to-lime-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]",
+    textSecondary: "text-lime-400",
+    barCell: "bg-emerald-500/20",
+  },
+  liability: {
+    primary: "amber",
+    secondary: "orange",
+    bgClass: "from-amber-950/40 to-[#0c0c14]",
+    borderClass: "border-amber-500/20",
+    textClass: "text-amber-400",
+    glowClass: "bg-amber-500/5",
+    cardHover: "hover:border-amber-500/40 hover:shadow-[0_0_40px_rgba(245,158,11,0.15)]",
+    pulseLive: "bg-amber-400 animate-pulse shadow-[0_0_10px_rgba(251,191,36,0.5)]",
+    scanLine: "bg-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.6)]",
+    cornerAccent: "border-amber-500/40",
+    pulseSecondary: "bg-orange-500 animate-pulse",
+    iconBg: "bg-amber-500/10 border-amber-500/20 group-hover:bg-amber-500/20",
+    headerIconBg: "bg-amber-500/10",
+    headerBadge: "bg-orange-500/10 border-orange-500/30 text-orange-400 shadow-[0_0_30px_rgba(249,115,22,0.1)]",
+    headerBadgeDot: "bg-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.8)]",
+    spinner: "border-amber-500/20 border-t-amber-500",
+    barFill: "from-amber-400 via-amber-500 to-orange-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]",
+    textSecondary: "text-orange-400",
+    barCell: "bg-amber-500/20",
+  },
+  guardian: {
+    primary: "cyan",
+    secondary: "blue",
+    bgClass: "from-blue-950/40 to-[#0c0c14]",
+    borderClass: "border-blue-500/20",
+    textClass: "text-blue-400",
+    glowClass: "bg-blue-500/5",
+    cardHover: "hover:border-blue-500/40 hover:shadow-[0_0_40px_rgba(59,130,246,0.15)]",
+    pulseLive: "bg-blue-400 animate-pulse shadow-[0_0_10px_rgba(96,165,250,0.5)]",
+    scanLine: "bg-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.6)]",
+    cornerAccent: "border-cyan-500/40",
+    pulseSecondary: "bg-cyan-500 animate-pulse",
+    iconBg: "bg-blue-500/10 border-blue-500/20 group-hover:bg-blue-500/20",
+    headerIconBg: "bg-blue-500/10",
+    headerBadge: "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.1)]",
+    headerBadgeDot: "bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]",
+    spinner: "border-blue-500/20 border-t-blue-500",
+    barFill: "from-cyan-400 via-blue-500 to-indigo-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]",
+    textSecondary: "text-cyan-400",
+    barCell: "bg-blue-500/20",
+  },
   hub: {
     primary: "cyan",
     secondary: "indigo",
@@ -377,8 +469,9 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
   const parkingInsights = useParkingInsights();
   const trafficInsights = useTrafficInsights();
   const currentInsights = sectionType === 'parking' ? parkingInsights.insights :
-    sectionType === 'hub' ? { ...parkingInsights.insights, ...trafficInsights.insights } :
-      trafficInsights.insights;
+    sectionType === 'kinetic' ? {} : // Will populate later if needed
+      sectionType === 'hub' ? { ...parkingInsights.insights, ...trafficInsights.insights } :
+        trafficInsights.insights;
   const { setVenue } = useActiveVenue();
 
   // Poll detection events for parking
@@ -913,6 +1006,58 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                   stats={{
                     "Risk": currentInsights?.risk_level || "LOW",
                     "Alerts": "0 ACTIVE"
+                  }}
+                />
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.5 }}>
+                <ServiceCard
+                  title="Kinetic Intelligence"
+                  description="Predictive behavioral analytics and zero-shot kinetic anomaly detection."
+                  icon={BrainCircuit}
+                  href="/smart-kinetic"
+                  theme={THEMES.kinetic}
+                  stats={{
+                    "Status": "STABLE",
+                    "Level": "PREDICTIVE"
+                  }}
+                />
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.6 }}>
+                <ServiceCard
+                  title="Guardian Route"
+                  description="Walk Me Home protocol: Protective tracking, SOS gestures, and anomaly escalation."
+                  icon={Shield}
+                  href="/smart-guardian"
+                  theme={THEMES.guardian}
+                  stats={{
+                    "Escorts": "ACTIVE",
+                    "Threats": "0 DETECTED"
+                  }}
+                />
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.7 }}>
+                <ServiceCard
+                  title="AI Green Wave"
+                  description="Autonomous emergency vehicle routing and traffic preemption protocols."
+                  icon={Zap}
+                  href="/smart-greenwave"
+                  theme={THEMES.greenwave}
+                  stats={{
+                    "Signals": "0 PREEMPTED",
+                    "Saving": "0s DELAY"
+                  }}
+                />
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.7 }}>
+                <ServiceCard
+                  title="Liability Defense"
+                  description="Pre-emptive hazard triaging & medical emergency autonomous detection."
+                  icon={ShieldCheck}
+                  href="/smart-liability"
+                  theme={THEMES.liability}
+                  stats={{
+                    "Triage": "ACTIVE",
+                    "Hazards": "0 DETECTED"
                   }}
                 />
               </motion.div>

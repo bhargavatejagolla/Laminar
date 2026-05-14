@@ -74,6 +74,7 @@ class DetectionResult:
         default_factory=lambda: {"high": 0, "medium": 0, "low": 0})
     inference_time_ms: float = 0.0
     bounding_boxes: List[Dict[str, Any]] = field(default_factory=list)
+    keypoints: List[Dict[str, Any]] = field(default_factory=list) # ✅ Added for pose support
 
 
 class YOLODetector:
@@ -99,6 +100,7 @@ class YOLODetector:
     def __init__(
         self,
         model_name: str = "yolo11m.pt",      # ✅ Medium version for surgical accuracy
+        pose_model_name: str = "yolov8n-pose.pt", # ✅ Pose tracker for kinetic intelligence
         confidence_threshold: float = 0.28,  # ✅ TUNED: 0.28 cuts false positives whilst keeping dense crowd recall
         iou_threshold: float = 0.35,         # ✅ TIGHTENED: 0.35 for sharper NMS in dense crowds
         image_size: int = 640,
@@ -111,6 +113,7 @@ class YOLODetector:
             return
 
         self.model_name = model_name
+        self.pose_model_name = pose_model_name
         self.conf_threshold = confidence_threshold
         self.iou_threshold = iou_threshold
         self.image_size = image_size
@@ -118,6 +121,7 @@ class YOLODetector:
         self.static_diff_threshold = static_diff_threshold
         self.device = self._get_device()
         self.model: Optional[YOLO] = None
+        self.pose_model: Optional[YOLO] = None
         self._initialized = False
         self._total_inferences = 0
         self._total_inference_time = 0.0
@@ -168,11 +172,13 @@ class YOLODetector:
             self.model = YOLO(self.model_name)
             self.model.to(self.device)
 
+            self.pose_model = YOLO(self.pose_model_name)
+            self.pose_model.to(self.device)
+
             # Performance optimizations
             if self.device == "cuda":
                 self.model.model.half()  # FP16 for GPU
-                # Optional: TensorRT export for maximum speed
-                # self.model.export(format="engine", device=self.device)
+                self.pose_model.model.half()
 
             self._initialized = True
 
@@ -537,6 +543,104 @@ class YOLODetector:
             "cpu_threads": self.cpu_threads if self.device == "cpu" else None,
             "memory": self.get_memory_usage(),
         }
+
+    # ==========================================================
+    # Pose Detection (Zero-Shot Kinetic Intelligence)
+    # ==========================================================
+
+    def detect_pose(
+        self,
+        frame: np.ndarray,
+        return_boxes: bool = False,
+        max_boxes: int = 500,
+        _prev_frame: Optional[np.ndarray] = None,
+    ) -> DetectionResult:
+        """
+        Detect persons and their skeletal keypoints in a single frame.
+        """
+        if not self._initialized or self.pose_model is None:
+            raise RuntimeError("YOLO Pose model not initialized")
+
+        if frame is None or frame.size == 0:
+            return DetectionResult()
+
+        start_time = time.time()
+
+        try:
+            frame_lb, scale, (pad_left, pad_top) = _letterbox(frame, self.image_size)
+
+            with torch.inference_mode():
+                with self._inference_lock:
+                    results = self.pose_model.predict(
+                        source=frame_lb,
+                        conf=self.conf_threshold,
+                        iou=self.iou_threshold,
+                        imgsz=self.image_size,
+                        device=self.device,
+                        verbose=False,
+                    )
+
+            result = results[0]
+            inference_time = (time.time() - start_time) * 1000  # ms
+
+            if result.boxes is None or len(result.boxes) == 0:
+                return DetectionResult(inference_time_ms=round(inference_time, 2))
+
+            boxes = result.boxes
+            confidences = boxes.conf.cpu().numpy()
+            
+            # Map coordinates from letterbox back to original image
+            boxes_xyxy = boxes.xyxy.cpu().numpy()
+            for i in range(len(boxes_xyxy)):
+                boxes_xyxy[i, 0] = (boxes_xyxy[i, 0] - pad_left) / scale
+                boxes_xyxy[i, 1] = (boxes_xyxy[i, 1] - pad_top) / scale
+                boxes_xyxy[i, 2] = (boxes_xyxy[i, 2] - pad_left) / scale
+                boxes_xyxy[i, 3] = (boxes_xyxy[i, 3] - pad_top) / scale
+
+            keypoints = None
+            if result.keypoints is not None:
+                keypoints_data = result.keypoints.data.cpu().numpy() # [N, 17, 3] usually
+                keypoints = []
+                for kpts in keypoints_data:
+                    kpt_list = []
+                    for k in kpts:
+                        x, y, conf = k
+                        if conf > 0.5:
+                            kx = (x - pad_left) / scale
+                            ky = (y - pad_top) / scale
+                            kpt_list.append((round(kx, 1), round(ky, 1), round(conf, 3)))
+                        else:
+                            kpt_list.append(None)
+                    keypoints.append(kpt_list)
+            else:
+                keypoints = [None] * len(boxes_xyxy)
+
+            count = len(boxes_xyxy)
+            avg_conf = float(np.mean(confidences)) if count > 0 else 0.0
+
+            result_boxes = []
+            for i, (x1, y1, x2, y2) in enumerate(boxes_xyxy):
+                if i >= max_boxes:
+                    break
+                result_boxes.append({
+                    "class_name": "person",
+                    "bbox": [
+                        (round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1))
+                    ],
+                    "confidence": round(confidences[i], 3),
+                })
+            
+            return DetectionResult(
+                count=count,
+                avg_confidence=avg_conf,
+                inference_time_ms=round(inference_time, 2),
+                bounding_boxes=result_boxes,
+                keypoints=keypoints
+            )
+
+        except Exception as e:
+            logger.error("YOLO Pose inference failed", extra={"error": str(e)}, exc_info=True)
+            return DetectionResult()
 
     def get_memory_usage(self) -> Dict[str, Any]:
         """Track memory usage for monitoring."""

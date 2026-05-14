@@ -43,6 +43,10 @@ class VenueDomain(str, Enum):
     PARKING = "parking"
     TRAFFIC = "traffic"
     INCIDENT = "incident"
+    KINETIC = "kinetic"
+    GREENWAVE = "greenwave"
+    LIABILITY = "liability"
+    GUARDIAN = "guardian"
 
 
 class Venue(BaseModel):

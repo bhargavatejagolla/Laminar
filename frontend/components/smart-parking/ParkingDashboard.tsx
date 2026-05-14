@@ -13,6 +13,8 @@ import { api } from "@/services/api";
 import SplashCursor from "@/components/react-bits/SplashCursor";
 import { useParkingInsights, useParkingEvents } from "@/hooks/useTelemetry";
 import { IntelligenceMap } from "@/components/map/IntelligenceMap";
+import { useActiveVenue } from "@/hooks/useActiveVenue";
+import { useSearchParams } from "next/navigation";
 
 // ── STAT CARD ──
 function StatCard({ label, value, icon: Icon, color, pulse }: { label: string, value: any, icon: any, color: string, pulse?: boolean }) {
@@ -35,23 +37,52 @@ export function ParkingDashboard() {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
-  const [venueId, setVenueId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const { activeVenueId, setVenue } = useActiveVenue();
+  const urlVenueId = searchParams.get("venue_id");
+  const urlCamId = searchParams.get("camera_id");
 
-  // Derived effective data
-  const activeData = analysisData || data;
-  const isAnalysisMode = !!analysisData;
+  const [venueId, setVenueId] = useState<string | null>(urlVenueId || activeVenueId);
+  const [cameras, setCameras] = useState<any[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (urlVenueId && urlVenueId !== activeVenueId) setVenue(urlVenueId);
+  }, [urlVenueId, activeVenueId, setVenue]);
+
+  useEffect(() => {
+    if (activeVenueId) setVenueId(activeVenueId);
+  }, [activeVenueId]);
+
+  useEffect(() => {
+    if (venueId) return;
     const fetchVenues = async () => {
       try {
         const res = await api.get("/venues");
         const venues = res.data?.items ? res.data.items : Array.isArray(res.data) ? res.data : [];
-        const parkingVenue = venues.find((v: any) => v.venue_type?.toLowerCase().includes("parking")) || venues[0];
-        if (parkingVenue) setVenueId(parkingVenue.id);
+        if (venues && venues.length > 0) {
+            setVenueId(venues[0].id);
+            setVenue(venues[0].id);
+        }
       } catch (e) { console.error("Venue resolution failed", e); }
     };
     fetchVenues();
-  }, []);
+  }, [venueId, setVenue]);
+
+  useEffect(() => {
+    if (!venueId) return;
+    let mounted = true;
+    api.get(`/cameras?venue_id=${venueId}`).then((r) => {
+        if(!mounted) return;
+        const cams = Array.isArray(r.data) ? r.data : [];
+        setCameras(cams);
+        if(cams.length > 0 && !activeCameraId) {
+            const selected = urlCamId ? cams.find((c: any) => c.id === urlCamId) || cams[0] : cams[0];
+            setActiveCameraId(selected.id);
+        }
+    }).catch(console.error);
+    return () => { mounted = false; };
+  }, [venueId, urlCamId, activeCameraId]);
 
   // ── PDF Export ──
   const handleExportPDF = useCallback(async () => {
@@ -176,11 +207,29 @@ export function ParkingDashboard() {
         {/* LEFT: Feed & Upload */}
         <div className="flex-1 flex flex-col gap-6">
           <div className="flex-[3] rounded-2xl border border-white/10 bg-black overflow-hidden relative group shadow-2xl">
-            <div className="absolute top-4 left-4 z-10 flex gap-2">
-              <div className="bg-rose-500 text-white text-[8px] font-black px-2 py-1 rounded-sm tracking-widest flex items-center gap-1.5 uppercase shadow-xl animate-pulse">
+            <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
+              <div className="bg-rose-500 text-white text-[8px] font-black px-2 py-1 rounded-sm tracking-widest flex items-center gap-1.5 uppercase shadow-xl animate-pulse self-start">
                 <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
                 LIVE_SPATIAL_FEED
               </div>
+              
+              {cameras.length > 0 && (
+                <div className="flex gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/10 rounded-xl">
+                  {cameras.map((c, i) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setActiveCameraId(c.id)}
+                      className={`px-3 py-1.5 rounded-lg text-[9px] font-black tracking-widest uppercase transition-all ${
+                        activeCameraId === c.id 
+                          ? 'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]' 
+                          : 'bg-transparent text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      Node {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="absolute top-4 right-4 z-20">
@@ -193,7 +242,7 @@ export function ParkingDashboard() {
 
             <div className="w-full h-full bg-[url('/grid.svg')] bg-center relative flex items-center justify-center">
               <img
-                src={`/api/v1/parking/feed?t=${Date.now()}`}
+                src={activeCameraId ? `/api/v1/parking/stream/${activeCameraId}?t=${Date.now()}` : `/api/v1/parking/feed?t=${Date.now()}`}
                 alt="Tactical Feed"
                 className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${isAnalysisMode ? 'opacity-100' : 'opacity-80 mix-blend-screen'}`}
               />

@@ -300,18 +300,16 @@ TECH STACK:
 CORE FEATURES:
 1. Venues — Physical locations monitored 24/7. Each venue has capacity, warning/critical thresholds, active cameras.
 2. Smart City Modules — High-fidelity tracking for Traffic Volume, Vehicle/Pedestrian Velocity, and Parking Slot Occupancy.
-3. Cameras — IP/RTSP cameras attached to venues, each streaming live video for AI detection.
-4. Crowd Metrics — Minute and hourly aggregate stats (avg_count, max_count, risk_level) per venue and per camera.
-5. Crowd Alerts — Auto-generated when crowd size exceeds thresholds. Risk levels: low/medium/high/critical.
-6. Live Map — Geographic venue overview with real-time heatmaps.
-7. Surge Monitor — Predictive surge detection using trend analysis.
-8. Prediction Engine — AI forecasts for crowd risk over the next intervals.
-9. Journey Tracking — Re-ID pipeline tracking persons across cameras. Computes wait times, dwell times.
-10. Person Wait Monitor — Real-time and historical wait time analytics per venue.
-11. Intelligence Reports — AI-written executive situation reports with recommended actions.
-12. Alerts Dashboard — Manage, escalate, and resolve crowd alerts.
-13. Command Center — Top-level system overview: venues, cameras, AI health, pipeline status.
-14. Randy AI Chat — This AI assistant; understands everything about the platform and general knowledge completely unrestrictedly.
+3. Multi-Modal IoT Sensor Matrix — If cameras are offline or unavailable, Laminar ingests alternative telemetry data (LiDAR, Wi-Fi Mac Address Sniffing, BLE Beacons, Acoustic/Gunshot Sensors) to maintain uninterrupted zone coverage.
+4. Autonomous Liability Defense — Real-time slip, fall, and hazard detection algorithms protecting corporations from lawsuits.
+5. Guardian Route — Turns cameras into an AI Personal Escort, tracking kinetic panic and stalking geometries for personal safety.
+6. AI Green Wave — Predictive traffic seizure system that instantly turns city lights green for dispatched emergency vehicles.
+7. Instant AMBER Rescue — Zero-latency multi-node semantic tracking capable of locating and trailing missing persons over time.
+8. 4D Spatial Playback Engine — A "Time Machine" utilizing WebGL pseudo-homography to stitch multiple live/past feeds into a fully navigable 3D environment.
+9. Cameras — IP/RTSP cameras attached to venues, each streaming live video for AI detection.
+10. Crowd Metrics & Surge Monitor — Minute and hourly aggregate stats and predictive surge detection.
+11. Intelligence Reports — AI-written executive situation reports.
+12. Randy AI Chat — This AI assistant; understands everything about the platform and answers questions flawlessly using this robust context.
 
 DATABASE MODELS:
 - Venue: id, name, venue_type (parking, traffic, crowd), location, capacity, is_active, is_deleted, warning_threshold, critical_threshold

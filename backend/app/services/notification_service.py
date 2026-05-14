@@ -171,7 +171,7 @@ class NotificationService:
         steps: list = guide["steps"]
         location_suffix = f" — {cam_location}" if cam_location else ""
 
-        role_recipients = await self._resolve_recipients(session, alert)
+        role_recipients = await self._resolve_recipients(session, alert.risk_level, extra)
         if not role_recipients:
             return
 
@@ -320,7 +320,7 @@ class NotificationService:
         if alert.extra_data and alert.extra_data.get("camera_location"):
             location_text = alert.extra_data.get("camera_location")
             
-        role_recipients = await self._resolve_recipients(session, alert)
+        role_recipients = await self._resolve_recipients(session, alert.risk_level, alert.extra_data)
         if not role_recipients:
             return
         
@@ -387,7 +387,11 @@ class NotificationService:
                     
         # Send Offline SMS (using simulation mode typically, but routing logic counts)
         try:
-            stmt = select(User.phone_number, User.language_preference).where(User.receive_sms_alerts == True, User.phone_number.isnot(None))
+            stmt = select(User.phone_number, User.language_preference).where(
+                User.receive_sms_alerts == True,
+                User.is_active == True,
+                User.phone_number.isnot(None)
+            )
             result = await session.execute(stmt)
             contacts = result.all()
             
@@ -475,7 +479,11 @@ class NotificationService:
         # Get SMS recipient count for critical alerts
         sms_count = 0
         if alert.risk_level in ["critical", "high", "medium"]:
-            stmt_sms = select(User.phone_number).where(User.receive_sms_alerts == True, User.phone_number.isnot(None))
+            stmt_sms = select(User.phone_number).where(
+                User.receive_sms_alerts == True,
+                User.is_active == True,
+                User.phone_number.isnot(None)
+            )
             result_sms = await session.execute(stmt_sms)
             sms_count = len(result_sms.all())
 
@@ -727,7 +735,11 @@ class NotificationService:
         try:
             from app.models.user import User
             logger.info("Fetching registered SMS contacts from User accounts...")
-            stmt = select(User.phone_number, User.language_preference).where(User.receive_sms_alerts == True, User.phone_number.isnot(None))
+            stmt = select(User.phone_number, User.language_preference).where(
+                User.receive_sms_alerts == True,
+                User.is_active == True,
+                User.phone_number.isnot(None)
+            )
             result = await session.execute(stmt)
             contacts = result.all()
 

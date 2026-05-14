@@ -260,7 +260,7 @@ export function TrafficDashboard() {
 
   useEffect(() => {
     let mounted = true;
-    api.get("/cameras")
+    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}` : "/cameras")
       .then((r) => {
         if (!mounted) return;
         const cams = Array.isArray(r.data) ? r.data : [];
@@ -272,7 +272,7 @@ export function TrafficDashboard() {
       })
       .catch(() => { });
     return () => { mounted = false; };
-  }, [activeCameraId, urlCamId]);
+  }, [activeCameraId, urlCamId, activeVenueId]);
 
   const handleCaptureVideo = async () => {
     if (!activeCameraId) return;

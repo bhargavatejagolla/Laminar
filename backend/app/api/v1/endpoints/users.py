@@ -253,3 +253,26 @@ async def map_user_venues(
         resp = UserAdminResponse.model_validate(target_user)
         resp.venues_mapped = [v.id for v in target_user.venues]
         return resp
+
+@router.delete("/{target_user_id}", response_model=UserAdminResponse)
+async def deactivate_user(
+    target_user_id: UUID,
+    user: User = Depends(require_role(UserRole.SUPER_ADMIN))
+):
+    """Deactivate a user account (soft-delete)."""
+    async with db_manager.session() as session:
+        target_user = await session.get(User, target_user_id, options=[selectinload(User.venues)])
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if target_user.id == user.id:
+            raise HTTPException(status_code=400, detail="Cannot deactivate your own account")
+
+        target_user.is_active = False
+        await session.commit()
+        await session.refresh(target_user)
+        
+        resp = UserAdminResponse.model_validate(target_user)
+        resp.venues_mapped = [v.id for v in getattr(target_user, 'venues', [])]
+        return resp
+

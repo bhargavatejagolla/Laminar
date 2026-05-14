@@ -38,7 +38,12 @@ from app.api.v1.endpoints.parking import router as parking_router
 from app.api.v1.endpoints.telemetry import router as telemetry_router
 from app.api.v1.endpoints.traffic import router as traffic_router
 from app.api.v1.endpoints.incident import router as incident_router
+from app.api.v1.endpoints.kinetic import router as kinetic_router
 from app.api.v1.endpoints.notifications import router as notifications_router
+from app.api.v1.endpoints.greenwave import router as greenwave_router
+from app.api.v1.endpoints.guardian import router as guardian_router
+from app.api.v1.endpoints.amber import router as amber_router
+from app.api.v1.endpoints.spatial import router as spatial_router
 
 # ── New Advanced AI Feature Routers ──────────────────────────────────────────
 from app.api.v1.endpoints.websocket import router as ws_router
@@ -83,6 +88,11 @@ router.include_router(parking_router, prefix="/parking", tags=["Smart Parking"])
 router.include_router(telemetry_router, prefix="/telemetry", tags=["Telemetry State"])
 router.include_router(traffic_router, prefix="/traffic", tags=["Smart Traffic Control"])
 router.include_router(incident_router, prefix="/incident", tags=["Emergency Incident Awareness"])
+router.include_router(kinetic_router, prefix="/kinetic", tags=["Zero-Shot Kinetic Intelligence"])
+router.include_router(greenwave_router, prefix="/greenwave", tags=["AI Green Wave Activation"])
+router.include_router(guardian_router, prefix="/guardian", tags=["Guardian AI"])
+router.include_router(amber_router, prefix="/amber", tags=["Amber AI"])
+router.include_router(spatial_router, prefix="/spatial", tags=["Spatial AI"])
 router.include_router(notifications_router, prefix="/notifications", tags=["Global Mesh Notifications"])
 
 # ── New Advanced AI Feature Routes ───────────────────────────────────────────

@@ -181,6 +181,7 @@ export default function AccessControlPage() {
   const [search, setSearch] = useState("");
   const [assignModal, setAssignModal] = useState<UserRecord | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [removingUser, setRemovingUser] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -223,9 +224,26 @@ export default function AccessControlPage() {
     }
   };
 
+  const handleRemoveUser = async (userId: string) => {
+    if (!window.confirm("Are you sure you want to remove this operator? Their access will be revoked but data will be preserved.")) return;
+    
+    setRemovingUser(userId);
+    try {
+      await api.delete(`/users/${userId}`);
+      toast.success("Operator removed from matrix");
+      setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Failed to remove operator");
+    } finally {
+      setRemovingUser(null);
+    }
+  };
+
   const filtered = users.filter(u =>
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    (u.name ?? "").toLowerCase().includes(search.toLowerCase())
+    u.is_active && (
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.name ?? "").toLowerCase().includes(search.toLowerCase())
+    )
   );
 
   const stats = {
@@ -445,13 +463,25 @@ export default function AccessControlPage() {
                                     </div>
                                   )}
                                   {u.role !== "super_admin" && (
-                                    <motion.button
-                                      whileHover={{ scale: 1.1, rotate: 5 }}
-                                      onClick={() => setAssignModal(u)}
-                                      className="w-8 h-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all shadow-lg"
-                                    >
-                                      <MapPin className="w-4 h-4" />
-                                    </motion.button>
+                                    <>
+                                      <motion.button
+                                        whileHover={{ scale: 1.1, rotate: 5 }}
+                                        onClick={() => setAssignModal(u)}
+                                        className="w-8 h-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all shadow-lg"
+                                      >
+                                        <MapPin className="w-4 h-4" />
+                                      </motion.button>
+                                      {isSuperAdmin && (
+                                        <motion.button
+                                          whileHover={{ scale: 1.1, rotate: -5 }}
+                                          onClick={() => handleRemoveUser(u.id)}
+                                          disabled={removingUser === u.id}
+                                          className="w-8 h-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-500 hover:text-rose-400 hover:border-rose-500/30 transition-all shadow-lg disabled:opacity-50"
+                                        >
+                                          {removingUser === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserX className="w-4 h-4" />}
+                                        </motion.button>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               )}

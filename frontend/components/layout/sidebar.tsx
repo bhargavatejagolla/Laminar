@@ -29,7 +29,9 @@ import {
   Car,
   Globe,
   TrafficCone,
-  ShieldAlert
+  ShieldAlert,
+  Shield,
+  Box
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useAlerts } from "@/hooks/useAlerts";
@@ -77,8 +79,14 @@ export default function Sidebar() {
       label: "Smart City OS",
       items: [
         { nameKey: "nav.systemsHub", name: "Systems Hub", href: "/smart-systems", icon: Globe, show: true },
+        { nameKey: "nav.amberRescue", name: "Instant AMBER", href: "/amber-rescue", icon: Target, show: true },
+        { nameKey: "nav.spatialEngine", name: "4D Spatial Engine", href: "/spatial-engine", icon: Box, show: true },
         { nameKey: "nav.smartParking", name: "Smart Parking", href: "/smart-parking", icon: Car, show: true },
         { nameKey: "nav.trafficControl", name: "Traffic Control", href: "/smart-traffic", icon: TrafficCone, show: isAdmin },
+        { nameKey: "nav.smartKinetic", name: "Kinetic SOS", href: "/smart-kinetic", icon: BrainCircuit, show: true },
+        { nameKey: "nav.guardianRoute", name: "Guardian Route", href: "/smart-guardian", icon: Shield, show: true },
+        { nameKey: "nav.aiGreenWave", name: "AI Green Wave", href: "/smart-greenwave", icon: Zap, show: true },
+        { nameKey: "nav.liabilityDefense", name: "Liability Defense", href: "/smart-liability", icon: ShieldCheck, show: true },
         { nameKey: "nav.incidentResponse", name: "Incident Response", href: "/smart-incidents", icon: ShieldAlert, show: isAdmin },
       ].filter(i => i.show)
     },

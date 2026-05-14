@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { toast } from "sonner";
-import { Plus, X, Building, Users, AlertTriangle, CloudLightning, Car, Activity, Flame, ShieldCheck } from "lucide-react";
+import { Plus, X, Building, Users, AlertTriangle, CloudLightning, Car, Activity, Flame, ShieldCheck, BrainCircuit, Zap, Shield } from "lucide-react";
 import { MapPicker } from "@/components/map/MapPicker";
 import { useTranslation } from "react-i18next";
 import { useVenues } from "@/hooks/useVenues";
@@ -52,8 +52,8 @@ export default function AddVenueModal({ isOpen, onClose }: Props) {
         typeof detail === "string"
           ? detail
           : Array.isArray(detail)
-          ? detail.map((d: any) => d.msg || d).join(", ")
-          : "Failed to create venue. Check your role or try again.";
+            ? detail.map((d: any) => d.msg || d).join(", ")
+            : "Failed to create venue. Check your role or try again.";
       toast.error(msg);
     },
   });
@@ -156,12 +156,12 @@ export default function AddVenueModal({ isOpen, onClose }: Props) {
                   }}
                 />
               </div>
-                <p className="text-[10px] text-slate-500 font-mono">Current Coordinates: [{formData.latitude?.toFixed(6)}, {formData.longitude?.toFixed(6)}]</p>
-                <div className="flex items-center gap-2 mt-1 px-2 py-1 rounded bg-cyan-500/5 border border-cyan-500/20 w-fit">
-                  <CloudLightning className="w-3 h-3 text-cyan-400 animate-pulse" />
-                  <span className="text-[9px] font-black uppercase tracking-tighter text-cyan-300">Geo-Telemetry & Climate Sync Active</span>
-                </div>
-                <p className="text-[9px] text-slate-600 italic leading-none mt-1">Linked to Prediction Engine for live weather & temperature ingestion.</p>
+              <p className="text-[10px] text-slate-500 font-mono">Current Coordinates: [{formData.latitude?.toFixed(6)}, {formData.longitude?.toFixed(6)}]</p>
+              <div className="flex items-center gap-2 mt-1 px-2 py-1 rounded bg-cyan-500/5 border border-cyan-500/20 w-fit">
+                <CloudLightning className="w-3 h-3 text-cyan-400 animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-tighter text-cyan-300">Geo-Telemetry & Climate Sync Active</span>
+              </div>
+              <p className="text-[9px] text-slate-600 italic leading-none mt-1">Linked to Prediction Engine for live weather & temperature ingestion.</p>
             </div>
 
             <div className="space-y-4">
@@ -171,16 +171,19 @@ export default function AddVenueModal({ isOpen, onClose }: Props) {
                   { id: "people", label: "People Intelligence", icon: Users, color: "text-blue-400", desc: "Crowd, Security & Flow" },
                   { id: "parking", label: "Smart Parking", icon: Car, color: "text-emerald-400", desc: "Vehicles & Occupancy" },
                   { id: "traffic", label: "Traffic Intelligence", icon: Activity, color: "text-amber-400", desc: "Traffic & Incident Tracking" },
+                  { id: "kinetic", label: "Kinetic SOS", icon: BrainCircuit, color: "text-indigo-400", desc: "Behavioral Intel" },
+                  { id: "guardian", label: "Guardian Route", icon: Shield, color: "text-blue-400", desc: "AI Escort Tracker" },
+                  { id: "greenwave", label: "AI Green Wave", icon: Zap, color: "text-emerald-400", desc: "Traffic Signal Preemption" },
+                  { id: "liability", label: "Liability Defense", icon: ShieldCheck, color: "text-rose-400", desc: "Predictive Triage" },
                 ].map((domain) => (
                   <button
                     key={domain.id}
                     type="button"
                     onClick={() => setFormData({ ...formData, venue_type: domain.id })}
-                    className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left group ${
-                      formData.venue_type === domain.id 
-                      ? "bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]" 
+                    className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left group ${formData.venue_type === domain.id
+                      ? "bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]"
                       : "bg-[#020617] border-slate-700 hover:border-slate-500"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <domain.icon className={`w-4 h-4 ${formData.venue_type === domain.id ? "text-cyan-400" : domain.color}`} />

@@ -100,7 +100,7 @@ class LaminarAIService:
             
         return "casual"
 
-    async def _try_local_http(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 60.0, max_tokens: int = 80) -> Optional[str]:
+    async def _try_local_http(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 120.0, max_tokens: int = 2000) -> Optional[str]:
         """Attempt local inference via HTTP (e.g., llama.cpp server)."""
         payload = {
             "model": "mistral",
@@ -130,7 +130,7 @@ class LaminarAIService:
             
         return None
 
-    async def _try_groq(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 30.0) -> Optional[str]:
+    async def _try_groq(self, messages: List[Dict[str, str]], is_json: bool = False, timeout: float = 60.0) -> Optional[str]:
         """Attempt inference via Groq API."""
         if not self.groq_key:
             return None
@@ -145,7 +145,7 @@ class LaminarAIService:
             "model": self.groq_model,
             "messages": messages,
             "temperature": 0.2,
-            "max_tokens": 500
+            "max_tokens": 2048
         }
         
         if is_json:
@@ -168,7 +168,7 @@ class LaminarAIService:
             logger.warning(f"Groq Exception: {e}")
         return None
 
-    async def _try_gemini(self, prompt: str, timeout: float = 10.0) -> Optional[str]:
+    async def _try_gemini(self, prompt: str, timeout: float = 60.0) -> Optional[str]:
         """Attempt inference via Google Gemini API."""
         if not self.gemini_key:
             return None
@@ -183,7 +183,7 @@ class LaminarAIService:
                 "temperature": 0.2,
                 "topP": 0.8,
                 "topK": 40,
-                "maxOutputTokens": 500
+                "maxOutputTokens": 2048
             }
         }
 
@@ -222,7 +222,7 @@ class LaminarAIService:
             return (res, "Groq") if return_provider_name else res
 
         # 2. Local HTTP (Fallback to llama.cpp)
-        local_tokens = 250 if is_json else 100
+        local_tokens = 2000 if is_json else 1000
         res = await _try_with_retry(self._try_local_http, messages, is_json=is_json, timeout=300.0, max_tokens=local_tokens)
         if res:
             logger.info("Generated AI response locally via HTTP Server")

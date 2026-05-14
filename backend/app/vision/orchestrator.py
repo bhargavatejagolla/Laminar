@@ -131,6 +131,15 @@ class VisionOrchestrator:
             elif venue_type == VenueDomain.INCIDENT:
                 from app.vision.incident_worker import IncidentWorker
                 worker = IncidentWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
+            elif venue_type in (VenueDomain.KINETIC, VenueDomain.LIABILITY):
+                from app.vision.kinetic_worker import KineticWorker
+                worker = KineticWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
+            elif venue_type == VenueDomain.GREENWAVE:
+                from app.vision.greenwave_worker import GreenWaveWorker
+                worker = GreenWaveWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
+            elif venue_type == VenueDomain.GUARDIAN:
+                from app.vision.guardian_worker import GuardianWorker
+                worker = GuardianWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
             else:
                 logger.error(f"Unknown venue domain '{venue_type}' for camera {camera.id}")
                 return
