@@ -2,6 +2,7 @@
 Laminar - Main Application Entrypoint (Reload Triggered)
 ---------------------------------------
 """
+# Deploy trigger: final path syntax update
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
