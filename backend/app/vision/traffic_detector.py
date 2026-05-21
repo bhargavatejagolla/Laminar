@@ -10,7 +10,6 @@ import asyncio
 import time
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
-from ultralytics import YOLO
 import cv2
 from datetime import datetime, timezone
 
@@ -141,6 +140,7 @@ class TrafficDetector:
         async with TrafficDetector._load_lock:
             if self.model_name not in TrafficDetector._model_cache:
                 logger.info(f"LAZY LOAD: Initializing Traffic YOLO {self.model_name}...")
+                from ultralytics import YOLO
                 loop = asyncio.get_event_loop()
                 model = await loop.run_in_executor(None, YOLO, self.model_name)
                 TrafficDetector._model_cache[self.model_name] = model
@@ -324,4 +324,15 @@ class TrafficDetector:
         }
 
 
-traffic_detector = TrafficDetector()
+_traffic_detector = None
+def get_traffic_detector():
+    global _traffic_detector
+    if _traffic_detector is None:
+        _traffic_detector = TrafficDetector()
+    return _traffic_detector
+
+class LazyTrafficDetector:
+    def __getattr__(self, name):
+        return getattr(get_traffic_detector(), name)
+
+traffic_detector = LazyTrafficDetector()

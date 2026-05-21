@@ -24,15 +24,10 @@ import time
 import os
 from dataclasses import dataclass, field
 
-# ── 🔴 OFFLINE MODE [FIX FOR BOOT HANGS] ──────────────────────────
-os.environ["ULTRALYTICS_OFFLINE"] = "True"
-os.environ["YOLO_VERBOSE"] = "False"
 # ────────────────────────────────────────────────────────────────
 
 import cv2
-import torch
 import numpy as np
-from ultralytics import YOLO
 
 
 def _letterbox(img: np.ndarray, target_size: int) -> Tuple[np.ndarray, float, Tuple[int, int]]:
@@ -52,13 +47,6 @@ def _letterbox(img: np.ndarray, target_size: int) -> Tuple[np.ndarray, float, Tu
     pad_top  = (target_size - new_h) // 2
     canvas[pad_top:pad_top + new_h, pad_left:pad_left + new_w] = resized
     return canvas, scale, (pad_left, pad_top)
-
-# Fix for PyTorch 2.6+ secure weights_only unpickling rejecting Ultralytics models
-try:
-    import ultralytics.nn.tasks
-    torch.serialization.add_safe_globals([ultralytics.nn.tasks.DetectionModel])
-except (ImportError, AttributeError):
-    pass
 
 from app.core.logging import get_logger
 
@@ -119,9 +107,8 @@ class YOLODetector:
         self.image_size = image_size
         self.cpu_threads = 1  # Forced to 1 to prevent Windows uvicorn deadlocks
         self.static_diff_threshold = static_diff_threshold
-        self.device = self._get_device()
-        self.model: Optional[YOLO] = None
-        self.pose_model: Optional[YOLO] = None
+        self.model: Optional[Any] = None
+        self.pose_model: Optional[Any] = None
         self._initialized = False
         self._total_inferences = 0
         self._total_inference_time = 0.0
@@ -146,6 +133,16 @@ class YOLODetector:
 
     def _load_model(self) -> None:
         """Load YOLO model with error handling and CPU optimizations."""
+        import torch
+        from ultralytics import YOLO
+
+        # Fix for PyTorch 2.6+ secure weights_only unpickling rejecting Ultralytics models
+        try:
+            import ultralytics.nn.tasks
+            torch.serialization.add_safe_globals([ultralytics.nn.tasks.DetectionModel])
+        except (ImportError, AttributeError):
+            pass
+
         try:
             logger.info(
                 "Loading YOLO model",
@@ -220,6 +217,7 @@ class YOLODetector:
 
         logger.info("Warming up YOLO model")
 
+        import torch
         # Test with different sizes to warm up kernels
         for size in [320, self.image_size]:
             dummy = np.zeros((size, size, 3), dtype=np.uint8)
@@ -274,6 +272,7 @@ class YOLODetector:
             # Plain cv2.resize squashes people into squares → missed detections
             frame_lb, scale, (pad_left, pad_top) = _letterbox(frame, self.image_size)
 
+            import torch
             # ✅ PERFORMANCE FIX: inference_mode is a strict superset of no_grad
             # It skips even more overhead (version counter tracking, etc.)
             with torch.inference_mode():
@@ -412,6 +411,7 @@ class YOLODetector:
             frames_lb = [d[0] for d in batch_data]
             meta = [d[1:] for d in batch_data] # (scale, (pad_l, pad_t))
 
+            import torch
             # Batch inference on GPU
             with torch.inference_mode():
                 results = self.model.predict(
@@ -514,6 +514,7 @@ class YOLODetector:
             extra={"model": self.model_name}
         )
 
+        import torch
         # Clean up old model
         self.model = None
         if torch.cuda.is_available():
@@ -569,6 +570,7 @@ class YOLODetector:
         try:
             frame_lb, scale, (pad_left, pad_top) = _letterbox(frame, self.image_size)
 
+            import torch
             with torch.inference_mode():
                 with self._inference_lock:
                     results = self.pose_model.predict(
@@ -645,6 +647,7 @@ class YOLODetector:
     def get_memory_usage(self) -> Dict[str, Any]:
         """Track memory usage for monitoring."""
         if self.device == "cuda":
+            import torch
             try:
                 allocated = torch.cuda.memory_allocated() / 1024**2  # MB
                 reserved = torch.cuda.memory_reserved() / 1024**2  # MB
@@ -673,6 +676,7 @@ class YOLODetector:
 
     def shutdown(self) -> None:
         """Cleanup model and release resources."""
+        import torch
         logger.info("Shutting down YOLO detector")
         self.model = None
         self._initialized = False

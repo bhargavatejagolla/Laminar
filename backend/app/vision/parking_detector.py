@@ -9,8 +9,6 @@ Filters for cars, trucks, buses, and motorcycles.
 import asyncio
 from typing import Tuple, List, Dict, Any, Optional
 import numpy as np
-import torch
-from ultralytics import YOLO
 import cv2
 from datetime import datetime, timezone
 
@@ -143,6 +141,7 @@ class ParkingDetector:
             if self.model_name not in ParkingDetector._model_cache:
                 logger.info(f"LAZY LOAD: Initializing YOLO model {self.model_name}...")
                 # Run the blocking YOLO load in an executor
+                from ultralytics import YOLO
                 loop = asyncio.get_event_loop()
                 model = await loop.run_in_executor(None, YOLO, self.model_name)
                 ParkingDetector._model_cache[self.model_name] = model
@@ -359,5 +358,16 @@ class ParkingDetector:
         }
 
 # Singleton instance
-parking_detector = ParkingDetector()
+_parking_detector = None
+def get_parking_detector():
+    global _parking_detector
+    if _parking_detector is None:
+        _parking_detector = ParkingDetector()
+    return _parking_detector
+
+class LazyParkingDetector:
+    def __getattr__(self, name):
+        return getattr(get_parking_detector(), name)
+
+parking_detector = LazyParkingDetector()
 

@@ -1,10 +1,6 @@
 import numpy as np
 import cv2
-import torch
-import torch.nn.functional as F
-from torchvision import models, transforms
-from torchvision.models import ResNet18_Weights
-from typing import List
+from typing import List, Any
 
 class ReIDService:
     """
@@ -13,6 +9,10 @@ class ReIDService:
     allowing highly robust matchings for the same identity across frames and cameras.
     """
     def __init__(self):
+        import torch
+        from torchvision import models, transforms
+        from torchvision.models import ResNet18_Weights
+
         # Determine device
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
@@ -58,6 +58,9 @@ class ReIDService:
         crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         
         try:
+            import torch
+            import torch.nn.functional as F
+
             # Apply transforms: output is [3, 224, 224] Tensor
             tensor = self.transform(crop_rgb)
             # Add batch dimension: [1, 3, 224, 224]
@@ -93,5 +96,16 @@ class ReIDService:
         # Vectors are L2 normalized, so dot product = cosine similarity
         return float(np.dot(emb1, emb2))
 
-reid_service = ReIDService()
+_reid_service = None
+def get_reid_service():
+    global _reid_service
+    if _reid_service is None:
+        _reid_service = ReIDService()
+    return _reid_service
+
+class LazyReIDService:
+    def __getattr__(self, name):
+        return getattr(get_reid_service(), name)
+
+reid_service = LazyReIDService()
 

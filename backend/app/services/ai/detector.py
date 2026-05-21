@@ -1,8 +1,6 @@
-import torch
 import numpy as np
-from ultralytics import YOLO
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
 
 from app.services.ai.detection_result import DetectionResult, BoundingBox
@@ -29,6 +27,8 @@ class YOLODetector:
         confidence_threshold: float = 0.4,
         device: Optional[str] = None,
     ):
+        import torch
+        from ultralytics import YOLO
         self.confidence_threshold = confidence_threshold
 
         # Auto device selection

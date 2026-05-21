@@ -8,8 +8,6 @@ Detects accidents, fires, and safety breaches.
 
 from typing import Tuple, List, Dict, Any
 import numpy as np
-import torch
-from ultralytics import YOLO
 import cv2
 from datetime import datetime, timezone
 import random
@@ -25,6 +23,7 @@ class IncidentDetector:
     """
 
     def __init__(self, model_name: str = "yolo11n.pt", conf: float = 0.25):
+        from ultralytics import YOLO
         self.model_name = model_name
         self.conf = conf
         self.device = "cpu"
@@ -142,4 +141,15 @@ class IncidentDetector:
             logger.error(f"Incident detection error: {e}")
             return [], frame, {}
 
-incident_detector = IncidentDetector()
+_incident_detector = None
+def get_incident_detector():
+    global _incident_detector
+    if _incident_detector is None:
+        _incident_detector = IncidentDetector()
+    return _incident_detector
+
+class LazyIncidentDetector:
+    def __getattr__(self, name):
+        return getattr(get_incident_detector(), name)
+
+incident_detector = LazyIncidentDetector()
