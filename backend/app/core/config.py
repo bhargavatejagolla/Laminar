@@ -121,7 +121,20 @@ class Settings(BaseSettings):
         """
         Build async PostgreSQL connection URL.
         Uses asyncpg driver for optimal performance.
+        Dynamically uses the environment-provided DATABASE_URL (e.g. Neon)
+        if running in production/staging environments, otherwise defaults to local Docker DB.
         """
+        import os
+        db_url = os.getenv("DATABASE_URL")
+        if db_url and self.ENVIRONMENT in ("production", "staging"):
+            # Ensure it uses postgresql+asyncpg for async SQLAlchemy
+            if db_url.startswith("postgresql://"):
+                db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            from pydantic import TypeAdapter
+            return TypeAdapter(PostgresDsn).validate_python(db_url)
+
         return PostgresDsn.build(
             scheme="postgresql+asyncpg",
             username=self.POSTGRES_USER,
@@ -137,7 +150,20 @@ class Settings(BaseSettings):
         """
         Build sync PostgreSQL connection URL for Alembic.
         Removes asyncpg driver specification for compatibility.
+        Dynamically uses the environment-provided DATABASE_URL (e.g. Neon)
+        if running in production/staging environments, otherwise defaults to local Docker DB.
         """
+        import os
+        db_url = os.getenv("DATABASE_URL")
+        if db_url and self.ENVIRONMENT in ("production", "staging"):
+            # Ensure it uses standard postgresql/postgres scheme for sync (like Alembic)
+            if db_url.startswith("postgresql+asyncpg://"):
+                db_url = db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+            elif db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+            from pydantic import TypeAdapter
+            return TypeAdapter(PostgresDsn).validate_python(db_url)
+
         return PostgresDsn.build(
             scheme="postgresql",
             username=self.POSTGRES_USER,

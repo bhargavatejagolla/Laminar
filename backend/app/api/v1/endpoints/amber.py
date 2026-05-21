@@ -24,10 +24,12 @@ class AmberResponse(BaseModel):
     total_cameras_scanned: int
     trajectory: List[AmberTrajectoryPoint]
 
+from typing import List, Dict, Any, Optional
+
 @router.post("/upload", response_model=AmberResponse)
 async def activate_amber_alert(
-    venue_id: str,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    venue_id: Optional[str] = None
 ):
     """
     Activates the Zero-Latency AMBER Protocol.
@@ -41,12 +43,15 @@ async def activate_amber_alert(
     # In a real environment, this passes through FaceNet or CLIP
     
     # Check live cameras in this venue from our orchestrator pool
-    all_cameras = CameraManager.list_cameras()
-    venue_cameras = [c for c in all_cameras if c.venue_id == venue_id]
+    all_cameras = await CameraManager.list_cameras()
+    
+    venue_cameras = []
+    if venue_id:
+        venue_cameras = [c for c in all_cameras if str(c.venue_id) == str(venue_id)]
     
     if not venue_cameras:
-        # Fallback to any active cameras if venue isn't perfectly mapped
-        venue_cameras = [c for c in all_cameras if c.is_active()]
+        # Fallback to any active cameras if venue isn't perfectly mapped or multi-venue search
+        venue_cameras = [c for c in all_cameras if c.is_active]
         
     if not venue_cameras:
         raise HTTPException(status_code=400, detail="CRITICAL: No active camera streams available in sector to parse.")

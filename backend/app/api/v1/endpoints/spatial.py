@@ -32,7 +32,7 @@ async def get_spatial_scene(venue_id: str, minutes: int = 15):
     logger.info(f"Generating 4D Spatial Mesh for Venue {venue_id} over {minutes} minutes")
     
     # Check if we have active cameras for this venue, fallback to any if needed
-    all_cameras = CameraManager.list_cameras()
+    all_cameras = await CameraManager.list_cameras()
     venue_cams = [c for c in all_cameras if c.venue_id == venue_id]
     if not venue_cams:
         venue_cams = all_cameras

@@ -9,13 +9,21 @@ from sqlalchemy import text
 
 env = dotenv_values(".env")
 
-DB_URL = (
-    f"postgresql+asyncpg://{env.get('POSTGRES_USER', 'postgres')}:"
-    f"{env.get('POSTGRES_PASSWORD', '')}@"
-    f"{env.get('POSTGRES_SERVER', 'localhost')}:"
-    f"{env.get('POSTGRES_PORT', '5432')}/"
-    f"{env.get('POSTGRES_DB', 'laminar')}"
-)
+db_url = env.get("DATABASE_URL")
+if db_url and env.get("ENVIRONMENT") in ("production", "staging"):
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    DB_URL = db_url
+else:
+    DB_URL = (
+        f"postgresql+asyncpg://{env.get('POSTGRES_USER', 'postgres')}:"
+        f"{env.get('POSTGRES_PASSWORD', '')}@"
+        f"{env.get('POSTGRES_SERVER', 'localhost')}:"
+        f"{env.get('POSTGRES_PORT', '5432')}/"
+        f"{env.get('POSTGRES_DB', 'laminar')}"
+    )
 
 MIGRATIONS = [
     # Ensure both tables exist first (create_all handles this, but just in case)

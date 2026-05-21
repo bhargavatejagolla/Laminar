@@ -75,8 +75,7 @@ export default function AmberDashboard() {
     const triggerAmberProtocol = async () => {
         if (!imageToUpload) return;
         if (!venue) {
-            toast.error('No active venue selected!');
-            return;
+            toast.info('No active venue selected. Initiating global search across all active cameras.');
         }
 
         setIsScanning(true);
@@ -95,7 +94,8 @@ export default function AmberDashboard() {
             const formData = new FormData();
             formData.append("file", imageToUpload);
 
-            const res = await api.post(`/amber/upload?venue_id=${venue.id}`, formData, {
+            const url = venue ? `/amber/upload?venue_id=${venue.id}` : `/amber/upload`;
+            const res = await api.post(url, formData, {
                 headers: { "Content-Type": "multipart/form-data" }
             });
 
