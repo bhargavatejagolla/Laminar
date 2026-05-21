@@ -604,12 +604,12 @@ async def list_camera_clips(
     return [
         {
             "id": c.id,
-            "filename": c.file_path.split("/")[-1].split("\\")[-1],
+            "filename": c.file_path.replace('\\', '/').split('/')[-1],
             "duration": c.duration_seconds,
             "status": c.status,
             "created_at": c.created_at,
-            "url": "/api/v1/clips/{}".format(c.file_path.split("/")[-1].split("\\")[-1]), # Stream URL
-            "download_url": "/api/v1/cameras/{}/clips/{}/download".format(camera_id, c.file_path.split("/")[-1].split("\\")[-1])
+            "url": "/api/v1/clips/{}".format(c.file_path.replace('\\', '/').split('/')[-1]), # Stream URL
+            "download_url": "/api/v1/cameras/{}/clips/{}/download".format(camera_id, c.file_path.replace('\\', '/').split('/')[-1])
         }
         for c in clips
     ]
