@@ -276,6 +276,31 @@ class DatabaseManager:
         max_overflow: Optional[int] = None,
     ) -> AsyncEngine:
         """Create an async engine with connection pooling."""
+        import urllib.parse
+
+        # Check if sslmode is in the url and strip it, passing ssl=True to connect_args for asyncpg compatibility
+        parsed = urllib.parse.urlparse(url)
+        query_params = urllib.parse.parse_qs(parsed.query)
+        
+        has_ssl = False
+        if "sslmode" in query_params:
+            sslmode = query_params["sslmode"][0]
+            if sslmode in ("require", "verify-ca", "verify-full", "prefer", "allow"):
+                has_ssl = True
+            query_params.pop("sslmode", None)
+            
+        new_query = urllib.parse.urlencode(query_params, doseq=True)
+        parsed = parsed._replace(query=new_query)
+        url = urllib.parse.urlunparse(parsed)
+
+        connect_args = {
+            "server_settings": {
+                "application_name": f"laminar_{role}",
+                "statement_timeout": "20000",
+            }
+        }
+        if has_ssl:
+            connect_args["ssl"] = True
 
         engine = create_async_engine(
             url,
@@ -287,12 +312,7 @@ class DatabaseManager:
             pool_pre_ping=settings.DB_POOL_PRE_PING,
             pool_use_lifo=True,
             future=True,
-            connect_args={
-                "server_settings": {
-                    "application_name": f"laminar_{role}",
-                    "statement_timeout": "20000",
-                }
-            },
+            connect_args=connect_args,
         )
 
         # Add query execution listener for slow query detection
