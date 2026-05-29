@@ -125,7 +125,7 @@ graph TD
 
 ## 📸 Live Demo
 
-![Laminar Dashboard Mockup](file:///C:/Users/bharg/.gemini/antigravity/brain/3aa048c0-53f1-44cd-a0ea-3b4bc354335e/laminar_dashboard_mockup_1779975115107.png)
+![Laminar Dashboard Mockup](a.png)
 
 ---
 
