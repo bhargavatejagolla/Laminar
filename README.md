@@ -31,7 +31,7 @@ Whether you're processing live video streams with YOLOv8, detecting anomalies wi
 | Feature | Description | Technology |
 |---------|-------------|------------|
 | 👁️ **Real-time Computer Vision** | Object detection, facial recognition, and tracking powered by cutting-edge neural networks. | `YOLOv8`, `OpenCV`, `face-api.js` |
-| 🧠 **Local LLM Integration** | Embedded AI assistant capable of semantic search and context-aware responses without external APIs. | `llama-cpp-python`, `Faiss` |
+| 🧠 **LLM Integration** | Embedded AI assistant capable of semantic search and context-aware responses without external APIs. | `Open source models-groq`, `Faiss` |
 | 🔮 **Predictive Analytics** | Time-series forecasting and anomaly detection to predict surges and identify outliers. | `Prophet`, `Scikit-Learn` |
 | 🌍 **Geospatial Intelligence** | Geofencing, zone containment checks, and interactive maps. | `Shapely`, `Leaflet` |
 | 📊 **Immersive 3D Dashboard** | Next-generation user interface featuring 3D elements, dynamic animations, and complex data visualization. | `React Three Fiber`, `GSAP` |
