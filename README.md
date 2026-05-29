@@ -123,7 +123,7 @@ graph TD
 
 ---
 
-## 📸 Live Demo
+## 📸 Landing Page
 
 ![Laminar Dashboard Mockup](a.png)
 
