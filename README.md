@@ -375,11 +375,11 @@ python start.py
 ## 🎯 Architecture Diagram
 ```mermaid
 graph TD
-    A[Client UI / Next.js] -->|REST API & WebSockets| B(FastAPI Gateway)
-    B --> C[(PostgreSQL)]
-    B --> D[YOLOv8 Vision Engine]
-    B --> E[LLM & NLP Module (Google Gemini / Groq)]
-    B --> F[Predictive Analytics]
+    A["Client UI / Next.js"] -->|REST API & WebSockets| B("FastAPI Gateway")
+    B --> C[("PostgreSQL")]
+    B --> D["YOLOv8 Vision Engine"]
+    B --> E["LLM & NLP Module (Google Gemini / Groq)"]
+    B --> F["Predictive Analytics"]
     style A fill:#000,stroke:#333,stroke-width:2px,color:#fff
     style B fill:#009688,stroke:#333,stroke-width:2px,color:#fff
     style C fill:#336791,stroke:#333,stroke-width:2px,color:#fff
