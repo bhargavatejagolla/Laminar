@@ -35,6 +35,7 @@ from app.models.dwell_monitor import MonitoringZone, PersonDwellTime
 from app.models.journey import Journey
 
 from app.models.ticket import Ticket, TicketMessage
+from app.models.sos_report import SOSReport
 
 # ==========================================================
 # Public Exports
@@ -54,6 +55,7 @@ __all__ = [
     "Journey",
     "Ticket",
     "TicketMessage",
+    "SOSReport",
 ]
 
 

@@ -329,3 +329,59 @@ export function useTrafficDensityMatrix(cameraId?: string, interval: number = 20
 
   return { matrixData };
 }
+
+/**
+ * Hook for Kinetic SOS Insights
+ */
+export function useKineticInsights(interval: number = 2000) {
+  const [insights, setInsights] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const res = await api.get('/kinetic/insights');
+        setInsights(res.data);
+      } catch (err) {
+        console.error('Kinetic Insights Fetch Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInsights();
+    const timer = setInterval(fetchInsights, interval);
+    return () => clearInterval(timer);
+  }, [interval]);
+
+  return { insights, loading };
+}
+
+/**
+ * SSE hook for real-time kinetic events.
+ */
+export function useKineticEvents() {
+  const [events, setEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    const sse = new EventSource('/api/v1/kinetic/events/stream');
+
+    sse.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.status === 'connected' || data.type === 'connected') return;
+        setEvents(prev => [data, ...prev].slice(0, 50));
+      } catch (err) {
+        console.error('Kinetic SSE Parse Error:', err);
+      }
+    };
+
+    sse.onerror = () => {
+      console.warn('Kinetic SSE Connection lost. Reconnecting...');
+    };
+
+    return () => sse.close();
+  }, []);
+
+  return { events };
+}

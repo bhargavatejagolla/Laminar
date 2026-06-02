@@ -442,6 +442,8 @@ async def reset_parking_frame(camera_id: Optional[str] = Query(None)):
             "frame": None,
         })
         logger.info(f"Frame reset for camera {cam_id}")
+    if cam_id in _last_injected_frame_bytes:
+        _last_injected_frame_bytes.pop(cam_id)
     return {"status": "cleared", "camera_id": cam_id}
 
 
@@ -946,14 +948,13 @@ async def stream_parking_camera(camera_id: str):
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
         while True:
             worker = ORCHESTRATOR._workers.get(cam_uuid)
-            # ParkingWorker stores frames in _cached_frame_bytes (set by worker loop)
-            frame_bytes = None
-            if worker and isinstance(worker, ParkingWorker):
-                frame_bytes = getattr(worker, "_cached_frame_bytes", None)
             
-            # Fallback to local injected frame cache if worker offline
-            if not frame_bytes and camera_id in _last_injected_frame_bytes:
-                frame_bytes = _last_injected_frame_bytes[camera_id]
+            # Prioritize injected frame (if analysis mode is active)
+            injected = _last_injected_frame_bytes.get(camera_id)
+            if injected:
+                frame_bytes = injected
+            elif worker and isinstance(worker, ParkingWorker):
+                frame_bytes = getattr(worker, "_cached_frame_bytes", None)
                 
             yield boundary + (frame_bytes if frame_bytes else blank_bytes) + b"\r\n"
             await asyncio.sleep(0.08)

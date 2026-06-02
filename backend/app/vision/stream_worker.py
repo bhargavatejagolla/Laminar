@@ -935,11 +935,34 @@ class StreamWorker:
                     if self._reid_frame_counter >= self._reid_throttle_frames:
                         self._reid_frame_counter = 0
                         from app.services.reid_service import reid_service
+                        from app.services.face_recognition_service import face_service
+                        from app.vision.amber_vector_store import amber_vector_store
                         from app.services.journey_manager_service import journey_manager
                         
                         try:
-                            # Pass the full camera frame for complete pristine screenshot
-                            embedding = reid_service.extract_embedding(frame, [x1, y1, x2, y2])
+                            # 1. Body Embedding (ReID)
+                            body_emb = reid_service.extract_embedding(frame, [x1, y1, x2, y2])
+                            
+                            # 2. Face Embedding (InsightFace)
+                            face_emb = face_service.extract_face_embedding(frame, [x1, y1, x2, y2])
+                            
+                            # 3. Store in FAISS
+                            meta = {
+                                "camera_id": str(self.camera_id),
+                                "zone_name": self._camera_name or f"Camera {self.camera_id}",
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "bbox": [x1, y1, x2, y2],
+                                "type": "body"
+                            }
+                            if body_emb is not None and not np.all(body_emb == 0):
+                                amber_vector_store.add_embedding(body_emb, meta)
+                                
+                            if face_emb is not None:
+                                face_meta = meta.copy()
+                                face_meta["type"] = "face"
+                                amber_vector_store.add_embedding(face_emb, face_meta)
+                                
+                            embedding = body_emb  # Keep body_emb for existing journey tracking logic  
                             global_id, insight_msg = await journey_manager.process_detection(
                                 str(self.camera_id), embedding, self._camera_name, frame_crop=frame
                             )

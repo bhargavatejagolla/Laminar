@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { ArrowLeft, Car, AlertTriangle, Zap, Activity, BrainCircuit, Users, Upload, Thermometer, Video, FileText, Download, Globe, RotateCw, ShieldCheck, Shield } from "lucide-react";
+import { ArrowLeft, Car, AlertTriangle, Zap, Activity, BrainCircuit, Users, Upload, Thermometer, Video, FileText, Download, Globe, RotateCw, ShieldCheck, Shield, X, Maximize2, Minimize2 } from "lucide-react";
 import { api } from "@/services/api";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
@@ -20,7 +20,7 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   hub: Globe,
 };
 
-import { useParkingInsights, useTrafficInsights } from "@/hooks/useTelemetry";
+import { useParkingInsights, useTrafficInsights, useKineticInsights, useKineticEvents } from "@/hooks/useTelemetry";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
 import SplashCursor from "@/components/react-bits/SplashCursor";
 import ElectricBorder from "@/components/react-bits/ElectricBorder";
@@ -91,6 +91,7 @@ function ServiceCard({ title, description, icon: Icon, href, stats, theme }: { t
 // Reusable Camera Card Component
 function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera: any; sectionType: string; insights: any; showHeatmap?: boolean }) {
   const { t } = useTranslation();
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const isStatic = camera.static_mode_enabled;
   // Map each section to its correct MJPEG stream endpoint
   const streamUrl = () => {
@@ -110,7 +111,7 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
   const theme = THEMES[sectionType] || THEMES.parking;
 
   return (
-    <div className={`rounded-2xl border border-white/5 bg-[#0c0c14] overflow-hidden flex flex-col relative group h-full min-h-[380px] shadow-2xl transition-all duration-500 ${theme.cardHover}`}>
+    <div className={isFullscreen ? `fixed inset-4 z-[9999] rounded-3xl border border-white/10 bg-[#0c0c14] overflow-hidden flex flex-col shadow-[0_0_100px_rgba(0,0,0,0.8)] transition-all duration-500` : `rounded-2xl border border-white/5 bg-[#0c0c14] overflow-hidden flex flex-col relative group h-full min-h-[380px] shadow-2xl transition-all duration-500 ${theme.cardHover}`}>
       <div className="absolute top-5 left-5 z-20 flex gap-2 items-center">
         <div className={`bg-black/60 backdrop-blur-xl border border-white/10 px-3.5 py-1.5 rounded-full text-[10px] font-mono font-bold tracking-[0.15em] ${theme.textClass} flex items-center gap-2 shadow-2xl border-t-white/20`}>
           <div className={`w-1.5 h-1.5 rounded-full ${isStatic ? 'bg-amber-400' : theme.pulseLive}`} />
@@ -123,19 +124,25 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
         )}
       </div>
 
-      <div className="absolute top-5 right-5 z-20">
-        <div className="bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[9px] font-mono text-slate-500 border border-white/5 uppercase">
+      <div className="absolute top-5 right-5 z-20 flex gap-2">
+        <div className="bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[9px] font-mono text-slate-500 border border-white/5 uppercase flex items-center">
           {isStatic ? 'SIM' : 'LIVE'} · {camera.stream_type || 'RTSP'}
         </div>
+        <button 
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsFullscreen(!isFullscreen); }} 
+          className="bg-black/40 backdrop-blur-md p-1.5 rounded text-slate-500 border border-white/5 hover:text-white transition-colors cursor-pointer"
+        >
+          {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+        </button>
       </div>
 
-      <div className="flex-1 bg-[#050508] relative overflow-hidden group-hover:scale-[1.01] transition-transform duration-1000 ease-out min-h-[500px]">
+      <div className={`flex-1 bg-[#050508] relative overflow-hidden group-hover:scale-[1.01] transition-transform duration-1000 ease-out w-full rounded-2xl ${isFullscreen ? 'min-h-[80vh]' : 'aspect-video'}`}>
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10 bg-[length:30px_30px]" />
 
         <img
           src={feedUrl || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMwNTA1MDgiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZmlsbD0iIzIyMiIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+U1RSRUFNIE9GRkxJTkU8L3RleHQ+PC9zdmc+"}
           alt={`${camera.name} Feed`}
-          className={`absolute inset-0 w-full h-full object-contain bg-black transition-all duration-1000 ease-in-out ${isStatic ? 'opacity-70 saturate-[0.8] contrast-[1.2]' : 'opacity-90 saturate-[1.2] contrast-[1.1]'} group-hover:saturate-100 group-hover:opacity-100`}
+          className={`absolute inset-0 w-full h-full object-cover bg-black transition-all duration-1000 ease-in-out ${isStatic ? 'opacity-70 saturate-[0.8] contrast-[1.2]' : 'opacity-90 saturate-[1.2] contrast-[1.1]'} group-hover:saturate-100 group-hover:opacity-100`}
           onError={(e) => {
             e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMwNTA1MDgiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZmlsbD0iIzQ0NCIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+SE9TVEVEX1RSQU5TTUlTU0lPTl9XRVM8L3RleHQ+PC9zdmc+";
           }}
@@ -464,6 +471,9 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [detectionEvents, setDetectionEvents] = useState<any[]>([]);
   const [occupancyHistory, setOccupancyHistory] = useState<number[]>(Array(20).fill(0));
+  const [activeKineticCameraId, setActiveKineticCameraId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const kineticEventsHook = useKineticEvents();
 
   // Hook telemetry depending on section type
   const parkingInsights = useParkingInsights();
@@ -534,7 +544,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
         const allCameras = Array.isArray(camerasRes.data) ? camerasRes.data : [];
 
         // Strict domain match only — do not use name heuristic
-        const sectionVenues = (sectionType === 'hub' || sectionType === 'incident') ? allVenues : allVenues.filter((v: any) => v.venue_type === sectionType);
+        const sectionVenues = (sectionType === 'hub' || sectionType === 'incident' || sectionType === 'kinetic') ? allVenues : allVenues.filter((v: any) => v.venue_type === sectionType);
         const sectionVenueIds = new Set(sectionVenues.map((v: any) => v.id));
         const sectionCameras = allCameras.filter((c: any) => sectionVenueIds.has(c.venue_id));
 
@@ -944,6 +954,57 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
             </>
           )}
 
+          {sectionType === "kinetic" && (
+            <>
+              {/* Inject AI Media — Kinetic */}
+              <label className={`cursor-pointer px-4 py-2.5 rounded-2xl flex items-center gap-3 backdrop-blur-md border ${theme.borderClass} ${theme.glowClass} ${theme.textClass} hover:bg-white/5 transition-all shadow-lg`}>
+                <Upload className="w-4 h-4" />
+                <span className="text-[10px] font-mono font-black tracking-[0.2em] uppercase mt-0.5">Inject Kinetic Media</span>
+                <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={async (e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length === 0) return;
+                  const camId = activeKineticCameraId || cameras[0]?.id;
+                  if (!camId) {
+                    toast.error("No active camera node detected for injection.");
+                    return;
+                  }
+
+                  const uploadFile = async (file: File) => {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    return api.post(`/kinetic/upload?camera_id=${camId}`, formData, {
+                      headers: { "Content-Type": "multipart/form-data" }
+                    });
+                  };
+
+                  if (files.length === 1) {
+                    const lt = toast.loading("Injecting kinetic media...");
+                    try {
+                      await uploadFile(files[0]);
+                      toast.success("Kinetic analysis started.", { id: lt });
+                    } catch { toast.error("Injection failed.", { id: lt }); }
+                  }
+                }} />
+              </label>
+              
+              {/* Clear Kinetic Media */}
+              <button 
+                onClick={async () => {
+                  const camId = activeKineticCameraId || cameras[0]?.id;
+                  if (!camId) return;
+                  const lt = toast.loading("Clearing injected media...");
+                  try {
+                    await api.post(`/kinetic/clear-media/${camId}`);
+                    toast.success("Live feed resumed.", { id: lt });
+                  } catch { toast.error("Failed to clear media.", { id: lt }); }
+                }} 
+                className={`px-4 py-2.5 rounded-2xl flex items-center gap-2 backdrop-blur-md border ${theme.borderClass} text-slate-400 hover:bg-white/5 transition-all shadow-lg text-[10px] font-mono font-black tracking-[0.2em] uppercase`}
+              >
+                <X className="w-4 h-4" />
+                <span className="mt-0.5">Clear Media</span>
+              </button>
+            </>
+          )}
           <div className={`px-5 py-2.5 rounded-2xl flex items-center gap-3 backdrop-blur-md border ${theme.headerBadge}`}>
             <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${theme.headerBadgeDot}`} />
             <span className={`text-[10px] font-mono font-black tracking-[0.2em] uppercase`}>{t('smartCity.systemOnline')}</span>
@@ -951,9 +1012,9 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
         </div>
       </div>
 
-      <div className="flex gap-8 mt-4 items-start">
+      <div className={`flex gap-8 mt-4 items-start ${sectionType === 'kinetic' ? 'flex-col xl:flex-col' : 'flex-col xl:flex-row'}`}>
 
-        <div className={`flex-[3] grid gap-6 grid-cols-1 ${sectionType === 'hub' ? 'lg:grid-cols-2' : cameras.length > 1 ? 'lg:grid-cols-2' : ''} ${cameras.length >= 4 ? 'xl:grid-cols-2' : ''}`}>
+        <div className={`w-full flex-[3] grid gap-6 ${sectionType === 'kinetic' ? 'grid-cols-1' : sectionType === 'hub' ? 'grid-cols-1 lg:grid-cols-2' : cameras.length > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} ${sectionType !== 'kinetic' && cameras.length >= 4 ? 'xl:grid-cols-2' : ''}`}>
 
           {sectionType === 'hub' && (
             <>
@@ -1075,57 +1136,161 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
             </div>
           )}
 
-          {sectionType !== 'hub' && cameras.map(cam => (
-            <motion.div key={cam.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }}>
-              <CameraFeedCard camera={cam} sectionType={sectionType} insights={currentInsights} showHeatmap={showHeatmap} />
-            </motion.div>
-          ))}
+          {sectionType === 'kinetic' && cameras.length > 0 && (
+            <div className="col-span-full mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest font-mono">Select Camera</span>
+                <select 
+                  className={`bg-black/50 border ${theme.borderClass} ${theme.textClass} text-xs font-mono rounded-xl px-4 py-2 outline-none focus:border-${theme.primary}-500/50 transition-colors`}
+                  value={activeKineticCameraId || cameras[0]?.id || ''}
+                  onChange={(e) => setActiveKineticCameraId(e.target.value)}
+                >
+                  {cameras.map(cam => (
+                    <option key={cam.id} value={cam.id}>{cam.name} (Live Node)</option>
+                  ))}
+                </select>
+              </div>
+              <button 
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-mono font-black uppercase tracking-widest border ${theme.borderClass} ${theme.textClass} hover:bg-white/5 transition-all`}
+              >
+                {isFullscreen ? "Exit Fullscreen" : "Fullscreen View"}
+              </button>
+            </div>
+          )}
+
+          {sectionType !== 'hub' && cameras.map(cam => {
+            const currentKineticCameraId = activeKineticCameraId || cameras[0]?.id;
+            if (sectionType === 'kinetic' && cam.id !== currentKineticCameraId) return null;
+            return (
+              <motion.div key={cam.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className={isFullscreen ? 'fixed inset-0 z-50 bg-[#0a0a10] p-8' : ''}>
+                {isFullscreen && (
+                  <button 
+                    onClick={() => setIsFullscreen(false)}
+                    className="absolute top-12 right-12 z-50 bg-rose-500/10 text-rose-500 border border-rose-500/20 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-500/20"
+                  >
+                    Close Fullscreen
+                  </button>
+                )}
+                <CameraFeedCard camera={cam} sectionType={sectionType} insights={currentInsights} showHeatmap={showHeatmap} />
+              </motion.div>
+            )
+          })}
 
         </div>
 
         {/* Right Insights Sidebar */}
-        <div className="flex-[1] min-w-[350px] flex flex-col gap-6">
+        <div className="w-full flex-[1] min-w-[350px] flex flex-col gap-6">
           {/* Total Capacity Aggregation */}
-          <div className={`bg-gradient-to-br ${theme.bgClass} ${theme.borderClass} border rounded-3xl p-6 relative overflow-hidden backdrop-blur-md shadow-2xl`}>
-            <div className={`absolute top-0 right-0 w-32 h-32 ${theme.glowClass} rounded-full blur-3xl -mr-16 -mt-16`} />
-            <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] mb-6 font-mono`}>{t('smartCity.infrastructureLoad')}</p>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-end">
-                <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">{t('smartCity.activeCapacity')}</span>
-                <span className="text-white font-black font-mono text-lg">{(() => {
-                  if (currentInsights?.overall?.occupancy_pct !== undefined) return Math.round(currentInsights.overall.occupancy_pct);
-                  if (currentInsights?.metrics?.density !== undefined) return Math.round(currentInsights.metrics.density * 100);
-                  if (aggregateStats.capacity > 0) return Math.round((aggregateStats.occupancy / aggregateStats.capacity) * 100);
-                  return 0;
-                })()}%</span>
+          {sectionType !== 'kinetic' && (
+            <div className={`bg-gradient-to-br ${theme.bgClass} ${theme.borderClass} border rounded-3xl p-6 relative overflow-hidden backdrop-blur-md shadow-2xl`}>
+              <div className={`absolute top-0 right-0 w-32 h-32 ${theme.glowClass} rounded-full blur-3xl -mr-16 -mt-16`} />
+              <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] mb-6 font-mono`}>{t('smartCity.infrastructureLoad')}</p>
+  
+              <div className="space-y-4">
+                <div className="flex justify-between items-end">
+                  <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">{t('smartCity.activeCapacity')}</span>
+                  <span className="text-white font-black font-mono text-lg">{(() => {
+                    if (currentInsights?.overall?.occupancy_pct !== undefined) return Math.round(currentInsights.overall.occupancy_pct);
+                    if (currentInsights?.metrics?.density !== undefined) return Math.round(currentInsights.metrics.density * 100);
+                    if (aggregateStats.capacity > 0) return Math.round((aggregateStats.occupancy / aggregateStats.capacity) * 100);
+                    return 0;
+                  })()}%</span>
+                </div>
+                <div className="w-full bg-white/5 h-3 rounded-full overflow-hidden relative shadow-inner border border-white/5">
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r ${theme.barFill} transition-all duration-1000`}
+                    style={{
+                      width: `${Math.min((() => {
+                        if (currentInsights?.overall?.occupancy_pct !== undefined) return Math.round(currentInsights.overall.occupancy_pct);
+                        if (currentInsights?.metrics?.density !== undefined) return Math.round(currentInsights.metrics.density * 100);
+                        if (aggregateStats.capacity > 0) return Math.round((aggregateStats.occupancy / aggregateStats.capacity) * 100);
+                        return 0;
+                      })(), 100)}%`
+                    }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-white/5 h-3 rounded-full overflow-hidden relative shadow-inner border border-white/5">
-                <div
-                  className={`h-full rounded-full bg-gradient-to-r ${theme.barFill} transition-all duration-1000`}
-                  style={{
-                    width: `${Math.min((() => {
-                      if (currentInsights?.overall?.occupancy_pct !== undefined) return Math.round(currentInsights.overall.occupancy_pct);
-                      if (currentInsights?.metrics?.density !== undefined) return Math.round(currentInsights.metrics.density * 100);
-                      if (aggregateStats.capacity > 0) return Math.round((aggregateStats.occupancy / aggregateStats.capacity) * 100);
-                      return 0;
-                    })(), 100)}%`
-                  }}
-                />
+  
+              <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/5">
+                <div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">Venues</p>
+                  <p className="text-xl font-black text-white font-mono leading-none">{venues.length}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">Edge Nodes</p>
+                  <p className={`text-xl font-black font-mono leading-none ${theme.textSecondary}`}>{cameras.length}</p>
+                </div>
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/5">
-              <div>
-                <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">Venues</p>
-                <p className="text-xl font-black text-white font-mono leading-none">{venues.length}</p>
+          {/* Kinetic Intelligence Panel */}
+          {sectionType === "kinetic" && (
+            <div className={`bg-[#12121a]/80 backdrop-blur-xl border ${theme.borderClass} rounded-3xl p-6 relative shadow-[0_0_40px_rgba(99,102,241,0.03)] border-t-${theme.primary}-500/40`}>
+              <div className="flex items-center justify-between mb-4">
+                <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Kinetic Intelligence</p>
+                {(() => {
+                  const risk = currentInsights?.risk_level || "LOW";
+                  const col = risk === "CRITICAL" ? 'text-red-400 bg-red-500/10 border-red-500/30' : 
+                              risk === "HIGH" ? 'text-orange-400 bg-orange-500/10 border-orange-500/30' : 
+                              risk === "MEDIUM" ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' : 
+                              'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+                  return <span className={`text-[9px] font-mono font-black px-2 py-1 rounded-full border ${col}`}>{risk} RISK</span>;
+                })()}
               </div>
-              <div>
-                <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">Edge Nodes</p>
-                <p className={`text-xl font-black font-mono leading-none ${theme.textSecondary}`}>{cameras.length}</p>
+
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-white/5 rounded-2xl p-3">
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Active Subjects</p>
+                  <p className="text-xl font-black font-mono text-white">{currentInsights?.active_subjects ?? 0}</p>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-3">
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Anomalies Detected</p>
+                  <p className={`text-xl font-black font-mono ${currentInsights?.anomalies_detected > 0 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
+                    {currentInsights?.anomalies_detected ?? 0}
+                  </p>
+                </div>
               </div>
+
+              <div className="flex items-center justify-between mb-4">
+                <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Kinetic Alert Stream</p>
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${theme.pulseSecondary}`} />
+                  <span className={`text-[9px] ${theme.textClass}/70 font-mono`}>LIVE</span>
+                </div>
+              </div>
+              
+              {(!kineticEventsHook.events || kineticEventsHook.events.length === 0) ? (
+                <p className="text-slate-600 text-xs font-mono text-center py-4">System nominal. No abnormal kinetic signatures.</p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
+                  {kineticEventsHook.events.slice(0, 20).map((ev: any, i: number) => {
+                    const risk = ev.risk_level || "LOW";
+                    const isHighRisk = risk === "CRITICAL" || risk === "HIGH";
+                    return (
+                      <div key={i} className={`flex flex-col gap-1 ${isHighRisk ? 'bg-rose-500/10 border-rose-500/20' : 'bg-white/3 border-white/5'} rounded-xl px-3 py-2 transition-colors border`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[10px] font-mono font-black ${isHighRisk ? 'text-rose-400' : 'text-slate-300'}`}>
+                            {ev.type}
+                          </span>
+                          <span className="text-[9px] text-slate-500 font-mono">
+                            {ev.confidence ? `${ev.confidence}% CONF` : ''}
+                          </span>
+                        </div>
+                        <span className={`text-[9px] ${isHighRisk ? 'text-rose-400/80' : 'text-slate-400'}`}>
+                          {ev.message}
+                        </span>
+                        <span className="text-[8px] text-slate-600 mt-1">
+                          {ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : ''}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Parking Intelligence Panel */}
           {sectionType === "parking" && (
@@ -1222,7 +1387,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
           )}
 
           {/* Live Decision Panel */}
-          {currentInsights && (
+          {currentInsights && sectionType !== 'kinetic' && (
             <div className="bg-[#12121a]/80 backdrop-blur-xl border border-fuchsia-500/20 rounded-3xl p-6 relative shadow-[0_0_40px_rgba(217,70,239,0.03)] border-t-fuchsia-500/40">
               <div className="flex items-center gap-3 mb-5">
                 <div className="bg-fuchsia-500/20 p-2 rounded-xl">
@@ -1243,21 +1408,23 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
           )}
 
           {/* System Health Summary */}
-          <div className="bg-white/5 border border-white/5 rounded-3xl p-6 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('smartCity.syncState')}</span>
-              <span className={`text-[10px] font-black font-mono ${theme.textSecondary}`}>0.4ms {t('smartCity.latency')}</span>
+          {sectionType !== 'kinetic' && (
+            <div className="bg-white/5 border border-white/5 rounded-3xl p-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">{t('smartCity.syncState')}</span>
+                <span className={`text-[10px] font-black font-mono ${theme.textSecondary}`}>0.4ms {t('smartCity.latency')}</span>
+              </div>
+              <div className="h-12 flex gap-1 items-end">
+                {[...Array(20)].map((_, i) => (
+                  <div
+                    key={i}
+                    className={`flex-1 rounded-t-sm ${theme.barCell}`}
+                    style={{ height: `${Math.random() * 80 + 20}%` }}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="h-12 flex gap-1 items-end">
-              {[...Array(20)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`flex-1 rounded-t-sm ${theme.barCell}`}
-                  style={{ height: `${Math.random() * 80 + 20}%` }}
-                />
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

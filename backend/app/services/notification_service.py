@@ -617,6 +617,15 @@ class NotificationService:
             if "Police / Security" in recipients:
                 filtered["Police / Security"] = recipients["Police / Security"]
 
+        # Force SOS alerts to Police and Reporter (if email provided)
+        if extra.get("domain") == "AMBER_PROTOCOL":
+            if "Police / Security" not in filtered:
+                filtered["Police / Security"] = recipients.get("Police / Security", [])
+            
+            reporter = extra.get("reporter_contact")
+            if reporter and "@" in reporter:
+                filtered["Reporter"] = [reporter]
+
         return {k: v for k, v in filtered.items() if v}
 
 
@@ -770,22 +779,33 @@ class NotificationService:
 
             for lang, phone_numbers in lang_groups.items():
                 t = TranslationService.t
-                alert_title = t(lang, "surge_alert") if is_surge else t(lang, "critical_alert")
                 
-                current_label = t(lang, "current_count", "Current")
-                persons_label = t(lang, "persons", "persons")
-                velocity_label = t(lang, "surge_velocity", "Velocity")
-                escalation_label = t(lang, "escalation_risk", "Escalation Risk")
+                # ── INTERCEPT: Specialized AMBER SMS Payload ──
+                if live.get("domain") == "AMBER_PROTOCOL":
+                    tracking_url = live.get("tracking_url", "http://localhost:3000/amber-rescue")
+                    sms_msg = (
+                        f"🚨 AMBER MATCH ACQUIRED 🚨\n"
+                        f"Target Location: {location_text}\n"
+                        f"Time: {datetime.now(timezone.utc).strftime('%H:%M UTC')}\n"
+                        f"Action: Dispatch units immediately.\n"
+                        f"Live Tracker: {tracking_url}"
+                    )
+                else:
+                    alert_title = t(lang, "surge_alert") if is_surge else t(lang, "critical_alert")
+                    current_label = t(lang, "current_count", "Current")
+                    persons_label = t(lang, "persons", "persons")
+                    velocity_label = t(lang, "surge_velocity", "Velocity")
+                    escalation_label = t(lang, "escalation_risk", "Escalation Risk")
 
-                sms_msg = (
-                    f"\U0001f6a8 {alert_title} [{alert.risk_level.upper()}] \U0001f6a8\n"
-                    f"{t(lang, 'venue', 'Venue')}: {venue.name}\n"
-                    f"{t(lang, 'location', 'Location')}: {location_text}\n"
-                    f"{current_label}: {int(avg_count)} {persons_label} | {velocity_label}: {growth_rate:+.1f}%/min\n"
-                    f"{t(lang, 'severity', 'Severity')}: {severity} | {escalation_label}: {prob_str}\n"
-                    f"{t(lang, 'time', 'Time')}: {datetime.now(timezone.utc).strftime('%H:%M UTC')}\n"
-                    f"{t(lang, 'action_required', 'Action Required')}"
-                )
+                    sms_msg = (
+                        f"\U0001f6a8 {alert_title} [{alert.risk_level.upper()}] \U0001f6a8\n"
+                        f"{t(lang, 'venue', 'Venue')}: {venue.name}\n"
+                        f"{t(lang, 'location', 'Location')}: {location_text}\n"
+                        f"{current_label}: {int(avg_count)} {persons_label} | {velocity_label}: {growth_rate:+.1f}%/min\n"
+                        f"{t(lang, 'severity', 'Severity')}: {severity} | {escalation_label}: {prob_str}\n"
+                        f"{t(lang, 'time', 'Time')}: {datetime.now(timezone.utc).strftime('%H:%M UTC')}\n"
+                        f"{t(lang, 'action_required', 'Action Required')}"
+                    )
 
                 async def _send_and_log():
                     result = await self.sms_service.notify_recipients(phone_numbers, sms_msg)
@@ -972,6 +992,53 @@ class NotificationService:
         msg["From"] = settings.SMTP_USER
         t = TranslationService.t
         live = live_metrics or {}
+        extra = alert.extra_data or {}
+        domain = extra.get("domain", "crowd")
+
+        # Translate role label if possible
+        role_key = "role_management" if "Management" in role_label else "role_police" if "Police" in role_label else None
+        display_role = t(lang, role_key, role_label) if role_key else role_label
+
+        # ── INTERCEPT: Specialized AMBER Dispatch Template ──
+        if domain == "AMBER_PROTOCOL":
+            tracking_url = extra.get("tracking_url", f"{settings.FRONTEND_URL}/amber-rescue")
+            tracking_id = extra.get("tracking_id", "AMBER-XXXX")
+            cam_loc = extra.get("camera_location", "Unknown Zone")
+            
+            msg["Subject"] = f"🚨 [AMBER ACQUIRED] Missing Target Locked in {cam_loc} [{display_role.upper()}]"
+            msg.set_content("This email requires HTML support.")
+            
+            html = f"""
+            <!DOCTYPE html>
+            <html>
+            <body style="font-family: Arial, sans-serif; background: #000000; margin: 0; padding: 0; color: #ffffff;">
+                <div style="background: #dc2626; padding: 30px; text-align: center; border-bottom: 4px solid #ef4444;">
+                    <div style="font-size: 14px; font-weight: bold; letter-spacing: 2px; opacity: 0.9; margin-bottom: 8px;">LAMINAR TACTICAL DISPATCH</div>
+                    <h1 style="margin: 0; font-size: 28px; font-weight: 900; text-transform: uppercase;">Missing Target Acquired</h1>
+                </div>
+                
+                <div style="padding: 40px 30px; background: #111827;">
+                    <p style="font-size: 18px; margin-top: 0;"><strong>Critical Alert:</strong> The AI Spatial Engine has confirmed a neural signature match across the camera network.</p>
+                    
+                    <table style="width: 100%; border-collapse: collapse; margin: 30px 0; background: #1f2937; border-radius: 8px; overflow: hidden;">
+                        <tr><td style="padding: 15px 20px; border-bottom: 1px solid #374151; width: 140px; color: #9ca3af; font-weight: bold;">Tracking ID</td><td style="padding: 15px 20px; border-bottom: 1px solid #374151; font-family: monospace; font-size: 16px;">{tracking_id}</td></tr>
+                        <tr><td style="padding: 15px 20px; border-bottom: 1px solid #374151; color: #9ca3af; font-weight: bold;">Venue</td><td style="padding: 15px 20px; border-bottom: 1px solid #374151;">{venue.name}</td></tr>
+                        <tr><td style="padding: 15px 20px; color: #9ca3af; font-weight: bold;">Current Location</td><td style="padding: 15px 20px; font-size: 18px; color: #f87171; font-weight: bold;">{cam_loc}</td></tr>
+                    </table>
+                    
+                    <div style="text-align: center; margin: 40px 0;">
+                        <a href="{tracking_url}" style="display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 18px 40px; font-size: 18px; font-weight: bold; border-radius: 6px; border: 1px solid #ef4444; box-shadow: 0 0 15px rgba(220, 38, 38, 0.5);">OPEN LIVE KINETIC TRACKER &rarr;</a>
+                    </div>
+                    
+                    <div style="background: rgba(220, 38, 38, 0.1); border-left: 4px solid #dc2626; padding: 15px; font-size: 14px; color: #fca5a5;">
+                        <strong>Dispatch Instructions:</strong> All available units converge on the highlighted zone immediately. Tracker will auto-update if target crosses another sector gate.
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            msg.add_alternative(html, subtype="html")
+            return msg
 
         # Enhanced subject line showing target role
         subject_prefix = alert.risk_level.upper()
@@ -980,8 +1047,6 @@ class NotificationService:
             subject_prefix = f"PREDICTED {predicted.upper()}"
 
         # Domain-aware Iconography & Labels
-        extra = alert.extra_data or {}
-        domain = extra.get("domain", "crowd")
         icon = {"parking": "🅿️", "traffic": "🚗", "incident": "🚨", "crowd": "👥"}.get(domain, "🔔")
         
         # Protective Labels (Ensure crowd remains "Crowd Alert" and "occupancy")
@@ -993,10 +1058,6 @@ class NotificationService:
             domain_label = {"parking": "Smart Parking", "traffic": "Traffic Flow", "incident": "Tactical Incident"}.get(domain, "System Alert")
             count_label = {"parking": "Vehicles", "traffic": "Vehicles", "incident": "Units"}.get(domain, "Count")
             occupancy_term = f"{domain} saturation"
-
-        # Translate role label if possible
-        role_key = "role_management" if "Management" in role_label else "role_police" if "Police" in role_label else None
-        display_role = t(lang, role_key, role_label) if role_key else role_label
 
         # Set Subject
         if alert.extra_data and alert.extra_data.get("type") == "camera_issue":

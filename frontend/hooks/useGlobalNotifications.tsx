@@ -63,6 +63,24 @@ export function useGlobalNotifications() {
         });
       }
     },
+    onSosReport: (data) => {
+      playVoiceAlert(`SOS Received. ${data.missing_name} reported missing.`);
+      toast.error(`🚨 PUBLIC SOS RECEIVED`, {
+        description: `Missing Person Reported: ${data.missing_name}. Last seen: ${data.last_seen}. AI Scanning network.`,
+        duration: Number.POSITIVE_INFINITY,
+        className: "!bg-red-950/95 border-2 border-red-500 shadow-[0_0_40px_rgba(239,68,68,0.5)] backdrop-blur-3xl !rounded-xl",
+        action: { label: "VIEW AMBER DASHBOARD", onClick: () => window.location.href = "/amber-rescue" }
+      });
+    },
+    onTargetLocked: (data) => {
+      playVoiceAlert(`AMBER Alert Target Locked in ${data.camera_location || 'unknown sector'}. Dispatch immediate response.`);
+      toast.error(`🎯 AMBER TARGET LOCKED`, {
+        description: `Missing person found in ${data.camera_location}. Tracker ID: ${data.tracking_id}.`,
+        duration: Number.POSITIVE_INFINITY,
+        className: "!bg-red-950/95 border-2 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.8)] backdrop-blur-3xl !rounded-xl animate-pulse",
+        action: { label: "OPEN TRACKER", onClick: () => window.location.href = data.tracking_url || "/amber-rescue" }
+      });
+    }
   });
 
   // 1. Alert Notifications

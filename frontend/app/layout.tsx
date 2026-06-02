@@ -8,6 +8,7 @@ import { Toaster } from "sonner";
 import AIAssistantChat from "@/components/dashboard/ai-assistant-chat";
 import I18nProvider from "@/components/providers/i18n-provider";
 import { NotificationMesh } from "@/components/layout/NotificationMesh";
+import GlobalSplashCursor from "@/components/react-bits/GlobalSplashCursor";
 
 export const metadata = {
   title: "Laminar — AI Crowd Intelligence",
@@ -64,6 +65,8 @@ export default function RootLayout({
               }} />
               {children}
               <NotificationMesh />
+              {/* Global Splash Cursor Effect (optimized and conditionally rendered) */}
+              <GlobalSplashCursor />
               {/* Global AI Assistant Floating Widget */}
               <AIAssistantChat />
             </I18nProvider>

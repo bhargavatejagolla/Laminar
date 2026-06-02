@@ -25,7 +25,7 @@ class ParkingDetector:
     _model_cache = {}
     _load_lock = asyncio.Lock()
 
-    def __init__(self, model_name: str = "yolov8x.pt", conf: float = 0.25, iou: float = 0.45):
+    def __init__(self, model_name: str = "yolov8x.pt", conf: float = 0.15, iou: float = 0.45):
         self.model_name = model_name
         self.conf = conf
         self.iou = iou
@@ -170,6 +170,7 @@ class ParkingDetector:
                     iou=self.iou,
                     classes=self.vehicle_classes,
                     device=self.device,
+                    imgsz=1024,
                     verbose=False
                 )
             )

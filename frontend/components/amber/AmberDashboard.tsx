@@ -17,6 +17,8 @@ interface TrajectoryPoint {
     confidence: number;
     status: 'past' | 'live';
     action: string;
+    zone_name?: string;
+    snapshot_path?: string;
 }
 
 interface AmberResponse {
@@ -154,6 +156,15 @@ export default function AmberDashboard() {
                         </p>
                     </div>
                 </div>
+                
+                <a 
+                    href="/sos-report" 
+                    target="_blank" 
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl border border-red-500/50 bg-red-950/40 text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-all font-bold uppercase tracking-widest text-xs"
+                >
+                    <AlertTriangle className="w-4 h-4" />
+                    Open Public SOS Portal
+                </a>
             </header>
 
             {/* MAIN BODY */}
@@ -272,7 +283,7 @@ export default function AmberDashboard() {
                                             <p className="text-red-400 text-xs font-bold uppercase tracking-widest mb-4">Live Spatial Location</p>
 
                                             <div className="flex items-center gap-4 border-t border-red-900/50 pt-4">
-                                                {previewUrl && <img src={previewUrl} className="w-16 h-16 rounded-xl border border-red-500/50 object-cover" />}
+                                                {(livePoint.snapshot_path || previewUrl) && <img src={livePoint.snapshot_path ? (livePoint.snapshot_path.startsWith('http') ? livePoint.snapshot_path : (livePoint.snapshot_path.startsWith('/') ? livePoint.snapshot_path : `/${livePoint.snapshot_path}`)) : previewUrl!} className="w-16 h-16 rounded-xl border border-red-500/50 object-cover" />}
                                                 <div>
                                                     <p className="text-white text-lg font-mono font-black">{formatTime(livePoint.timestamp)} <span className="text-xs text-red-500 ml-1">LST</span></p>
                                                     <p className="text-[10px] text-red-500/70 font-mono tracking-widest mt-1">CONF: {Math.round(livePoint.confidence * 100)}% MATCH</p>
@@ -317,15 +328,25 @@ export default function AmberDashboard() {
 
                                             <div className={`p-4 rounded-2xl border transition-all ${t.status === 'live' ? 'bg-red-950/30 border-red-500/40' : 'bg-transparent border-red-900/20'}`}>
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <span className="font-black tracking-tight text-white">{t.camera_name}</span>
+                                                    <span className="font-black tracking-tight text-white">
+                                                        {t.camera_name}
+                                                        {t.zone_name && <span className="text-red-500/70 ml-2 text-[10px] uppercase font-mono tracking-widest border border-red-900/50 px-1.5 py-0.5 rounded bg-red-950/30">{t.zone_name}</span>}
+                                                    </span>
                                                     <span className="text-[10px] font-mono font-bold text-red-500/80">{formatTime(t.timestamp)}</span>
                                                 </div>
-                                                <p className="text-xs text-slate-400 font-medium leading-relaxed">{t.action}</p>
-                                                <div className="mt-3 flex items-center gap-2">
-                                                    <div className="flex-1 h-1 bg-red-950 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-red-600" style={{ width: `${t.confidence * 100}%` }} />
+                                                <div className="flex gap-3 mt-2">
+                                                    {t.snapshot_path && (
+                                                        <img src={t.snapshot_path.startsWith('http') ? t.snapshot_path : (t.snapshot_path.startsWith('/') ? t.snapshot_path : `/${t.snapshot_path}`)} className="w-12 h-12 rounded-lg border border-red-500/30 object-cover shrink-0" />
+                                                    )}
+                                                    <div className="flex-1">
+                                                        <p className="text-xs text-slate-300 font-medium leading-relaxed">{t.action}</p>
+                                                        <div className="mt-3 flex items-center gap-2">
+                                                            <div className="flex-1 h-1 bg-red-950 rounded-full overflow-hidden">
+                                                                <div className="h-full bg-red-600" style={{ width: `${t.confidence * 100}%` }} />
+                                                            </div>
+                                                            <span className="text-[9px] font-mono text-red-400 font-bold">{Math.round(t.confidence * 100)}% MATCH</span>
+                                                        </div>
                                                     </div>
-                                                    <span className="text-[9px] font-mono text-red-400 font-bold">{Math.round(t.confidence * 100)}% MATCH</span>
                                                 </div>
                                             </div>
                                         </motion.div>

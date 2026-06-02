@@ -20,7 +20,7 @@
 
 ## 🌟 Overview
 
-**Laminar** is a premium, full‑stack AI operating system for smart cities. It fuses real‑time computer vision, predictive analytics, large language models, and immersive 3D visualizations into a single, ultra‑responsive platform. All LLM capabilities are powered by **Google Gemini API** and **Groq API**—there is no local Ollama dependency.
+**Laminar** is a premium, full‑stack AI operating system for smart cities. It fuses real‑time computer vision, predictive analytics, large language models, and immersive 3D visualizations into a single, ultra‑responsive platform. All LLM capabilities are powered by **Google Gemini API** and **Groq API** – no local Ollama is used.
 
 ---
 
@@ -320,7 +320,7 @@
 ### Backend
 * FastAPI (Async Python)
 * PostgreSQL (asyncpg & SQLAlchemy)
-* Node.js (for auxiliary services)
+* Node.js (auxiliary services)
 
 ### AI & Computer Vision
 * YOLOv8, OpenCV, TensorFlow, PyTorch
@@ -332,6 +332,12 @@
 * Federated Learning, Edge AI
 * MQTT, Event‑Driven Systems
 * Scalable Telemetry Architecture
+
+---
+
+## Vision of LAMINAR
+
+> “LAMINAR is building the AI operating system for future cities – transforming passive surveillance into predictive, autonomous, and human‑centered urban intelligence.”
 
 ---
 

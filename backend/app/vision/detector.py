@@ -107,6 +107,7 @@ class YOLODetector:
         self.image_size = image_size
         self.cpu_threads = 1  # Forced to 1 to prevent Windows uvicorn deadlocks
         self.static_diff_threshold = static_diff_threshold
+        self.device = self._get_device()
         self.model: Optional[Any] = None
         self.pose_model: Optional[Any] = None
         self._initialized = False

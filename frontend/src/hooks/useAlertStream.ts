@@ -50,6 +50,8 @@ interface UseAlertStreamOptions {
   onCrossCamera?: (data: any) => void;
   onMetricUpdate?: (metric: StreamMetric) => void;
   onStatusChange?: (data: { id: string; status: string; risk_level: string; auto: boolean; notes?: string }) => void;
+  onSosReport?: (data: any) => void;
+  onTargetLocked?: (data: any) => void;
   enabled?: boolean;
 }
 
@@ -79,6 +81,8 @@ export function useAlertStream({
   onCrossCamera,
   onMetricUpdate,
   onStatusChange,
+  onSosReport,
+  onTargetLocked,
   enabled = true,
 }: UseAlertStreamOptions = {}) {
   const [alerts, setAlerts] = useState<StreamAlert[]>([]);
@@ -100,6 +104,8 @@ export function useAlertStream({
   const onCrossCameraRef = useRef<UseAlertStreamOptions["onCrossCamera"]>(onCrossCamera);
   const onMetricUpdateRef = useRef<UseAlertStreamOptions["onMetricUpdate"]>(onMetricUpdate);
   const onStatusChangeRef = useRef<UseAlertStreamOptions["onStatusChange"]>(onStatusChange);
+  const onSosReportRef = useRef<UseAlertStreamOptions["onSosReport"]>(onSosReport);
+  const onTargetLockedRef = useRef<UseAlertStreamOptions["onTargetLocked"]>(onTargetLocked);
   const maxAlertsRef = useRef<number>(maxAlerts);
 
   useEffect(() => {
@@ -117,6 +123,14 @@ export function useAlertStream({
   useEffect(() => {
     onStatusChangeRef.current = onStatusChange;
   }, [onStatusChange]);
+
+  useEffect(() => {
+    onSosReportRef.current = onSosReport;
+  }, [onSosReport]);
+
+  useEffect(() => {
+    onTargetLockedRef.current = onTargetLocked;
+  }, [onTargetLocked]);
 
   useEffect(() => {
     maxAlertsRef.current = maxAlerts;
@@ -236,6 +250,10 @@ export function useAlertStream({
         } else if ((data?.type === "alert_status_change" || data?.type === "alert_escalated") && data.data) {
           // Alert status changed (resolved/acknowledged/escalated) — notify consumers
           onStatusChangeRef.current?.(data.data);
+        } else if (data?.type === "sos_report_received" && data.data) {
+          onSosReportRef.current?.(data.data);
+        } else if (data?.type === "target_locked" && data.data) {
+          onTargetLockedRef.current?.(data.data);
         }
       } catch {
         // ignore malformed messages

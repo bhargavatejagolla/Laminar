@@ -44,6 +44,7 @@ from app.api.v1.endpoints.greenwave import router as greenwave_router
 from app.api.v1.endpoints.guardian import router as guardian_router
 from app.api.v1.endpoints.amber import router as amber_router
 from app.api.v1.endpoints.spatial import router as spatial_router
+from app.api.v1.endpoints.sos import router as sos_router
 
 # ── New Advanced AI Feature Routers ──────────────────────────────────────────
 from app.api.v1.endpoints.websocket import router as ws_router
@@ -93,6 +94,7 @@ router.include_router(greenwave_router, prefix="/greenwave", tags=["AI Green Wav
 router.include_router(guardian_router, prefix="/guardian", tags=["Guardian AI"])
 router.include_router(amber_router, prefix="/amber", tags=["Amber AI"])
 router.include_router(spatial_router, prefix="/spatial", tags=["Spatial AI"])
+router.include_router(sos_router, prefix="/sos", tags=["Public SOS Report"])
 router.include_router(notifications_router, prefix="/notifications", tags=["Global Mesh Notifications"])
 
 # ── New Advanced AI Feature Routes ───────────────────────────────────────────

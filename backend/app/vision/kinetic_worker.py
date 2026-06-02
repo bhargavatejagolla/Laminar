@@ -12,6 +12,7 @@ from app.vision.kinetic_detector import KineticDetector
 from app.core.global_state import GLOBAL_STATE
 from app.core.database import db_manager
 from app.services.notification_service import notification_service
+from app.api.v1.endpoints.kinetic import push_kinetic_event
 
 logger = get_logger(__name__)
 
@@ -22,17 +23,47 @@ SKELETON_COLORS = [
     (255, 0, 255)   # Magenta
 ]
 
-def draw_pose_overlay(frame: np.ndarray, result) -> np.ndarray:
+def draw_pose_overlay(frame: np.ndarray, result, anomalies: list = None) -> np.ndarray:
     """Overlays neural neon skeletal tracking on the frame."""
     overlay = frame.copy()
+    anomalies = anomalies or []
     
     if hasattr(result, 'keypoints') and result.keypoints:
         for i, (kpts, box) in enumerate(zip(result.keypoints, result.bounding_boxes)):
             color = SKELETON_COLORS[i % len(SKELETON_COLORS)]
             x1, y1, x2, y2 = [int(p) for p in box["bbox"][0]]
             
+            # Check if this person is part of an anomaly
+            person_anomaly = None
+            for a in anomalies:
+                ax1, ay1, ax2, ay2 = a["bbox"]
+                # naive IoU or center distance check (using center for simplicity)
+                cx, cy = (x1+x2)/2, (y1+y2)/2
+                acx, acy = (ax1+ax2)/2, (ay1+ay2)/2
+                if abs(cx-acx) < 50 and abs(cy-acy) < 50:
+                    person_anomaly = a
+                    break
+            
+            box_color = color
+            thickness = 1
+            if person_anomaly:
+                risk = person_anomaly.get("risk_level", "LOW")
+                if risk == "CRITICAL":
+                    box_color = (0, 0, 255) # Red
+                    thickness = 3
+                elif risk == "HIGH":
+                    box_color = (0, 165, 255) # Orange
+                    thickness = 2
+                elif risk == "MEDIUM":
+                    box_color = (0, 255, 255) # Yellow
+                    thickness = 2
+            
             # Subtly highlight the bounding box
-            cv2.rectangle(overlay, (x1, y1), (x2, y2), color, 1)
+            cv2.rectangle(overlay, (x1, y1), (x2, y2), box_color, thickness)
+            
+            if person_anomaly:
+                cv2.putText(overlay, f"{person_anomaly['type']} ({person_anomaly.get('confidence', 0)}%)", 
+                            (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2, cv2.LINE_AA)
 
             if kpts:
                 # Draw keypoints
@@ -83,6 +114,7 @@ class KineticWorker:
         self._cached_frame_bytes: Optional[bytes] = None
         self._last_annotated_frame: Optional[np.ndarray] = None
         self._last_result = None
+        self._last_anomalies = []
         self.injected_frame: Optional[np.ndarray] = None
 
     async def start(self):
@@ -129,7 +161,7 @@ class KineticWorker:
 
                 if self._last_result:
                     annotated = frame.copy()
-                    annotated = draw_pose_overlay(annotated, self._last_result)
+                    annotated = draw_pose_overlay(annotated, self._last_result, getattr(self, '_last_anomalies', []))
                     self._last_annotated_frame = annotated
 
                 frame_to_encode = self._last_annotated_frame if self._last_annotated_frame is not None else frame
@@ -159,8 +191,12 @@ class KineticWorker:
                     # Process Anomalies
                     if hasattr(result, 'keypoints') and result.keypoints:
                         anomalies = self.kinetic_engine.detect_anomalies(result.bounding_boxes, result.keypoints)
+                        self._last_anomalies = anomalies
+                        
                         for inc in anomalies:
                             asyncio.create_task(self._process_incident(inc))
+                            # Broadcast to SSE
+                            push_kinetic_event(str(self.camera_id), inc)
                             
                         # Update Global State
                         GLOBAL_STATE.update(
@@ -171,6 +207,7 @@ class KineticWorker:
                                 "camera_id": str(self.camera_id),
                                 "active_subjects": result.count,
                                 "anomalies_detected": len(anomalies),
+                                "latest_anomalies": anomalies,
                                 "last_updated": datetime.utcnow().isoformat()
                             }
                         )
@@ -189,7 +226,7 @@ class KineticWorker:
                     await notification_service.push_notification(
                         domain="security",
                         type=inc["type"],
-                        priority=inc["priority"] if "priority" in inc else "CRITICAL",
+                        priority=inc.get("risk_level", "CRITICAL").upper(),
                         description=inc["message"],
                         venue_id=str(self.venue_id),
                         venue_name=venue_obj.name,

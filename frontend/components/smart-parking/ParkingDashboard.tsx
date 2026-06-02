@@ -45,6 +45,7 @@ export function ParkingDashboard() {
   const [venueId, setVenueId] = useState<string | null>(urlVenueId || activeVenueId);
   const [cameras, setCameras] = useState<any[]>([]);
   const [activeCameraId, setActiveCameraId] = useState<string | null>(null);
+  const [feedTimestamp, setFeedTimestamp] = useState(Date.now());
 
   useEffect(() => {
     if (urlVenueId && urlVenueId !== activeVenueId) setVenue(urlVenueId);
@@ -116,12 +117,15 @@ export function ParkingDashboard() {
     const uploadFile = async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`/api/v1/parking/upload?camera_id=upload-demo${venueId ? `&venue_id=${venueId}` : ""}`, {
+      const res = await fetch(`/api/v1/parking/upload?camera_id=${activeCameraId || 'upload-demo'}${venueId ? `&venue_id=${venueId}` : ""}`, {
         method: "POST",
         body: formData,
       });
       const result = await res.json();
-      if (result.success) setAnalysisData(result);
+      if (result.success) {
+        setAnalysisData(result);
+        setFeedTimestamp(Date.now());
+      }
       return result;
     };
 
@@ -147,8 +151,10 @@ export function ParkingDashboard() {
     );
   }
 
-  const overall = activeData.overall || {};
-  const criticalCount = (activeData.alerts?.length || 0) + (overall.status === "CRITICAL" ? 1 : 0);
+  const activeData = analysisData || data;
+  const overall = activeData?.overall || {};
+  const criticalCount = (activeData?.alerts?.length || 0) + (overall.status === "CRITICAL" ? 1 : 0);
+  const isAnalysisMode = !!analysisData;
 
   return (
     <div className="w-full h-full bg-[#0a0a10] text-white p-8 overflow-hidden flex flex-col gap-6 relative z-10">
@@ -242,7 +248,7 @@ export function ParkingDashboard() {
 
             <div className="w-full h-full bg-[url('/grid.svg')] bg-center relative flex items-center justify-center">
               <img
-                src={activeCameraId ? `/api/v1/parking/stream/${activeCameraId}?t=${Date.now()}` : `/api/v1/parking/feed?t=${Date.now()}`}
+                src={activeCameraId ? `/api/v1/parking/stream/${activeCameraId}?t=${feedTimestamp}` : `/api/v1/parking/feed?t=${feedTimestamp}`}
                 alt="Tactical Feed"
                 className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${isAnalysisMode ? 'opacity-100' : 'opacity-80 mix-blend-screen'}`}
               />
@@ -253,7 +259,10 @@ export function ParkingDashboard() {
             {isAnalysisMode && (
               <motion.button
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                onClick={() => setAnalysisData(null)}
+                onClick={() => {
+                  setAnalysisData(null);
+                  api.post(`/parking/reset-frame?camera_id=${activeCameraId || 'upload-demo'}`).then(() => setFeedTimestamp(Date.now()));
+                }}
                 className="absolute bottom-6 right-6 bg-rose-500 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-rose-400 transition-all z-30"
               >
                 CLEAR ANALYSIS
