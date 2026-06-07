@@ -123,7 +123,7 @@ class TrafficDetector:
     _model_cache = {}
     _load_lock = asyncio.Lock()
 
-    def __init__(self, model_name: str = "yolo11n.pt", conf: float = 0.25):
+    def __init__(self, model_name: str = "yolo11m.pt", conf: float = 0.25):
         self.model_name = model_name
         self.conf = conf
         self.device = "cpu"

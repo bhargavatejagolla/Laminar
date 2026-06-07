@@ -68,10 +68,10 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
             <body style="font-family: sans-serif; background: #f8fafc; padding: 20px;">
                 <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     <div style="background: {color}; color: white; padding: 20px; text-align: center;">
-                        <h1 style="margin: 0; font-size: 24px;">🚨 {tier_label} PARKING ALERT</h1>
+                        <h1 style="margin: 0; font-size: 24px;">≡ƒÜ¿ {tier_label} PARKING ALERT</h1>
                     </div>
                     <div style="padding: 30px;">
-                        <h2 style="margin-top: 0; color: #1e293b;">📍 {venue_obj.name}</h2>
+                        <h2 style="margin-top: 0; color: #1e293b;">≡ƒôì {venue_obj.name}</h2>
                         <p style="font-size: 16px; color: #334155; line-height: 1.5;">
                             The <strong>{venue_obj.name}</strong> parking facility has reached <strong>{int(occ_pct)}% capacity</strong> and triggered a {tier_label} alert.
                         </p>
@@ -96,7 +96,7 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
                         </table>
                         
                         <div style="text-align: center; margin-top: 30px;">
-                            <a href="{maps_link}" style="display: inline-block; background: #0f172a; color: white; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; letter-spacing: 1px;">OPEN IN GOOGLE MAPS ↗</a>
+                            <a href="{maps_link}" style="display: inline-block; background: #0f172a; color: white; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; letter-spacing: 1px;">OPEN IN GOOGLE MAPS Γåù</a>
                         </div>
                     </div>
                 </div>
@@ -112,16 +112,16 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                 server.send_message(msg)
                 
-            logger.info(f"✅ DEDICATED PARKING EMAIL SENT for {venue_obj.name} to {recipients}")
+            logger.info(f"Γ£à DEDICATED PARKING EMAIL SENT for {venue_obj.name} to {recipients}")
             
         except Exception as e:
-            logger.error(f"❌ DEDICATED PARKING EMAIL FAILED: {e}")
+            logger.error(f"Γ¥î DEDICATED PARKING EMAIL FAILED: {e}")
             
     await asyncio.to_thread(_sync_send)
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # SSE Subscribers
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 def _push_event(camera_id: str, event: dict):
     """Push a detection event to central store and all SSE subscribers."""
@@ -136,8 +136,8 @@ def _push_event(camera_id: str, event: dict):
             pass  # Slow consumer, drop
 
 
-def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue_id: Optional[str] = None, avg_velocity: float = 0.0, occupancy_pct: float = 0.0, capacity: int = 100, occupancy: int = 0, warn_thresh_override: int = None, crit_thresh_override: int = None, venue_name_override: str = None, lat_override: float = None, lng_override: float = None):
-    # ── Calculate Current Risk Context ──
+def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue_id: Optional[str] = None, avg_velocity: float = 0.0, occupancy_pct: float = 0.0, capacity: int = 100, occupancy: int = 0, warn_thresh_override: int = None, crit_thresh_override: int = None, venue_name_override: str = None, lat_override: float = None, lng_override: float = None, force: bool = False):
+    # ΓöÇΓöÇ Calculate Current Risk Context ΓöÇΓöÇ
     count = len(vehicles)
 
     risk_level = "low"
@@ -252,13 +252,13 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
         risk_level = "critical"
         density = "High Velocity Hazard"
 
-    # Block if low risk (unless it's an upload demo)
-    if risk_level == "low" and camera_id != "upload-demo":
+    # Block if low risk (unless it's an upload demo or forced)
+    if risk_level == "low" and camera_id != "upload-demo" and not force:
         return
     
     # State transition guard (per camera)
     last_state = _last_alert_state.get(camera_id, "low")
-    if risk_level == last_state and camera_id != "upload-demo":
+    if risk_level == last_state and camera_id != "upload-demo" and not force:
         return
     _last_alert_state[camera_id] = risk_level
 
@@ -381,9 +381,9 @@ def _generate_parking_recommendation(density: str) -> str:
     return "OPERATIONAL: Display 'Limited Availability' on digital signs."
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # Notification
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 class NotifyPayload(BaseModel):
     message: str
@@ -391,9 +391,9 @@ class NotifyPayload(BaseModel):
 # Standard notification handled via notification_service
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # Status & Insights
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/status")
 async def get_parking_status():
@@ -407,9 +407,9 @@ async def get_parking_insights():
     return await parking_detector.get_current_insights()
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # Notify Endpoint
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.post("/notify")
 async def parking_notify(payload: dict = Body(default={})):
@@ -447,9 +447,9 @@ async def reset_parking_frame(camera_id: Optional[str] = Query(None)):
     return {"status": "cleared", "camera_id": cam_id}
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # Image Injection (MVP Demo)
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.post("/upload")
 async def upload_parking_source(
@@ -464,7 +464,7 @@ async def upload_parking_source(
     try:
         contents = await file.read()
         
-        # ── 1. Create temp file for processing ──
+        # ΓöÇΓöÇ 1. Create temp file for processing ΓöÇΓöÇ
         suffix = ".mp4"
         if file.filename and "." in file.filename:
             suffix = "." + file.filename.rsplit(".", 1)[-1].lower()
@@ -473,7 +473,7 @@ async def upload_parking_source(
             tmp.write(contents)
             tmp_path = tmp.name
 
-        # ── 2. Determine if Video or Image ──
+        # ΓöÇΓöÇ 2. Determine if Video or Image ΓöÇΓöÇ
         cap = cv2.VideoCapture(tmp_path)
         is_video = cap.get(cv2.CAP_PROP_FRAME_COUNT) > 1
         
@@ -525,7 +525,7 @@ async def upload_parking_source(
         if img is None:
             raise HTTPException(400, "Invalid media file")
 
-        # ── 3. Strategic Worker Injection (for live feed sync) ──
+        # ΓöÇΓöÇ 3. Strategic Worker Injection (for live feed sync) ΓöÇΓöÇ
         from app.vision.orchestrator import ORCHESTRATOR
         from app.vision.parking_worker import ParkingWorker
         worker_to_inject = None
@@ -537,7 +537,7 @@ async def upload_parking_source(
                     worker_to_inject = w
             except: pass
         
-        # ── 4. Strategic Capacity Resolution ──
+        # ΓöÇΓöÇ 4. Strategic Capacity Resolution ΓöÇΓöÇ
         venue_capacity = None
         warn_thresh = None
         crit_thresh = None
@@ -570,125 +570,81 @@ async def upload_parking_source(
                             v_lng = v_obj.longitude
                 except: pass
 
-        # ── 4. Zone Occupancy ──
+        # ΓöÇΓöÇ 4. Zone Occupancy ΓöÇΓöÇ
         slot_states = await parking_detector.detect_occupancy(img, all_detections, max_slots=venue_capacity)
         occupancy = sum(1 for s in slot_states.values() if s["occupied"])
         capacity = len(slot_states)
         occ_pct = round((occupancy / capacity) * 100) if capacity > 0 else 0
+        avg_conf = sum(v.get("confidence", 0) for v in best_vehicles) / len(best_vehicles) if best_vehicles else 0
 
-        # ── 5. Global State & Injection ──
+        # ΓöÇΓöÇ 6. Worker Injection Commit ΓöÇΓöÇ
+        # Inject the annotated frame and metrics back into the active worker
+        # so the standard feed endpoint sees this frame.
+        
+        if img is not None:
+            # We skip the raw cv2.rectangle for vehicles here because detect_occupancy 
+            # now accurately draws dynamic padded red polygons, eliminating the "double box" issue.
+            
+            # Draw parking slots
+            slot_states = await parking_detector.detect_occupancy(img, best_vehicles, max_slots=venue_capacity)
+            for zid, state_info in slot_states.items():
+                poly = np.array(state_info["polygon"], dtype=np.int32)
+                color = (0, 0, 255) if state_info["occupied"] else (0, 255, 0)
+                overlay = img.copy()
+                cv2.fillPoly(overlay, [poly], color)
+                cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
+                cv2.polylines(img, [poly], True, color, 2)
+
+        _, buffer = cv2.imencode(".jpg", img)
+        frame_bytes = buffer.tobytes()
+        
+        # ── 7. Global State Update ──
+        from app.core.global_state import GLOBAL_STATE
+        payload = {
+            "occupied_spots": occupancy,
+            "total_slots": venue_capacity if venue_capacity else 100,
+            "avg_velocity": avg_velocity,
+            "avg_confidence": avg_conf,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "slot_states": slot_states
+        }
+        GLOBAL_STATE.update_domain_camera("parking", camera_id, payload)
+        if venue_id:
+            GLOBAL_STATE.update("parking", venue_id, payload)
+
+        if worker_to_inject:
+            worker_to_inject._cached_frame_bytes = frame_bytes
+            
+        # Maintain the last injected globally for fallback
+        _last_injected_frame_bytes[camera_id] = frame_bytes
+        
+        # Notifications are now handled centrally via push_parking_event
         try:
             push_parking_event(
-                camera_id=camera_id, vehicles=best_vehicles, frame_shape=img.shape,
-                venue_id=venue_id, avg_velocity=avg_velocity, 
-                occupancy_pct=occ_pct, capacity=capacity, occupancy=occupancy,
-                warn_thresh_override=warn_thresh, crit_thresh_override=crit_thresh,
-                venue_name_override=v_name, lat_override=v_lat, lng_override=v_lng
+                camera_id=camera_id, vehicles=best_vehicles, frame_shape=img.shape if img is not None else (0,0,0),
+                venue_id=venue_id, avg_velocity=avg_velocity, occupancy_pct=occ_pct,
+                capacity=capacity, occupancy=occupancy, force=True
             )
         except Exception as e:
             logger.error(f"FAILURE IN push_parking_event: {str(e)}", exc_info=True)
 
-        # ── 6. UI Visualization ──
-        v_overlay = img.copy()
-        
-        # Draw green polygons only for EMPTY spaces
-        for zid, state in slot_states.items():
-            if not state["occupied"]:
-                poly = np.array(state["polygon"], dtype=np.int32)
-                cv2.fillPoly(v_overlay, [poly], (0, 200, 0))
-        shaded_img = cv2.addWeighted(v_overlay, 0.15, img, 0.85, 0)
-
-        # Draw red bounding boxes exclusively around the detected vehicles
-        for v in best_vehicles:
-            bbox = v.get("bbox", [])
-            if len(bbox) == 4:
-                vx1, vy1, vx2, vy2 = map(int, bbox)
-                cv2.rectangle(shaded_img, (vx1, vy1), (vx2, vy2), (0, 0, 255), 2)
-                conf = int(v.get("confidence", 0) * 100)
-                # Small label on vehicle
-                cv2.putText(shaded_img, f"veh {conf}%", (vx1, max(vy1 - 8, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-
-        # Cache for feed fallback
-        _, buf = cv2.imencode(".jpg", shaded_img, [cv2.IMWRITE_JPEG_QUALITY, 85])
-        _last_injected_frame_bytes[camera_id] = buf.tobytes()
-
-        # Detailed AI context
-        status = "CRITICAL" if occ_pct > 85 else "HIGH" if occ_pct > 60 else "NOMINAL"
-        suggestion = (
-            "CRITICAL COMMAND: Total spatial saturation threshold breached. Initiating active redirect." if status == "CRITICAL" else
-            "CAUTION: High-density cluster forming. Analyzing ingress telemetry." if status == "HIGH" else
-            "SYSTEM NOMINAL: Neural heuristic shows optimal throughput."
-        )
-        
-        # Prepare response object but don't return yet
-        res_obj = {
-            "success": True,
-            "overall": {
-                "occupancy_pct": occ_pct,
-                "total_slots": capacity,
-                "total_available": capacity - occupancy,
-                "status": status,
-                "occupied_spots": occupancy
-            },
-            "suggestion": suggestion,
-            "prediction": "Peak saturation imminent" if status == "CRITICAL" else "Stable flow trajectory",
-            "zones": {
-                zid: {
-                    "occupancy_pct": 100 if s["occupied"] else 0, 
-                    "available": 0 if s["occupied"] else 1, 
-                    "capacity": 1, 
-                    "status": "CRITICAL" if s["occupied"] else "AVAILABLE"
-                } for zid, s in slot_states.items()
-            }
+        return {
+            "status": "success",
+            "type": "video" if is_video else "image",
+            "camera_id": camera_id,
+            "occupancy": occupancy,
+            "avg_velocity": round(avg_velocity, 2),
+            "avg_confidence": round(avg_conf, 2),
+            "vehicles": all_detections
         }
-
     except Exception as e:
         logger.error(f"Media analysis failed: {e}", exc_info=True)
         raise HTTPException(500, f"Analysis aborted: {str(e)}")
 
-    # Always update Global State so /insights polling picks up the new occupancy
-    from app.core.global_state import GLOBAL_STATE
-    GLOBAL_STATE.update_domain_camera(
-        domain="parking",
-        camera_id=camera_id,
-        payload={
-            "venue_id": venue_id,
-            "occupied_spots": occupancy,
-            "total_slots": capacity,
-            "available_slots": capacity - occupancy,
-            "camera_id": camera_id,
-            "slot_states": slot_states,
-            "analysis_mode": True
-        }
-    )
-    # Also update venue-level if we have venue_id
-    if venue_id:
-        GLOBAL_STATE.update(
-            domain="parking",
-            venue_id=venue_id,
-            payload={
-                "venue_id": venue_id,
-                "occupied_spots": occupancy,
-                "total_slots": capacity,
-                "available_slots": capacity - occupancy,
-                "camera_id": camera_id,
-                "slot_states": slot_states,
-                "analysis_mode": True
-            }
-        )
-    
-    # Injected Frame is set to the correct worker
-    if worker_to_inject:
-        worker_to_inject.injected_frame = img.copy()
 
-    # Notifications are now handled centrally via push_parking_event
-
-    return res_obj
-
-
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # SSE Events Stream
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/events/stream")
 async def parking_events_stream():
@@ -722,9 +678,9 @@ async def parking_events_stream():
     )
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # Recent Detection Events
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/events/recent")
 async def get_recent_events(camera_id: Optional[str] = Query(None), limit: int = Query(20)):
@@ -734,9 +690,9 @@ async def get_recent_events(camera_id: Optional[str] = Query(None), limit: int =
     return {"events": events, "total": len(events)}
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # 10-Second Video Snapshot Download
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/snapshot/video")
 async def download_parking_snapshot(camera_id: Optional[str] = Query(None)):
@@ -791,9 +747,9 @@ async def download_parking_snapshot(camera_id: Optional[str] = Query(None)):
     )
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # Heatmap Endpoint
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/heatmap/{camera_id}")
 async def get_parking_heatmap(camera_id: str):
@@ -835,9 +791,9 @@ async def get_parking_heatmap(camera_id: str):
     )
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # PDF Report
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/report/pdf")
 async def download_parking_report(camera_id: Optional[str] = Query(None)):
@@ -858,6 +814,29 @@ async def download_parking_report(camera_id: Optional[str] = Query(None)):
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(0, 6, f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}", ln=True, align="C")
         pdf.ln(5)
+
+        # Inject Screenshot if available
+        frame_bytes = None
+        if camera_id and camera_id in _last_injected_frame_bytes:
+            frame_bytes = _last_injected_frame_bytes[camera_id]
+        elif not camera_id and _last_injected_frame_bytes:
+            frame_bytes = list(_last_injected_frame_bytes.values())[-1]
+            
+        if frame_bytes:
+            import tempfile
+            import os
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tf:
+                tf.write(frame_bytes)
+                tf_path = tf.name
+            try:
+                # Add image, width 180 (centered)
+                pdf.image(tf_path, x=15, y=pdf.get_y(), w=180)
+                pdf.ln(115) # roughly 115mm height for the image
+            except Exception as e:
+                logger.error(f"Failed to embed screenshot in PDF: {e}")
+            finally:
+                if os.path.exists(tf_path):
+                    os.unlink(tf_path)
 
         # Table header
         pdf.set_fill_color(20, 20, 30)
@@ -915,9 +894,9 @@ async def download_parking_report(camera_id: Optional[str] = Query(None)):
         )
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # MJPEG Live Stream
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/stream/{camera_id}")
 async def stream_parking_camera(camera_id: str):
@@ -969,9 +948,9 @@ async def stream_parking_camera(camera_id: str):
 # Duplicate removed
 
 
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 # Legacy feed (keep for backward compatibility)
-# ─────────────────────────────────────────────
+# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/feed")
 async def parking_video_feed():
@@ -979,7 +958,9 @@ async def parking_video_feed():
     from app.vision.orchestrator import ORCHESTRATOR
     from app.vision.parking_worker import ParkingWorker
     
+    last_yielded = None
     async def frame_gen():
+        nonlocal last_yielded
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
         while True:
             frame_bytes = None
@@ -993,9 +974,10 @@ async def parking_video_feed():
                 fallback_key = "upload-demo" if "upload-demo" in _last_injected_frame_bytes else list(_last_injected_frame_bytes.keys())[0]
                 frame_bytes = _last_injected_frame_bytes[fallback_key]
             
-            if frame_bytes is not None:
+            if frame_bytes and frame_bytes != last_yielded:
                 yield boundary + frame_bytes + b"\r\n"
-            else:
+                last_yielded = frame_bytes
+            elif not frame_bytes:
                 blank = np.zeros((480, 640, 3), dtype=np.uint8)
                 cv2.putText(blank, "WAITING FOR CAMERA", (100, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,200,200), 2)
                 _, buf = cv2.imencode(".jpg", blank)

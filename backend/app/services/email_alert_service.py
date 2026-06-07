@@ -279,6 +279,134 @@ class EmailAlertService:
             logger.error(f"Dispatch email failed: {e}")
             return False
 
+    async def send_alert_email(self, subject: str, body: str, recipients: List[str] = None, metadata: Dict[str, Any] = None) -> bool:
+        """
+        Premium UI/UX email sender for Critical Alerts.
+        """
+        target_recipients = recipients or self.recipients
+        if not self.host or not self.user or not target_recipients:
+            logger.warning(f"Email missing config. Mocking email send to {target_recipients}:\nSubject: {subject}\nBody: {body}")
+            return True
+
+        try:
+            msg = MIMEMultipart("related")
+            msg["Subject"] = subject
+            msg["From"] = f"Laminar AI <{self.user}>"
+            msg["To"] = ", ".join(target_recipients)
+            
+            # Extract rich data
+            coords = metadata.get("coordinates", "Unknown Location") if metadata else "Unknown Location"
+            action = metadata.get("recommended_action", "Standby for further instructions.") if metadata else "Standby for further instructions."
+            insight = metadata.get("insight", "Anomalous event detected in sector.") if metadata else "Anomalous event detected in sector."
+            
+            # Fetch Image for Email Attachment
+            img_url = metadata.get("screenshot_url") if metadata else None
+            img_data = None
+            img_cid = None
+            if img_url and (img_url.startswith("/api") or img_url.startswith("/storage")):
+                import httpx
+                try:
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(f"http://127.0.0.1:8000{img_url}")
+                        if resp.status_code == 200:
+                            img_data = resp.content
+                            img_cid = "incident_snapshot"
+                except Exception as e:
+                    logger.error(f"Failed to fetch internal snapshot for email: {e}")
+                
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Build Premium HTML
+            html_body = f"""
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="font-family: 'Inter', -apple-system, sans-serif; background:#000000; color:#f8fafc; padding:40px 20px; margin:0;">
+              <div style="max-width:600px; margin:0 auto; background:#0f0f13; border:1px solid #e11d4850; border-radius:16px; overflow:hidden; box-shadow: 0 20px 40px rgba(225, 29, 72, 0.15);">
+                
+                <!-- HEADER -->
+                <div style="background:linear-gradient(135deg, #be123c, #881337); padding:30px 24px; text-align:center; border-bottom: 2px solid #f43f5e;">
+                  <div style="display:inline-block; background:#fff; color:#be123c; font-size:10px; font-weight:900; letter-spacing:2px; padding:4px 12px; border-radius:20px; margin-bottom:12px;">CRITICAL INCIDENT</div>
+                  <h1 style="margin:0; color:#ffffff; font-size:24px; font-weight:800; letter-spacing:-0.5px;">AUTONOMOUS SOS ACTIVATED</h1>
+                  <p style="margin:8px 0 0; color:#fecdd3; font-size:13px; font-weight:500;">{now} (LOCAL TIME)</p>
+                </div>
+                
+                <!-- BODY -->
+                <div style="padding:32px 24px;">
+                  
+                  <!-- DESCRIPTION -->
+                  <div style="background:#18181b; border: 1px solid #27272a; padding:20px; border-radius:12px; margin-bottom:24px;">
+                    <p style="margin:0; color:#e4e4e7; font-size:15px; line-height:1.6;">
+                      {body}
+                    </p>
+                  </div>
+                  
+                  <!-- AI INSIGHTS -->
+                  <div style="background:rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3); padding:20px; border-radius:12px; margin-bottom:24px;">
+                    <p style="margin:0 0 8px; font-size:11px; color:#38bdf8; text-transform:uppercase; font-weight:700; letter-spacing:1px;">🧠 System Telemetry & Insights</p>
+                    <p style="margin:0; color:#e0f2fe; font-size:14px; line-height:1.6; font-style: italic;">"{insight}"</p>
+                  </div>
+                  
+                  <!-- COORDINATES -->
+                  <div style="margin-bottom:24px;">
+                    <p style="margin:0 0 8px; font-size:11px; color:#a1a1aa; text-transform:uppercase; font-weight:700; letter-spacing:1px;">📍 Incident Location</p>
+                    <div style="background:#09090b; border-left: 4px solid #0ea5e9; padding:16px; border-radius:4px;">
+                      <p style="margin:0; color:#38bdf8; font-size:16px; font-family:monospace; font-weight:bold;">{coords}</p>
+                    </div>
+                  </div>
+                  
+                  <!-- SNAPSHOT -->
+                  {f'''
+                  <div style="margin-bottom:24px;">
+                    <p style="margin:0 0 8px; font-size:11px; color:#a1a1aa; text-transform:uppercase; font-weight:700; letter-spacing:1px;">📸 Live Camera Snapshot</p>
+                    <img src="cid:{img_cid}" alt="Incident Snapshot" style="width:100%; border-radius:12px; border: 2px solid #27272a;" />
+                  </div>
+                  ''' if img_cid else ''}
+                  
+                  <!-- ACTION REQUIRED -->
+                  <div style="background:rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.3); padding:20px; border-radius:12px;">
+                    <p style="margin:0 0 8px; font-size:11px; color:#fb7185; text-transform:uppercase; font-weight:700; letter-spacing:1px;">⚠️ Recommended Action</p>
+                    <p style="margin:0; color:#ffe4e6; font-size:16px; font-weight:600;">{action}</p>
+                  </div>
+                  
+                </div>
+                
+                <!-- FOOTER -->
+                <div style="background:#09090b; padding:20px; text-align:center; border-top: 1px solid #27272a;">
+                  <p style="margin:0; font-size:11px; color:#52525b; letter-spacing:1px;">LAMINAR AI • TACTICAL OVERSIGHT ENGINE</p>
+                </div>
+                
+              </div>
+            </body>
+            </html>
+            """
+            
+            # Attach HTML
+            html_part = MIMEText(html_body, "html")
+            msg.attach(html_part)
+            
+            # Attach Image Inline
+            if img_data and img_cid:
+                from email.mime.image import MIMEImage
+                img_part = MIMEImage(img_data)
+                img_part.add_header('Content-ID', f"<{img_cid}>")
+                img_part.add_header('Content-Disposition', 'inline')
+                msg.attach(img_part)
+
+            # Send the email in a thread to avoid blocking the event loop
+            import asyncio
+            def _send():
+                with smtplib.SMTP(self.host, self.port, timeout=10) as server:
+                    server.ehlo(); server.starttls(); server.login(self.user, self.password)
+                    server.sendmail(self.user, target_recipients, msg.as_string())
+            
+            await asyncio.to_thread(_send)
+            logger.info(f"Critical alert email sent to {target_recipients}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send critical alert email: {e}")
+            return False
+
 
 # Singleton instance
 email_alert_service = EmailAlertService()

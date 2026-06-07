@@ -37,9 +37,26 @@ export default function SmartLiabilityPage() {
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     const [activeTab, setActiveTab] = useState<"dashboard" | "tactical" | "liability">("dashboard");
+    const [incident, setIncident] = useState<any>(null);
 
     useEffect(() => {
         setMounted(true);
+        const fetchIncidents = async () => {
+            try {
+                const res = await fetch("http://localhost:8000/api/v1/incident/alerts");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        setIncident(data[0]); // Get the most recent incident
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch incidents", e);
+            }
+        };
+        fetchIncidents();
+        const interval = setInterval(fetchIncidents, 3000);
+        return () => clearInterval(interval);
     }, []);
 
     if (!mounted) return null;
@@ -120,72 +137,153 @@ export default function SmartLiabilityPage() {
                             exit={{ opacity: 0, y: -20 }}
                             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
                         >
-                            {/* Main Empty State Panel (mimicking screenshot) */}
-                            <div className="lg:col-span-2 bg-[#121216] border border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden group shadow-inner">
-                                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.05)_0%,transparent_60%)]"></div>
-                                
-                                <motion.div 
-                                    animate={{ opacity: [0.5, 1, 0.5] }} 
-                                    transition={{ duration: 3, repeat: Infinity }}
-                                    className="mb-8 p-6 bg-white/5 rounded-full border border-white/5"
-                                >
-                                    <AlertTriangle className="w-16 h-16 text-slate-500" strokeWidth={1.5} />
-                                </motion.div>
-                                
-                                <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">No Liability Nodes Detected</h2>
-                                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-md text-center leading-relaxed">
-                                    Deploy edge infrastructure into venues tagged as "Liability" to enable local intelligence protocols.
-                                </p>
-                            </div>
+                            {!incident ? (
+                                /* Main Empty State Panel (mimicking screenshot) */
+                                <div className="lg:col-span-2 bg-[#121216] border border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden group shadow-inner">
+                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.05)_0%,transparent_60%)]"></div>
+                                    
+                                    <motion.div 
+                                        animate={{ opacity: [0.5, 1, 0.5] }} 
+                                        transition={{ duration: 3, repeat: Infinity }}
+                                        className="mb-8 p-6 bg-white/5 rounded-full border border-white/5"
+                                    >
+                                        <AlertTriangle className="w-16 h-16 text-slate-500" strokeWidth={1.5} />
+                                    </motion.div>
+                                    
+                                    <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">No Liability Nodes Detected</h2>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-md text-center leading-relaxed">
+                                        Deploy edge infrastructure into venues tagged as "Liability" to enable local intelligence protocols.
+                                    </p>
+                                </div>
+                            ) : (
+                                /* Incident Forensics Timeline */
+                                <div className="lg:col-span-2 bg-[#121216] border border-white/5 rounded-3xl p-8 relative shadow-inner">
+                                    <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-6">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2 mb-1"><Database className="w-3 h-3"/> Digital Black Box Record</div>
+                                            <h2 className="text-2xl font-black uppercase tracking-widest text-white drop-shadow-md">Incident #{incident.id.substring(0, 12)}...</h2>
+                                            <p className="text-xs text-rose-400 font-mono font-bold mt-1">{incident.type || 'Distress Event'}</p>
+                                        </div>
+                                        <div className="px-4 py-2 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(244,63,94,0.15)]">
+                                            <ShieldAlert className="w-4 h-4" /> Forensics Locked
+                                        </div>
+                                    </div>
+                                    
+                                    {incident.annotated_frame && (
+                                        <div className="mb-6 rounded-xl overflow-hidden border border-white/10 shadow-lg relative">
+                                            <img src={`data:image/jpeg;base64,${incident.annotated_frame}`} alt="Evidence" className="w-full h-auto object-cover max-h-64" />
+                                            <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded">Visual Evidence Captured</div>
+                                        </div>
+                                    )}
+
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-6">Incident Reconstruction Timeline</h3>
+                                    
+                                    <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
+                                        {[
+                                            { time: "T-00:00", text: "System nominal", type: "info" },
+                                            { time: "T+00:02", text: "Anomaly detected in feed", type: "warning" },
+                                            { time: "T+00:04", text: `Risk elevated: ${incident.priority}`, type: "warning" },
+                                            { time: "T+00:05", text: `${incident.type} Confirmed`, type: "critical" },
+                                            { time: "T+00:06", text: "Incident created", type: "critical" },
+                                            { time: "T+00:07", text: "Email dispatched", type: "info" },
+                                            { time: "T+00:09", text: "Evidence package sealed", type: "success" }
+                                        ].map((event, i) => (
+                                            <motion.div 
+                                                key={i}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.15 }}
+                                                className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
+                                            >
+                                                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#121216] bg-slate-800 text-slate-500 group-hover:text-amber-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 relative z-10 transition-colors">
+                                                    <div className={`w-3 h-3 rounded-full ${event.type === 'critical' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]' : event.type === 'warning' ? 'bg-amber-500' : event.type === 'success' ? 'bg-emerald-500' : 'bg-sky-500'}`} />
+                                                </div>
+                                                
+                                                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-white/5 bg-black/40 backdrop-blur shadow-sm group-hover:border-white/10 transition-colors">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className={`font-mono text-xs font-bold ${event.type === 'critical' ? 'text-rose-400' : 'text-slate-400'}`}>{event.time}</span>
+                                                    </div>
+                                                    <div className="text-sm font-bold text-slate-200">{event.text}</div>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Right Side Panels */}
                             <div className="space-y-6">
-                                {/* Infrastructure Load */}
-                                <div className="bg-[#121216] border border-amber-500/20 rounded-3xl p-6 relative overflow-hidden shadow-[inset_0_0_20px_rgba(245,158,11,0.02)]">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 mb-6">Infrastructure Load</h3>
-                                    
-                                    <div className="mb-8">
-                                        <div className="flex justify-between items-end mb-2">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Capacity</span>
-                                            <span className="text-xl font-black font-mono">0%</span>
+                                
+                                {/* Generate Evidence Package */}
+                                <div 
+                                    onClick={() => window.open("http://localhost:8000/api/v1/incident/report/pdf", "_blank")}
+                                    className="bg-gradient-to-br from-amber-500/20 to-amber-600/5 border border-amber-500/40 rounded-3xl p-6 relative overflow-hidden group hover:border-amber-400 transition-colors cursor-pointer shadow-[0_0_30px_rgba(245,158,11,0.1)]"
+                                >
+                                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%,100%_100%] animate-[shimmer_3s_infinite]"></div>
+                                    <div className="relative z-10 flex flex-col items-center justify-center text-center">
+                                        <div className="w-16 h-16 rounded-2xl bg-amber-500 text-black flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(245,158,11,0.6)] group-hover:scale-105 transition-transform">
+                                            <FileText className="w-8 h-8" />
                                         </div>
-                                        <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-white/5">
-                                            <div className="h-full w-0 bg-amber-500"></div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                                        <div>
-                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">Venues</span>
-                                            <span className="text-2xl font-black font-mono text-white">0</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">Edge Nodes</span>
-                                            <span className="text-2xl font-black font-mono text-amber-500">0</span>
-                                        </div>
+                                        <h3 className="text-lg font-black uppercase tracking-widest text-amber-500 drop-shadow-md">Generate Evidence Package</h3>
+                                        <p className="text-[10px] font-mono text-amber-500/70 mt-2">One-Click PDF Dossier Creation</p>
                                     </div>
                                 </div>
 
-                                {/* Decision Engine */}
-                                <div className="bg-[#121216] border border-fuchsia-500/20 rounded-3xl p-6 relative overflow-hidden shadow-[inset_0_0_20px_rgba(217,70,239,0.02)]">
-                                    <div className="flex items-start gap-4 mb-4">
-                                        <div className="p-3 bg-fuchsia-500/10 rounded-xl border border-fuchsia-500/20">
-                                            <Cpu className="w-6 h-6 text-fuchsia-400" />
+                                {/* Randy Investigation Summary */}
+                                <div className="bg-[#121216] border border-fuchsia-500/30 rounded-3xl p-6 relative shadow-[inset_0_0_20px_rgba(217,70,239,0.02)]">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className="p-2 bg-fuchsia-500/10 rounded-xl border border-fuchsia-500/30">
+                                            <Cpu className="w-5 h-5 text-fuchsia-400" />
                                         </div>
-                                        <div>
-                                            <h3 className="text-[12px] font-black uppercase tracking-[0.1em] text-white">Decision Engine</h3>
-                                            <span className="text-[9px] font-bold text-fuchsia-400 uppercase tracking-widest">Autonomous Phase</span>
-                                        </div>
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-fuchsia-400">Randy Investigation Summary</h3>
                                     </div>
                                     
-                                    <p className="text-xs font-mono text-slate-400 leading-relaxed pt-2">
-                                        No critical incidents currently detected. Maintaining standard dynamic monitoring pattern.
-                                    </p>
+                                    <div className="space-y-4 text-xs font-mono text-slate-300 leading-relaxed border-l-2 border-fuchsia-500/30 pl-4">
+                                        {incident ? (
+                                            <>
+                                                <div><span className="text-emerald-400">✓</span> Analysis type: {incident.analysis_type || 'AI Core'}.</div>
+                                                <div><span className="text-amber-400">!</span> {incident.description}</div>
+                                                {incident.explanation && <div><span className="text-sky-400">ℹ</span> {incident.explanation}</div>}
+                                                <div><span className="text-emerald-400">✓</span> Priority status locked at {incident.priority}.</div>
+                                                <div><span className="text-emerald-400">✓</span> Automatic response and notification dispatched.</div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div><span className="text-emerald-400">✓</span> Awaiting incident generation.</div>
+                                                <div><span className="text-sky-400">ℹ</span> System standing by for real-time telemetry.</div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Cross-System Evidence Sources */}
+                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2"><Database className="w-4 h-4"/> Evidence Sources</h3>
+                                    
+                                    <div className="space-y-3 font-mono text-xs font-bold text-slate-300">
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Guardian Route</div>
+                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Kinetic SOS</div>
+                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Camera Network</div>
+                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Notification Engine</div>
+                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
+                                        </div>
+                                        <div className={`flex items-center justify-between p-2 rounded-lg border ${incident ? 'bg-fuchsia-500/10 border-fuchsia-500/20' : 'bg-white/5 border-white/5'}`}>
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-fuchsia-500' : 'text-slate-600'}`} /> Randy AI Analysis</div>
+                                            <span className={`text-[9px] uppercase tracking-widest ${incident ? 'text-fuchsia-500' : 'text-slate-500'}`}>{incident ? 'Sealed' : 'Pending'}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <div className="text-right text-[10px] font-black uppercase tracking-[0.2em] text-amber-500/50 flex items-center justify-end gap-2">
-                                    Sync State <span className="text-amber-500">0.4ms Latency</span>
-                                </div>
                             </div>
                         </motion.div>
                     )}

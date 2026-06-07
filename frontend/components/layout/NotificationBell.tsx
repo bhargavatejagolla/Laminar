@@ -295,6 +295,27 @@ function NotifCard({ n, onDismiss }: { n: MeshNotification; onDismiss: () => voi
                       <p className="text-[10px] text-slate-300 leading-relaxed">{meta.recommendation}</p>
                     </div>
                   )}
+                  {meta.coordinates && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-[#042f2e]/50 border border-emerald-500/20 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <p className="text-[9px] text-emerald-400/80 font-mono uppercase tracking-[0.15em] font-black">
+                          Tactical Location Data
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-emerald-300 font-mono font-bold tracking-tight">{meta.coordinates}</p>
+                    </div>
+                  )}
+                  {meta.screenshot_url && (
+                    <div className="mt-2 rounded-xl overflow-hidden border border-rose-500/30 bg-black/40 shadow-inner relative group">
+                      <div className="absolute top-2 left-2 bg-rose-500/80 backdrop-blur text-white text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-rose-400/50 flex items-center gap-1.5 z-10">
+                        <span className="w-1 h-1 rounded-full bg-white animate-ping" />
+                        Live Feed Snapshot
+                      </div>
+                      <img src={meta.screenshot_url} alt="Incident Snapshot" className="w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                      <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-xl pointer-events-none" />
+                    </div>
+                  )}
                   {/* Raw metadata extras */}
                   {meta.risk_score != null && (
                     <div className="mt-1.5 flex items-center gap-2">

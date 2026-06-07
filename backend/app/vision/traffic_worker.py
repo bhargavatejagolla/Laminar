@@ -205,7 +205,7 @@ class TrafficWorker:
                 # ── Always update MJPEG cache ──
                 frame_to_encode = self._last_annotated_frame if self._last_annotated_frame is not None else frame
                 try:
-                    _, jpeg = cv2.imencode(".jpg", frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 78])
+                    _, jpeg = cv2.imencode(".jpg", frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 65])
                     self._cached_frame_bytes = jpeg.tobytes()
                 except Exception: pass
 
@@ -232,7 +232,7 @@ class TrafficWorker:
 
     async def _detection_loop(self):
         """Dedicated background task for AI inference (Traffic + Incidents)."""
-        detection_interval = 0.5  # 2 Hz
+        detection_interval = 0.05  # 20 Hz
         while self._running:
             try:
                 if hasattr(self, '_current_raw_frame') and self._current_raw_frame is not None:

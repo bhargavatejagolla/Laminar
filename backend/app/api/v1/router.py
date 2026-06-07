@@ -45,6 +45,7 @@ from app.api.v1.endpoints.guardian import router as guardian_router
 from app.api.v1.endpoints.amber import router as amber_router
 from app.api.v1.endpoints.spatial import router as spatial_router
 from app.api.v1.endpoints.sos import router as sos_router
+from app.api.v1.endpoints.resonance import router as resonance_router
 
 # ── New Advanced AI Feature Routers ──────────────────────────────────────────
 from app.api.v1.endpoints.websocket import router as ws_router
@@ -96,6 +97,7 @@ router.include_router(amber_router, prefix="/amber", tags=["Amber AI"])
 router.include_router(spatial_router, prefix="/spatial", tags=["Spatial AI"])
 router.include_router(sos_router, prefix="/sos", tags=["Public SOS Report"])
 router.include_router(notifications_router, prefix="/notifications", tags=["Global Mesh Notifications"])
+router.include_router(resonance_router, prefix="/resonance", tags=["Resonance AI"])
 
 # ── New Advanced AI Feature Routes ───────────────────────────────────────────
 router.include_router(ws_router, tags=["WebSocket"])

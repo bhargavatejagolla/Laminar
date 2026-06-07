@@ -45,25 +45,44 @@ def draw_pose_overlay(frame: np.ndarray, result, anomalies: list = None) -> np.n
                     break
             
             box_color = color
-            thickness = 1
+            thickness = 2
+            bg_color = (0, 0, 0)
             if person_anomaly:
                 risk = person_anomaly.get("risk_level", "LOW")
                 if risk == "CRITICAL":
                     box_color = (0, 0, 255) # Red
+                    bg_color = (0, 0, 150)
                     thickness = 3
                 elif risk == "HIGH":
                     box_color = (0, 165, 255) # Orange
-                    thickness = 2
+                    bg_color = (0, 100, 200)
+                    thickness = 3
                 elif risk == "MEDIUM":
                     box_color = (0, 255, 255) # Yellow
+                    bg_color = (0, 150, 150)
                     thickness = 2
             
-            # Subtly highlight the bounding box
+            # Draw glowing bounding box
             cv2.rectangle(overlay, (x1, y1), (x2, y2), box_color, thickness)
             
+            # Add corner accents (Cyberpunk style)
+            length = min(30, int((x2-x1)*0.2))
+            c_thick = thickness + 2
+            cv2.line(overlay, (x1, y1), (x1 + length, y1), box_color, c_thick)
+            cv2.line(overlay, (x1, y1), (x1, y1 + length), box_color, c_thick)
+            cv2.line(overlay, (x2, y1), (x2 - length, y1), box_color, c_thick)
+            cv2.line(overlay, (x2, y1), (x2, y1 + length), box_color, c_thick)
+            cv2.line(overlay, (x1, y2), (x1 + length, y2), box_color, c_thick)
+            cv2.line(overlay, (x1, y2), (x1, y2 - length), box_color, c_thick)
+            cv2.line(overlay, (x2, y2), (x2 - length, y2), box_color, c_thick)
+            cv2.line(overlay, (x2, y2), (x2, y2 - length), box_color, c_thick)
+            
             if person_anomaly:
-                cv2.putText(overlay, f"{person_anomaly['type']} ({person_anomaly.get('confidence', 0)}%)", 
-                            (x1, max(20, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 2, cv2.LINE_AA)
+                label = f"[{person_anomaly['type']}] CONF: {person_anomaly.get('confidence', 0)}%"
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+                text_y = max(th + 5, y1 - 8)
+                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), bg_color, -1)
+                cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
             if kpts:
                 # Draw keypoints
@@ -166,7 +185,7 @@ class KineticWorker:
 
                 frame_to_encode = self._last_annotated_frame if self._last_annotated_frame is not None else frame
                 try:
-                    _, jpeg = cv2.imencode(".jpg", frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 78])
+                    _, jpeg = cv2.imencode(".jpg", frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 65])
                     self._cached_frame_bytes = jpeg.tobytes()
                 except Exception: pass
 
@@ -176,7 +195,7 @@ class KineticWorker:
                 await asyncio.sleep(1)
 
     async def _detection_loop(self):
-        detection_interval = 0.5 
+        detection_interval = 0.05 
         while self._running:
             try:
                 if hasattr(self, '_current_raw_frame') and self._current_raw_frame is not None:

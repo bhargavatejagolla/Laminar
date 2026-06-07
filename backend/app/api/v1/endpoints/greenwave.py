@@ -61,10 +61,12 @@ async def greenwave_video_stream(camera_id: UUID):
         return StreamingResponse(iter([]), media_type="multipart/x-mixed-replace; boundary=frame")
 
     async def frame_generator():
+        last_yielded = None
         while True:
-            if worker._cached_frame_bytes:
+            if worker._cached_frame_bytes and worker._cached_frame_bytes != last_yielded:
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + worker._cached_frame_bytes + b'\r\n')
-            await asyncio.sleep(0.05)
+                last_yielded = worker._cached_frame_bytes
+            await asyncio.sleep(0.033)
 
     return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")

@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 import asyncio
+import traceback
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_DOWNLOAD_WARNINGS"] = "1"
@@ -45,6 +47,14 @@ app = FastAPI(
     redoc_url=settings.REDOC_URL,
     openapi_url=settings.OPENAPI_URL,
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    err_msg = traceback.format_exc()
+    logger.error(f"Global Unhandled Exception: {err_msg}")
+    with open("global_error.txt", "a") as f:
+        f.write(f"--- ERROR AT {request.url.path} ---\n{err_msg}\n")
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error", "error_message": str(exc)})
 
 # ----------------------------------------------------------
 # Middleware
@@ -88,6 +98,12 @@ app.mount("/profile_pictures",
 
 _downloads_clips = os.path.abspath(os.path.join("..", "downloads", "evidence_clips"))
 os.makedirs(_downloads_clips, exist_ok=True)
+
+# Resonance Engine EVM media
+os.makedirs("media/resonance", exist_ok=True)
+app.mount("/api/v1/resonance_media",
+          StaticFiles(directory="media/resonance"),
+          name="resonance_media")
 app.mount("/api/v1/storage/clips",
           StaticFiles(directory=_downloads_clips),
           name="evidence_clips")

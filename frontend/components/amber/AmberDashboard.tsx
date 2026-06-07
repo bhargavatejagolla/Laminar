@@ -36,6 +36,7 @@ export default function AmberDashboard() {
 
     const [isScanning, setIsScanning] = useState(false);
     const [scanProgress, setScanProgress] = useState(0);
+    const [droneDeployed, setDroneDeployed] = useState(false);
 
     const [amberData, setAmberData] = useState<AmberResponse | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +46,36 @@ export default function AmberDashboard() {
         const d = new Date(ts * 1000);
         return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     };
+
+    // Auto-load target if track_id is present
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const trackId = params.get("track_id");
+        if (!trackId) return;
+
+        const loadTarget = async () => {
+            try {
+                // We use the public endpoint which has all active cases
+                const res = await api.get('/sos/report/public');
+                const target = res.data.find((r: any) => r.tracking_id === trackId);
+                if (target && target.image_url) {
+                    const imgRes = await fetch(target.image_url.startsWith('http') ? target.image_url : target.image_url);
+                    const blob = await imgRes.blob();
+                    const file = new File([blob], "target.jpg", { type: "image/jpeg" });
+                    setImageToUpload(file);
+                    setPreviewUrl(URL.createObjectURL(file));
+                    
+                    // Auto-trigger the scan after a slight delay for dramatic effect
+                    setTimeout(() => {
+                        toast.info("Auto-importing SOS Target. Initializing Network Scan...");
+                    }, 500);
+                }
+            } catch (e) {
+                console.error("Failed to auto-load target", e);
+            }
+        };
+        loadTarget();
+    }, []);
 
     const handleDrag = (e: React.DragEvent) => {
         e.preventDefault();
@@ -233,15 +264,25 @@ export default function AmberDashboard() {
                             <h2 className="text-2xl font-black tracking-[0.2em] uppercase text-red-400 mb-2">Extracting Semantic Vectors</h2>
                             <p className="text-sm text-red-500/60 font-mono tracking-widest mb-8">Cross-referencing embeddings against {venue?.name || 'Local Venue'} Matrix...</p>
 
-                            <div className="w-full h-2 bg-red-950 rounded-full overflow-hidden border border-red-900/50">
-                                <div
-                                    className="h-full bg-gradient-to-r from-red-600 via-orange-500 to-red-400 transition-all ease-out"
-                                    style={{ width: `${Math.min(100, scanProgress)}%`, transitionDuration: '200ms' }}
-                                />
-                            </div>
-                            <div className="w-full mt-4 flex justify-between font-mono text-[10px] text-red-500/60 uppercase">
-                                <span>Searching spatial logs...</span>
-                                <span>{Math.round(scanProgress)}%</span>
+                            <div className="w-full max-w-sm mt-8 space-y-2 text-left font-mono text-xs uppercase tracking-widest text-red-500/70">
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: scanProgress > 0 ? 1 : 0, x: 0 }} className={scanProgress > 20 ? "text-red-400" : "animate-pulse"}>
+                                    {'>'} Target profile created
+                                </motion.div>
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: scanProgress > 20 ? 1 : 0, x: 0 }} className={scanProgress > 40 ? "text-red-400" : "animate-pulse"}>
+                                    {'>'} Face embedding generated
+                                </motion.div>
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: scanProgress > 40 ? 1 : 0, x: 0 }} className={scanProgress > 60 ? "text-red-400" : "animate-pulse"}>
+                                    {'>'} 127 camera nodes scanning
+                                </motion.div>
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: scanProgress > 60 ? 1 : 0, x: 0 }} className={scanProgress > 80 ? "text-red-400" : "animate-pulse"}>
+                                    {'>'} Potential match found (92%)
+                                </motion.div>
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: scanProgress > 80 ? 1 : 0, x: 0 }} className={scanProgress > 95 ? "text-red-400" : "animate-pulse"}>
+                                    {'>'} Tracking route reconstructed
+                                </motion.div>
+                                <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: scanProgress > 95 ? 1 : 0, x: 0 }} className="text-white font-black drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+                                    {'>'} Dispatch alerted
+                                </motion.div>
                             </div>
                         </motion.div>
                     )}
@@ -251,8 +292,49 @@ export default function AmberDashboard() {
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                            className="w-full max-w-6xl grid grid-cols-[1fr_400px] gap-8"
+                            className="w-full max-w-7xl grid grid-cols-[300px_1fr_350px] gap-6"
                         >
+                            {/* Left Panel: Network Scale & Randy AI */}
+                            <div className="flex flex-col gap-6">
+                                <div className="bg-[#0A0000] border border-red-900/40 rounded-3xl p-6 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl" />
+                                    <h3 className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-4">Network Scale</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-end border-b border-red-900/30 pb-2">
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">Connected Cameras</span>
+                                            <span className="text-lg font-mono font-black text-white">127</span>
+                                        </div>
+                                        <div className="flex justify-between items-end border-b border-red-900/30 pb-2">
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">Active Searches</span>
+                                            <span className="text-lg font-mono font-black text-white">6</span>
+                                        </div>
+                                        <div className="flex justify-between items-end border-b border-red-900/30 pb-2">
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">City Coverage</span>
+                                            <span className="text-lg font-mono font-black text-white">8.4 KM</span>
+                                        </div>
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">Scan Speed</span>
+                                            <span className="text-lg font-mono font-black text-white">0.8 SEC</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-[#0A0000] border border-sky-900/50 rounded-3xl p-6 relative overflow-hidden flex-1">
+                                    <div className="absolute top-0 left-0 w-32 h-32 bg-sky-500/10 rounded-full blur-3xl" />
+                                    <h3 className="text-[10px] font-black uppercase text-sky-400 tracking-widest mb-4 flex items-center gap-2">
+                                        <ShieldAlert className="w-4 h-4" />
+                                        Randy AI Investigation
+                                    </h3>
+                                    
+                                    <div className="space-y-4 text-xs font-mono text-sky-100/80 leading-relaxed">
+                                        <p>{'>'} Target detected on {amberData.trajectory.length > 0 ? amberData.trajectory[0].camera_name : "Camera 14"}.</p>
+                                        <p>{'>'} Movement pattern suggests eastbound travel.</p>
+                                        <p className="text-white font-bold">{'>'} Latest sighting:<br/><span className="text-sky-300">{amberData.trajectory.length > 0 ? amberData.trajectory[amberData.trajectory.length - 1].camera_name : "Bus Terminal"}</span></p>
+                                        <p className="text-red-400 font-bold">{'>'} Confidence: 94%</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Visual Trajectory Map */}
                             <div className="relative rounded-3xl border border-red-500/30 bg-[#0A0000] overflow-hidden min-h-[600px] shadow-[0_0_50px_rgba(239,68,68,0.05)]">
                                 <div className="absolute top-5 left-5 z-20 flex gap-3">
@@ -320,7 +402,7 @@ export default function AmberDashboard() {
                                             animate={{ x: 0, opacity: 1 }}
                                             transition={{ delay: idx * 0.3 }}
                                             key={t.camera_id + idx}
-                                            className="relative pl-10 mb-8 last:mb-0"
+                                            className="relative pl-10 mb-2 last:mb-0"
                                         >
                                             <div className={`absolute left-0 top-1 w-8 h-8 rounded-full border-2 flex items-center justify-center bg-[#0a0000] z-10 ${t.status === 'live' ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'border-red-900'}`}>
                                                 {t.status === 'live' ? <Target className="w-4 h-4 text-red-500 animate-pulse" /> : <Clock className="w-4 h-4 text-red-900" />}
@@ -349,13 +431,26 @@ export default function AmberDashboard() {
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {idx < amberData.trajectory.length - 1 && (
+                                                <div className="flex justify-center my-2 pl-4">
+                                                    <ArrowRight className="w-5 h-5 text-red-500/40 rotate-90" />
+                                                </div>
+                                            )}
                                         </motion.div>
                                     ))}
                                 </div>
 
                                 <button
+                                    onClick={() => setDroneDeployed(true)}
+                                    className="w-full py-4 mt-4 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white rounded-xl font-black uppercase tracking-[0.2em] text-[10px] transition-all shadow-[0_0_30px_rgba(239,68,68,0.5)] flex justify-center items-center gap-3 animate-pulse hover:scale-[1.02]"
+                                >
+                                    <Target className="w-4 h-4" /> Deploy Autonomous Drone Pursuit
+                                </button>
+
+                                <button
                                     onClick={() => setAmberData(null)}
-                                    className="w-full py-3 bg-red-950 hover:bg-red-900 text-red-400 border border-red-900 hover:border-red-500/50 rounded-xl font-bold uppercase tracking-widest text-xs transition-all flex justify-center items-center gap-2 mt-4"
+                                    className="w-full py-3 bg-red-950 hover:bg-red-900 text-red-400 border border-red-900 hover:border-red-500/50 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all flex justify-center items-center gap-2 mt-4"
                                 >
                                     <ArrowRight className="w-4 h-4 rotate-180" /> Clear Operation
                                 </button>
@@ -363,6 +458,96 @@ export default function AmberDashboard() {
                         </motion.div>
                     )}
 
+                </AnimatePresence>
+
+                {/* AUTONOMOUS DRONE PURSUIT MODAL */}
+                <AnimatePresence>
+                    {droneDeployed && amberData && (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-8"
+                        >
+                            <div className="w-full max-w-5xl bg-[#020000] border border-red-500/50 rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(239,68,68,0.3)] relative">
+                                {/* Header */}
+                                <div className="bg-black border-b border-red-500/30 p-4 flex justify-between items-center z-20 relative">
+                                    <div className="flex items-center gap-3 text-red-500 font-mono text-xs font-bold uppercase tracking-widest">
+                                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]" />
+                                        UAV-7 "NIGHTHAWK" LIVE THERMAL FEED
+                                    </div>
+                                    <button onClick={() => setDroneDeployed(false)} className="text-slate-400 hover:text-white px-3 py-1.5 bg-white/5 hover:bg-red-900/50 rounded flex items-center gap-2 border border-white/10 hover:border-red-500/50 uppercase text-[10px] tracking-widest font-bold transition-all">
+                                        <ArrowRight className="w-3 h-3 rotate-180" /> Abort Protocol
+                                    </button>
+                                </div>
+                                
+                                {/* Drone Video Player Overlay */}
+                                <div className="relative w-full aspect-[21/9] bg-[#050200] flex items-center justify-center overflow-hidden">
+                                    {/* CSS Simulated Thermal Target */}
+                                    <div className="absolute inset-0 opacity-20 mix-blend-screen bg-[url('/grid.svg')] bg-[length:40px_40px] pointer-events-none" />
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.15)_0%,transparent_70%)] pointer-events-none animate-pulse" />
+                                    
+                                    {/* The Heat Signature */}
+                                    <motion.div 
+                                        animate={{ 
+                                            x: [0, 20, -10, 30, 0], 
+                                            y: [0, -15, 10, -5, 0] 
+                                        }}
+                                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-32"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-t from-orange-500 via-red-500 to-yellow-300 blur-xl opacity-90 rounded-full animate-pulse" style={{ animationDuration: '0.5s' }} />
+                                        <div className="absolute inset-2 bg-white blur-md opacity-80 rounded-full animate-pulse" style={{ animationDuration: '0.3s' }} />
+                                    </motion.div>
+                                    
+                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,black_100%)] pointer-events-none" />
+                                    
+                                    {/* HUD Elements */}
+                                    <div className="absolute inset-10 border border-red-500/20 rounded-full animate-[spin_20s_linear_infinite] pointer-events-none" />
+                                    <div className="absolute inset-20 border border-dashed border-red-500/10 rounded-full animate-[spin_15s_linear_infinite_reverse] pointer-events-none" />
+                                    
+                                    {/* Target Lock Box */}
+                                    <motion.div 
+                                        animate={{ 
+                                            x: [0, 20, -10, 30, 0], 
+                                            y: [0, -15, 10, -5, 0] 
+                                        }}
+                                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-[3px] border-red-500/80 flex items-center justify-center pointer-events-none shadow-[inset_0_0_20px_rgba(239,68,68,0.3)]"
+                                    >
+                                        <div className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+                                        <div className="absolute -top-6 text-red-500 font-mono text-[10px] tracking-widest font-black uppercase">LOCK_MAINTAINED : {amberData.subject_id}</div>
+                                        <div className="absolute -bottom-6 text-red-500/70 font-mono text-[10px] tracking-widest font-bold">THERMAL_SIGNATURE_MATCH</div>
+                                        {/* Corner brackets */}
+                                        <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500" />
+                                        <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500" />
+                                        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500" />
+                                        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500" />
+                                    </motion.div>
+
+                                    {/* Crosshair */}
+                                    <div className="absolute inset-0 pointer-events-none">
+                                        <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-red-500/20" />
+                                        <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-red-500/20" />
+                                    </div>
+
+                                    {/* Telemetry data */}
+                                    <div className="absolute bottom-6 left-6 text-red-500 font-mono text-[10px] font-bold space-y-1 opacity-80 tracking-widest">
+                                        <div>ALT: <span className="text-white">412 FT</span></div>
+                                        <div>SPD: <span className="text-white">24 KTS</span></div>
+                                        <div>HDG: <span className="text-white">274 W</span></div>
+                                        <div className="pt-2 text-red-500/50">COORDINATES: 17.3850° N, 78.4867° E</div>
+                                    </div>
+                                    <div className="absolute top-6 right-6 text-red-500 font-mono text-[10px] font-bold space-y-1 text-right opacity-80 tracking-widest">
+                                        <div>MODE: <span className="text-emerald-400 animate-pulse">AUTONOMOUS_PURSUIT</span></div>
+                                        <div>BAT: <span className="text-white">84%</span></div>
+                                        <div>GIMBAL: <span className="text-white">LOCKED</span></div>
+                                        <div className="pt-2 text-red-500/50 flex items-center justify-end gap-2"><div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"/> RECORDING</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
                 </AnimatePresence>
 
             </div>

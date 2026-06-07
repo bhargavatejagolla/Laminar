@@ -124,6 +124,10 @@ async def _autonomous_kinetic_loop():
                                     )
                                     
                             # Update global state
+                            fusion_state = {"fusion_score": 0.0, "sos_activated": False, "timeline": []}
+                            if hasattr(kinetic_engine, "get_fusion_state"):
+                                fusion_state = kinetic_engine.get_fusion_state()
+                                
                             GLOBAL_STATE.update(
                                 domain="kinetic",
                                 venue_id=str(getattr(worker, "venue_id", "unknown")),
@@ -133,6 +137,7 @@ async def _autonomous_kinetic_loop():
                                     "active_subjects": result.count if hasattr(result, 'count') else 0,
                                     "anomalies_detected": len(anomalies),
                                     "latest_anomalies": anomalies,
+                                    "fusion_state": fusion_state,
                                     "last_updated": datetime.utcnow().isoformat()
                                 }
                             )
@@ -191,7 +196,8 @@ async def get_kinetic_insights() -> Dict[str, Any]:
             cameras_data[str(cam_id)] = {
                 "active_subjects": venue_data.get("active_subjects", 0),
                 "anomalies_detected": venue_data.get("anomalies_detected", 0),
-                "latest_anomalies": venue_data.get("latest_anomalies", [])
+                "latest_anomalies": venue_data.get("latest_anomalies", []),
+                "fusion_state": venue_data.get("fusion_state", {"fusion_score": 0.0})
             }
 
         events = venue_data.get("latest_anomalies", [])
@@ -210,7 +216,8 @@ async def get_kinetic_insights() -> Dict[str, Any]:
         "anomalies_detected": total_anomalies,
         "risk_level": highest_risk,
         "latest_events": latest_events,
-        "cameras": cameras_data
+        "cameras": cameras_data,
+        "fusion_state": state.get(list(state.keys())[0], {}).get("fusion_state", {}) if state else {}
     }
 
 @router.get("/events/stream")
@@ -251,14 +258,17 @@ async def kinetic_video_stream(camera_id: UUID):
         detector = get_detector()
         kinetic_engine = KineticDetector()
         last_processed = 0
+        last_yielded_standalone = None
         
         while True:
             # 1. Priority: Standalone Injected Frame
             standalone_frame = _standalone_kinetic_frames.get(str(camera_id))
             if standalone_frame is not None:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + standalone_frame + b'\r\n')
-                await asyncio.sleep(0.05)
+                if standalone_frame != last_yielded_standalone:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + standalone_frame + b'\r\n')
+                    last_yielded_standalone = standalone_frame
+                await asyncio.sleep(0.033)
                 continue
 
             # 2. Live camera feed
@@ -332,13 +342,46 @@ async def inject_kinetic_media(camera_id: UUID, file: UploadFile = File(...)):
             
         async def process_video():
             try:
-                cap = cv2.VideoCapture(temp_path)
-                if not cap.isOpened():
-                    raise Exception(f"OpenCV failed to open video file: {temp_path}. The file may be corrupt or an unsupported format.")
-
                 from app.vision.detector import get_detector
                 from app.vision.kinetic_detector import KineticDetector
                 from app.vision.kinetic_worker import draw_pose_overlay
+                
+                detector = get_detector()
+                kinetic_engine = KineticDetector()
+                
+                # ── 1. Offline Audio Distress Analysis (Faster-Whisper) ──
+                keyword_hits = 0
+                try:
+                    def _extract_and_transcribe():
+                        hits = 0
+                        import moviepy.editor as mp
+                        from faster_whisper import WhisperModel
+                        video = mp.VideoFileClip(temp_path)
+                        if video.audio:
+                            audio_path = temp_path.replace(".mp4", ".wav")
+                            video.audio.write_audiofile(audio_path, logger=None, verbose=False)
+                            model = WhisperModel("tiny.en", device="cpu", compute_type="int8")
+                            segments, _ = model.transcribe(audio_path, beam_size=5)
+                            keywords = ["help", "stop", "save me", "fire", "emergency"]
+                            for segment in segments:
+                                text = segment.text.lower()
+                                for kw in keywords:
+                                    if kw in text:
+                                        hits += text.count(kw)
+                            os.remove(audio_path)
+                        if video:
+                            video.close()
+                        return hits
+                    
+                    keyword_hits = await asyncio.to_thread(_extract_and_transcribe)
+                    if hasattr(kinetic_engine, "inject_audio_signals"):
+                        kinetic_engine.inject_audio_signals(keyword_hits)
+                except Exception as e:
+                    logger.error(f"Audio extraction failed: {e}")
+
+                cap = cv2.VideoCapture(temp_path)
+                if not cap.isOpened():
+                    raise Exception(f"OpenCV failed to open video file: {temp_path}.")
                 
                 venue_id_str = "unknown"
                 async with db_manager.session() as session:
@@ -346,9 +389,6 @@ async def inject_kinetic_media(camera_id: UUID, file: UploadFile = File(...)):
                     cam = await session.get(Camera, camera_id)
                     if cam and cam.venue_id:
                         venue_id_str = str(cam.venue_id)
-                        
-                detector = get_detector()
-                kinetic_engine = KineticDetector()
                 
                 frame_count = 0
                 while cap.isOpened():
@@ -422,13 +462,18 @@ async def inject_kinetic_media(camera_id: UUID, file: UploadFile = File(...)):
                                         "snapshot_path": snapshot_path, 
                                         "injected": True,
                                         "camera_location": getattr(cam, "location", "") or venue_name,
-                                        "insight": "AI Engine detected kinetic signatures indicating potential violence or distress.",
+                                        "insight": kinetic_engine.get_randy_summary() if hasattr(kinetic_engine, "get_randy_summary") and inc["type"] == "KINETIC_SOS_CRITICAL" else "AI Engine detected kinetic signatures indicating potential violence or distress.",
                                         "recommended_action": "DISPATCH security team immediately to the location."
                                     }
                                 )
                                 
                     # Update global state for UI parameters dynamically
                     active_subj = result.count if hasattr(result, 'count') else 0
+                    
+                    fusion_state = {"fusion_score": 0.0, "sos_activated": False, "timeline": []}
+                    if hasattr(kinetic_engine, "get_fusion_state"):
+                        fusion_state = kinetic_engine.get_fusion_state()
+                        
                     GLOBAL_STATE.update(
                         domain="kinetic",
                         venue_id=venue_id_str,
@@ -438,6 +483,7 @@ async def inject_kinetic_media(camera_id: UUID, file: UploadFile = File(...)):
                             "active_subjects": active_subj,
                             "anomalies_detected": len(anomalies),
                             "latest_anomalies": anomalies,
+                            "fusion_state": fusion_state,
                             "last_updated": datetime.utcnow().isoformat()
                         }
                     )

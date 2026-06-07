@@ -4,11 +4,13 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Grid, Line, Box, Sphere, Html, Ring } from "@react-three/drei";
 import * as THREE from "three";
-import { Play, Pause, FastForward, Rewind, ArrowLeft, Map, Activity, Clock, Users, Video } from "lucide-react";
+import { Play, Pause, FastForward, Rewind, ArrowLeft, Map, Activity, Clock, Users, Video, Database } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
 import { toast } from "sonner";
+import Loading from "@/app/loading";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Tracklet {
     time: number;
@@ -299,67 +301,230 @@ export default function SpatialEngine() {
     };
 
     const isPrediction = currentFrame > CURRENT_MARK_MINS * 60;
+    const isHistorical = currentFrame < CURRENT_MARK_MINS * 60 - 30;
+
+    const setMode = (mode: 'historical' | 'live' | 'future') => {
+        if (mode === 'historical') setCurrentFrame(45 * 60); // 18:45
+        if (mode === 'live') setCurrentFrame(CURRENT_MARK_MINS * 60); // 19:00
+        if (mode === 'future') setCurrentFrame(MAX_FRAMES); // 19:15
+    };
 
     return (
         <div className="w-full h-screen bg-[#050508] relative overflow-hidden flex flex-col font-sans text-white">
 
             {/* ───── TOP BAR ───── */}
             <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/90 to-transparent z-10 flex justify-between items-start pt-6 px-10 pointer-events-none">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 pointer-events-auto">
                     <button 
                         onClick={() => router.back()} 
-                        className="w-12 h-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex justify-center items-center transition backdrop-blur-md pointer-events-auto cursor-pointer shadow-lg"
+                        className="w-12 h-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex justify-center items-center transition backdrop-blur-md cursor-pointer shadow-lg group"
                         title="Go Back"
                     >
-                        <ArrowLeft className="w-6 h-6 text-white/80" />
+                        <ArrowLeft className="w-6 h-6 text-white/80 group-hover:-translate-x-1 transition-transform" />
                     </button>
                     <div className="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex justify-center items-center backdrop-blur-md shadow-[0_0_30px_rgba(99,102,241,0.3)]">
                         <Map className="w-6 h-6 text-indigo-400" />
                     </div>
                     <div>
                         <h1 className="text-2xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70 drop-shadow-md">
-                            4D SPATIAL PLAYBACK ENGINE
+                            4D SPATIAL <span className="text-indigo-400">PLAYBACK ENGINE</span>
                         </h1>
                         <p className="text-indigo-400/90 text-[10px] font-mono tracking-[0.25em] font-bold mt-1 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,1)] animate-pulse" /> 
-                            {isPrediction ? "PREDICTIVE AI SYNTHESIS ACTIVE" : "NEURAL RADIANCE SYNTHESIS ACTIVE"}
+                            <span className={`w-1.5 h-1.5 rounded-full ${isPrediction ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,1)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,1)]'} animate-pulse`} /> 
+                            {isPrediction ? "PREDICTIVE FUTURE SIMULATION" : isHistorical ? "HISTORICAL REPLAY MODE" : "LIVE REALITY SYNTHESIS"}
                         </p>
                     </div>
                 </div>
 
-                {/* Intelligent Stats Panel */}
+                {/* Mode Toggles */}
                 <div className="bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl flex items-center p-1 shadow-2xl pointer-events-auto">
-                    <div className="flex items-center gap-6 px-5 py-2">
-                        <div className="text-right">
-                            <p className="text-[9px] uppercase tracking-widest text-slate-400 mb-0.5 flex items-center justify-end gap-1"><Users className="w-3 h-3"/> Live Population</p>
-                            <p className="text-lg font-bold tracking-wider text-white">842</p>
-                        </div>
-                        <div className="w-[1px] h-10 bg-white/10" />
-                        <div className="text-right">
-                            <p className="text-[9px] uppercase tracking-widest text-slate-400 mb-0.5 flex items-center justify-end gap-1"><Video className="w-3 h-3"/> Active Cameras</p>
-                            <p className="text-lg font-bold tracking-wider text-white">24</p>
-                        </div>
-                        <div className="w-[1px] h-10 bg-white/10" />
-                        <div className="text-right">
-                            <p className="text-[9px] uppercase tracking-widest text-slate-400 mb-0.5 flex items-center justify-end gap-1"><Activity className="w-3 h-3"/> Historical Samples</p>
-                            <p className="text-lg font-bold tracking-wider text-white">128,421</p>
-                        </div>
-                        <div className="w-[1px] h-10 bg-white/10" />
-                        <div className="text-right bg-indigo-900/30 px-3 py-1.5 rounded-xl border border-indigo-500/20">
-                            <p className="text-[9px] uppercase tracking-widest text-indigo-300 mb-0.5 flex items-center justify-end gap-1"><Clock className="w-3 h-3"/> Prediction Horizon</p>
-                            <p className="text-lg font-bold tracking-wider text-indigo-400">+15 min</p>
-                        </div>
-                    </div>
+                    <button onClick={() => setMode('historical')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${isHistorical ? 'bg-slate-800 text-white shadow-inner' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+                        ◉ Historical Replay
+                    </button>
+                    <button onClick={() => setMode('live')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${!isHistorical && !isPrediction ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+                        ◉ Live Reality
+                    </button>
+                    <button onClick={() => setMode('future')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${isPrediction ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+                        ◉ Future Simulation
+                    </button>
                 </div>
+            </div>
+
+            {/* ───── DYNAMIC SIDE PANELS ───── */}
+            <div className="absolute top-32 left-10 w-80 z-10 pointer-events-none">
+                <AnimatePresence mode="wait">
+                    {/* Prediction Factors Panel */}
+                    {isPrediction && (
+                        <motion.div 
+                            key="future"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20, transition: { duration: 0.1 } }}
+                            className="bg-black/60 backdrop-blur-2xl border border-purple-500/30 rounded-3xl p-6 shadow-[0_0_40px_rgba(168,85,247,0.1)] relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(168,85,247,0.15)_0%,transparent_70%)]"></div>
+                            <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-purple-400 mb-5 flex items-center gap-2 relative z-10">
+                                <Activity className="w-3 h-3" /> Prediction Factors
+                            </h3>
+                            <div className="space-y-4 font-mono text-xs font-bold text-slate-300 relative z-10">
+                                <div className="flex items-center gap-3"><span className="text-rose-400 font-black text-sm">↑</span> Food Court inflow surge</div>
+                                <div className="flex items-center gap-3"><span className="text-rose-400 font-black text-sm">↑</span> Exit West severe congestion</div>
+                                <div className="flex items-center gap-3"><span className="text-amber-400 font-black text-sm">↑</span> Historical Saturday pattern match</div>
+                                <div className="flex items-center gap-3"><span className="text-purple-400 font-black text-sm">↑</span> Event ending in 12 min</div>
+                            </div>
+                            <div className="mt-6 pt-5 border-t border-purple-500/20 relative z-10">
+                                <div className="text-[9px] uppercase tracking-widest text-purple-400/60 mb-1">AI Confidence</div>
+                                <div className="text-2xl font-black text-white flex items-baseline gap-2">
+                                    94.2% <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest animate-pulse">High Conviction</span>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Historical Cross-System Timeline */}
+                    {isHistorical && (
+                        <motion.div 
+                            key="history"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20, transition: { duration: 0.1 } }}
+                            className="bg-black/60 backdrop-blur-2xl border border-indigo-500/30 rounded-3xl p-6 shadow-[0_0_40px_rgba(99,102,241,0.1)] relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] opacity-20"></div>
+                            <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-indigo-400 mb-5 flex items-center gap-2 relative z-10">
+                                <Database className="w-3 h-3" /> Cross-System Timeline
+                            </h3>
+                            <div className="space-y-5 font-mono text-xs font-bold text-slate-300 relative z-10 before:absolute before:inset-0 before:ml-[11px] before:w-[2px] before:bg-gradient-to-b before:from-indigo-500 before:via-emerald-500 before:to-amber-500">
+                                <div className="relative pl-8">
+                                    <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-indigo-500 -translate-x-1/2"></div>
+                                    <div className="text-indigo-400 mb-1 font-black">18:52</div>
+                                    <div className="text-[10px] leading-relaxed">Spatial Engine predicts surge.</div>
+                                </div>
+                                <div className="relative pl-8">
+                                    <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-rose-500 -translate-x-1/2"></div>
+                                    <div className="text-rose-400 mb-1 font-black">18:54</div>
+                                    <div className="text-[10px] leading-relaxed">Kinetic SOS alerted.</div>
+                                </div>
+                                <div className="relative pl-8">
+                                    <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-emerald-500 -translate-x-1/2 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                                    <div className="text-emerald-400 mb-1 font-black">18:55</div>
+                                    <div className="text-[10px] leading-relaxed">Guardian Route rerouted civilians.</div>
+                                </div>
+                                <div className="relative pl-8">
+                                    <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-emerald-500 -translate-x-1/2"></div>
+                                    <div className="text-emerald-400 mb-1 font-black">18:56</div>
+                                    <div className="text-[10px] leading-relaxed">Green Wave prepared emergency access.</div>
+                                </div>
+                                <div className="relative pl-8">
+                                    <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-amber-500 -translate-x-1/2"></div>
+                                    <div className="text-amber-400 mb-1 font-black">18:57</div>
+                                    <div className="text-[10px] leading-relaxed">Liability Engine started evidence capture.</div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Live Telemetry Panel */}
+                    {!isPrediction && !isHistorical && (
+                        <motion.div 
+                            key="live"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20, transition: { duration: 0.1 } }}
+                            className="bg-black/60 backdrop-blur-2xl border border-emerald-500/30 rounded-3xl p-6 shadow-[0_0_40px_rgba(16,185,129,0.1)] relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(16,185,129,0.1)_0%,transparent_70%)]"></div>
+                            <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-emerald-400 mb-5 flex items-center gap-2 relative z-10">
+                                <Video className="w-3 h-3" /> Live Telemetry
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 relative z-10">
+                                <div className="bg-white/5 border border-white/5 p-3 rounded-xl">
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-400 mb-1">Live Pop</div>
+                                    <div className="text-2xl font-black text-white font-mono">842</div>
+                                </div>
+                                <div className="bg-white/5 border border-white/5 p-3 rounded-xl">
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-400 mb-1">Active Cams</div>
+                                    <div className="text-2xl font-black text-white font-mono">24</div>
+                                </div>
+                            </div>
+                            <div className="mt-5 space-y-4 pt-5 border-t border-white/10 relative z-10">
+                                <div>
+                                    <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1.5">
+                                        <span className="text-slate-400 uppercase tracking-widest">Main Hall Density</span>
+                                        <span className="text-rose-400">HIGH</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-rose-500 w-[85%]"></div></div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1.5">
+                                        <span className="text-slate-400 uppercase tracking-widest">Food Court Density</span>
+                                        <span className="text-amber-400">MEDIUM</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-amber-500 w-[55%]"></div></div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1.5">
+                                        <span className="text-slate-400 uppercase tracking-widest">Exit West Capacity</span>
+                                        <span className="text-emerald-400">68%</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 w-[68%]"></div></div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            <div className="absolute top-32 right-10 w-72 z-10 pointer-events-none">
+                <AnimatePresence>
+                    {isPrediction && (
+                        <motion.div 
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="bg-purple-950/40 backdrop-blur-2xl border border-purple-500/40 rounded-3xl p-6 shadow-[0_0_40px_rgba(168,85,247,0.15)] relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.15)_0%,transparent_70%)]"></div>
+                            <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-purple-400 mb-5 flex items-center gap-2 relative z-10">
+                                <Clock className="w-3 h-3" /> Forecast Horizon
+                            </h3>
+                            <div className="space-y-5 font-mono text-xs relative z-10">
+                                <div>
+                                    <div className="text-[10px] uppercase tracking-widest text-purple-300 font-black mb-2 flex items-center gap-2">
+                                        <span className="w-1 h-1 rounded-full bg-purple-400"></span> +5 min
+                                    </div>
+                                    <div className="flex justify-between items-center text-slate-300 bg-black/40 p-2 rounded-lg border border-purple-500/20">
+                                        <span>Main Hall Density:</span>
+                                        <span className="text-amber-400 font-bold">74%</span>
+                                    </div>
+                                </div>
+                                <div className="pt-1">
+                                    <div className="text-[10px] uppercase tracking-widest text-purple-300 font-black mb-2 flex items-center gap-2">
+                                        <span className="w-1 h-1 rounded-full bg-purple-400"></span> +10 min
+                                    </div>
+                                    <div className="flex justify-between items-center text-slate-300 bg-black/40 p-2 rounded-lg border border-purple-500/20">
+                                        <span>Main Hall Density:</span>
+                                        <span className="text-rose-400 font-bold">88%</span>
+                                    </div>
+                                </div>
+                                <div className="pt-2">
+                                    <div className="text-[10px] uppercase tracking-widest text-rose-400 font-black mb-2 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span> +15 min
+                                    </div>
+                                    <div className="p-3 bg-gradient-to-r from-rose-500/20 to-rose-600/10 border border-rose-500/40 rounded-xl text-rose-400 font-black text-center uppercase tracking-[0.15em] shadow-[inset_0_0_20px_rgba(244,63,94,0.1)]">
+                                        Critical Surge Expected
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* ───── 3D CANVAS PORTAL ───── */}
             <div className="flex-1 w-full h-full cursor-move">
                 {loading ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center relative">
-                        <div className="w-32 h-32 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-                        <p className="absolute text-indigo-400 font-mono text-xs font-bold tracking-[0.2em] uppercase mt-40">Compiling Intelligence Matrix...</p>
-                    </div>
+                    <Loading />
                 ) : (
                     <Canvas camera={{ position: [0, 45, 50], fov: 45 }}>
                         <color attach="background" args={["#050508"]} />
@@ -413,15 +578,15 @@ export default function SpatialEngine() {
                         <span className="text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase">Status</span>
                         {isPrediction ? (
                             <span className="text-sm font-bold text-yellow-400 tracking-wider flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" /> FUTURE PROJECTION
+                                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" /> FUTURE SIMULATION
                             </span>
-                        ) : currentFrame < CURRENT_MARK_MINS * 60 - 30 ? (
+                        ) : isHistorical ? (
                             <span className="text-sm font-bold text-slate-300 tracking-wider flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-slate-400" /> HISTORICAL REPLAY
                             </span>
                         ) : (
                             <span className="text-sm font-bold text-emerald-400 tracking-wider flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> CURRENT REALITY
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> LIVE REALITY
                             </span>
                         )}
                     </div>

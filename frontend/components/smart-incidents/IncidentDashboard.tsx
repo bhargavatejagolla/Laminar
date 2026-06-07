@@ -47,15 +47,17 @@ function LiveTacticalCamera({
   initialCamId?: string | null;
 }) {
   const [activeCam, setActiveCam] = useState<any>(null);
+  const [camsList, setCamsList] = useState<any[]>([]);
 
   useEffect(() => {
     if (!venueId) return;
     const fetchCams = async () => {
       try {
         // Use auth-aware api service (attaches JWT automatically)
-        const res = await api.get(`/cameras?venue_id=${venueId}`);
+        const res = await api.get(`/cameras?venue_id=${venueId}&stream_type=security`);
         const cams = res.data;
         if (cams && cams.length > 0) {
+          setCamsList(cams);
           const selected = initialCamId
             ? cams.find((c: any) => c.id === initialCamId) || cams[0]
             : cams[0];
@@ -107,9 +109,22 @@ function LiveTacticalCamera({
 
         <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
           <div className="space-y-1">
-            <p className="text-[10px] text-white font-black uppercase tracking-widest shadow-black drop-shadow-md">
-              {activeCam.name.toUpperCase()}
-            </p>
+            <div className="relative inline-block mb-1">
+              <select
+                value={activeCam.id}
+                onChange={(e) => setActiveCam(camsList.find(c => c.id === e.target.value))}
+                className="appearance-none bg-black/80 backdrop-blur-md border border-white/10 hover:border-rose-500/50 text-[10px] text-white font-black uppercase tracking-widest shadow-black drop-shadow-md rounded-lg pl-2.5 pr-7 py-1.5 cursor-pointer focus:outline-none transition-colors"
+              >
+                {camsList.map((c: any) => (
+                  <option key={c.id} value={c.id} className="bg-[#0a0a0f] text-white">
+                    {c.name.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+                <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+              </div>
+            </div>
             <div className="flex gap-2 text-[7px] text-rose-400 font-mono font-bold tracking-tighter">
               <span>LAT: 17.4411</span>
               <span>LNG: 78.6601</span>
@@ -349,6 +364,10 @@ export function IncidentDashboard() {
       const data = await res.json();
       if (data.success) {
         setSessionAlerts((prev) => [data.incident, ...prev]);
+        if (data.incident.processed_video_url) {
+          // Replace raw video with annotated AI stream
+          setUploadedVideoUrl(data.incident.processed_video_url);
+        }
         return data;
       }
       throw new Error("Neural Scan Failed");

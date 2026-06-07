@@ -110,7 +110,7 @@ class GreenWaveWorker:
 
                 frame_to_encode = self._last_annotated_frame if self._last_annotated_frame is not None else frame
                 try:
-                    _, jpeg = cv2.imencode(".jpg", frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 78])
+                    _, jpeg = cv2.imencode(".jpg", frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 65])
                     self._cached_frame_bytes = jpeg.tobytes()
                 except Exception: pass
 
@@ -120,7 +120,7 @@ class GreenWaveWorker:
                 await asyncio.sleep(1)
 
     async def _detection_loop(self):
-        detection_interval = 0.5 
+        detection_interval = 0.05 
         while self._running:
             try:
                 if hasattr(self, '_current_raw_frame') and self._current_raw_frame is not None:

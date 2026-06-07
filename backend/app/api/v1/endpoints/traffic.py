@@ -235,6 +235,7 @@ def push_traffic_event(
     wait_time: float,
     risk_score: int = 0,
     venue_id: Optional[str] = None,
+    screenshot_path: Optional[str] = None,
 ):
     """Called by TrafficWorker to broadcast live analytics via SSE."""
     # ── 1. Coordinate & Threshold Lookup (Priority: GLOBAL_STATE) ──
@@ -324,7 +325,8 @@ def push_traffic_event(
                                 venue_id=vid, venue_obj=v,
                                 count=cnt, density=den, velocity=vel,
                                 wait_time=wt, risk_score=rs, tier_label=tier,
-                                insight=ins, recommendation=rec
+                                insight=ins, recommendation=rec,
+                                screenshot_path=screenshot_path
                             )
                     except Exception as ex:
                         logger.error(f"Live traffic notification failed: {ex}")
@@ -647,9 +649,10 @@ async def upload_traffic_video(
             logger.error(f"❌ Video capture failed: Cannot open {tmp_path}.")
             raise HTTPException(status_code=400, detail=f"Cannot open video. Verify file format (MP4/AVI).")
 
-        fps_src      = cap.get(cv2.CAP_PROP_FPS) or 25.0
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        sample_every = max(1, int(fps_src / 2))  # ~2 fps analysis
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        # CRITICAL: Next.js proxy times out after 30 seconds.
+        # We must sample less frames to ensure processing finishes within the timeout window.
+        sample_every = max(1, int(fps * 1.5)) # Every 1.5s analysis
 
         frame_results: list = []
         all_vehicles:  list = []
@@ -697,7 +700,7 @@ async def upload_traffic_video(
 
         # Normalize accumulated matrix
         max_cell = max(density_accum[r][c] for r in range(GRID_ROWS) for c in range(GRID_COLS)) or 1
-        norm_matrix = [[round(density_accum[r][c] / max_cell * 10) for c in range(GRID_COLS)] for r in range(GRID_ROWS)]
+        norm_matrix = [[int(round(float(density_accum[r][c]) / max_cell * 10)) for c in range(GRID_COLS)] for r in range(GRID_ROWS)]
 
         # Fetch Venue Info for Global State (Coordinates)
         lat, lng = 0.0, 0.0
@@ -786,39 +789,58 @@ async def upload_traffic_video(
                             insight=insight, recommendation=_generate_recommendation(peak_density, peak_risk_score),
                             screenshot_path=screenshot_path
                         )
+                        # Push to Global State so it shows up in the UI Insights Box immediately
+                        GLOBAL_STATE.push_event("notifications", "traffic", {
+                            "id": f"VIDEO-{int(time.time()*1000)}",
+                            "domain": "traffic",
+                            "type": "alert",
+                            "risk_level": peak_density.lower(),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "latitude": lat,
+                            "longitude": lng,
+                            "total_vehicles": max_count,
+                            "congestion_level": peak_density,
+                            "wait_time": round(avg_wait, 1),
+                            "insight": insight,
+                            "recommendation": _generate_recommendation(peak_density, peak_risk_score)
+                        })
             except Exception as e:
                 logger.error(f"Upload notification failed: {e}")
-    except Exception as exc:
-        err_msg = traceback.format_exc()
-        logger.error(f"CRITICAL: Traffic Upload Error:\n{err_msg}")
-        with open("traffic_upload_error.txt", "w") as f:
-            f.write(err_msg)
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(exc)}")
-
-        return {
-            "success": True,
-            "filename": file.filename,
-            "frames_analyzed": len(frame_results),
-            "summary": {
-                "avg_vehicle_count": avg_count,
-                "max_vehicle_count": max_count,
-                "avg_speed_px_s": avg_speed,
-                "avg_wait_time_min": avg_wait,
-                "peak_density": peak_density,
-            },
-            "density_matrix": norm_matrix,
-            "vehicle_breakdown": _count_by_class(all_vehicles),
-            "timeline": [
-                {
-                    "frame": int(i * sample_every), 
-                    "count": int(r["count"]), 
-                    "density": str(r["density"]), 
-                    "speed": float(r.get("avg_velocity", 0.0)), 
-                    "risk": int(r.get("risk_score", 0))
-                }
-                for i, r in enumerate(frame_results)
-            ],
-        }
+        try:
+            import json
+            payload = {
+                "success": True,
+                "filename": file.filename,
+                "frames_analyzed": len(frame_results),
+                "summary": {
+                    "avg_vehicle_count": avg_count,
+                    "max_vehicle_count": max_count,
+                    "avg_speed_px_s": avg_speed,
+                    "avg_wait_time_min": avg_wait,
+                    "peak_density": peak_density,
+                },
+                "density_matrix": norm_matrix,
+                "vehicle_breakdown": _count_by_class(all_vehicles),
+                "timeline": [
+                    {
+                        "frame": int(i * sample_every), 
+                        "count": int(r["count"]), 
+                        "density": str(r["density"]), 
+                        "speed": float(r.get("avg_velocity", 0.0)), 
+                        "risk": int(r.get("risk_score", 0))
+                    }
+                    for i, r in enumerate(frame_results)
+                ],
+            }
+            # Manually test json serialization!
+            json_str = json.dumps(payload)
+            # If it succeeds, return standard payload or JSONResponse
+            from fastapi.responses import JSONResponse
+            return JSONResponse(content=payload)
+        except Exception as e:
+            with open("payload_error.txt", "w") as f:
+                f.write(traceback.format_exc())
+            raise e
     except Exception as e:
         logger.error(f"Upload error: {e}", exc_info=True)
         if isinstance(e, HTTPException):
@@ -874,8 +896,20 @@ async def upload_traffic_image(
     wait_time = result.get("wait_time_estimate", 0.0)
     risk_score = result.get("risk_score", 0)
 
+    screenshot_path = None
+    if density in ("High", "Critical"):
+        try:
+            annotated_frame = draw_vehicle_overlays(img.copy(), result.get("vehicles", []))
+            annotated_frame = draw_hud(annotated_frame, result)
+            os.makedirs("screenshots/traffic", exist_ok=True)
+            rel_path = f"screenshots/traffic/alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+            screenshot_path = os.path.abspath(rel_path)
+            cv2.imwrite(screenshot_path, annotated_frame)
+        except Exception as e:
+            logger.warning(f"Screenshot failed for image upload: {e}")
+
     # Push as a live event so the SSE feed and dashboard pick it up
-    push_traffic_event(camera_id, count, density, velocity, wait_time, risk_score, venue_id)
+    push_traffic_event(camera_id, count, density, velocity, wait_time, risk_score, venue_id, screenshot_path)
 
     # Update Global State
     from app.core.global_state import GLOBAL_STATE
@@ -1360,6 +1394,25 @@ async def download_traffic_report(camera_id: Optional[str] = None):
         pdf.set_text_color(140, 140, 140)
         pdf.cell(0, 8, "No detection events recorded yet. Awaiting live camera data.", ln=True)
 
+    # ── Section 9: Latest Alert Evidence ──────────────────────────────────
+    import glob
+    latest_screenshot = None
+    try:
+        screenshots = glob.glob(os.path.abspath("screenshots/traffic/*.jpg"))
+        if screenshots:
+            latest_screenshot = max(screenshots, key=os.path.getctime)
+    except Exception:
+        pass
+
+    if latest_screenshot and os.path.exists(latest_screenshot):
+        pdf.add_page()
+        pdf.section_title("9. LATEST ALERT EVIDENCE (SCREENSHOT)", color=(180, 0, 0))
+        try:
+            pdf.image(latest_screenshot, x=15, y=pdf.get_y() + 5, w=180)
+            pdf.ln(120)
+        except Exception as e:
+            logger.error(f"Failed to embed screenshot in PDF: {e}")
+
     # ── Footer note ────────────────────────────────────────────────────────
     pdf.ln(6)
     pdf.set_font("Helvetica", "I", 8)
@@ -1407,11 +1460,18 @@ async def stream_traffic_camera(camera_id: str):
 
     async def frame_generator():
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
+        last_yielded = None
         while True:
             worker = ORCHESTRATOR._workers.get(cam_uuid)
             frame_bytes = getattr(worker, "_cached_frame_bytes", None) if worker else None
-            yield boundary + (frame_bytes if frame_bytes else blank_bytes) + b"\r\n"
-            await asyncio.sleep(0.08)
+            
+            if frame_bytes and frame_bytes != last_yielded:
+                yield boundary + frame_bytes + b"\r\n"
+                last_yielded = frame_bytes
+            elif not frame_bytes:
+                yield boundary + blank_bytes + b"\r\n"
+                
+            await asyncio.sleep(0.033)
 
     return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 

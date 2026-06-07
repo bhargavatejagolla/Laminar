@@ -115,7 +115,7 @@ class ParkingWorker:
                 # ── Always update cache for MJPEG stream ──
                 frame_to_encode = self.last_annotated_frame if self.last_annotated_frame is not None else frame
                 try:
-                    _, jpeg = cv2.imencode('.jpg', frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    _, jpeg = cv2.imencode('.jpg', frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 65])
                     self._cached_frame_bytes = jpeg.tobytes()
                 except Exception as enc_err:
                     logger.warning(f"JPEG encode error: {enc_err}")
@@ -143,7 +143,7 @@ class ParkingWorker:
 
     async def _detection_loop(self):
         """Dedicated background task for AI inference."""
-        detection_interval = 0.5 # 2 Hz for better responsiveness
+        detection_interval = 0.05 # 2 Hz for better responsiveness
         while self._running:
             try:
                 if hasattr(self, '_current_raw_frame') and self._current_raw_frame is not None:

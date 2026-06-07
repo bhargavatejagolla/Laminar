@@ -4,8 +4,9 @@ import { toast } from "sonner"
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
-// Use relative path to leverage Next.js rewrites/proxy (essential for Ngrok and local dev parity)
-const API_BASE_URL = "/api/v1";
+// Bypass Next.js rewrites proxy in development to avoid the strict 30-second proxy timeout!
+// This fixes the 500 Internal Server Error during video uploads.
+const API_BASE_URL = IS_DEV ? "http://127.0.0.1:8000/api/v1" : "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

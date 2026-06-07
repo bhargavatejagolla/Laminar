@@ -120,8 +120,10 @@ async def process_incident_video(
         all_vehicles = {}
         frames_analyzed = 0
         
+        processed_video_url = None
         is_video = False
         cap = None
+        out_writer = None
         try:
             cap = cv2.VideoCapture(tmp_path)
             is_video = cap.get(cv2.CAP_PROP_FRAME_COUNT) > 1
@@ -135,6 +137,14 @@ async def process_incident_video(
                 target_samples = min(50, max(10, int(duration_sec)))
                 sample_every = max(1, total_frames // target_samples)
                 
+                # Setup VideoWriter for annotated stream
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                out_filename = f"incident_{int(time.time())}.webm"
+                out_path = os.path.join("..", "frontend", "public", out_filename)
+                fourcc = cv2.VideoWriter_fourcc(*'vp80')
+                out_writer = cv2.VideoWriter(out_path, fourcc, 5.0, (width, height))
+                
                 logger.info(f"Video detected: {duration_sec:.1f}s, {total_frames} frames. Sampling every {sample_every} frames (Target: {target_samples}).")
                 frame_idx = 0
                 while True:
@@ -145,6 +155,11 @@ async def process_incident_video(
                         incidents, annotated, vehicles = incident_detector.detect_and_annotate(frame)
                         for cls, cnt in vehicles.items():
                             all_vehicles[cls] = max(all_vehicles.get(cls, 0), cnt)
+                            
+                        # Write the annotated frame to the compiled video
+                        if out_writer:
+                            out_writer.write(annotated)
+                            
                         if incidents:
                             for inc in incidents:
                                 if best_incident is None or (inc["priority"] == "CRITICAL" and best_incident.get("priority") != "CRITICAL"):
@@ -152,6 +167,10 @@ async def process_incident_video(
                                     _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
                                     annotated_frame_b64 = base64.b64encode(jpeg.tobytes()).decode("utf-8")
                     frame_idx += 1
+                    
+                if out_writer:
+                    out_writer.release()
+                    processed_video_url = f"/{out_filename}"
             else:
                 nparr = np.frombuffer(content, np.uint8)
                 img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -207,6 +226,7 @@ async def process_incident_video(
             "vehicle_types": all_vehicles,
             "vehicle_count": vehicle_count,
             "annotated_frame": annotated_frame_b64,
+            "processed_video_url": processed_video_url,
             "_source": "VIDEO_UPLOAD",
         }
 

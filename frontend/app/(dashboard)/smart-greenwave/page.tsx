@@ -327,10 +327,66 @@ export default function SmartGreenWavePage() {
                                             />
                                         </div>
                                         
-                                        <IntersectionNode name="Intersection A" signal={signalA} />
-                                        <IntersectionNode name="Intersection B" signal={signalB} />
-                                        <IntersectionNode name="Intersection C" signal={signalC} />
+                                        <IntersectionNode name="Intersection A" signal={signalA} density="High" eta="12s" active={simStep >= 1} />
+                                        <IntersectionNode name="Intersection B" signal={signalB} density="Medium" eta="28s" active={simStep >= 3} />
+                                        <IntersectionNode name="Intersection C" signal={signalC} density="Low" eta="43s" active={simStep >= 4} />
                                     </div>
+                                    
+                                    {/* Mini City Map Overlay */}
+                                    {simStep >= 2 && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, scale: 0.9 }} 
+                                            animate={{ opacity: 1, scale: 1 }} 
+                                            className="mt-12 bg-black/50 border border-emerald-500/20 rounded-2xl p-6 relative overflow-hidden"
+                                        >
+                                            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.05)_0%,transparent_70%)] pointer-events-none"></div>
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 flex items-center justify-between">
+                                                <span>Live City Map</span>
+                                                <span className="text-emerald-500 animate-pulse">Pre-clearing route</span>
+                                            </h4>
+                                            
+                                            <div className="flex flex-col items-center justify-center space-y-2 relative z-10 font-mono text-xs font-bold">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500 flex items-center justify-center text-emerald-400">H</div>
+                                                    <span className="text-emerald-400 tracking-widest uppercase">Hospital</span>
+                                                </div>
+                                                <div className="h-6 w-0.5 bg-emerald-500/30 relative overflow-hidden">
+                                                    {simStep >= 4 && <motion.div initial={{top:"100%"}} animate={{top:"0%"}} transition={{duration:1}} className="absolute inset-0 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" />}
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-3 h-3 rounded-full ${simStep >= 4 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]' : 'bg-red-500'} transition-colors duration-500`} />
+                                                    <span className={`${simStep >= 4 ? 'text-emerald-400' : 'text-slate-400'} tracking-widest`}>J-C</span>
+                                                </div>
+                                                <div className="h-6 w-0.5 bg-emerald-500/30 relative overflow-hidden">
+                                                    {simStep >= 3 && <motion.div initial={{top:"100%"}} animate={{top:"0%"}} transition={{duration:1}} className="absolute inset-0 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" />}
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-3 h-3 rounded-full ${simStep >= 3 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]' : 'bg-red-500'} transition-colors duration-500`} />
+                                                    <span className={`${simStep >= 3 ? 'text-emerald-400' : 'text-slate-400'} tracking-widest`}>J-B</span>
+                                                </div>
+                                                <div className="h-6 w-0.5 bg-emerald-500/30 relative overflow-hidden">
+                                                    {simStep >= 1 && <motion.div initial={{top:"100%"}} animate={{top:"0%"}} transition={{duration:1}} className="absolute inset-0 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" />}
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" />
+                                                    <span className="text-emerald-400 tracking-widest">J-A</span>
+                                                </div>
+                                                <div className="h-6 w-0.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]" />
+                                                
+                                                <motion.div 
+                                                    animate={{ y: [-2, 2, -2] }} 
+                                                    transition={{ repeat: Infinity, duration: 2 }}
+                                                    className="flex items-center gap-3 mt-2"
+                                                >
+                                                    <Siren className="w-5 h-5 text-rose-500" />
+                                                    <span className="text-rose-400 tracking-widest uppercase">Ambulance</span>
+                                                </motion.div>
+                                            </div>
+                                        </motion.div>
+                                    )}
                                 </div>
                             </div>
 
@@ -342,20 +398,30 @@ export default function SmartGreenWavePage() {
                                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400 mb-6 flex items-center gap-2"><Clock className="w-4 h-4"/> Waiting Time Intelligence</h3>
                                     
                                     <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
-                                            <div>
-                                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Normal Route</div>
-                                                <div className="text-sm font-black font-mono text-slate-300">Est. Delay</div>
+                                        <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div>
+                                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Without Laminar</div>
+                                                    <div className="text-sm font-black font-mono text-slate-300">Normal Route</div>
+                                                </div>
+                                                <div className="text-xl font-black font-mono text-slate-400">4m 12s</div>
                                             </div>
-                                            <div className="text-xl font-black font-mono text-red-400">4m 12s</div>
+                                            <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-white/5">
+                                                <div className="h-full w-full bg-red-500/50"></div>
+                                            </div>
                                         </div>
 
-                                        <div className="flex justify-between items-center p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                                            <div>
-                                                <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">AI Green Wave Route</div>
-                                                <div className="text-sm font-black font-mono text-emerald-400">Est. Delay</div>
+                                        <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div>
+                                                    <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">With Laminar</div>
+                                                    <div className="text-sm font-black font-mono text-emerald-400">Green Wave Route</div>
+                                                </div>
+                                                <div className="text-xl font-black font-mono text-emerald-400">1m 08s</div>
                                             </div>
-                                            <div className="text-xl font-black font-mono text-emerald-400">1m 08s</div>
+                                            <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-emerald-500/30">
+                                                <div className="h-full w-[25%] bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -363,6 +429,29 @@ export default function SmartGreenWavePage() {
                                         <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Total Impact</div>
                                         <div className="text-3xl font-black uppercase tracking-tighter text-white drop-shadow-md">
                                             3m 04s <span className="text-emerald-500 text-xl">SAVED</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Emergency Priority Score */}
+                                <div className="bg-[#121216] border border-rose-500/20 rounded-3xl p-6 relative overflow-hidden">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-500 mb-4 flex items-center gap-2"><AlertTriangle className="w-4 h-4"/> Emergency Priority Status</h3>
+                                    <div className="grid grid-cols-2 gap-y-4 gap-x-2 text-xs font-mono">
+                                        <div>
+                                            <div className="text-[9px] text-slate-500 tracking-widest uppercase">Priority Level</div>
+                                            <div className="text-rose-400 font-bold mt-1">CRITICAL</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[9px] text-slate-500 tracking-widest uppercase">Patient Risk</div>
+                                            <div className="text-rose-400 font-bold mt-1">HIGH</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[9px] text-slate-500 tracking-widest uppercase">Corridor Status</div>
+                                            <div className="text-emerald-400 font-bold mt-1">PREPARING</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[9px] text-slate-500 tracking-widest uppercase">Response Mode</div>
+                                            <div className="text-sky-400 font-bold mt-1">AUTONOMOUS</div>
                                         </div>
                                     </div>
                                 </div>
@@ -375,21 +464,51 @@ export default function SmartGreenWavePage() {
                                     <MetricCard label="ETA Reduction" value="72%" sub="Efficiency" icon={Activity} color="emerald" />
                                 </div>
 
-                                {/* AI Recommendation Engine */}
-                                <div className="bg-[#121216] border border-fuchsia-500/20 rounded-3xl p-6 relative overflow-hidden group hover:border-fuchsia-500/40 transition-colors">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/5 to-transparent"></div>
+                                {/* Ecosystem Integration */}
+                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">AI Green Wave Active</h3>
+                                    <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-3">Linked Systems</div>
+                                    <div className="space-y-2 text-xs font-mono font-bold text-slate-300">
+                                        <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Traffic Node</div>
+                                        <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Guardian Route</div>
+                                        <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Emergency Dispatch</div>
+                                        <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Incident Hub</div>
+                                        <div className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-fuchsia-500" /> Randy AI</div>
+                                    </div>
+                                </div>
+
+                                {/* Randy Tactical Analysis */}
+                                <div className="bg-fuchsia-950/20 border border-fuchsia-500/30 rounded-3xl p-6 relative overflow-hidden shadow-[inset_0_0_20px_rgba(217,70,239,0.05)]">
                                     <div className="flex items-center gap-3 mb-4 relative z-10">
-                                        <div className="p-2 bg-fuchsia-500/20 rounded-lg">
+                                        <div className="p-2 bg-fuchsia-500/20 rounded-lg border border-fuchsia-500/50">
                                             <ShieldCheck className="w-4 h-4 text-fuchsia-400" />
                                         </div>
-                                        <span className="text-xs font-black text-fuchsia-400 uppercase tracking-widest">AI Mission Control</span>
+                                        <span className="text-[11px] font-black text-fuchsia-400 uppercase tracking-[0.2em]">Randy Tactical Analysis</span>
                                     </div>
                                     
-                                    <div className="relative z-10 space-y-2 text-sm font-mono leading-relaxed text-slate-300">
-                                        <div className="text-emerald-400 font-bold mb-3">&gt; Green Corridor Activated</div>
-                                        {simStep >= 3 && <motion.div initial={{opacity:0, y:5}} animate={{opacity:1, y:0}}>Predicted congestion bypassed at Junction B.</motion.div>}
-                                        {simStep >= 4 && <motion.div initial={{opacity:0, y:5}} animate={{opacity:1, y:0}}>Signal timings pre-emptively adjusted.</motion.div>}
-                                        {simStep >= 4 && <motion.div initial={{opacity:0, y:5}} animate={{opacity:1, y:0}} className="text-white font-bold mt-2 pt-2 border-t border-white/10">Estimated arrival improved by 3 minutes 12 seconds.</motion.div>}
+                                    <div className="relative z-10 space-y-3 text-xs font-mono leading-relaxed text-slate-300">
+                                        <div className="text-rose-400 font-bold mb-3">Ambulance AMB-102 detected.</div>
+                                        {simStep >= 2 && (
+                                            <motion.div initial={{opacity:0}} animate={{opacity:1}}>
+                                                <div className="text-slate-500">Traffic density at Junction B:</div>
+                                                <div className="text-white font-bold text-sm">82%</div>
+                                            </motion.div>
+                                        )}
+                                        {simStep >= 3 && (
+                                            <motion.div initial={{opacity:0}} animate={{opacity:1}}>
+                                                <div className="text-slate-500 mt-2">Predicted blockage:</div>
+                                                <div className="text-red-400 font-bold text-sm">14 seconds</div>
+                                            </motion.div>
+                                        )}
+                                        {simStep >= 4 && (
+                                            <motion.div initial={{opacity:0}} animate={{opacity:1}}>
+                                                <div className="text-slate-500 mt-2">Action Taken:</div>
+                                                <div className="text-emerald-400 font-bold">Signal synchronization activated.</div>
+                                                
+                                                <div className="text-slate-500 mt-2">Expected ETA reduction:</div>
+                                                <div className="text-emerald-400 font-bold text-sm">72%</div>
+                                            </motion.div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -407,11 +526,17 @@ export default function SmartGreenWavePage() {
 }
 
 // Subcomponents
-function IntersectionNode({ name, signal }: { name: string, signal: SignalState }) {
+function IntersectionNode({ name, signal, density, eta, active }: { name: string, signal: SignalState, density: string, eta: string, active?: boolean }) {
     return (
         <div className="relative z-10 flex flex-col items-center">
-            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">{name}</div>
-            <div className="bg-black border border-white/10 p-2 rounded-xl shadow-lg flex flex-col gap-1.5">
+            <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">{name}</div>
+            
+            <div className="flex flex-col items-center justify-center text-[9px] font-mono mb-3 bg-black/40 px-2 py-1 rounded border border-white/5 w-24 text-center">
+                <div className="text-slate-400">Density: <span className={density === 'High' ? 'text-red-400' : density === 'Medium' ? 'text-yellow-400' : 'text-emerald-400'}>{density}</span></div>
+                <div className="text-slate-400 mt-0.5">ETA: <span className="text-white">{eta}</span></div>
+            </div>
+
+            <div className={`bg-black border p-2 rounded-xl flex flex-col gap-1.5 transition-all duration-300 ${active ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'border-white/10 shadow-lg'}`}>
                 <div className={`w-4 h-4 rounded-full transition-all duration-300 ${signal === 'red' ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'bg-red-950 opacity-30'}`} />
                 <div className={`w-4 h-4 rounded-full transition-all duration-300 ${signal === 'yellow' ? 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.8)]' : 'bg-yellow-950 opacity-30'}`} />
                 <div className={`w-4 h-4 rounded-full transition-all duration-300 ${signal === 'green' ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)]' : 'bg-emerald-950 opacity-30'}`} />

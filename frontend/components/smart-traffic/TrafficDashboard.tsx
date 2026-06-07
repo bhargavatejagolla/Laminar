@@ -260,7 +260,7 @@ export function TrafficDashboard() {
 
   useEffect(() => {
     let mounted = true;
-    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}` : "/cameras")
+    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&stream_type=traffic` : "/cameras?stream_type=traffic")
       .then((r) => {
         if (!mounted) return;
         const cams = Array.isArray(r.data) ? r.data : [];
@@ -529,14 +529,24 @@ export function TrafficDashboard() {
               </div>
 
               {cameras.length > 0 && (
-                <div className="flex gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/10 rounded-xl">
-                  {cameras.map((c, i) => (
-                    <button key={c.id} onClick={() => setActiveCameraId(c.id)}
-                      className={`px-2.5 py-1 text-xs font-black uppercase rounded-lg transition-all ${activeCameraId === c.id ? "bg-emerald-500 text-black" : "text-slate-400 hover:text-white hover:bg-white/5"
-                        }`}>
-                      Node {i + 1}
-                    </button>
-                  ))}
+                <div className="relative flex items-center">
+                  <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                    <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <select
+                    value={activeCameraId || ""}
+                    onChange={(e) => setActiveCameraId(e.target.value)}
+                    className="appearance-none bg-black/60 backdrop-blur-xl border border-white/10 hover:border-emerald-500/50 text-white text-xs font-black uppercase tracking-wider rounded-xl pl-8 pr-8 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+                  >
+                    {cameras.map((c, i) => (
+                      <option key={c.id} value={c.id} className="bg-[#0a0a0f] text-white">
+                        {c.name || `Node ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
+                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
                 </div>
               )}
             </div>

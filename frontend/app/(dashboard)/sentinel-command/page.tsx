@@ -15,7 +15,9 @@ import {
     Cpu,
     Radio,
     Fingerprint,
-    ScanLine
+    ScanLine,
+    Droplets,
+    HeartPulse
 } from "lucide-react";
 
 const MODULES = [
@@ -88,18 +90,50 @@ const MODULES = [
         color: "fuchsia",
         metric: "Tracking 24 Venues",
         status: "ACTIVE"
+    },
+    {
+        id: "resonance",
+        name: "Resonance Engine",
+        desc: "Eulerian Structural Micro-Vibration Analysis. Predicts bridge and building collapses seconds before failure.",
+        href: "/smart-resonance",
+        icon: Activity,
+        color: "orange",
+        metric: "Monitoring 4 Bridges",
+        status: "ACTIVE"
+    },
+    {
+        id: "liquidthreat",
+        name: "Liquid Threat Engine",
+        desc: "Multi-Node Urban Flood Intelligence & Autonomous Route Intervention System.",
+        href: "/smart-liquidthreat",
+        icon: Droplets,
+        color: "cyan",
+        metric: "4 Active Corridors",
+        status: "MONITORING"
+    },
+    {
+        id: "aegis",
+        name: "AEGIS Protocol",
+        desc: "Autonomous Emergency Guidance & Intervention System. Orchestrates drones, civilians, and traffic for medical events.",
+        href: "/smart-aegis",
+        icon: HeartPulse,
+        color: "rose",
+        metric: "1 Active Dispatch",
+        status: "ARMED"
     }
 ];
 
 // Color maps for Tailwind
 const COLOR_MAP: Record<string, { text: string, bg: string, border: string, shadow: string, glow: string }> = {
     sky: { text: "text-sky-400", bg: "bg-sky-500/10", border: "border-sky-500/30", shadow: "hover:shadow-[0_0_30px_rgba(56,189,248,0.2)]", glow: "shadow-[0_0_15px_rgba(56,189,248,0.8)]" },
+    cyan: { text: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/30", shadow: "hover:shadow-[0_0_30px_rgba(34,211,238,0.2)]", glow: "shadow-[0_0_15px_rgba(34,211,238,0.8)]" },
     amber: { text: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30", shadow: "hover:shadow-[0_0_30px_rgba(245,158,11,0.2)]", glow: "shadow-[0_0_15px_rgba(245,158,11,0.8)]" },
     rose: { text: "text-rose-400", bg: "bg-rose-500/10", border: "border-rose-500/30", shadow: "hover:shadow-[0_0_30px_rgba(244,63,94,0.2)]", glow: "shadow-[0_0_15px_rgba(244,63,94,0.8)]" },
     emerald: { text: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30", shadow: "hover:shadow-[0_0_30px_rgba(16,185,129,0.2)]", glow: "shadow-[0_0_15px_rgba(16,185,129,0.8)]" },
     red: { text: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", shadow: "hover:shadow-[0_0_30px_rgba(239,68,68,0.2)]", glow: "shadow-[0_0_15px_rgba(239,68,68,0.8)]" },
     indigo: { text: "text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/30", shadow: "hover:shadow-[0_0_30px_rgba(99,102,241,0.2)]", glow: "shadow-[0_0_15px_rgba(99,102,241,0.8)]" },
-    fuchsia: { text: "text-fuchsia-400", bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/30", shadow: "hover:shadow-[0_0_30px_rgba(217,70,239,0.2)]", glow: "shadow-[0_0_15px_rgba(217,70,239,0.8)]" }
+    fuchsia: { text: "text-fuchsia-400", bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/30", shadow: "hover:shadow-[0_0_30px_rgba(217,70,239,0.2)]", glow: "shadow-[0_0_15px_rgba(217,70,239,0.8)]" },
+    orange: { text: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/30", shadow: "hover:shadow-[0_0_30px_rgba(249,115,22,0.2)]", glow: "shadow-[0_0_15px_rgba(249,115,22,0.8)]" }
 };
 
 export default function SentinelCommandPage() {

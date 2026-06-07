@@ -39,6 +39,18 @@ backend/storage/alert_snapshots/
 backend/storage/semantic_snapshots/
 backend/storage/semantic_index.faiss
 backend/storage/semantic_meta.json
+backend/storage/insightface_models/
+backend/storage/snapshots/
+backend/storage/dwell_snapshots/
+backend/storage/sos_uploads/
+backend/storage/*.faiss
+backend/media/
+backend/screenshots/
+
+# Media and large archives
+*.zip
+*.mp4
+*.webm
 
 # Test / debug scripts
 backend/test_*.py

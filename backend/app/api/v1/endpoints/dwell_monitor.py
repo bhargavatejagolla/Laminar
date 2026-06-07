@@ -70,6 +70,7 @@ async def _dwell_frame_generator(camera_id: UUID):
 
     boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
 
+    last_yielded = None
     while True:
         jpeg = None
         worker = vision_manager._workers.get(camera_id)
@@ -77,19 +78,21 @@ async def _dwell_frame_generator(camera_id: UUID):
         if worker:
             # 1. Prefer dwell-annotated frame (shows wait time overlays)
             if hasattr(worker, "get_latest_dwell_frame_jpeg"):
-                jpeg = worker.get_latest_dwell_frame_jpeg(quality=72)
+                jpeg = worker.get_latest_dwell_frame_jpeg(quality=65)
 
             # 2. Fall back to the standard annotated feed (YOLO boxes)
             if not jpeg and hasattr(worker, "_latest_annotated_frame") and worker._latest_annotated_frame is not None:
                 try:
-                    ok, buf = cv2.imencode(".jpg", worker._latest_annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 72])
+                    ok, buf = cv2.imencode(".jpg", worker._latest_annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
                     if ok:
                         jpeg = buf.tobytes()
                 except Exception:
                     pass
 
         if jpeg:
-            yield boundary + jpeg + b"\r\n"
+            if jpeg != last_yielded:
+                yield boundary + jpeg + b"\r\n"
+                last_yielded = jpeg
         else:
             # Minimal placeholder — much smaller than before so the stream
             # starts quickly and the browser doesn't think the feed is dead.
@@ -102,7 +105,7 @@ async def _dwell_frame_generator(camera_id: UUID):
             except Exception:
                 pass
 
-        await asyncio.sleep(0.06)   # ~16 fps
+        await asyncio.sleep(0.033)   # ~30 fps
 
 
 @router.get("/stream/{camera_id}", tags=["Dwell Monitor"])

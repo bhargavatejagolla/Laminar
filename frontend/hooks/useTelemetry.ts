@@ -169,13 +169,30 @@ export function useParkingEvents() {
   const [events, setEvents] = useState<any[]>([]);
 
   useEffect(() => {
+    let isMounted = true;
+    const fetchRecent = async () => {
+      try {
+        const res = await api.get('/parking/events/recent?limit=20');
+        if (isMounted && res.data.events) {
+          setEvents(res.data.events);
+        }
+      } catch (e) {
+        console.error('Failed to fetch recent parking events', e);
+      }
+    };
+    fetchRecent();
+
     const sse = new EventSource('/api/v1/parking/events/stream');
 
     sse.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
         if (data.status === 'connected' || data.type === 'connected') return;
-        setEvents(prev => [data, ...prev].slice(0, 50));
+        setEvents(prev => {
+          // Prevent duplicates by checking ID or timestamp
+          if (prev.some(p => p.id === data.id || (p.timestamp === data.timestamp && p.type === data.type))) return prev;
+          return [data, ...prev].slice(0, 50);
+        });
       } catch (err) {
         console.error('Parking SSE Parse Error:', err);
       }
@@ -185,7 +202,10 @@ export function useParkingEvents() {
       console.warn('Parking SSE Connection lost. Reconnecting...');
     };
 
-    return () => sse.close();
+    return () => {
+      isMounted = false;
+      sse.close();
+    };
   }, []);
 
   return { events };

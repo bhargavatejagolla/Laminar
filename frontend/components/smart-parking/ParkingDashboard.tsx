@@ -73,8 +73,9 @@ export function ParkingDashboard() {
   useEffect(() => {
     if (!venueId) return;
     let mounted = true;
-    api.get(`/cameras?venue_id=${venueId}`).then((r) => {
-        if(!mounted) return;
+    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&stream_type=parking` : "/cameras?stream_type=parking")
+      .then((r) => {
+        if (!mounted) return;
         const cams = Array.isArray(r.data) ? r.data : [];
         setCameras(cams);
         if(cams.length > 0 && !activeCameraId) {
@@ -122,9 +123,16 @@ export function ParkingDashboard() {
         body: formData,
       });
       const result = await res.json();
-      if (result.success) {
-        setAnalysisData(result);
+      if (result.status === "success" || result.success) {
         setFeedTimestamp(Date.now());
+        // Fetch full insights to populate UI properly instead of using raw upload response
+        try {
+          const insightRes = await fetch('/api/v1/parking/insights');
+          const insightData = await insightRes.json();
+          setAnalysisData(insightData);
+        } catch (e) {
+          console.error("Failed to fetch updated insights", e);
+        }
       }
       return result;
     };
@@ -142,6 +150,8 @@ export function ParkingDashboard() {
     }
     setUploadLoading(false);
   };
+
+
 
   if (loading || !data) {
     return (
@@ -208,11 +218,11 @@ export function ParkingDashboard() {
       </div>
 
       {/* ── MAIN CONTENT GRID ── */}
-      <div className="flex-1 flex gap-6 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-6 min-h-0">
 
         {/* LEFT: Feed & Upload */}
-        <div className="flex-1 flex flex-col gap-6">
-          <div className="flex-[3] rounded-2xl border border-white/10 bg-black overflow-hidden relative group shadow-2xl">
+        <div className="lg:col-span-3 flex flex-col gap-6 min-h-0">
+          <div className="flex-1 rounded-2xl border border-white/10 bg-black overflow-hidden relative group shadow-2xl min-h-[400px]">
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               <div className="bg-rose-500 text-white text-[8px] font-black px-2 py-1 rounded-sm tracking-widest flex items-center gap-1.5 uppercase shadow-xl animate-pulse self-start">
                 <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
@@ -220,25 +230,38 @@ export function ParkingDashboard() {
               </div>
               
               {cameras.length > 0 && (
-                <div className="flex gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/10 rounded-xl">
-                  {cameras.map((c, i) => (
-                    <button
-                      key={c.id}
-                      onClick={() => setActiveCameraId(c.id)}
-                      className={`px-3 py-1.5 rounded-lg text-[9px] font-black tracking-widest uppercase transition-all ${
-                        activeCameraId === c.id 
-                          ? 'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]' 
-                          : 'bg-transparent text-slate-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      Node {i + 1}
-                    </button>
-                  ))}
+                <div className="flex gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/10 rounded-xl relative">
+                  <select
+                    value={activeCameraId || ""}
+                    onChange={(e) => setActiveCameraId(e.target.value)}
+                    className="appearance-none bg-transparent outline-none text-[9px] font-black tracking-widest uppercase text-white px-3 py-1.5 cursor-pointer pr-8"
+                  >
+                    <option value="" disabled className="bg-black text-slate-500">SELECT NODE</option>
+                    {cameras.map((c, i) => (
+                      <option key={c.id} value={c.id} className="bg-black text-white">
+                        {c.name || `NODE ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="absolute top-4 right-4 z-20">
+            <div className="absolute top-4 right-4 z-20 flex gap-2">
+              {isAnalysisMode && (
+                <button
+                  onClick={() => {
+                    setAnalysisData(null);
+                    api.post(`/parking/reset-frame?camera_id=${activeCameraId || 'upload-demo'}`).then(() => setFeedTimestamp(Date.now()));
+                  }}
+                  className="bg-rose-500/20 hover:bg-rose-500/40 border border-rose-500/50 backdrop-blur px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest text-white transition-all"
+                >
+                  CLEAR
+                </button>
+              )}
               <label className="cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest text-white flex items-center gap-2 transition-all">
                 {uploadLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" /> : <UploadCloud className="w-3.5 h-3.5 text-cyan-400" />}
                 INJECT VECTOR
@@ -248,9 +271,12 @@ export function ParkingDashboard() {
 
             <div className="w-full h-full bg-[url('/grid.svg')] bg-center relative flex items-center justify-center">
               <img
-                src={activeCameraId ? `/api/v1/parking/stream/${activeCameraId}?t=${feedTimestamp}` : `/api/v1/parking/feed?t=${feedTimestamp}`}
+                src={isAnalysisMode ? `/api/v1/parking/feed?t=${feedTimestamp}&camera_id=${activeCameraId || 'upload-demo'}` : (activeCameraId ? `/api/v1/parking/stream/${activeCameraId}?t=${feedTimestamp}` : `/api/v1/parking/feed?t=${feedTimestamp}`)}
                 alt="Tactical Feed"
                 className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${isAnalysisMode ? 'opacity-100' : 'opacity-80 mix-blend-screen'}`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `/api/v1/parking/feed?t=${feedTimestamp}`;
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a10] via-transparent to-transparent pointer-events-none" />
               <div className="absolute inset-x-0 bottom-0 h-1 bg-cyan-500/20 scan-line" />
@@ -287,7 +313,7 @@ export function ParkingDashboard() {
         </div>
 
         {/* RIGHT: Tactical Log & Zones Map */}
-        <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+        <div className="lg:col-span-2 flex flex-col gap-6 overflow-hidden min-h-0">
 
           {/* Real-time Event Stream */}
           <div className="flex-[3] bg-[#0a0a0f] border border-white/5 rounded-2xl flex flex-col min-h-0 relative overflow-hidden">

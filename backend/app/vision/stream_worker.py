@@ -429,7 +429,7 @@ class StreamWorker:
                 # 5. Always update MJPEG cache
                 frame_to_encode = self._latest_annotated_frame if self._latest_annotated_frame is not None else frame
                 try:
-                    _, buf = cv2.imencode('.jpg', frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    _, buf = cv2.imencode('.jpg', frame_to_encode, [cv2.IMWRITE_JPEG_QUALITY, 65])
                     self._cached_frame_bytes = buf.tobytes()
                 except Exception: pass
 
@@ -1298,7 +1298,7 @@ class StreamWorker:
             os.makedirs(snap_dir, exist_ok=True)
             filename = f"{camera_id_str}_{ts_str}.jpg"
             save_path = os.path.join(snap_dir, filename)
-            ok = cv2.imwrite(save_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+            ok = cv2.imwrite(save_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
             if ok:
                 logger.info(
                     "Semantic snapshot saved",
@@ -1340,7 +1340,7 @@ class StreamWorker:
             save_path = os.path.join("storage", "snapshots", filename)
             abs_path = os.path.join(os.getcwd(), save_path)
             
-            ok = cv2.imwrite(abs_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            ok = cv2.imwrite(abs_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 65])
             
             if ok:
                 # 3. Update the track in the service

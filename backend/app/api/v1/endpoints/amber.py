@@ -173,19 +173,17 @@ async def activate_amber_alert(
             except Exception as e:
                 logger.warning(f"WebSocket broadcast failed for AMBER: {e}")
             
-            import asyncio
-            asyncio.create_task(
-                notifier.notify_realtime_event(
-                    session=db,
-                    domain="AMBER_PROTOCOL",
-                    type="target_locked",
-                    priority="CRITICAL",
-                    description=f"AMBER TARGET LOCKED: Missing person located in {last_loc.zone_name or last_loc.camera_name}. Neural Signature Match Confidence: {int(last_loc.confidence*100)}%.",
-                    venue_id=str(venue.id) if venue else "00000000-0000-0000-0000-000000000000",
-                    venue_name=venue.name if venue else "Global Network",
-                    camera_id=last_loc.camera_id,
-                    metadata=meta,
-                )
+            # Await the notification to prevent DB session closed error
+            await notifier.notify_realtime_event(
+                session=db,
+                domain="AMBER_PROTOCOL",
+                type="target_locked",
+                priority="CRITICAL",
+                description=f"AMBER TARGET LOCKED: Missing person located in {last_loc.zone_name or last_loc.camera_name}. Neural Signature Match Confidence: {int(last_loc.confidence*100)}%.",
+                venue_id=venue_id if venue_id else "00000000-0000-0000-0000-000000000000",
+                venue_name=venue_name_str,
+                camera_id=last_loc.camera_id,
+                metadata=meta,
             )
             logger.info("Dispatched CRITICAL AMBER Notification to Police/Security contacts.")
         except Exception as e:

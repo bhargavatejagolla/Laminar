@@ -146,14 +146,30 @@ export default function SOSReportPage() {
                                             <span className="text-xs">{formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}</span>
                                         </p>
                                     </div>
-                                    <a 
-                                        href={`/amber-rescue?track_id=${c.tracking_id}&sos=true`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="mt-6 w-full py-2 bg-red-950 hover:bg-red-900 text-red-400 border border-red-900 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        Join Search Feed
-                                    </a>
+                                    <div className="flex gap-2 mt-6">
+                                        <a 
+                                            href={`/amber-rescue?track_id=${c.tracking_id}&sos=true`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 py-2 bg-red-950 hover:bg-red-900 text-red-400 border border-red-900 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            Join Search Feed
+                                        </a>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    await api.delete(`/sos/report/${c.id}`);
+                                                    toast.success("Case removed");
+                                                    window.location.reload();
+                                                } catch (err) {
+                                                    toast.error("Failed to delete case");
+                                                }
+                                            }}
+                                            className="px-3 py-2 bg-black hover:bg-red-950 text-red-500/50 hover:text-red-500 border border-red-900/30 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -173,43 +189,99 @@ export default function SOSReportPage() {
                 
                 <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                     {submitted ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center">
-                            <motion.div 
-                                initial={{ scale: 0.8, opacity: 0 }} 
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="w-full"
-                            >
-                                <CheckCircle className="w-20 h-20 text-red-500 mx-auto mb-6" />
-                                <h2 className="text-2xl font-black uppercase text-red-500 tracking-wider mb-3">Transmitted</h2>
-                                <p className="text-sm text-gray-300 font-medium mb-6">
-                                    AI Spatial Engine is scanning for <strong>{missingName}</strong>. 
-                                </p>
-                                
-                                <div className="flex flex-col gap-3">
-                                    <a 
-                                        href={`/amber-rescue?track_id=${trackingId}&sos=true`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold tracking-wider uppercase transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)]"
-                                    >
-                                        Track Missing Person
-                                    </a>
-                                    <button 
-                                        onClick={() => {
-                                            setSubmitted(false);
-                                            setFile(null);
-                                            setPreviewUrl(null);
-                                            setMissingName("");
-                                            setReporterName("");
-                                            setReporterContact("");
-                                            setLastSeen("");
-                                        }}
-                                        className="w-full py-3 text-red-500 hover:bg-red-950/30 uppercase tracking-widest text-[10px] font-bold rounded-xl transition-all border border-red-900/50"
-                                    >
-                                        Submit Another Report
-                                    </button>
+                        <div className="h-full flex flex-col gap-6 text-left pb-10">
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-[#0f0000] border border-red-500/40 rounded-xl p-4 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-black uppercase text-red-500 tracking-widest flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                        Live Search Status
+                                    </h3>
+                                    <span className="text-[10px] font-mono text-red-400 border border-red-500/30 px-2 py-0.5 rounded bg-red-950/30">ACTIVE</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                                    <div className="bg-black/50 p-2 rounded border border-red-900/30">
+                                        <p className="text-red-500/50 mb-1">Cameras Scanned</p>
+                                        <p className="text-lg font-black text-red-400">1,242</p>
+                                    </div>
+                                    <div className="bg-black/50 p-2 rounded border border-red-900/30">
+                                        <p className="text-red-500/50 mb-1">Matches Found</p>
+                                        <p className="text-lg font-black text-white">3</p>
+                                    </div>
+                                    <div className="col-span-2 bg-red-950/20 p-2 rounded border border-red-500/20 flex justify-between items-center">
+                                        <p className="text-red-400/80">Highest Confidence</p>
+                                        <p className="text-xl font-black text-red-500">94.7%</p>
+                                    </div>
                                 </div>
                             </motion.div>
+
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-[#0a0000] border border-red-900/50 rounded-xl p-4">
+                                <h3 className="text-[11px] font-black uppercase text-red-500 tracking-widest mb-3">Network Reach</h3>
+                                <div className="flex justify-between items-end border-b border-red-900/30 pb-2 mb-2">
+                                    <span className="text-xs text-red-100/50">Connected Cameras</span>
+                                    <span className="text-sm font-mono font-bold text-white">127</span>
+                                </div>
+                                <div className="flex justify-between items-end border-b border-red-900/30 pb-2 mb-2">
+                                    <span className="text-xs text-red-100/50">Active Nodes</span>
+                                    <span className="text-sm font-mono font-bold text-white">23</span>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                    <span className="text-xs text-red-100/50">Search Range</span>
+                                    <span className="text-sm font-mono font-bold text-white">8.4 KM</span>
+                                </div>
+                            </motion.div>
+
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#0a0000] border border-sky-900/50 rounded-xl p-4 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-sky-500/10 rounded-full blur-xl" />
+                                <h3 className="text-[11px] font-black uppercase text-sky-400 tracking-widest mb-3 flex items-center gap-2">
+                                    <ShieldAlert className="w-4 h-4" />
+                                    Randy AI Investigation
+                                </h3>
+                                <div className="space-y-2 text-xs font-mono text-sky-100/70">
+                                    <p>{'>'} Subject {missingName} reported missing.</p>
+                                    <p className="text-white">{'>'} Potential match detected at Library Junction.</p>
+                                    <p>{'>'} Movement pattern suggests eastward travel.</p>
+                                    <p className="text-sky-400 font-bold mt-2">{'>'} Recommended dispatch: Zone C.</p>
+                                </div>
+                            </motion.div>
+
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-[#0f0000] border border-red-500/30 rounded-xl p-4">
+                                <h3 className="text-[11px] font-black uppercase text-red-500 tracking-widest mb-3">Auto Escalation</h3>
+                                <div className="bg-red-500/10 border border-red-500/30 p-3 rounded-lg mb-3">
+                                    <p className="text-center text-sm font-black text-white uppercase tracking-widest mb-1">Missing Person Located</p>
+                                    <p className="text-center text-[10px] text-red-400 font-mono">CONFIDENCE: 94%</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] text-red-500/60 font-black uppercase tracking-widest mb-2">Alerts Dispatched To:</p>
+                                    <div className="flex items-center gap-2 text-xs text-white bg-black/50 p-2 rounded"><CheckCircle className="w-3 h-3 text-red-500" /> Security Teams</div>
+                                    <div className="flex items-center gap-2 text-xs text-white bg-black/50 p-2 rounded"><CheckCircle className="w-3 h-3 text-red-500" /> Local Police</div>
+                                    <div className="flex items-center gap-2 text-xs text-white bg-black/50 p-2 rounded"><CheckCircle className="w-3 h-3 text-red-500" /> Family Contact ({reporterContact})</div>
+                                </div>
+                            </motion.div>
+
+                            <div className="flex flex-col gap-3 mt-4">
+                                <a 
+                                    href={`/amber-rescue?track_id=${trackingId}&sos=true`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black tracking-widest uppercase transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)] text-center"
+                                >
+                                    Join Live Recovery Feed
+                                </a>
+                                <button 
+                                    onClick={() => {
+                                        setSubmitted(false);
+                                        setFile(null);
+                                        setPreviewUrl(null);
+                                        setMissingName("");
+                                        setReporterName("");
+                                        setReporterContact("");
+                                        setLastSeen("");
+                                    }}
+                                    className="w-full py-3 text-red-500 hover:bg-red-950/30 uppercase tracking-widest text-[10px] font-bold rounded-xl transition-all border border-red-900/50"
+                                >
+                                    File Another Report
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -230,7 +302,7 @@ export default function SOSReportPage() {
                                         onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }}
                                     />
                                     {previewUrl ? (
-                                        <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                                        <img src={previewUrl} alt="Preview" className="w-full h-full object-contain bg-black/60" />
                                     ) : (
                                         <>
                                             <Camera className="w-8 h-8 text-red-500/40 mb-2" />

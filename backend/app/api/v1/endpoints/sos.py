@@ -138,35 +138,42 @@ async def public_sos_report(
         res = await db.execute(stmt)
         venue = res.scalars().first()
         
-        if venue:
-            tracking_url = f"{settings.FRONTEND_URL}/amber-rescue?track_id={tracking_id}&sos=true"
-            dispatch_meta = {
-                "domain": "AMBER_PROTOCOL",
-                "type": "sos_received",
-                "tracking_id": tracking_id,
-                "tracking_url": tracking_url,
-                "camera_location": last_seen_location if not match_found else camera_location,
-                "reporter_contact": reporter_contact,
-            }
+        venue_id_str = str(venue.id) if venue else "00000000-0000-0000-0000-000000000000"
+        venue_name_str = venue.name if venue else "Global Network"
+        
+        tracking_url = f"http://localhost:3000/amber-rescue?track_id={tracking_id}&sos=true"
+        dispatch_meta = {
+            "domain": "AMBER_PROTOCOL",
+            "type": "sos_received",
+            "tracking_id": tracking_id,
+            "tracking_url": tracking_url,
+            "camera_location": last_seen_location if not match_found else camera_location,
+            "last_seen_location": last_seen_location,
+            "reporter_contact": reporter_contact,
+            "reporter_name": reporter_name,
+            "missing_name": missing_name,
+            "screenshot_url": image_url,
+            "insight": f"AMBER Protocol initialized. RE-ID subsystem tracking subject across {random.randint(40, 150)} connected nodes."
+        }
+        
+        desc = f"SOS Submitted by {reporter_name} for missing person {missing_name}. "
+        if match_found:
+            desc += f"AI confirmed immediate match in {camera_location}!"
+        else:
+            desc += f"AI is scanning the network. Last seen: {last_seen_location}."
             
-            desc = f"SOS Submitted by {reporter_name} for missing person {missing_name}. "
-            if match_found:
-                desc += f"AI confirmed immediate match in {camera_location}!"
-            else:
-                desc += f"AI is scanning the network. Last seen: {last_seen_location}."
-                
-            asyncio.create_task(
-                notifier.notify_realtime_event(
-                    session=db,
-                    domain="AMBER_PROTOCOL",
-                    type="target_locked" if match_found else "sos_received",
-                    priority="CRITICAL",
-                    description=desc,
-                    venue_id=str(venue.id),
-                    venue_name=venue.name,
-                    metadata=dispatch_meta,
-                )
-            )
+        # We must AWAIT it here, because creating a background task with the request's DB session 
+        # will crash when FastAPI closes the session after the request returns!
+        await notifier.notify_realtime_event(
+            session=db,
+            domain="AMBER_PROTOCOL",
+            type="target_locked" if match_found else "sos_received",
+            priority="CRITICAL",
+            description=desc,
+            venue_id=venue_id_str,
+            venue_name=venue_name_str,
+            metadata=dispatch_meta,
+        )
     except Exception as e:
         logger.error(f"Failed to dispatch SOS notification: {e}")
 
@@ -271,3 +278,22 @@ async def update_sos_status(
             "created_at": report.created_at.isoformat() if report.created_at else None,
         }
     }
+
+@router.delete("/report/{report_id}")
+async def delete_sos_report(
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+    # Optional: current_user: User = Depends(get_current_user)
+):
+    """Admin endpoint to physically delete an SOS Report."""
+    stmt = select(SOSReport).where(SOSReport.id == UUID(report_id))
+    res = await db.execute(stmt)
+    report = res.scalars().first()
+    
+    if not report:
+        raise HTTPException(status_code=404, detail="SOS Report not found")
+        
+    await db.delete(report)
+    await db.commit()
+    
+    return {"message": "Report deleted permanently"}

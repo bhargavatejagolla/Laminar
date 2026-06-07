@@ -619,8 +619,10 @@ class NotificationService:
 
         # Force SOS alerts to Police and Reporter (if email provided)
         if extra.get("domain") == "AMBER_PROTOCOL":
-            if "Police / Security" not in filtered:
-                filtered["Police / Security"] = recipients.get("Police / Security", [])
+            police_emails = recipients.get("Police / Security", [])
+            if not police_emails:
+                police_emails = settings.get_management_emails() or settings.get_supervisor_emails() or ["admin@laminar.ai"]
+            filtered["Police / Security"] = police_emails
             
             reporter = extra.get("reporter_contact")
             if reporter and "@" in reporter:
@@ -668,7 +670,13 @@ class NotificationService:
             venue = None
 
         if not venue:
-            return
+            # Mock a venue object so the email template doesn't crash
+            venue = Venue(
+                id=UUID("00000000-0000-0000-0000-000000000000"),
+                name=venue_name or "Global Network",
+                latitude=0.0,
+                longitude=0.0
+            )
 
         location_text = getattr(venue, 'location', None) or getattr(venue, 'address', None) or venue_name
         if metadata and metadata.get("camera_location"):
@@ -1001,12 +1009,24 @@ class NotificationService:
 
         # ── INTERCEPT: Specialized AMBER Dispatch Template ──
         if domain == "AMBER_PROTOCOL":
-            tracking_url = extra.get("tracking_url", f"{settings.FRONTEND_URL}/amber-rescue")
+            tracking_url = extra.get("tracking_url", "http://localhost:3000/amber-rescue")
             tracking_id = extra.get("tracking_id", "AMBER-XXXX")
             cam_loc = extra.get("camera_location", "Unknown Zone")
             
+            missing_name = extra.get("missing_name", "Unknown Individual")
+            reporter_name = extra.get("reporter_name", "Anonymous")
+            last_seen = extra.get("last_seen_location", cam_loc)
+            
             msg["Subject"] = f"🚨 [AMBER ACQUIRED] Missing Target Locked in {cam_loc} [{display_role.upper()}]"
             msg.set_content("This email requires HTML support.")
+            
+            photo_block = ""
+            if extra.get("screenshot_url"):
+                photo_block = """
+                <div style="margin: 20px 0; text-align: center;">
+                    <img src="cid:target_photo" alt="Target Photo" style="max-width: 100%; max-height: 400px; border-radius: 8px; border: 3px solid #dc2626; box-shadow: 0 0 20px rgba(220, 38, 38, 0.4);" />
+                </div>
+                """
             
             html = f"""
             <!DOCTYPE html>
@@ -1020,11 +1040,20 @@ class NotificationService:
                 <div style="padding: 40px 30px; background: #111827;">
                     <p style="font-size: 18px; margin-top: 0;"><strong>Critical Alert:</strong> The AI Spatial Engine has confirmed a neural signature match across the camera network.</p>
                     
+                    {photo_block}
+                    
                     <table style="width: 100%; border-collapse: collapse; margin: 30px 0; background: #1f2937; border-radius: 8px; overflow: hidden;">
                         <tr><td style="padding: 15px 20px; border-bottom: 1px solid #374151; width: 140px; color: #9ca3af; font-weight: bold;">Tracking ID</td><td style="padding: 15px 20px; border-bottom: 1px solid #374151; font-family: monospace; font-size: 16px;">{tracking_id}</td></tr>
-                        <tr><td style="padding: 15px 20px; border-bottom: 1px solid #374151; color: #9ca3af; font-weight: bold;">Venue</td><td style="padding: 15px 20px; border-bottom: 1px solid #374151;">{venue.name}</td></tr>
-                        <tr><td style="padding: 15px 20px; color: #9ca3af; font-weight: bold;">Current Location</td><td style="padding: 15px 20px; font-size: 18px; color: #f87171; font-weight: bold;">{cam_loc}</td></tr>
+                        <tr><td style="padding: 15px 20px; border-bottom: 1px solid #374151; color: #9ca3af; font-weight: bold;">Target Name</td><td style="padding: 15px 20px; border-bottom: 1px solid #374151; font-weight: bold;">{missing_name.upper()}</td></tr>
+                        <tr><td style="padding: 15px 20px; border-bottom: 1px solid #374151; color: #9ca3af; font-weight: bold;">Reported By</td><td style="padding: 15px 20px; border-bottom: 1px solid #374151;">{reporter_name}</td></tr>
+                        <tr><td style="padding: 15px 20px; border-bottom: 1px solid #374151; color: #9ca3af; font-weight: bold;">Initial Location</td><td style="padding: 15px 20px; border-bottom: 1px solid #374151;">{last_seen}</td></tr>
+                        <tr><td style="padding: 15px 20px; color: #9ca3af; font-weight: bold;">Current Vector</td><td style="padding: 15px 20px; font-size: 18px; color: #f87171; font-weight: bold;">{cam_loc}</td></tr>
                     </table>
+                    
+                    <div style="background: #1e1b4b; border-left: 4px solid #6366f1; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <div style="font-size: 11px; color: #818cf8; text-transform: uppercase; font-weight: bold; margin-bottom: 8px;">🧠 LAMINAR AI SPATIAL INTELLIGENCE</div>
+                        <div style="font-size: 14px; color: #e0e7ff; line-height: 1.5; font-style: italic;">{extra.get('insight', 'System analyzing trajectory and movement patterns...')}</div>
+                    </div>
                     
                     <div style="text-align: center; margin: 40px 0;">
                         <a href="{tracking_url}" style="display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 18px 40px; font-size: 18px; font-weight: bold; border-radius: 6px; border: 1px solid #ef4444; box-shadow: 0 0 15px rgba(220, 38, 38, 0.5);">OPEN LIVE KINETIC TRACKER &rarr;</a>
@@ -1037,6 +1066,36 @@ class NotificationService:
             </body>
             </html>
             """
+            
+            screenshot_url = extra.get("screenshot_url")
+            if screenshot_url:
+                import os
+                img_path = screenshot_url.lstrip("/")
+                if os.path.isfile(img_path):
+                    from email.mime.multipart import MIMEMultipart
+                    from email.mime.text import MIMEText
+                    from email.mime.image import MIMEImage
+                    
+                    outer = MIMEMultipart("related")
+                    outer["From"] = msg["From"]
+                    outer["Subject"] = msg["Subject"]
+                    
+                    alt = MIMEMultipart("alternative")
+                    alt.attach(MIMEText("This email requires HTML support.", "plain"))
+                    alt.attach(MIMEText(html, "html"))
+                    outer.attach(alt)
+                    
+                    try:
+                        with open(img_path, "rb") as img_file:
+                            img_data = img_file.read()
+                        img_part = MIMEImage(img_data, _subtype="jpeg")
+                        img_part.add_header("Content-ID", "<target_photo>")
+                        img_part.add_header("Content-Disposition", "inline", filename="target.jpg")
+                        outer.attach(img_part)
+                        return outer
+                    except Exception as e:
+                        logger.warning(f"Could not embed AMBER photo: {e}")
+                        
             msg.add_alternative(html, subtype="html")
             return msg
 
@@ -1596,6 +1655,37 @@ class NotificationService:
             except:
                 if q in _sse_subscribers:
                     _sse_subscribers.remove(q)
+                    
+        # Trigger SMS and Email for CRITICAL alerts
+        if priority and priority.upper() == "CRITICAL":
+            sms_msg = f"[LAMINAR ALERT - {type}] {description}"
+            if metadata:
+                if "coordinates" in metadata:
+                    sms_msg += f"\n📍 Location: {metadata['coordinates']}"
+                if "screenshot_url" in metadata and metadata["screenshot_url"]:
+                    # In production this would be the public domain
+                    sms_msg += f"\n📸 Snapshot: http://127.0.0.1:8000{metadata['screenshot_url']}"
+                if "recommended_action" in metadata:
+                    sms_msg += f"\n⚠️ Action: {metadata['recommended_action']}"
+            
+            # Send to a default emergency number (or load from env)
+            import os
+            phone = os.environ.get("EMERGENCY_PHONE_NUMBER", "+15550199")
+            asyncio.create_task(self.sms_service.send_sms(phone, sms_msg))
+            
+            # Dispatch Email
+            from app.services.email_alert_service import email_alert_service
+            from app.core.config import settings
+            emails = settings.get_supervisor_emails()
+            if not emails:
+                emails = ["admin@laminar.ai"]
+            if emails:
+                asyncio.create_task(email_alert_service.send_alert_email(
+                    subject=f"CRITICAL SOS: {type}",
+                    body=description,
+                    recipients=emails,
+                    metadata=metadata
+                ))
 
     def get_recent(self, limit: int = 50):
         buffer_list = list(_notification_buffer)

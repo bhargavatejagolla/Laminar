@@ -20,10 +20,11 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
   hub: Globe,
 };
 
-import { useParkingInsights, useTrafficInsights, useKineticInsights, useKineticEvents } from "@/hooks/useTelemetry";
+import { useParkingInsights, useTrafficInsights, useKineticInsights, useKineticEvents, useIncidentAlerts } from "@/hooks/useTelemetry";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
 import SplashCursor from "@/components/react-bits/SplashCursor";
 import ElectricBorder from "@/components/react-bits/ElectricBorder";
+import Loading from "@/app/loading";
 
 function ServiceCard({ title, description, icon: Icon, href, stats, theme }: { title: string; description: string; icon: any; href: string; stats: any; theme: any }) {
   const { t } = useTranslation();
@@ -476,11 +477,14 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
   const kineticEventsHook = useKineticEvents();
 
   // Hook telemetry depending on section type
+  const kineticInsightsHook = useKineticInsights();
   const parkingInsights = useParkingInsights();
   const trafficInsights = useTrafficInsights();
+  const incidentInsights = useIncidentAlerts();
+  
   const currentInsights = sectionType === 'parking' ? parkingInsights.insights :
-    sectionType === 'kinetic' ? {} : // Will populate later if needed
-      sectionType === 'hub' ? { ...parkingInsights.insights, ...trafficInsights.insights } :
+    sectionType === 'kinetic' ? kineticInsightsHook.insights :
+      sectionType === 'hub' ? { ...parkingInsights.insights, traffic: trafficInsights.insights, incidents: incidentInsights.alerts } :
         trafficInsights.insights;
   const { setVenue } = useActiveVenue();
 
@@ -541,12 +545,25 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
         ]);
 
         const allVenues = Array.isArray(venuesRes.data) ? venuesRes.data : [];
-        const allCameras = Array.isArray(camerasRes.data) ? camerasRes.data : [];
+        const rawCameras = Array.isArray(camerasRes.data) ? camerasRes.data : [];
+        const allCameras = rawCameras.filter((c: any) => c.is_active !== false);
 
-        // Strict domain match only — do not use name heuristic
-        const sectionVenues = (sectionType === 'hub' || sectionType === 'incident' || sectionType === 'kinetic') ? allVenues : allVenues.filter((v: any) => v.venue_type === sectionType);
-        const sectionVenueIds = new Set(sectionVenues.map((v: any) => v.id));
-        const sectionCameras = allCameras.filter((c: any) => sectionVenueIds.has(c.venue_id));
+        // Strict domain match or name heuristic, except for hub
+        const sectionVenues = sectionType === 'hub' ? allVenues : allVenues.filter((v: any) => 
+          (v.venue_type && v.venue_type.toLowerCase() === sectionType.toLowerCase()) || 
+          (v.name && v.name.toLowerCase().includes(sectionType.toLowerCase()))
+        );
+        
+        let sectionCameras = allCameras;
+        if (sectionType !== 'hub') {
+            const sectionVenueIds = new Set(sectionVenues.map((v: any) => v.id));
+            sectionCameras = allCameras.filter((c: any) => sectionVenueIds.has(c.venue_id));
+            
+            // If no venues matched, fallback to cameras with matching name
+            if (sectionCameras.length === 0) {
+                sectionCameras = allCameras.filter((c:any) => c.name.toLowerCase().includes(sectionType.toLowerCase()));
+            }
+        }
 
         setVenues(sectionVenues);
         setCameras(sectionCameras);
@@ -581,16 +598,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
   }, [sectionType]);
 
   if (loadingInitial) {
-    return (
-      <div className="flex items-center justify-center h-full w-full bg-[#0a0a10]">
-        <div className="relative">
-          <div className={`w-16 h-16 rounded-full animate-spin border-4 ${theme.spinner}`}></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Zap className={`w-5 h-5 ${theme.textClass} animate-pulse`} />
-          </div>
-        </div>
-      </div>
-    );
+    return <Loading />;
   }
 
   return (
@@ -1012,9 +1020,9 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
         </div>
       </div>
 
-      <div className={`flex gap-8 mt-4 items-start ${sectionType === 'kinetic' ? 'flex-col xl:flex-col' : 'flex-col xl:flex-row'}`}>
+      <div className="flex gap-8 mt-4 items-start flex-col xl:flex-row">
 
-        <div className={`w-full flex-[3] grid gap-6 ${sectionType === 'kinetic' ? 'grid-cols-1' : sectionType === 'hub' ? 'grid-cols-1 lg:grid-cols-2' : cameras.length > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} ${sectionType !== 'kinetic' && cameras.length >= 4 ? 'xl:grid-cols-2' : ''}`}>
+        <div className={`w-full flex-[2] grid gap-6 ${sectionType === 'hub' ? 'grid-cols-1 lg:grid-cols-2' : cameras.length > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} ${cameras.length >= 4 ? 'xl:grid-cols-2' : ''}`}>
 
           {sectionType === 'hub' && (
             <>
@@ -1039,8 +1047,8 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                   href="/smart-traffic"
                   theme={THEMES.traffic}
                   stats={{
-                    "Density": `${Math.round((currentInsights?.metrics?.density || 0) * 100)}%`,
-                    "Incidents": currentInsights?.signals?.length || 0
+                    "Density": `${currentInsights?.traffic?.overall?.congested_zones > 0 ? "HIGH" : "OPTIMAL"}`,
+                    "Incidents": currentInsights?.traffic?.overall?.total_vehicles || 0
                   }}
                 />
               </motion.div>
@@ -1065,60 +1073,8 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                   href="/smart-incidents"
                   theme={THEMES.incident}
                   stats={{
-                    "Risk": currentInsights?.risk_level || "LOW",
-                    "Alerts": "0 ACTIVE"
-                  }}
-                />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.5 }}>
-                <ServiceCard
-                  title="Kinetic Intelligence"
-                  description="Predictive behavioral analytics and zero-shot kinetic anomaly detection."
-                  icon={BrainCircuit}
-                  href="/smart-kinetic"
-                  theme={THEMES.kinetic}
-                  stats={{
-                    "Status": "STABLE",
-                    "Level": "PREDICTIVE"
-                  }}
-                />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.6 }}>
-                <ServiceCard
-                  title="Guardian Route"
-                  description="Walk Me Home protocol: Protective tracking, SOS gestures, and anomaly escalation."
-                  icon={Shield}
-                  href="/smart-guardian"
-                  theme={THEMES.guardian}
-                  stats={{
-                    "Escorts": "ACTIVE",
-                    "Threats": "0 DETECTED"
-                  }}
-                />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.7 }}>
-                <ServiceCard
-                  title="AI Green Wave"
-                  description="Autonomous emergency vehicle routing and traffic preemption protocols."
-                  icon={Zap}
-                  href="/smart-greenwave"
-                  theme={THEMES.greenwave}
-                  stats={{
-                    "Signals": "0 PREEMPTED",
-                    "Saving": "0s DELAY"
-                  }}
-                />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.7 }}>
-                <ServiceCard
-                  title="Liability Defense"
-                  description="Pre-emptive hazard triaging & medical emergency autonomous detection."
-                  icon={ShieldCheck}
-                  href="/smart-liability"
-                  theme={THEMES.liability}
-                  stats={{
-                    "Triage": "ACTIVE",
-                    "Hazards": "0 DETECTED"
+                    "Risk": currentInsights?.incidents?.length > 0 ? "HIGH" : "LOW",
+                    "Alerts": `${currentInsights?.incidents?.length || 0} ACTIVE`
                   }}
                 />
               </motion.div>
@@ -1225,70 +1181,79 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
             </div>
           )}
 
-          {/* Kinetic Intelligence Panel */}
+          {/* Kinetic Intelligence Panel (SOS 3.0) */}
           {sectionType === "kinetic" && (
-            <div className={`bg-[#12121a]/80 backdrop-blur-xl border ${theme.borderClass} rounded-3xl p-6 relative shadow-[0_0_40px_rgba(99,102,241,0.03)] border-t-${theme.primary}-500/40`}>
-              <div className="flex items-center justify-between mb-4">
-                <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Kinetic Intelligence</p>
+            <div className={`bg-[#12121a]/80 backdrop-blur-xl border ${theme.borderClass} rounded-3xl p-6 relative shadow-[0_0_40px_rgba(99,102,241,0.03)] border-t-${theme.primary}-500/40 flex flex-col gap-6`}>
+              <div className="flex items-center justify-between">
+                <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Kinetic Intelligence v3</p>
                 {(() => {
-                  const risk = currentInsights?.risk_level || "LOW";
-                  const col = risk === "CRITICAL" ? 'text-red-400 bg-red-500/10 border-red-500/30' : 
-                              risk === "HIGH" ? 'text-orange-400 bg-orange-500/10 border-orange-500/30' : 
-                              risk === "MEDIUM" ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' : 
-                              'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
-                  return <span className={`text-[9px] font-mono font-black px-2 py-1 rounded-full border ${col}`}>{risk} RISK</span>;
+                  const active = currentInsights?.fusion_state?.sos_activated;
+                  return active 
+                    ? <span className="text-[9px] font-mono font-black px-2 py-1 rounded-full border text-rose-400 bg-rose-500/10 border-rose-500/30 animate-pulse">SOS ACTIVATED</span>
+                    : <span className="text-[9px] font-mono font-black px-2 py-1 rounded-full border text-emerald-400 bg-emerald-500/10 border-emerald-500/30">MONITORING</span>;
                 })()}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-white/5 rounded-2xl p-3">
-                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Active Subjects</p>
-                  <p className="text-xl font-black font-mono text-white">{currentInsights?.active_subjects ?? 0}</p>
+              {/* Confidence Fusion Gauge */}
+              <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
+                <div className="flex justify-between items-end mb-3">
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Confidence Fusion Score</span>
+                  <span className={`font-black font-mono text-xl leading-none ${currentInsights?.fusion_state?.fusion_score > 70 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    {currentInsights?.fusion_state?.fusion_score || 0}%
+                  </span>
                 </div>
-                <div className="bg-white/5 rounded-2xl p-3">
-                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Anomalies Detected</p>
-                  <p className={`text-xl font-black font-mono ${currentInsights?.anomalies_detected > 0 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`}>
-                    {currentInsights?.anomalies_detected ?? 0}
-                  </p>
+                <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden relative shadow-inner">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${currentInsights?.fusion_state?.fusion_score > 70 ? 'bg-gradient-to-r from-rose-600 to-rose-400' : 'bg-gradient-to-r from-emerald-600 to-emerald-400'}`}
+                    style={{ width: `${Math.min(currentInsights?.fusion_state?.fusion_score || 0, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-3 px-1 text-[8px] font-mono text-slate-500">
+                  <span className={currentInsights?.fusion_state?.sos_conf > 30 ? 'text-indigo-400 font-bold' : ''}>GESTURE</span>
+                  <span className={currentInsights?.fusion_state?.audio_conf > 30 ? 'text-indigo-400 font-bold' : ''}>AUDIO</span>
+                  <span className={currentInsights?.fusion_state?.fall_conf > 30 ? 'text-indigo-400 font-bold' : ''}>FALL</span>
+                  <span className={currentInsights?.fusion_state?.motion_conf > 30 ? 'text-indigo-400 font-bold' : ''}>PANIC</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between mb-4">
-                <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Kinetic Alert Stream</p>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${theme.pulseSecondary}`} />
-                  <span className={`text-[9px] ${theme.textClass}/70 font-mono`}>LIVE</span>
+              {/* Local Randy AI Summary */}
+              <div className="bg-indigo-900/10 rounded-2xl p-4 border border-indigo-500/20 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-50" />
+                <div className="flex items-center gap-2 mb-3">
+                  <BrainCircuit className="w-4 h-4 text-indigo-400" />
+                  <span className="text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-widest">Randy AI Summary</span>
                 </div>
+                <pre className="text-[11px] font-mono text-indigo-100/80 whitespace-pre-wrap leading-relaxed">
+                  {currentInsights?.fusion_state?.randy_summary || "System optimal. No emergency signals detected."}
+                </pre>
               </div>
-              
-              {(!kineticEventsHook.events || kineticEventsHook.events.length === 0) ? (
-                <p className="text-slate-600 text-xs font-mono text-center py-4">System nominal. No abnormal kinetic signatures.</p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-2">
-                  {kineticEventsHook.events.slice(0, 20).map((ev: any, i: number) => {
-                    const risk = ev.risk_level || "LOW";
-                    const isHighRisk = risk === "CRITICAL" || risk === "HIGH";
-                    return (
-                      <div key={i} className={`flex flex-col gap-1 ${isHighRisk ? 'bg-rose-500/10 border-rose-500/20' : 'bg-white/3 border-white/5'} rounded-xl px-3 py-2 transition-colors border`}>
-                        <div className="flex items-center justify-between">
-                          <span className={`text-[10px] font-mono font-black ${isHighRisk ? 'text-rose-400' : 'text-slate-300'}`}>
-                            {ev.type}
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-mono">
-                            {ev.confidence ? `${ev.confidence}% CONF` : ''}
-                          </span>
-                        </div>
-                        <span className={`text-[9px] ${isHighRisk ? 'text-rose-400/80' : 'text-slate-400'}`}>
-                          {ev.message}
-                        </span>
-                        <span className="text-[8px] text-slate-600 mt-1">
-                          {ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : ''}
-                        </span>
-                      </div>
-                    );
-                  })}
+
+              {/* Emergency Timeline */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Emergency Timeline</p>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${theme.pulseSecondary}`} />
+                    <span className={`text-[9px] ${theme.textClass}/70 font-mono`}>LIVE</span>
+                  </div>
                 </div>
-              )}
+                
+                {(!currentInsights?.fusion_state?.timeline || currentInsights.fusion_state.timeline.length === 0) ? (
+                  <p className="text-slate-600 text-[10px] font-mono py-2 italic border-l-2 border-white/5 pl-3">No active events.</p>
+                ) : (
+                  <div className="space-y-3 pl-2">
+                    {currentInsights.fusion_state.timeline.map((ev: any, i: number) => (
+                      <div key={i} className="flex gap-3 items-start relative">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 absolute -left-1 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+                        <div className="flex flex-col pl-4 border-l border-indigo-500/20">
+                          <span className="text-[9px] text-slate-500 font-mono leading-none mb-1">{ev.timestamp}</span>
+                          <span className="text-[11px] text-slate-300 font-mono font-medium">{ev.message}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
