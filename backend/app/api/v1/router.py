@@ -112,3 +112,6 @@ router.include_router(edge_sync_router, prefix="/edge", tags=["Edge-Federated Le
 
 from app.api.v1.endpoints.tickets import router as tickets_router
 router.include_router(tickets_router, prefix="/tickets", tags=["Support Tickets"])
+
+from app.api.v1.endpoints.liquid import router as liquid_router
+router.include_router(liquid_router, prefix="/liquid", tags=["Liquid Threat"])

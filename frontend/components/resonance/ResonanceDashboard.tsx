@@ -13,12 +13,14 @@ import {
     LineChart, 
     Cpu, 
     ArrowRight,
+    ArrowLeft,
     Bell,
     CheckCircle2,
     XCircle,
     Camera
 } from "lucide-react";
 import { api } from "@/services/api";
+import { useRouter } from "next/navigation";
 
 interface Structure {
     id: string;
@@ -57,6 +59,7 @@ const DEFAULT_STRUCTURES: Structure[] = [
 ];
 
 export default function ResonanceDashboard() {
+    const router = useRouter();
     const [structures, setStructures] = useState<Structure[]>(DEFAULT_STRUCTURES);
     const [activeId, setActiveId] = useState<string>("s1");
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -267,14 +270,25 @@ export default function ResonanceDashboard() {
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(249,115,22,0.1)_0%,transparent_50%)] pointer-events-none" />
             
             <header className="flex justify-between items-end border-b border-orange-500/20 pb-4 shrink-0 z-10">
-                <div>
-                    <h1 className="text-4xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200 flex items-center gap-4">
-                        <Activity className="w-10 h-10 text-orange-500" />
-                        RESONANCE ENGINE
-                    </h1>
-                    <p className="font-mono text-[10px] text-orange-400/80 tracking-[0.3em] uppercase mt-2 ml-14">
-                        Eulerian Video Magnification (EVM) • Structural Integrity Matrix
-                    </p>
+                <div className="flex items-end gap-6">
+                    <button
+                        onClick={() => router.push("/sentinel-command")}
+                        className="group flex flex-col items-center justify-center gap-1 mb-2 transition-all"
+                    >
+                        <div className="w-12 h-12 flex items-center justify-center bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-2xl transition-all shadow-[0_0_15px_rgba(249,115,22,0.1)]">
+                            <ArrowLeft className="w-5 h-5 text-orange-500/70 group-hover:text-orange-400 transition-colors group-hover:-translate-x-0.5" />
+                        </div>
+                        <span className="text-[9px] font-black tracking-[0.1em] text-orange-500/70 uppercase">Back</span>
+                    </button>
+                    <div>
+                        <h1 className="text-4xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200 flex items-center gap-4">
+                            <Activity className="w-10 h-10 text-orange-500" />
+                            RESONANCE ENGINE
+                        </h1>
+                        <p className="font-mono text-[10px] text-orange-400/80 tracking-[0.3em] uppercase mt-2 ml-14">
+                            Eulerian Video Magnification (EVM) • Structural Integrity Matrix
+                        </p>
+                    </div>
                 </div>
                 <div className="flex gap-4">
                     <button 

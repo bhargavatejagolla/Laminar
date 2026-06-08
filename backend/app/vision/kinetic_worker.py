@@ -61,7 +61,42 @@ def draw_pose_overlay(frame: np.ndarray, result, anomalies: list = None) -> np.n
                     box_color = (0, 255, 255) # Yellow
                     bg_color = (0, 150, 150)
                     thickness = 2
+            # Draw Safety Bubble and Threat Levels
+            threat_level = box.get("threat_level")
+            is_primary = box.get("primary")
             
+            if threat_level:
+                if threat_level == "Red":
+                    box_color = (0, 0, 255)
+                    bg_color = (0, 0, 150)
+                elif threat_level == "Orange":
+                    box_color = (0, 128, 255)
+                    bg_color = (0, 80, 150)
+                elif threat_level == "Yellow":
+                    box_color = (0, 255, 255)
+                    bg_color = (0, 150, 150)
+                elif threat_level == "Green":
+                    box_color = (0, 255, 0)
+                    bg_color = (0, 150, 0)
+                    
+            if is_primary:
+                box_color = (255, 0, 255) # Magenta for the primary subject
+                # Draw Safety Bubble (2 meters estimated radius)
+                bubble_radius = int(max(x2-x1, y2-y1) * 1.5)
+                cx, cy = int((x1+x2)/2), int((y1+y2)/2)
+                cv2.circle(overlay, (cx, cy), bubble_radius, (255, 0, 255), 1, cv2.LINE_AA)
+                
+                label = "PROTECTED SUBJECT A91"
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+                text_y = max(th + 5, y1 - 25)
+                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), (150, 0, 150), -1)
+                cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+            elif threat_level:
+                label = f"THREAT: {threat_level.upper()}"
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+                text_y = max(th + 5, y1 - 8)
+                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), bg_color, -1)
+                cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
             # Draw glowing bounding box
             cv2.rectangle(overlay, (x1, y1), (x2, y2), box_color, thickness)
             

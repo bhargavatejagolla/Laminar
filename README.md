@@ -135,6 +135,18 @@
 
 ---
 
+## Flood Intelligence Network (Multi-Node Omni-Base Calibration)
+
+* Real-Time Flood Severity Index (0-100)
+* Morphological HSV Water Segmentation
+* Traffic Disruption & Submersion Analytics
+* AI Green Wave & Emergency Corridor Escalation
+* Guardian Route Rerouting for Pedestrians
+* Dynamic Rise Trend Monitoring
+* Incident Hub Command Generation
+
+---
+
 ## Smart Parking Intelligence
 
 * Parking Occupancy Detection
@@ -323,8 +335,8 @@
 * Node.js (auxiliary services)
 
 ### AI & Computer Vision
-* YOLOv8, OpenCV, TensorFlow, PyTorch
-* Pose Estimation, Object Tracking
+* YOLOv11, OpenCV, TensorFlow, PyTorch
+* Pose Estimation, Morphological Image Segmentation, Object Tracking
 * **Google Gemini API**
 * **Groq API**
 

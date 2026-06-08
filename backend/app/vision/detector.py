@@ -105,7 +105,7 @@ class YOLODetector:
         self.conf_threshold = confidence_threshold
         self.iou_threshold = iou_threshold
         self.image_size = image_size
-        self.cpu_threads = 1  # Forced to 1 to prevent Windows uvicorn deadlocks
+        self.cpu_threads = cpu_threads
         self.static_diff_threshold = static_diff_threshold
         self.device = self._get_device()
         self.model: Optional[Any] = None
@@ -125,7 +125,9 @@ class YOLODetector:
 
     def _get_device(self) -> str:
         """Auto-detect best available device."""
-        # Forcing CPU to avoid CUDA initialization hangs on some Windows environments
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
         return "cpu"
 
     # ==========================================================
@@ -574,13 +576,15 @@ class YOLODetector:
             import torch
             with torch.inference_mode():
                 with self._inference_lock:
-                    results = self.pose_model.predict(
+                    results = self.pose_model.track(
                         source=frame_lb,
                         conf=self.conf_threshold,
                         iou=self.iou_threshold,
                         imgsz=self.image_size,
                         device=self.device,
                         verbose=False,
+                        persist=True,
+                        tracker="bytetrack.yaml"
                     )
 
             result = results[0]
@@ -621,11 +625,14 @@ class YOLODetector:
             count = len(boxes_xyxy)
             avg_conf = float(np.mean(confidences)) if count > 0 else 0.0
 
+            track_ids = result.boxes.id.int().cpu().numpy() if result.boxes.id is not None else [None] * len(boxes_xyxy)
+
             result_boxes = []
             for i, (x1, y1, x2, y2) in enumerate(boxes_xyxy):
                 if i >= max_boxes:
                     break
                 result_boxes.append({
+                    "id": track_ids[i],
                     "class_name": "person",
                     "bbox": [
                         (round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1))

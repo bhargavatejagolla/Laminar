@@ -19,6 +19,7 @@ import {
     Droplets,
     HeartPulse
 } from "lucide-react";
+import Lightfall from "@/components/ui/Lightfall";
 
 const MODULES = [
     {
@@ -151,6 +152,27 @@ export default function SentinelCommandPage() {
             {/* Neural Grid Background */}
             <div className="absolute inset-0 pointer-events-none z-0 opacity-30">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.03)_1px,transparent_1px)] bg-[size:60px_60px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)]"></div>
+            </div>
+
+            {/* Lightfall Animation */}
+            <div className="absolute inset-0 pointer-events-none z-0 opacity-100 mix-blend-screen">
+                <Lightfall
+                    colors={['#0ea5e9', '#06b6d4', '#f43f5e']} // sky, cyan, rose (matching Sentinel Command theme)
+                    backgroundColor="#000000"
+                    speed={0.4}
+                    streakCount={3}
+                    streakWidth={2.0}
+                    streakLength={0.8}
+                    glow={2.5}
+                    density={0.7}
+                    twinkle={1.5}
+                    zoom={2.5}
+                    backgroundGlow={0.0}
+                    opacity={1}
+                    mouseInteraction={true}
+                    mouseStrength={0.8}
+                    mouseRadius={1.5}
+                />
             </div>
 
             <div className="relative z-10 px-6 pt-12 max-w-[1400px] mx-auto">

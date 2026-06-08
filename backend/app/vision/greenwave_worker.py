@@ -10,6 +10,8 @@ from app.vision.detector import get_detector
 from app.core.global_state import GLOBAL_STATE
 from app.core.database import db_manager
 from app.services.notification_service import notification_service
+from app.vision.tracker import CentroidTracker
+import math
 
 logger = get_logger(__name__)
 
@@ -36,7 +38,8 @@ def draw_greenwave_overlay(frame: np.ndarray, result) -> np.ndarray:
                 cv2.line(overlay, (x1, y1), (x1 + 15, y1), (0, 255, 0), 2)
                 cv2.line(overlay, (x1, y1), (x1, y1 + 15), (0, 255, 0), 2)
                 
-                label = f"EMERGENCY VEHICLE DETECTED"
+                confidence_str = box.get("final_confidence", 0)
+                label = f"EMERGENCY VEHICLE ({confidence_str}%)"
                 cv2.putText(overlay, label, (x1, max(20, y1 - 10)), 
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
                             
@@ -61,6 +64,10 @@ class GreenWaveWorker:
         self._last_annotated_frame: Optional[np.ndarray] = None
         self._last_result = None
         self.injected_frame: Optional[np.ndarray] = None
+        
+        self.tracker = CentroidTracker(max_disappeared=15, max_distance=80)
+        self.tracked_vehicles = {}
+        self.frame_count = 0
 
     async def start(self):
         if self._running: return
@@ -125,19 +132,113 @@ class GreenWaveWorker:
             try:
                 if hasattr(self, '_current_raw_frame') and self._current_raw_frame is not None:
                     frame = self._current_raw_frame.copy()
+                    self.frame_count += 1
+                    
+                    if self.frame_count % 3 != 0:
+                        await asyncio.sleep(0.01)
+                        continue
                     
                     loop = asyncio.get_running_loop()
                     result = await loop.run_in_executor(
-                        None, lambda: self.detector.detect_vehicles(frame)
+                        None, lambda: self.detector.detect_people(frame, True, 500, None, [2, 3, 5, 7])
                     )
-                    self._last_result = result
                     
                     has_emergency = False
+                    best_confidence = 0
+                    
                     if hasattr(result, 'bounding_boxes') and result.bounding_boxes:
+                        rects = []
                         for box in result.bounding_boxes:
-                            if box.get("class_name") in ["truck", "bus"]:
+                            x1, y1, x2, y2 = [int(p) for p in box["bbox"]]
+                            rects.append((x1, y1, x2, y2))
+                            
+                        tracked_objects = self.tracker.update(rects)
+                        
+                        for obj_id, centroid in tracked_objects.items():
+                            matched_box = None
+                            best_yolo_conf = 0
+                            for box in result.bounding_boxes:
+                                x1, y1, x2, y2 = [int(p) for p in box["bbox"]]
+                                bx, by = (x1+x2)/2, (y1+y2)/2
+                                if abs(bx - centroid[0]) < 20 and abs(by - centroid[1]) < 20:
+                                    matched_box = box
+                                    best_yolo_conf = box.get("confidence", 0) * 100
+                                    break
+                                    
+                            if not matched_box:
+                                continue
+                                
+                            if obj_id not in self.tracked_vehicles:
+                                self.tracked_vehicles[obj_id] = {
+                                    "light_score": 0, "motion_score": 0,
+                                    "vehicle_class_score": 0, "route_priority_score": 0,
+                                    "tracking_consistency": 0,
+                                    "frames_tracked": 0,
+                                    "first_seen": time.time(),
+                                    "confidence_history": []
+                                }
+                                
+                            v_state = self.tracked_vehicles[obj_id]
+                            v_state["frames_tracked"] += 1
+                            v_state["vehicle_class_score"] = best_yolo_conf
+                            
+                            history = self.tracker.history.get(obj_id, [])
+                            if len(history) >= 5:
+                                dx = history[-1][0] - history[-5][0]
+                                dy = history[-1][1] - history[-5][1]
+                                dist = (dx**2 + dy**2)**0.5
+                                v_state["motion_score"] = min(100, int(dist * 3)) if dist > 15 else 20
+                                
+                                angles = []
+                                for i in range(1, len(history)):
+                                    adx = history[i][0] - history[i-1][0]
+                                    ady = history[i][1] - history[i-1][1]
+                                    angles.append(math.atan2(ady, adx))
+                                if angles:
+                                    variance = np.var(angles)
+                                    v_state["route_priority_score"] = 90 if variance < 0.2 else 30
+                                    
+                            x1, y1, x2, y2 = [int(p) for p in matched_box["bbox"]]
+                            crop = frame[max(0, y1):min(frame.shape[0], y2), max(0, x1):min(frame.shape[1], x2)]
+                            if crop.size > 0 and v_state["frames_tracked"] % 2 == 0:
+                                hsv_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+                                upper_crop = hsv_crop[0:int(crop.shape[0]*0.4), :]
+                                if upper_crop.size > 0:
+                                    red_mask1 = cv2.inRange(upper_crop, np.array([0, 120, 70]), np.array([10, 255, 255]))
+                                    red_mask2 = cv2.inRange(upper_crop, np.array([170, 120, 70]), np.array([180, 255, 255]))
+                                    blue_mask = cv2.inRange(upper_crop, np.array([100, 150, 0]), np.array([140, 255, 255]))
+                                    if cv2.countNonZero(red_mask1 + red_mask2) > 5 or cv2.countNonZero(blue_mask) > 5:
+                                        v_state["light_score"] = min(90, v_state["light_score"] + 20)
+                                    else:
+                                        v_state["light_score"] = max(0, v_state["light_score"] - 5)
+                                        
+                            v_state["tracking_consistency"] = min(100, len(history) * 10)
+                                        
+                            final_score = (0.35 * v_state["light_score"] + 
+                                           0.25 * v_state["tracking_consistency"] + 
+                                           0.20 * v_state["vehicle_class_score"] + 
+                                           0.10 * v_state["motion_score"] + 
+                                           0.10 * v_state["route_priority_score"])
+                                           
+                            v_state["confidence_history"].append(final_score)
+                            if len(v_state["confidence_history"]) > 10:
+                                v_state["confidence_history"].pop(0)
+                                
+                            avg_score = sum(v_state["confidence_history"]) / max(1, len(v_state["confidence_history"]))
+                            
+                            matched_box["final_confidence"] = int(avg_score)
+                            tracked_time = time.time() - v_state["first_seen"]
+                            
+                            # Enforce hard gates for emergency confirmation
+                            if (avg_score > 75 and 
+                                v_state["vehicle_class_score"] > 60 and 
+                                v_state["light_score"] > 60 and 
+                                tracked_time > 1.5):
                                 has_emergency = True
-                                break
+                                best_confidence = max(best_confidence, int(avg_score))
+                                matched_box["class_name"] = "truck" # for overlay to highlight
+                                
+                    self._last_result = result
                     
                     signals_cleared = 0
                     if has_emergency:
@@ -153,7 +254,8 @@ class GreenWaveWorker:
                             "emergency_active": has_emergency,
                             "signals_preempted": signals_cleared,
                             "delay_reduction_sec": 45 if has_emergency else 0,
-                            "last_updated": datetime.utcnow().isoformat()
+                            "last_updated": datetime.utcnow().isoformat(),
+                            "confidence": best_confidence
                         }
                     )
 

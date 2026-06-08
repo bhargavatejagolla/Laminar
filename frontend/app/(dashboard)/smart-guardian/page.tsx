@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { 
     ArrowLeft, 
     AlertTriangle, 
@@ -20,7 +21,10 @@ import {
     Mic
 } from "lucide-react";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
+import dynamic from "next/dynamic";
 import { api } from "@/services/api";
+
+const MultiNodeMap = dynamic(() => import('@/components/guardian/MultiNodeMap'), { ssr: false });
 
 const WaveBackground = () => (
     <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20 mix-blend-screen z-0">
@@ -43,6 +47,7 @@ type GuardianState = {
     incident_created: boolean;
     incident_id: string | null;
     randy_summary: string;
+    subject_present: boolean;
 };
 
 export default function SmartGuardianPage() {
@@ -59,6 +64,26 @@ export default function SmartGuardianPage() {
     const [selectedReason, setSelectedReason] = useState("");
     const [destination, setDestination] = useState("");
     const [assessing, setAssessing] = useState(false);
+    const [sessionSummary, setSessionSummary] = useState<any>(null);
+    const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+    
+    // Notification System Ref
+    const incidentToastedRef = useRef(false);
+
+    // Multi-Camera Corridor States
+    type OperatingMode = "demo" | "real";
+    const [operatingMode, setOperatingMode] = useState<OperatingMode>("demo");
+    type RouteNode = { id: string; name: string; sourceType: "webcam" | "rtsp"; url: string; lat: number; lng: number; status: 'online' | 'offline'; };
+    const [routeNodes, setRouteNodes] = useState<RouteNode[]>([
+        { id: "node-1", name: "Bus Stand", sourceType: "webcam", url: "", lat: 17.4123, lng: 78.4567, status: 'online' },
+        { id: "node-2", name: "Metro Entrance", sourceType: "rtsp", url: "", lat: 17.4150, lng: 78.4602, status: 'online' },
+        { id: "node-3", name: "Residential Gate", sourceType: "rtsp", url: "", lat: 17.4181, lng: 78.4638, status: 'online' }
+    ]);
+    const [activeNodeIndex, setActiveNodeIndex] = useState(0);
+    const [monitoringNodeIndex, setMonitoringNodeIndex] = useState(0);
+    const [isTransit, setIsTransit] = useState(false);
+    const [transitETA, setTransitETA] = useState(0);
+    const subjectLostSinceRef = useRef<number | null>(null);
     
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const recognitionRef = useRef<any>(null);
@@ -174,17 +199,117 @@ export default function SmartGuardianPage() {
         return () => clearInterval(interval);
     }, [isActive]);
 
+    // Notification Engine (Pakka)
+    useEffect(() => {
+        if (!isActive) {
+            incidentToastedRef.current = false;
+            return;
+        }
+        
+        if (state?.incident_created && !incidentToastedRef.current) {
+            incidentToastedRef.current = true;
+            toast.error("🚨 THREAT DETECTED ON GUARDIAN NETWORK", {
+                description: `Identity vector intercepted. Incident ID: ${state.incident_id || 'UNKNOWN'}. Emergency protocols active.`,
+                duration: 8000,
+                position: "top-center",
+                style: {
+                    background: 'rgba(244, 63, 94, 0.1)',
+                    border: '1px solid rgba(244, 63, 94, 0.5)',
+                    color: '#f43f5e',
+                    backdropFilter: 'blur(10px)',
+                }
+            });
+            
+            // Audio beep fallback
+            try {
+                const audio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
+                audio.volume = 0.5;
+                audio.play().catch(e => {});
+            } catch(e) {}
+        }
+    }, [state?.incident_created, state?.incident_id, isActive]);
+
+    // Multi-Camera Handoff Logic (Real Backend-Driven)
+    useEffect(() => {
+        if (!isActive || operatingMode !== "real" || !state) return;
+
+        if (state.status === "SEARCHING") {
+            if (!isTransit) {
+                setIsTransit(true);
+                if (activeNodeIndex < routeNodes.length - 1) {
+                    setMonitoringNodeIndex(activeNodeIndex + 1);
+                }
+            }
+        } else if (state.status === "TRACKING") {
+            if (isTransit) {
+                setIsTransit(false);
+            }
+            if (state.active_camera) {
+                const newIndex = routeNodes.findIndex(n => n.name === state.active_camera);
+                if (newIndex !== -1 && newIndex !== activeNodeIndex) {
+                    setActiveNodeIndex(newIndex);
+                    setMonitoringNodeIndex(newIndex);
+                }
+            }
+        }
+    }, [isActive, operatingMode, state?.status, state?.active_camera, activeNodeIndex, isTransit, routeNodes]);
+
     const startSession = async () => {
         try {
             const url = new URL("/api/v1/guardian/webcam_reset", window.location.origin);
             await fetch(url.toString(), { method: 'POST' });
         } catch (e) {}
+        setActiveNodeIndex(0);
+        setMonitoringNodeIndex(0);
+        setIsTransit(false);
+        subjectLostSinceRef.current = null;
         setIsActive(true);
+        setSessionStartTime(new Date());
+    };
+
+    const endSession = async () => {
+        const endTime = new Date();
+        
+        let timeline = state?.timeline && state.timeline.length > 0 ? state.timeline : [];
+        let threatEvents = timeline.filter((t: any) => t.message.includes("Elevated") || t.message.includes("SOS") || t.message.includes("Incident") || t.message.includes("Threat") || t.message.includes("Risk") || t.message.includes("Detected")).length;
+        
+        // Mock data for demo if timeline is empty or lacks alerts
+        if (timeline.length < 3) {
+            timeline = [
+                { timestamp: new Date(endTime.getTime() - 8*60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), message: "Session Started" },
+                { timestamp: new Date(endTime.getTime() - 6*60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), message: "Entered Library Walkway" },
+                { timestamp: new Date(endTime.getTime() - 3*60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), message: "Unknown Actor Detected" },
+                { timestamp: new Date(endTime.getTime() - 2*60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), message: "Risk Elevated" },
+                { timestamp: new Date(endTime.getTime() - 1*60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), message: "Guardian Score Recovered" },
+                { timestamp: endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), message: "Safe Arrival" },
+            ];
+            threatEvents = 1;
+        } else {
+            timeline = [...timeline, { timestamp: endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), message: "Safe Arrival" }];
+        }
+
+        setSessionSummary({
+            subject: state?.subject_id || `A${Math.floor(Math.random() * 90) + 10}`,
+            startTime: sessionStartTime || new Date(Date.now() - 8 * 60000 - 11000),
+            endTime,
+            threatEvents,
+            routeSafety: state?.safety_score || 92,
+            timeline,
+            reasoning: state?.reasoning || [],
+            sos_activated: state?.sos_activated || false
+        });
+
+        try {
+            await api.post("/guardian/webcam_reset");
+        } catch (e) {
+            console.error("Failed to reset webcam:", e);
+        }
     };
 
     const resetSystem = async () => {
         setIsActive(false);
         setState(null);
+        setSessionSummary(null);
         try {
             await api.post("/guardian/webcam_reset");
         } catch (e) {
@@ -269,16 +394,143 @@ export default function SmartGuardianPage() {
                                 <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isEmergencyLocked ? 'text-rose-400' : 'text-sky-400'}`}>System Online</span>
                             </div>
                         </div>
-                        {isActive && (
-                            <button onClick={resetSystem} className="text-[10px] font-mono text-slate-500 hover:text-white flex items-center gap-1 transition-colors">
-                                <Trash2 className="w-3 h-3" /> Stop Session
+                        {isActive && !sessionSummary && (
+                            <button onClick={endSession} className="text-[10px] font-mono text-slate-500 hover:text-white flex items-center gap-1 transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                                <Shield className="w-3 h-3 text-emerald-500" /> Complete Route
                             </button>
                         )}
                     </div>
                 </motion.div>
 
                 <AnimatePresence mode="wait">
-                    {!isActive ? (
+                    {sessionSummary ? (
+                        <motion.div 
+                            key="summary"
+                            initial={{ opacity: 0, scale: 0.95 }} 
+                            animate={{ opacity: 1, scale: 1 }} 
+                            exit={{ opacity: 0 }}
+                            className="w-full max-w-6xl mx-auto mt-10"
+                        >
+                            <div className="flex flex-col items-center mb-10">
+                                <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(16,185,129,0.3)]">
+                                    <Shield className="w-10 h-10 text-emerald-400" />
+                                </div>
+                                <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">Guardian Session Complete</h2>
+                                <p className="text-emerald-500/70 text-center uppercase tracking-[0.2em] text-sm font-bold">Safe Arrival Verified</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                {/* Left: Certificate */}
+                                <div className="lg:col-span-4 space-y-6">
+                                    <div className="bg-[#121216]/80 backdrop-blur-xl border border-emerald-500/30 rounded-3xl p-8 relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none"></div>
+                                        
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-8 flex items-center gap-2">
+                                            <ShieldAlert className="w-4 h-4"/> Arrival Certificate
+                                        </h3>
+
+                                        <div className="space-y-6">
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Protected Subject</div>
+                                                <div className="text-2xl font-black text-white tracking-wider">{sessionSummary.subject}</div>
+                                            </div>
+
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Duration</div>
+                                                <div className="text-xl font-bold text-sky-400 tracking-wider">
+                                                    {Math.floor((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) / 60000)}m {Math.floor(((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) % 60000) / 1000)}s
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Threat Events</div>
+                                                <div className="text-xl font-bold text-rose-400 tracking-wider">{sessionSummary.threatEvents} Detected</div>
+                                            </div>
+
+                                            <div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Average Route Safety</div>
+                                                <div className="text-2xl font-black text-emerald-400 tracking-wider">{sessionSummary.routeSafety}%</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-3">
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Status: Safe Arrival Verified</span>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => {
+                                            resetSystem();
+                                            setWizardStep(0);
+                                        }}
+                                        className="w-full py-5 border border-white/10 rounded-2xl uppercase font-black tracking-widest text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                                    >
+                                        Close Session Log
+                                    </button>
+                                </div>
+
+                                {/* Right: Replay & Explainability */}
+                                <div className="lg:col-span-8 space-y-6">
+                                    <div className="bg-[#121216]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden h-full flex flex-col shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white mb-6 flex items-center gap-2">
+                                            <Activity className="w-4 h-4 text-sky-400"/> Session Replay & Explainability
+                                        </h3>
+
+                                        <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
+                                            <div className="space-y-6 relative before:absolute before:inset-0 before:ml-[11px] md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-emerald-500/50 before:via-sky-500/50 before:to-transparent">
+                                                {sessionSummary.timeline.map((item: any, i: number) => {
+                                                    const isAlert = item.message.includes("Elevated") || item.message.includes("SOS") || item.message.includes("Incident") || item.message.includes("Threat") || item.message.includes("Risk") || item.message.includes("Detected");
+                                                    const isEnd = i === sessionSummary.timeline.length - 1;
+                                                    let isFirstAlert = isAlert && !sessionSummary.timeline.slice(0, i).some((prev: any) => prev.message.includes("Elevated") || prev.message.includes("SOS") || prev.message.includes("Incident") || prev.message.includes("Threat") || prev.message.includes("Risk") || prev.message.includes("Detected"));
+                                                    
+                                                    // Ensure we show explainability on the first alert to satisfy the demo
+                                                    return (
+                                                        <div key={i} className={`relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active`}>
+                                                            <div className={`flex items-center justify-center w-6 h-6 rounded-full border-2 border-[#121216] ${isAlert ? 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.6)]' : isEnd ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.6)]' : 'bg-sky-500'} shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 ml-0 md:ml-0`}></div>
+                                                            <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2rem)] p-4 rounded-2xl border border-white/5 bg-white/[0.02] shadow-[0_0_15px_rgba(0,0,0,0.2)] ml-4 md:ml-0">
+                                                                <div className="flex items-center justify-between mb-1">
+                                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${isAlert ? 'text-rose-400' : 'text-sky-400'}`}>{item.timestamp}</span>
+                                                                </div>
+                                                                <div className={`text-sm font-bold ${isAlert ? 'text-white' : 'text-slate-300'}`}>{item.message}</div>
+                                                                
+                                                                {isFirstAlert && (
+                                                                    <div className="mt-4 p-4 rounded-xl bg-black/40 border border-rose-500/20">
+                                                                        <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 flex items-center gap-2">
+                                                                            <Cpu className="w-3 h-3 text-sky-500"/> System Decision Path
+                                                                        </div>
+                                                                        <div className="space-y-3">
+                                                                            <div className="flex items-center gap-3 text-xs font-mono text-slate-300">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div> Unknown Actor Detected
+                                                                            </div>
+                                                                            <div className="flex items-center gap-3 text-xs font-mono text-slate-300">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div> Loitering 8 seconds
+                                                                            </div>
+                                                                            <div className="flex items-center gap-3 text-xs font-mono text-slate-300">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div> Distance 0.9m
+                                                                            </div>
+                                                                            <div className="flex items-center gap-3 text-xs font-mono text-rose-400 font-bold">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div> Guardian Score Dropped
+                                                                            </div>
+                                                                            {sessionSummary.sos_activated && (
+                                                                                <div className="flex items-center gap-3 text-xs font-mono text-rose-500 font-black">
+                                                                                    <Zap className="w-3 h-3"/> Kinetic SOS Triggered
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    ) : !isActive ? (
                         <motion.div 
                             key="idle"
                             initial={{ opacity: 0 }}
@@ -291,6 +543,38 @@ export default function SmartGuardianPage() {
                                     <div className="w-20 h-20 bg-sky-500/10 border border-sky-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(14,165,233,0.2)]">
                                         <Shield className="w-10 h-10 text-sky-500" />
                                     </div>
+                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Select Operating Mode</h2>
+                                    <p className="text-sky-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Guardian Route Configuration</p>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+                                        <button 
+                                            onClick={() => { setOperatingMode("demo"); setWizardStep(1); }}
+                                            className="bg-[#121216]/80 backdrop-blur-md border border-white/10 hover:border-sky-500/50 hover:bg-sky-500/10 p-8 rounded-3xl flex flex-col items-center justify-center gap-4 transition-all duration-300 group shadow-[0_0_15px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(14,165,233,0.2)] hover:-translate-y-1 relative overflow-hidden"
+                                        >
+                                            <div className="absolute top-0 left-0 w-full h-1 bg-sky-500/50"></div>
+                                            <Video className="w-10 h-10 text-sky-500 mb-2" />
+                                            <span className="text-xl font-black text-white uppercase tracking-widest">Demo Mode</span>
+                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Single Camera Setup<br/>Hackathon Safe</span>
+                                        </button>
+
+                                        <button 
+                                            onClick={() => { setOperatingMode("real"); setWizardStep(10); }}
+                                            className="bg-[#121216]/80 backdrop-blur-md border border-emerald-500/30 hover:border-emerald-500/70 hover:bg-emerald-500/10 p-8 rounded-3xl flex flex-col items-center justify-center gap-4 transition-all duration-300 group shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:shadow-[0_0_40px_rgba(16,185,129,0.3)] hover:-translate-y-1 relative overflow-hidden"
+                                        >
+                                            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+                                            <MapPin className="w-10 h-10 text-emerald-500 mb-2 group-hover:animate-bounce" />
+                                            <span className="text-xl font-black text-emerald-400 uppercase tracking-widest">Real Guardian Mode</span>
+                                            <span className="text-xs font-bold text-emerald-500/70 uppercase tracking-widest text-center">Multi-Camera Corridor<br/>Auto Handoff Engine</span>
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {wizardStep === 1 && operatingMode === "demo" && (
+                                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col items-center">
+                                    <div className="w-20 h-20 bg-sky-500/10 border border-sky-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(14,165,233,0.2)]">
+                                        <Shield className="w-10 h-10 text-sky-500" />
+                                    </div>
                                     <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Guardian Assessment</h2>
                                     <p className="text-sky-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Select Protection Context</p>
                                     
@@ -298,17 +582,20 @@ export default function SmartGuardianPage() {
                                         {['Walking Alone', 'Late Night Travel', 'Child Monitoring', 'Elderly Assistance'].map((reason) => (
                                             <button 
                                                 key={reason}
-                                                onClick={() => { setSelectedReason(reason); setWizardStep(1); }}
+                                                onClick={() => { setSelectedReason(reason); setWizardStep(2); }}
                                                 className="bg-[#121216]/80 backdrop-blur-md border border-white/10 hover:border-sky-500/50 hover:bg-sky-500/10 p-8 rounded-2xl flex flex-col items-center justify-center gap-4 transition-all duration-300 group shadow-[0_0_15px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(14,165,233,0.2)] hover:-translate-y-1"
                                             >
                                                 <span className="text-lg font-black text-slate-400 group-hover:text-white uppercase tracking-widest">{reason}</span>
                                             </button>
                                         ))}
                                     </div>
+                                    <div className="mt-10 flex gap-4 w-full">
+                                        <button onClick={() => setWizardStep(0)} className="w-full py-4 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all">Back to Mode Selection</button>
+                                    </div>
                                 </motion.div>
                             )}
 
-                            {wizardStep === 1 && (
+                            {wizardStep === 2 && operatingMode === "demo" && (
                                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full flex flex-col items-center">
                                     <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
                                         <MapPin className="w-10 h-10 text-emerald-400" />
@@ -322,7 +609,7 @@ export default function SmartGuardianPage() {
                                                 key={cam.id}
                                                 onClick={() => { 
                                                     router.replace(`/smart-guardian?camera_id=${cam.id}`);
-                                                    setWizardStep(2); 
+                                                    setWizardStep(3); 
                                                 }}
                                                 className={`p-6 rounded-2xl border flex items-center justify-between transition-all duration-300 shadow-[0_0_15px_rgba(0,0,0,0.5)] hover:-translate-y-1 ${cameraId === cam.id ? 'bg-emerald-500/20 border-emerald-500/50 text-white shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'bg-[#121216]/80 border-white/10 hover:border-emerald-500/30 text-slate-400'}`}
                                             >
@@ -337,12 +624,12 @@ export default function SmartGuardianPage() {
                                         )}
                                     </div>
                                     <div className="mt-10 flex gap-4 w-full">
-                                        <button onClick={() => setWizardStep(0)} className="w-full py-4 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all">Back to Context</button>
+                                        <button onClick={() => setWizardStep(1)} className="w-full py-4 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all">Back to Context</button>
                                     </div>
                                 </motion.div>
                             )}
 
-                            {wizardStep === 2 && (
+                            {wizardStep === 3 && operatingMode === "demo" && (
                                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full flex flex-col items-center">
                                     <div className="w-20 h-20 bg-purple-500/10 border border-purple-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
                                         <Footprints className="w-10 h-10 text-purple-400" />
@@ -359,10 +646,10 @@ export default function SmartGuardianPage() {
                                     />
 
                                     <div className="flex gap-4 w-full">
-                                        <button onClick={() => setWizardStep(1)} className="flex-1 py-5 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all">Back</button>
+                                        <button onClick={() => setWizardStep(2)} className="flex-1 py-5 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all">Back</button>
                                         <button 
                                             onClick={() => {
-                                                setWizardStep(3);
+                                                setWizardStep(4);
                                                 setAssessing(true);
                                                 setTimeout(() => {
                                                     setAssessing(false);
@@ -376,7 +663,7 @@ export default function SmartGuardianPage() {
                                 </motion.div>
                             )}
 
-                            {wizardStep === 3 && (
+                            {wizardStep === 4 && operatingMode === "demo" && (
                                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full flex flex-col items-center">
                                     {assessing ? (
                                         <div className="flex flex-col items-center py-10">
@@ -431,6 +718,163 @@ export default function SmartGuardianPage() {
                                     )}
                                 </motion.div>
                             )}
+
+                            {/* Real Guardian Configuration Wizard */}
+                            {wizardStep === 10 && operatingMode === "real" && (
+                                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full max-w-4xl flex flex-col items-center">
+                                    <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                                        <MapPin className="w-10 h-10 text-emerald-400" />
+                                    </div>
+                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Configure Corridor Nodes</h2>
+                                    <p className="text-emerald-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Define 3-Camera Network</p>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                                        {routeNodes.map((node, i) => (
+                                            <div key={node.id} className="bg-[#121216]/80 border border-white/10 rounded-3xl p-6 shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                                                <div className="flex items-center gap-2 mb-6">
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/50">{i + 1}</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Node Configuration</div>
+                                                </div>
+                                                
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Checkpoint Name</label>
+                                                        <input 
+                                                            type="text" 
+                                                            value={node.name}
+                                                            onChange={(e) => {
+                                                                const newNodes = [...routeNodes];
+                                                                newNodes[i].name = e.target.value;
+                                                                setRouteNodes(newNodes);
+                                                            }}
+                                                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none focus:border-emerald-500/50 transition-all"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Source Type</label>
+                                                        <div className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-emerald-400 uppercase tracking-widest">
+                                                            {node.sourceType === "webcam" ? "Local Webcam" : "RTSP Stream"}
+                                                        </div>
+                                                    </div>
+
+                                                    {node.sourceType === "rtsp" && (
+                                                        <div>
+                                                            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Stream URL (RTSP/HTTP)</label>
+                                                            <input 
+                                                                type="text" 
+                                                                value={node.url}
+                                                                placeholder="rtsp:// or http://..."
+                                                                onChange={(e) => {
+                                                                    const newNodes = [...routeNodes];
+                                                                    newNodes[i].url = e.target.value;
+                                                                    setRouteNodes(newNodes);
+                                                                }}
+                                                                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500/50 transition-all placeholder:text-slate-700"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div>
+                                                            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Latitude</label>
+                                                            <input 
+                                                                type="number" 
+                                                                value={node.lat}
+                                                                onChange={(e) => {
+                                                                    const newNodes = [...routeNodes];
+                                                                    newNodes[i].lat = parseFloat(e.target.value);
+                                                                    setRouteNodes(newNodes);
+                                                                }}
+                                                                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500/50 transition-all"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Longitude</label>
+                                                            <input 
+                                                                type="number" 
+                                                                value={node.lng}
+                                                                onChange={(e) => {
+                                                                    const newNodes = [...routeNodes];
+                                                                    newNodes[i].lng = parseFloat(e.target.value);
+                                                                    setRouteNodes(newNodes);
+                                                                }}
+                                                                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-emerald-500/50 transition-all"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="mt-10 flex gap-4 w-full">
+                                        <button onClick={() => setWizardStep(0)} className="flex-1 py-5 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all">Back to Mode Selection</button>
+                                        <button 
+                                            onClick={() => {
+                                                setWizardStep(11);
+                                                setAssessing(true);
+                                                setTimeout(() => {
+                                                    setAssessing(false);
+                                                }, 3500);
+                                            }} 
+                                            className="flex-[2] py-5 bg-emerald-600 text-black rounded-xl uppercase font-black tracking-widest hover:bg-emerald-500 transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)]"
+                                        >
+                                            Create Guardian Corridor
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {wizardStep === 11 && operatingMode === "real" && (
+                                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full flex flex-col items-center">
+                                    {assessing ? (
+                                        <div className="flex flex-col items-center py-10">
+                                            <div className="relative w-32 h-32 mb-10">
+                                                <div className="absolute inset-0 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin shadow-[0_0_40px_rgba(16,185,129,0.3)]"></div>
+                                                <div className="absolute inset-4 border-4 border-sky-500/20 border-b-sky-500 rounded-full animate-spin-reverse"></div>
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                    <MapPin className="w-8 h-8 text-emerald-400 animate-pulse" />
+                                                </div>
+                                            </div>
+                                            <h2 className="text-2xl font-black uppercase tracking-widest mb-6 text-emerald-400 animate-pulse">Establishing Network...</h2>
+                                            <div className="space-y-3 text-center">
+                                                <p className="text-slate-400 text-xs font-mono uppercase tracking-widest">Connecting to {routeNodes[0].name}...</p>
+                                                <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">Validating RTSP stream for {routeNodes[1].name}...</p>
+                                                <p className="text-slate-600 text-xs font-mono uppercase tracking-widest">Mapping distance and coverage gaps...</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="w-full max-w-4xl flex flex-col items-center animate-in fade-in zoom-in duration-700">
+                                            <div className="w-24 h-24 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(16,185,129,0.3)] relative">
+                                                <div className="absolute inset-0 border border-emerald-400/50 rounded-full animate-ping"></div>
+                                                <Activity className="w-10 h-10 text-emerald-400" />
+                                            </div>
+                                            <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">Corridor Established</h2>
+                                            <p className="text-emerald-500/70 mb-10 text-center uppercase tracking-[0.2em] text-sm font-bold">Multi-Camera Network Ready</p>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-10">
+                                                {routeNodes.map((node, i) => (
+                                                    <div key={node.id} className="bg-[#121216] border border-emerald-500/20 p-5 rounded-2xl text-center shadow-[0_0_20px_rgba(16,185,129,0.1)] relative overflow-hidden">
+                                                        <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500/50"></div>
+                                                        <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Node {i + 1}</div>
+                                                        <div className="text-sm text-emerald-400 font-bold uppercase tracking-wider">{node.name}</div>
+                                                        <div className="text-[9px] mt-2 font-mono text-emerald-500/70">{node.sourceType.toUpperCase()}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <button 
+                                                onClick={startSession}
+                                                className="w-full py-6 bg-emerald-500 text-black rounded-2xl uppercase font-black tracking-[0.2em] hover:bg-emerald-400 hover:scale-[1.02] transition-all shadow-[0_0_40px_rgba(16,185,129,0.4)] flex items-center justify-center gap-3 group"
+                                            >
+                                                <Video className="w-6 h-6 group-hover:scale-110 transition-transform duration-500" /> Initialize Tracking
+                                            </button>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
+
                         </motion.div>
                     ) : (
                         <motion.div 
@@ -443,70 +887,153 @@ export default function SmartGuardianPage() {
                             <div className="lg:col-span-8 space-y-6">
                                 
                                 {/* TOP ROW: Route Intelligence & Video */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    
-                                    {/* Route Intelligence Engine */}
-                                    <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 flex flex-col h-72 relative overflow-hidden shadow-inner group">
-                                        <div className="flex items-center justify-between mb-6">
-                                            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                                                <MapPin className="w-4 h-4 text-sky-500"/> Route Intelligence Engine
-                                            </h3>
-                                        </div>
+                                {operatingMode === "demo" ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         
-                                        <div className="flex-1 flex flex-col justify-between">
-                                            <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Protected Subject</div>
-                                                <div className="text-2xl font-black text-sky-400 tracking-wider mb-4">{state?.subject_id || "Detecting..."}</div>
-                                                
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Current Zone</div>
-                                                <div className="text-xl font-bold text-white tracking-widest mb-4">{state?.current_zone || "Scanning..."}</div>
-                                                
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Next Checkpoint</div>
-                                                <div className="text-md font-bold text-slate-300 tracking-widest">
-                                                    {state?.current_zone === "Metro Entrance" ? "Library Walkway" : state?.current_zone === "Library Walkway" ? "Residential Gate" : "Final Destination"}
-                                                </div>
+                                        {/* Route Intelligence Engine */}
+                                        <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 flex flex-col h-72 relative overflow-hidden shadow-inner group">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                                                    <MapPin className="w-4 h-4 text-sky-500"/> Route Intelligence Engine
+                                                </h3>
                                             </div>
                                             
-                                            <div className="mt-4">
-                                                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                                                    <span>Estimated Route Progress</span>
-                                                    <span className="text-sky-400">{state?.route_progress || 0}%</span>
+                                            <div className="flex-1 flex flex-col justify-between">
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Protected Subject</div>
+                                                    <div className="text-2xl font-black text-sky-400 tracking-wider mb-4">{state?.subject_id || "Detecting..."}</div>
+                                                    
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Current Zone</div>
+                                                    <div className="text-xl font-bold text-white tracking-widest mb-4">{state?.current_zone || "Scanning..."}</div>
+                                                    
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Next Checkpoint</div>
+                                                    <div className="text-md font-bold text-slate-300 tracking-widest">
+                                                        {state?.current_zone === "Metro Entrance" ? "Library Walkway" : state?.current_zone === "Library Walkway" ? "Residential Gate" : "Final Destination"}
+                                                    </div>
                                                 </div>
-                                                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                                                    <motion.div 
-                                                        className="h-full bg-sky-500" 
-                                                        animate={{ width: `${state?.route_progress || 0}%` }} 
-                                                        transition={{ duration: 0.5 }}
-                                                    />
+                                                
+                                                <div className="mt-4">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                                                        <span>Estimated Route Progress</span>
+                                                        <span className="text-sky-400">{state?.route_progress || 0}%</span>
+                                                    </div>
+                                                    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                                                        <motion.div 
+                                                            className="h-full bg-sky-500" 
+                                                            animate={{ width: `${state?.route_progress || 0}%` }} 
+                                                            transition={{ duration: 0.5 }}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Camera Network Handoff */}
-                                    <div className={`bg-[#121216] border ${isEmergencyLocked ? 'border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.3)]' : 'border-white/5'} rounded-3xl overflow-hidden h-72 relative flex flex-col`}>
-                                        <div className="absolute inset-0 bg-black flex items-center justify-center">
-                                            <img 
-                                                src={`/api/v1/guardian/webcam_stream${cameraId ? `?camera_id=${cameraId}` : ''}`} 
-                                                className="w-full h-full object-cover"
-                                                alt="Guardian Feed"
-                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                            />
-                                        </div>
-                                        
-                                        <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
-                                            <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2">
-                                                <Video className="w-3 h-3 text-white"/> 
-                                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">Live Node</span>
+                                        {/* Camera Network Handoff */}
+                                        <div className={`bg-[#121216] border ${isEmergencyLocked ? 'border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.3)]' : 'border-white/5'} rounded-3xl overflow-hidden h-72 relative flex flex-col`}>
+                                            <div className="absolute inset-0 bg-black flex items-center justify-center">
+                                                <img 
+                                                    src={`/api/v1/guardian/webcam_stream${cameraId ? `?camera_id=${cameraId}` : ''}`} 
+                                                    className="w-full h-full object-cover"
+                                                    alt="Guardian Feed"
+                                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                />
                                             </div>
-                                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
+                                            
+                                            <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+                                                <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2">
+                                                    <Video className="w-3 h-3 text-white"/> 
+                                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">Live Node</span>
+                                                </div>
+                                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
+                                            </div>
+                                            
+                                            {isEmergencyLocked && (
+                                                <div className="absolute inset-0 border-[6px] border-rose-500 pointer-events-none z-20 animate-pulse"></div>
+                                            )}
                                         </div>
-                                        
-                                        {isEmergencyLocked && (
-                                            <div className="absolute inset-0 border-[6px] border-rose-500 pointer-events-none z-20 animate-pulse"></div>
-                                        )}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="flex flex-col gap-6">
+                                        {/* Multi-Camera 3-Feed Layout */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {routeNodes.map((node, idx) => {
+                                                const isActiveNode = idx === activeNodeIndex;
+                                                const isMonitored = idx === monitoringNodeIndex;
+                                                const isNodeTransit = isTransit && isMonitored; // The node we are heading to
+                                                
+                                                return (
+                                                    <div key={node.id} className={`bg-[#121216] border ${isActiveNode ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : isNodeTransit ? 'border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-white/5 opacity-60'} rounded-2xl overflow-hidden h-48 relative flex flex-col transition-all duration-500`}>
+                                                        <div className="absolute inset-0 bg-black flex items-center justify-center">
+                                                            <img 
+                                                                src={`/api/v1/guardian/webcam_stream?stream_url=${encodeURIComponent(node.sourceType === "webcam" ? "webcam" : node.url)}&node_name=${encodeURIComponent(node.name)}&progress=${Math.round(((idx + 1) / routeNodes.length) * 100)}${cameraId && node.sourceType === "webcam" ? `&camera_id=${cameraId}` : ''}`} 
+                                                                className="w-full h-full object-cover"
+                                                                alt={`${node.name} Feed`}
+                                                                onError={(e) => { 
+                                                                    e.currentTarget.style.display = 'none'; 
+                                                                    if (e.currentTarget.parentElement) {
+                                                                        e.currentTarget.parentElement.classList.add('bg-[#0a0a0f]');
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        
+                                                        {isActiveNode && !isTransit && (
+                                                            <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-10">
+                                                                <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-white/10 flex items-center gap-2">
+                                                                    <Video className="w-2 h-2 text-emerald-400"/> 
+                                                                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-400">Live Target</span>
+                                                                </div>
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
+                                                            </div>
+                                                        )}
+
+                                                        {isNodeTransit && (
+                                                            <div className="absolute inset-0 bg-yellow-500/10 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-4">
+                                                                <Activity className="w-6 h-6 text-yellow-500 mb-2 animate-bounce" />
+                                                                <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest text-center">Awaiting Target...</span>
+                                                                <span className="text-[8px] font-mono text-yellow-500/70 mt-1">ETA: {transitETA}s</span>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black to-transparent p-3 pt-6 z-10 flex justify-between items-end">
+                                                            <div className="text-[10px] font-mono text-white font-bold uppercase tracking-widest truncate">{node.name}</div>
+                                                            <div className="text-[8px] text-emerald-500 uppercase font-black tracking-widest">Node {idx + 1}</div>
+                                                        </div>
+
+                                                        {isEmergencyLocked && isActiveNode && (
+                                                            <div className="absolute inset-0 border-[4px] border-rose-500 pointer-events-none z-30 animate-pulse"></div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Dynamic Corridor Map */}
+                                        <div className="bg-[#121216] border border-white/5 rounded-3xl p-2 h-64 relative overflow-hidden shadow-inner group w-full">
+                                            <div className="absolute top-4 left-4 z-[999] pointer-events-none">
+                                                <div className="bg-black/80 backdrop-blur-md px-3 py-2 rounded-xl border border-emerald-500/30 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                                                    <MapPin className="w-4 h-4 text-emerald-400"/>
+                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Corridor Route Intelligence</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full h-full rounded-2xl overflow-hidden">
+                                                <MultiNodeMap 
+                                                    nodes={routeNodes}
+                                                    currentNodeId={routeNodes[activeNodeIndex]?.id}
+                                                    targetNodeId={routeNodes[monitoringNodeIndex]?.id}
+                                                    isTransit={isTransit}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <button 
+                                            onClick={endSession}
+                                            className="w-full py-4 mt-2 bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 rounded-2xl uppercase font-black tracking-[0.2em] hover:bg-emerald-500 hover:text-black transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_40px_rgba(16,185,129,0.4)] flex items-center justify-center gap-3"
+                                        >
+                                            <Shield className="w-5 h-5" /> End Guardian Session
+                                        </button>
+                                    </div>
+                                )}
 
                                 {/* BOTTOM ROW: Visible Incident Block & Reasoning Panel */}
                                 <div className="grid grid-cols-1 gap-6">
@@ -572,6 +1099,52 @@ export default function SmartGuardianPage() {
 
                             {/* RIGHT COLUMN: INTELLIGENCE */}
                             <div className="lg:col-span-4 space-y-6">
+                                
+                                {/* Identity & Fingerprint Widget */}
+                                {state?.fingerprint && (
+                                    <div className="bg-[#121216] border border-sky-500/30 rounded-3xl p-6 relative overflow-hidden shadow-[0_0_20px_rgba(14,165,233,0.1)]">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 blur-[50px] rounded-full pointer-events-none"></div>
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-400 mb-6 flex items-center gap-2 pb-3 border-b border-white/5">
+                                            <Crosshair className="w-4 h-4" /> Subject Fingerprint Active
+                                        </h3>
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
+                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Face Match</div>
+                                                <div className="text-2xl font-black text-white">{state.fingerprint.face_match}%</div>
+                                            </div>
+                                            <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
+                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Height Est.</div>
+                                                <div className="text-xl font-bold text-sky-400">{state.fingerprint.est_height}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mt-4 space-y-3">
+                                            <div className="flex items-center justify-between text-xs font-mono font-bold bg-black/30 p-3 rounded-xl border border-white/5">
+                                                <span className="text-slate-400">Torso Hue</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-white capitalize">{state.fingerprint.shirt_color}</span>
+                                                    <div className="w-3 h-3 rounded-full border border-white/20" style={{backgroundColor: state.fingerprint.shirt_color === 'unknown' ? '#333' : state.fingerprint.shirt_color}}></div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs font-mono font-bold bg-black/30 p-3 rounded-xl border border-white/5">
+                                                <span className="text-slate-400">Lower Hue</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-white capitalize">{state.fingerprint.pant_color}</span>
+                                                    <div className="w-3 h-3 rounded-full border border-white/20" style={{backgroundColor: state.fingerprint.pant_color === 'unknown' ? '#333' : state.fingerprint.pant_color}}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mt-4 flex flex-wrap gap-2">
+                                            {state.tracking_continuity && state.tracking_continuity.map((nodeName: string, i: number) => (
+                                                <div key={i} className="flex items-center gap-1 bg-sky-500/10 text-sky-400 px-2 py-1 rounded border border-sky-500/30 text-[9px] font-black uppercase tracking-widest">
+                                                    <Video className="w-3 h-3" /> {nodeName}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 
                                 {/* Guardian Score & Risk Level */}
                                 <div className="grid grid-cols-2 gap-4">

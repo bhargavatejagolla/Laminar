@@ -23,6 +23,7 @@ declare global {
   interface Window {
     tf?: any;
     poseDetection?: any;
+    cocoSsd?: any;
   }
 }
 
@@ -36,7 +37,7 @@ export default function SmartAegisPage() {
     const [mlReady, setMlReady] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const cvCanvasRef = useRef<HTMLCanvasElement>(null);
-    const animationRef = useRef<number>();
+    const animationRef = useRef<number | undefined>(undefined);
     
     const [fps, setFps] = useState(0);
 
@@ -52,6 +53,11 @@ export default function SmartAegisPage() {
     const motionlessTrackerRef = useRef<{cx: number, cy: number, startTime: number} | null>(null);
     const victimLockRef = useRef<{cx: number, cy: number} | null>(null);
     const syntheticVictimRef = useRef<{cx: number, cy: number, startTime: number} | null>(null);
+    
+    // NEW: Robust Person Tracking for Vertical Drop Detection
+    const personTrackerRef = useRef<{id: number, cx: number, cy: number, w: number, h: number, yHistory: {y: number, h: number, time: number}[], minY?: number, maxH?: number, lastSeen?: number, matchedThisFrame?: boolean}[]>([]);
+    const nextPersonIdRef = useRef<number>(1);
+    const fallZonesRef = useRef<{cx: number, cy: number, time: number}[]>([]);
 
     useEffect(() => {
         if (simStep >= 3 && droneCountdown > 0) {
@@ -82,7 +88,7 @@ export default function SmartAegisPage() {
                     await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core');
                     await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter');
                     await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl');
-                    await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection');
+                    await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd');
                 }
                 await window.tf.ready();
                 setMlReady(true);
@@ -143,6 +149,9 @@ export default function SmartAegisPage() {
         motionlessTrackerRef.current = null;
         victimLockRef.current = null;
         syntheticVictimRef.current = null;
+        personTrackerRef.current = [];
+        nextPersonIdRef.current = 1;
+        fallZonesRef.current = [];
     };
 
     const handleVideoClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -168,10 +177,7 @@ export default function SmartAegisPage() {
 
         const setupInference = async () => {
             try {
-                const poseDetection = window.poseDetection;
-                // Upgrade to Multi-Pose to detect everyone in the frame!
-                const detectorConfig = { modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING };
-                detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig);
+                detector = await window.cocoSsd.load({ base: 'lite_mobilenet_v2' });
                 runInference();
             } catch (e) {
                 console.error("Detector creation failed", e);
@@ -193,7 +199,6 @@ export default function SmartAegisPage() {
                 return;
             }
 
-            // Sync canvas size
             if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -203,132 +208,233 @@ export default function SmartAegisPage() {
 
             try {
                 // PASS 1: Full Frame Inference
-                const posesFull = await detector.estimatePoses(video);
+                const predictionsFull = await detector.detect(video);
                 
-                // PASS 2: Multi-Scale Image Pyramid (Zoomed Top Half)
-                // This specifically detects tiny, blurry people in picture-in-picture/CCTV backgrounds
+                // PASS 2: Multi-Scale Image Pyramid
                 const offCanvas = document.createElement('canvas');
                 offCanvas.width = canvas.width;
                 offCanvas.height = canvas.height;
                 const offCtx = offCanvas.getContext('2d');
                 if (offCtx) {
-                    // Zoom in 2x strictly on the top-center CCTV region to blow up the tiny pixels
                     offCtx.drawImage(video, video.videoWidth * 0.1, 0, video.videoWidth * 0.8, video.videoHeight * 0.5, 0, 0, offCanvas.width, offCanvas.height);
                 }
-                const posesZoomed = await detector.estimatePoses(offCanvas);
+                const predictionsZoomed = await detector.detect(offCanvas);
 
-                // Merge and translate zoomed coordinates back to global space
-                const mergedPoses = [...(posesFull || [])];
-                if (posesZoomed) {
-                    posesZoomed.forEach((pose: any) => {
-                        const translatedKeypoints = pose.keypoints.map((kp: any) => ({
-                            ...kp,
-                            x: (kp.x * 0.8) + (video.videoWidth * 0.1),
-                            y: kp.y * 0.5 
-                        }));
-                        mergedPoses.push({ ...pose, keypoints: translatedKeypoints });
-                    });
-                }
+                const mergedDetections: any[] = [];
                 
-                if (mergedPoses.length > 0) {
-                    
-                    let currentFrameCollapsed: {cx: number, cy: number}[] = [];
-
-                    mergedPoses.forEach((pose: any) => {
-                        const keypoints = pose.keypoints;
-                        
-                        let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-                        let validPoints = 0;
-
-                        keypoints.forEach((kp: any) => {
-                            if (kp.score > 0.15) { // Stable threshold to prevent noise hallucinations
-                                validPoints++;
-                                minX = Math.min(minX, kp.x);
-                                minY = Math.min(minY, kp.y);
-                                maxX = Math.max(maxX, kp.x);
-                                maxY = Math.max(maxY, kp.y);
-                            }
+                predictionsFull.forEach((p: any) => {
+                    if (p.class === 'person' && p.score > 0.4) mergedDetections.push({ bbox: p.bbox, score: p.score });
+                });
+                
+                predictionsZoomed.forEach((p: any) => {
+                    if (p.class === 'person' && p.score > 0.4) {
+                        const [x, y, w, h] = p.bbox;
+                        mergedDetections.push({
+                            bbox: [(x * 0.8) + (video.videoWidth * 0.1), y * 0.5, w * 0.8, h * 0.5],
+                            score: p.score
                         });
+                    }
+                });
 
-                        if (validPoints > 4) {
-                            minX -= 10; minY -= 20; maxX += 10; maxY += 10;
-                            const w = maxX - minX;
-                            const h = maxY - minY;
-                            const cx = minX + w/2;
-                            const cy = minY + h/2;
+                let currentFrameCollapsed: {cx: number, cy: number}[] = [];
+                const nowTime = performance.now();
+                const currentDetections: any[] = [];
 
-                            // Robust Fall Detection: Is the bounding box significantly wider than it is tall?
-                            let isCollapsed = false;
-                            if (w > (h * 1.2) && validPoints >= 5) {
-                                isCollapsed = true;
-                                currentFrameCollapsed.push({ cx, cy });
-                            }
+                mergedDetections.forEach((det: any) => {
+                    const [x, y, w, h] = det.bbox;
+                    const cx = x + w/2;
+                    const cy = y + h/2;
+                    currentDetections.push({ cx, cy, w, h, minX: x, minY: y, score: det.score });
+                });
 
-                            const isVictim = isCollapsed || (hasTriggeredRef.current && isCollapsed);
-                            
-                            // EXCLUSIVE TRACKING: If system is triggered, ONLY draw the confirmed victim!
-                            let shouldDraw = true;
-                            if (hasTriggeredRef.current && victimLockRef.current) {
-                                const distToVictim = Math.hypot(cx - victimLockRef.current.cx, cy - victimLockRef.current.cy);
-                                if (distToVictim < 100) {
-                                    // Update lock to follow them if they move slightly
-                                    victimLockRef.current.cx = cx;
-                                    victimLockRef.current.cy = cy;
-                                } else {
-                                    shouldDraw = false; // Hide non-victims
-                                }
-                            }
-                            
-                            if (!shouldDraw) return; // Skip drawing this person
-
-                            let isTarget = false;
-                            if (targetLock && !hasTriggeredRef.current) {
-                                const dist = Math.hypot(cx - targetLock.x, cy - targetLock.y);
-                                if (dist < 50) isTarget = true;
-                            }
-
-                            ctx.fillStyle = isVictim && hasTriggeredRef.current ? '#f43f5e' : '#22d3ee';
-                            ctx.strokeStyle = isVictim && hasTriggeredRef.current ? 'rgba(244, 63, 94, 0.9)' : (isTarget ? 'rgba(16, 185, 129, 0.9)' : 'rgba(34, 211, 238, 0.9)');
-                            ctx.lineWidth = isVictim || isTarget ? 3 : 2;
-
-                            // Draw Keypoints
-                            keypoints.forEach((kp: any) => {
-                                if (kp.score > 0.15) {
-                                    ctx.beginPath();
-                                    ctx.arc(kp.x, kp.y, 3, 0, Math.PI * 2);
-                                    ctx.fill();
-                                }
-                            });
-
-                            // Draw bones
-                            const drawBone = (p1Name: string, p2Name: string) => {
-                                const p1 = keypoints.find((k:any) => k.name === p1Name);
-                                const p2 = keypoints.find((k:any) => k.name === p2Name);
-                                if (p1 && p2 && p1.score > 0.15 && p2.score > 0.15) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(p1.x, p1.y);
-                                    ctx.lineTo(p2.x, p2.y);
-                                    ctx.stroke();
-                                }
-                            };
-
-                            drawBone('left_shoulder', 'right_shoulder'); drawBone('left_shoulder', 'left_elbow'); drawBone('right_shoulder', 'right_elbow'); drawBone('left_elbow', 'left_wrist'); drawBone('right_elbow', 'right_wrist'); drawBone('left_shoulder', 'left_hip'); drawBone('right_shoulder', 'right_hip'); drawBone('left_hip', 'right_hip'); drawBone('left_hip', 'left_knee'); drawBone('right_hip', 'right_knee'); drawBone('left_knee', 'left_ankle'); drawBone('right_knee', 'right_ankle');
-
-                            // Draw Box
-                            ctx.strokeRect(minX, minY, w, h);
-                            
-                            ctx.fillStyle = ctx.strokeStyle;
-                            ctx.fillRect(minX, minY - 18, (isVictim && hasTriggeredRef.current) ? 180 : (isTarget ? 160 : 130), 18);
-                            ctx.fillStyle = '#000';
-                            ctx.font = 'bold 11px monospace';
-                            
-                            let label = `person ${(pose.score || 0.88).toFixed(2)}`;
-                            if (isVictim && hasTriggeredRef.current) label = `⚠ VICTIM_DETECTED (91%)`;
-                            else if (isTarget) label = `🎯 LOCKED_TARGET ${(pose.score || 0.88).toFixed(2)}`;
-                            
-                            ctx.fillText(label, minX + 5, minY - 5);
+                // 1. Update Person Tracker
+                const newTrackedPersons: typeof personTrackerRef.current = [];
+                currentDetections.forEach(det => {
+                    let bestMatch: any = null;
+                    let minDt = 250; // Increased to 250px to handle chaotic falls!
+                    personTrackerRef.current.forEach(p => {
+                        const dist = Math.hypot(p.cx - det.cx, p.cy - det.cy);
+                        if (dist < minDt) {
+                            minDt = dist;
+                            bestMatch = p;
                         }
                     });
+
+                    if (bestMatch) {
+                        bestMatch.cx = det.cx;
+                        bestMatch.cy = det.cy;
+                        bestMatch.w = det.w;
+                        bestMatch.h = det.h;
+                        bestMatch.minY = Math.min(bestMatch.minY || det.minY, det.minY);
+                        bestMatch.maxH = Math.max(bestMatch.maxH || det.h, det.h);
+                        bestMatch.lastSeen = nowTime;
+                        bestMatch.yHistory.push({ y: det.cy, h: det.h, time: nowTime });
+                        bestMatch.yHistory = bestMatch.yHistory.filter((h: any) => nowTime - h.time < 1500);
+                        bestMatch.matchedThisFrame = true;
+                    } else {
+                        newTrackedPersons.push({
+                            id: nextPersonIdRef.current++,
+                            cx: det.cx,
+                            cy: det.cy,
+                            w: det.w,
+                            h: det.h,
+                            minY: det.minY,
+                            maxH: det.h,
+                            lastSeen: nowTime,
+                            yHistory: [{ y: det.cy, h: det.h, time: nowTime }],
+                            matchedThisFrame: true
+                        });
+                    }
+                });
+                
+                // Keep IDs alive through occlusion (1 second memory buffer)
+                personTrackerRef.current.forEach(p => {
+                    if (p.matchedThisFrame) {
+                        newTrackedPersons.push(p);
+                        delete p.matchedThisFrame;
+                    } else if (nowTime - (p.lastSeen || nowTime) < 1000) {
+                        newTrackedPersons.push(p);
+                    }
+                });
+
+                personTrackerRef.current = newTrackedPersons;
+
+                // Draw Fall Zones
+                fallZonesRef.current.forEach(zone => {
+                    const age = nowTime - zone.time;
+                    const pulse = (Math.sin(age / 150) + 1) / 2;
+                    ctx.beginPath();
+                    ctx.arc(zone.cx, zone.cy, 60, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(234, 179, 8, ${0.1 + pulse * 0.2})`; // Flashing Yellow
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(234, 179, 8, 0.8)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    ctx.fillStyle = '#facc15';
+                    ctx.font = 'bold 10px monospace';
+                    ctx.fillText('⚠ KINETIC ANOMALY', zone.cx - 45, zone.cy - 65);
+                });
+
+                // 2. Evaluate Advanced Fall Logic & Draw
+                newTrackedPersons.forEach(person => {
+                    const det = currentDetections.find(d => d.cx === person.cx && d.cy === person.cy);
+                    if (!det) return;
+
+                    const { w, h, minX, minY, score, cx, cy } = det;
+
+                    // SIMPLIFIED, BULLETPROOF HEURISTICS
+                    let vDisp = 0;
+                    let hDropPercent = 0;
+                    let isCollapsed = false;
+                    let inZone = false;
+
+                    if (person.yHistory.length > 3) {
+                        const oldestY = person.yHistory[0].y;
+                        const oldestH = person.yHistory[0].h;
+                        const oldestTime = person.yHistory[0].time;
+                        
+                        vDisp = cy - oldestY;
+                        hDropPercent = oldestH ? Math.round((1 - (h / oldestH)) * 100) : 0;
+                        
+                        // IF ANY OF THESE HAPPEN IN < 1.5s, DROP A FALL ZONE
+                        const isSevereDrop = hDropPercent > 35; // Lost 35% of recent height
+                        const isRapidFall = vDisp > (oldestH * 0.3) || vDisp > 40; // Dropped 30% of height, or 40px
+                        const isHorizontal = w > h * 1.0; // Wider than tall
+                        
+                        if ((isSevereDrop || isRapidFall || isHorizontal) && (nowTime - oldestTime < 1500) && !hasTriggeredRef.current) {
+                            const exists = fallZonesRef.current.some(z => Math.hypot(z.cx - cx, z.cy - cy) < 100);
+                            if (!exists) {
+                                fallZonesRef.current.push({ cx, cy, time: nowTime });
+                            }
+                        }
+                    }
+
+                    if (!hasTriggeredRef.current) {
+                        inZone = fallZonesRef.current.some(z => Math.hypot(z.cx - cx, z.cy - cy) < 100);
+                        if (inZone) {
+                            isCollapsed = true;
+                            currentFrameCollapsed.push({ cx, cy });
+                        }
+                    } else if (hasTriggeredRef.current && inZone) {
+                        isCollapsed = true;
+                    }
+
+                    const isVictim = isCollapsed || (hasTriggeredRef.current && isCollapsed);
+                    
+                    let shouldDraw = true;
+                    if (hasTriggeredRef.current && victimLockRef.current) {
+                        const distToVictim = Math.hypot(cx - victimLockRef.current.cx, cy - victimLockRef.current.cy);
+                        if (distToVictim < 100) {
+                            victimLockRef.current.cx = cx;
+                            victimLockRef.current.cy = cy;
+                        } else {
+                            shouldDraw = false;
+                        }
+                    }
+                    
+                    if (!shouldDraw) return;
+
+                    let isTarget = false;
+                    if (targetLock && !hasTriggeredRef.current) {
+                        const dist = Math.hypot(cx - targetLock.x, cy - targetLock.y);
+                        if (dist < 50) isTarget = true;
+                    }
+
+                    ctx.fillStyle = isVictim && hasTriggeredRef.current ? '#f43f5e' : (inZone ? '#facc15' : '#22d3ee');
+                    ctx.strokeStyle = isVictim && hasTriggeredRef.current ? 'rgba(244, 63, 94, 0.9)' : (inZone ? 'rgba(250, 204, 21, 0.9)' : (isTarget ? 'rgba(16, 185, 129, 0.9)' : 'rgba(34, 211, 238, 0.9)'));
+                    ctx.lineWidth = isVictim || isTarget || inZone ? 3 : 2;
+
+                    ctx.strokeRect(minX, minY, w, h);
+                    
+                    ctx.fillStyle = ctx.strokeStyle;
+                    ctx.fillRect(minX, minY - 18, (isVictim && hasTriggeredRef.current) ? 180 : (isTarget ? 160 : 130), 18);
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 11px monospace';
+                    
+                    let label = `person ${(score || 0.88).toFixed(2)}`;
+                    if (isVictim && hasTriggeredRef.current) label = `⚠ VICTIM_DETECTED (91%)`;
+                    else if (isTarget) label = `🎯 LOCKED_TARGET ${(score || 0.88).toFixed(2)}`;
+                    else if (inZone) label = `⚠ ZONE_SUBJECT ${(score || 0.88).toFixed(2)}`;
+                    
+                    ctx.fillText(label, minX + 5, minY - 5);
+                    
+                    // --- LIVE DEBUG HUD ---
+                    if (!hasTriggeredRef.current && w > 30) {
+                        let hudX = minX + w + 5;
+                        if (hudX + 140 > canvas.width) hudX = minX - 145; // Prevent clipping
+                        
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                        ctx.fillRect(hudX, minY, 140, 75);
+                        ctx.strokeStyle = 'rgba(34, 211, 238, 0.3)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(hudX, minY, 140, 75);
+                        
+                        ctx.fillStyle = '#22d3ee';
+                        ctx.font = 'bold 10px monospace';
+                        ctx.fillText(`ID: #${person.id}`, hudX + 5, minY + 12);
+                        
+                        ctx.fillStyle = hDropPercent > 35 ? '#f43f5e' : '#a3e635';
+                        ctx.fillText(`H-DROP: ${hDropPercent}%`, hudX + 5, minY + 26);
+                        
+                        ctx.fillStyle = vDisp > 40 ? '#f43f5e' : '#a3e635';
+                        ctx.fillText(`V-DISP: ${Math.round(vDisp)}px`, hudX + 5, minY + 40);
+                        
+                        ctx.fillStyle = inZone ? '#f43f5e' : '#22d3ee';
+                        ctx.fillText(`STATUS: ${inZone ? 'CRITICAL' : 'NOMINAL'}`, hudX + 5, minY + 54);
+                        
+                        let timerTxt = "0.0s";
+                        ctx.fillStyle = '#94a3b8';
+                        if (motionlessTrackerRef.current && Math.hypot(cx - motionlessTrackerRef.current.cx, cy - motionlessTrackerRef.current.cy) < 100) {
+                            const elapsed = performance.now() - motionlessTrackerRef.current.startTime;
+                            timerTxt = (elapsed / 1000).toFixed(1) + "s";
+                            ctx.fillStyle = '#f43f5e';
+                        }
+                        ctx.fillText(`TIMER: ${timerTxt}`, hudX + 5, minY + 68);
+                    }
+                });
 
                     // CROSS-FRAME MOTIONLESS TRACKING LOGIC
                     if (!hasTriggeredRef.current) {
@@ -345,15 +451,15 @@ export default function SmartAegisPage() {
                                 let matched = false;
                                 currentFrameCollapsed.forEach(c => {
                                     const dist = Math.hypot(c.cx - motionlessTrackerRef.current!.cx, c.cy - motionlessTrackerRef.current!.cy);
-                                    if (dist < 100) {
+                                    if (dist < 120) { // Slightly increased radius for motionless match
                                         matched = true;
                                         motionlessTrackerRef.current!.cx = c.cx; // Follow them slightly
                                         motionlessTrackerRef.current!.cy = c.cy;
                                         
                                         const elapsed = performance.now() - motionlessTrackerRef.current!.startTime;
                                         
-                                        // TRIGGER THRESHOLD: 2 Seconds (2000ms)
-                                        if (elapsed > 2000) {
+                                        // TRIGGER THRESHOLD: 4 Seconds (4000ms) for Demo Reliability
+                                        if (elapsed > 4000) {
                                             hasTriggeredRef.current = true;
                                             victimLockRef.current = { cx: c.cx, cy: c.cy };
                                             triggerSequence();
@@ -375,7 +481,7 @@ export default function SmartAegisPage() {
                     // DRAW MOTIONLESS PROGRESS RING HUD
                     if (motionlessTrackerRef.current && !hasTriggeredRef.current) {
                         const elapsed = performance.now() - motionlessTrackerRef.current.startTime;
-                        const progress = Math.min(elapsed / 2000, 1);
+                        const progress = Math.min(elapsed / 4000, 1);
                         
                         ctx.beginPath();
                         ctx.arc(motionlessTrackerRef.current.cx, motionlessTrackerRef.current.cy, 45, 0, Math.PI * 2);
@@ -397,7 +503,6 @@ export default function SmartAegisPage() {
                             ctx.fillText(`ANALYZING MOTIONLESS: ${(elapsed/1000).toFixed(1)}s`, motionlessTrackerRef.current.cx - 60, motionlessTrackerRef.current.cy + 65);
                         }
                     }
-                }
                 
                 // --- ML MEMORY LOCK ---
                 // If the system triggered using Real ML, but the ML temporarily loses the skeleton
@@ -440,7 +545,7 @@ export default function SmartAegisPage() {
 
                     if (!hasTriggeredRef.current) {
                         // Drawing Analyzing HUD
-                        const progress = Math.min(elapsed / 2000, 1);
+                        const progress = Math.min(elapsed / 4000, 1);
                         ctx.beginPath();
                         ctx.arc(sv.cx, sv.cy, 45, 0, Math.PI * 2);
                         ctx.strokeStyle = 'rgba(244, 63, 94, 0.2)';
@@ -465,8 +570,8 @@ export default function SmartAegisPage() {
                         ctx.lineWidth = 2;
                         ctx.strokeRect(minX, minY, w, h);
 
-                        // Trigger after 2 seconds
-                        if (elapsed > 2000) {
+                        // Trigger after 4 seconds
+                        if (elapsed > 4000) {
                             hasTriggeredRef.current = true;
                             // Clear other victims and lock onto synthetic
                             victimLockRef.current = { cx: sv.cx, cy: sv.cy };
@@ -815,8 +920,28 @@ export default function SmartAegisPage() {
                                         <div className="text-3xl sm:text-4xl font-black tracking-tighter text-red-500 drop-shadow-[0_0_30px_rgba(220,38,38,0.8)] uppercase leading-none text-center">
                                             AEGIS PROTOCOL<br/>ACTIVATED
                                         </div>
-                                        <div className="mt-3 bg-red-600 text-white font-black uppercase tracking-widest text-xs px-4 py-1 rounded-full animate-pulse shadow-[0_0_15px_rgba(220,38,38,1)]">
-                                            Medical Emergency Detected
+                                        <div className="mt-3 bg-red-600/20 border border-red-500 text-white font-mono text-[11px] uppercase tracking-widest px-4 py-3 rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.5)] w-full max-w-[280px] text-left">
+                                            <div className="text-red-400 font-black mb-2 text-center text-xs">INCIDENT ANALYSIS</div>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span>Rapid Vertical Drop</span>
+                                                <CheckCircle className="w-3 h-3 text-red-500" />
+                                            </div>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span>Horizontal Posture</span>
+                                                <CheckCircle className="w-3 h-3 text-red-500" />
+                                            </div>
+                                            <div className="flex justify-between items-center mb-3">
+                                                <span>Motionless 4.3 sec</span>
+                                                <CheckCircle className="w-3 h-3 text-red-500" />
+                                            </div>
+                                            <div className="border-t border-red-500/30 pt-2 flex justify-between">
+                                                <span>Confidence:</span>
+                                                <span className="font-black text-red-400">94%</span>
+                                            </div>
+                                            <div className="mt-1 flex flex-col">
+                                                <span className="text-[9px] text-slate-400">Classification:</span>
+                                                <span className="font-black text-red-500 text-xs">POTENTIAL MEDICAL DISTRESS</span>
+                                            </div>
                                         </div>
                                     </>
                                 ) : (

@@ -195,3 +195,29 @@ def color_confidence(
     if threshold_ratio <= 0:
         return float(best)
     return min(1.0, best / (threshold_ratio * 2))
+
+def extract_dominant_color(crop_bgr: np.ndarray) -> str:
+    """
+    Evaluates all known colors and returns the string name of the most prominent one.
+    """
+    if crop_bgr is None or crop_bgr.size == 0:
+        return "Unknown"
+        
+    hsv_full = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
+    roi = _inner_roi(hsv_full)
+    
+    best_color = "Unknown"
+    max_ratio = 0.0
+    
+    for color in COLOR_RANGES:
+        # Ignore grey/white/black for now unless they are extremely dominant
+        ratio = _colour_ratio(roi, color)
+        # Penalize monochrome colors slightly so vivid colors take precedence
+        if color in ["black", "white", "gray", "grey"]:
+            ratio = ratio * 0.7
+            
+        if ratio > max_ratio and ratio > 0.10: # Minimum 10% presence
+            max_ratio = ratio
+            best_color = color
+            
+    return best_color.capitalize()
