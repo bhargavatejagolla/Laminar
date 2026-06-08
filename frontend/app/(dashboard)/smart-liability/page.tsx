@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import { useTranslation } from "react-i18next";
+import {
     Activity, 
     ArrowLeft, 
     AlertTriangle,
@@ -34,6 +35,8 @@ const WaveBackground = () => (
 );
 
 export default function SmartLiabilityPage() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     const [activeTab, setActiveTab] = useState<"dashboard" | "tactical" | "liability">("dashboard");
@@ -79,21 +82,21 @@ export default function SmartLiabilityPage() {
                             <div className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all shadow-[0_0_15px_rgba(0,0,0,0.3)]">
                                 <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors group-hover:-translate-x-0.5" />
                             </div>
-                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">Back to<br/>Command</span>
+                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">{t("auto.Backto_7489") || "Back to"}<br/>{t("auto.Command_9711") || "Command"}</span>
                         </button>
 
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <ShieldCheck className="w-5 h-5 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
                                 <span className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-500">
-                                    Tactical Node Override
+                                    {t("auto.TacticalNodeOve_8323") || "Tactical Node Override"}
                                 </span>
                             </div>
                             <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.1)] mb-2">
-                                Laminar Liability <span className="text-amber-500">Intelligence</span>
+                                {t("auto.LaminarLiabilit_3283") || "Laminar Liability"} <span className="text-amber-500">{t("auto.Intelligence_328") || "Intelligence"}</span>
                             </h1>
                             <p className="text-xs md:text-sm font-bold text-slate-400 tracking-widest uppercase flex items-center gap-2">
-                                Real-Time Smart Liability Guidance & Tactical Routing Engine V2.1
+                                {t("auto.RealTimeSmartLi_2179") || "Real-Time Smart Liability Guidance & Tactical Routing Engine V2.1"}
                             </p>
                         </div>
                     </div>
@@ -101,7 +104,7 @@ export default function SmartLiabilityPage() {
                     <div className="flex items-center gap-3">
                         <div className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
                             <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shadow-[0_0_8px_rgba(245,158,11,1)]"></span>
-                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em]">System Online</span>
+                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em]">{t("auto.SystemOnline_4221") || "System Online"}</span>
                         </div>
                     </div>
                 </motion.div>
@@ -150,7 +153,7 @@ export default function SmartLiabilityPage() {
                                         <AlertTriangle className="w-16 h-16 text-slate-500" strokeWidth={1.5} />
                                     </motion.div>
                                     
-                                    <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">No Liability Nodes Detected</h2>
+                                    <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">{t("auto.NoLiabilityNode_8452") || "No Liability Nodes Detected"}</h2>
                                     <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-md text-center leading-relaxed">
                                         Deploy edge infrastructure into venues tagged as "Liability" to enable local intelligence protocols.
                                     </p>
@@ -160,23 +163,23 @@ export default function SmartLiabilityPage() {
                                 <div className="lg:col-span-2 bg-[#121216] border border-white/5 rounded-3xl p-8 relative shadow-inner">
                                     <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-6">
                                         <div>
-                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2 mb-1"><Database className="w-3 h-3"/> Digital Black Box Record</div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2 mb-1"><Database className="w-3 h-3"/> {t("auto.DigitalBlackBox_3806") || "Digital Black Box Record"}</div>
                                             <h2 className="text-2xl font-black uppercase tracking-widest text-white drop-shadow-md">Incident #{incident.id.substring(0, 12)}...</h2>
                                             <p className="text-xs text-rose-400 font-mono font-bold mt-1">{incident.type || 'Distress Event'}</p>
                                         </div>
                                         <div className="px-4 py-2 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(244,63,94,0.15)]">
-                                            <ShieldAlert className="w-4 h-4" /> Forensics Locked
+                                            <ShieldAlert className="w-4 h-4" /> {t("auto.ForensicsLocked_7873") || "Forensics Locked"}
                                         </div>
                                     </div>
                                     
                                     {incident.annotated_frame && (
                                         <div className="mb-6 rounded-xl overflow-hidden border border-white/10 shadow-lg relative">
                                             <img src={`data:image/jpeg;base64,${incident.annotated_frame}`} alt="Evidence" className="w-full h-auto object-cover max-h-64" />
-                                            <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded">Visual Evidence Captured</div>
+                                            <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded">{t("auto.VisualEvidenceC_6287") || "Visual Evidence Captured"}</div>
                                         </div>
                                     )}
 
-                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-6">Incident Reconstruction Timeline</h3>
+                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-6">{t("auto.IncidentReconst_9015") || "Incident Reconstruction Timeline"}</h3>
                                     
                                     <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
                                         {[
@@ -224,8 +227,8 @@ export default function SmartLiabilityPage() {
                                         <div className="w-16 h-16 rounded-2xl bg-amber-500 text-black flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(245,158,11,0.6)] group-hover:scale-105 transition-transform">
                                             <FileText className="w-8 h-8" />
                                         </div>
-                                        <h3 className="text-lg font-black uppercase tracking-widest text-amber-500 drop-shadow-md">Generate Evidence Package</h3>
-                                        <p className="text-[10px] font-mono text-amber-500/70 mt-2">One-Click PDF Dossier Creation</p>
+                                        <h3 className="text-lg font-black uppercase tracking-widest text-amber-500 drop-shadow-md">{t("auto.GenerateEvidenc_1966") || "Generate Evidence Package"}</h3>
+                                        <p className="text-[10px] font-mono text-amber-500/70 mt-2">{t("auto.OneClickPDFDoss_1105") || "One-Click PDF Dossier Creation"}</p>
                                     </div>
                                 </div>
 
@@ -235,7 +238,7 @@ export default function SmartLiabilityPage() {
                                         <div className="p-2 bg-fuchsia-500/10 rounded-xl border border-fuchsia-500/30">
                                             <Cpu className="w-5 h-5 text-fuchsia-400" />
                                         </div>
-                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-fuchsia-400">Randy Investigation Summary</h3>
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-fuchsia-400">{t("auto.RandyInvestigat_8024") || "Randy Investigation Summary"}</h3>
                                     </div>
                                     
                                     <div className="space-y-4 text-xs font-mono text-slate-300 leading-relaxed border-l-2 border-fuchsia-500/30 pl-4">
@@ -245,12 +248,12 @@ export default function SmartLiabilityPage() {
                                                 <div><span className="text-amber-400">!</span> {incident.description}</div>
                                                 {incident.explanation && <div><span className="text-sky-400">ℹ</span> {incident.explanation}</div>}
                                                 <div><span className="text-emerald-400">✓</span> Priority status locked at {incident.priority}.</div>
-                                                <div><span className="text-emerald-400">✓</span> Automatic response and notification dispatched.</div>
+                                                <div><span className="text-emerald-400">✓</span> {t("auto.Automaticrespon_5098") || "Automatic response and notification dispatched."}</div>
                                             </>
                                         ) : (
                                             <>
-                                                <div><span className="text-emerald-400">✓</span> Awaiting incident generation.</div>
-                                                <div><span className="text-sky-400">ℹ</span> System standing by for real-time telemetry.</div>
+                                                <div><span className="text-emerald-400">✓</span> {t("auto.Awaitinginciden_969") || "Awaiting incident generation."}</div>
+                                                <div><span className="text-sky-400">ℹ</span> {t("auto.Systemstandingb_3097") || "System standing by for real-time telemetry."}</div>
                                             </>
                                         )}
                                     </div>
@@ -258,27 +261,27 @@ export default function SmartLiabilityPage() {
 
                                 {/* Cross-System Evidence Sources */}
                                 <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2"><Database className="w-4 h-4"/> Evidence Sources</h3>
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2"><Database className="w-4 h-4"/> {t("auto.EvidenceSources_8311") || "Evidence Sources"}</h3>
                                     
                                     <div className="space-y-3 font-mono text-xs font-bold text-slate-300">
                                         <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Guardian Route</div>
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.GuardianRoute_7795") || "Guardian Route"}</div>
                                             <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
                                         </div>
                                         <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Kinetic SOS</div>
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.KineticSOS_2917") || "Kinetic SOS"}</div>
                                             <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
                                         </div>
                                         <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Camera Network</div>
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.CameraNetwork_2914") || "Camera Network"}</div>
                                             <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
                                         </div>
                                         <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> Notification Engine</div>
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.NotificationEng_7266") || "Notification Engine"}</div>
                                             <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
                                         </div>
                                         <div className={`flex items-center justify-between p-2 rounded-lg border ${incident ? 'bg-fuchsia-500/10 border-fuchsia-500/20' : 'bg-white/5 border-white/5'}`}>
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-fuchsia-500' : 'text-slate-600'}`} /> Randy AI Analysis</div>
+                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-fuchsia-500' : 'text-slate-600'}`} /> {t("auto.RandyAIAnalysis_851") || "Randy AI Analysis"}</div>
                                             <span className={`text-[9px] uppercase tracking-widest ${incident ? 'text-fuchsia-500' : 'text-slate-500'}`}>{incident ? 'Sealed' : 'Pending'}</span>
                                         </div>
                                     </div>
@@ -297,7 +300,7 @@ export default function SmartLiabilityPage() {
                             className="space-y-12"
                         >
                             <div className="max-w-4xl">
-                                <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 text-white">AI-Powered Emergency Infrastructure Control</h2>
+                                <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 text-white">{t("auto.AIPoweredEmerge_1663") || "AI-Powered Emergency Infrastructure Control"}</h2>
                                 <p className="text-lg text-slate-400 font-medium leading-relaxed mb-8">
                                     During emergencies, manual coordination wastes valuable time. Tactical Node Override is LAMINAR's autonomous infrastructure coordination layer. When a critical incident is detected, LAMINAR temporarily overrides normal operational priorities and automatically allocates resources toward the affected area.
                                 </p>
@@ -310,13 +313,13 @@ export default function SmartLiabilityPage() {
                                     color="amber"
                                     content={
                                         <ul className="space-y-2 text-sm text-slate-300 font-mono">
-                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Kinetic SOS & Crowd Intelligence</li>
-                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> AMBER Protocol & Guardian Route</li>
-                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> AI Video Search</li>
+                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {t("auto.KineticSOSCrowd_6166") || "Kinetic SOS & Crowd Intelligence"}</li>
+                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {t("auto.AMBERProtocolGu_5883") || "AMBER Protocol & Guardian Route"}</li>
+                                            <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {t("auto.AIVideoSearch_767") || "AI Video Search"}</li>
                                             <li className="mt-4 p-3 bg-black/50 border border-white/5 rounded-lg text-rose-400 font-bold">
-                                                Crowd Crush Detected<br/>
-                                                Risk Level: CRITICAL<br/>
-                                                Location: Gate B
+                                                {t("auto.CrowdCrushDetec_3765") || "Crowd Crush Detected"}<br/>
+                                                {t("auto.RiskLevelCRITIC_3301") || "Risk Level: CRITICAL"}<br/>
+                                                {t("auto.LocationGateB_2723") || "Location: Gate B"}
                                             </li>
                                         </ul>
                                     }
@@ -328,7 +331,7 @@ export default function SmartLiabilityPage() {
                                     color="blue"
                                     content={
                                         <p className="text-sm text-slate-300 leading-relaxed">
-                                            LAMINAR automatically identifies nearby operational assets in real-time, including: Cameras, Security Teams, Emergency Personnel, Smart Gates, Traffic Signals, Public Displays, and PA Systems.
+                                            {t("auto.LAMINARautomati_6941") || "LAMINAR automatically identifies nearby operational assets in real-time, including: Cameras, Security Teams, Emergency Personnel, Smart Gates, Traffic Signals, Public Displays, and PA Systems."}
                                         </p>
                                     }
                                 />
@@ -339,10 +342,10 @@ export default function SmartLiabilityPage() {
                                     color="rose"
                                     content={
                                         <div className="space-y-4">
-                                            <p className="text-sm text-slate-300 leading-relaxed">The system temporarily prioritizes the affected zone.</p>
+                                            <p className="text-sm text-slate-300 leading-relaxed">{t("auto.Thesystemtempor_3035") || "The system temporarily prioritizes the affected zone."}</p>
                                             <div className="bg-black/50 border border-white/5 p-3 rounded-lg font-mono text-xs space-y-2">
                                                 <div className="flex justify-between items-center opacity-50">
-                                                    <span>Multiple Nodes</span> <span>→ General Monitoring</span>
+                                                    <span>{t("auto.MultipleNodes_1658") || "Multiple Nodes"}</span> <span>→ General Monitoring</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-rose-400 font-bold border-t border-white/10 pt-2">
                                                     <span>Cam 12 (Main)</span> <span>→ Emergency Tracking</span>
@@ -354,7 +357,7 @@ export default function SmartLiabilityPage() {
                                                     <span>Cam 08 (Perim)</span> <span>→ Evac Route Scan</span>
                                                 </div>
                                             </div>
-                                            <p className="text-xs text-slate-400">The entire local camera grid automatically refocuses on the active incident and escape routes. Nearest personnel receive location, multi-angle live feeds, and risk scores.</p>
+                                            <p className="text-xs text-slate-400">{t("auto.Theentirelocalc_3375") || "The entire local camera grid automatically refocuses on the active incident and escape routes. Nearest personnel receive location, multi-angle live feeds, and risk scores."}</p>
                                         </div>
                                     }
                                 />
@@ -372,8 +375,8 @@ export default function SmartLiabilityPage() {
                             </div>
 
                             <div className="bg-amber-500/5 border border-amber-500/20 rounded-3xl p-8 text-center max-w-4xl mx-auto">
-                                <h3 className="text-xl font-black text-amber-500 uppercase tracking-widest mb-2">When every second matters...</h3>
-                                <p className="text-3xl font-black uppercase tracking-tighter text-white drop-shadow-md">Infrastructure responds automatically.</p>
+                                <h3 className="text-xl font-black text-amber-500 uppercase tracking-widest mb-2">{t("auto.Wheneverysecond_7542") || "When every second matters..."}</h3>
+                                <p className="text-3xl font-black uppercase tracking-tighter text-white drop-shadow-md">{t("auto.Infrastructurer_4114") || "Infrastructure responds automatically."}</p>
                             </div>
                         </motion.div>
                     )}
@@ -387,9 +390,9 @@ export default function SmartLiabilityPage() {
                             className="space-y-12"
                         >
                             <div className="max-w-4xl">
-                                <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 text-white">AI-Powered Evidence, Compliance & Legal Defense</h2>
+                                <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 text-white">{t("auto.AIPoweredEviden_6412") || "AI-Powered Evidence, Compliance & Legal Defense"}</h2>
                                 <p className="text-lg text-slate-400 font-medium leading-relaxed mb-8">
-                                    After an incident, organizations face challenges: missing evidence, conflicting statements, legal investigations, and liability claims. <strong>Liability Intelligence</strong> automatically creates a complete digital evidence trail for every significant event detected within LAMINAR.
+                                    {t("auto.Afteranincident_8176") || "After an incident, organizations face challenges: missing evidence, conflicting statements, legal investigations, and liability claims."} <strong>{t("auto.LiabilityIntell_2856") || "Liability Intelligence"}</strong> {t("auto.automaticallycr_4307") || "automatically creates a complete digital evidence trail for every significant event detected within LAMINAR."}
                                 </p>
                             </div>
 
@@ -411,7 +414,7 @@ export default function SmartLiabilityPage() {
                                     color="sky"
                                     content={
                                         <p className="text-sm text-slate-300 leading-relaxed">
-                                            The system gathers relevant video clips, camera snapshots, exact incident timelines, AI confidence scores, location data, and alert history into a secure package.
+                                            {t("auto.Thesystemgather_2643") || "The system gathers relevant video clips, camera snapshots, exact incident timelines, AI confidence scores, location data, and alert history into a secure package."}
                                         </p>
                                     }
                                 />
@@ -422,7 +425,7 @@ export default function SmartLiabilityPage() {
                                     color="indigo"
                                     content={
                                         <p className="text-sm text-slate-300 leading-relaxed">
-                                            LAMINAR creates accountability by recording: Who received the alert, response times, actions taken, escalations triggered, and notifications sent.
+                                            {t("auto.LAMINARcreatesa_9864") || "LAMINAR creates accountability by recording: Who received the alert, response times, actions taken, escalations triggered, and notifications sent."}
                                         </p>
                                     }
                                 />
@@ -433,15 +436,15 @@ export default function SmartLiabilityPage() {
                                     color="fuchsia"
                                     content={
                                         <p className="text-sm text-slate-300 leading-relaxed">
-                                            Instantly generate Executive Incident Reports, PDF Evidence Packages, Compliance Reports, and Investigation Summaries. Ready for insurance claims or legal review in minutes.
+                                            {t("auto.Instantlygenera_7634") || "Instantly generate Executive Incident Reports, PDF Evidence Packages, Compliance Reports, and Investigation Summaries. Ready for insurance claims or legal review in minutes."}
                                         </p>
                                     }
                                 />
                             </div>
 
                             <div className="bg-rose-500/5 border border-rose-500/20 rounded-3xl p-8 text-center max-w-4xl mx-auto mt-12">
-                                <h3 className="text-xl font-black text-rose-500 uppercase tracking-widest mb-2">From detection to documentation</h3>
-                                <p className="text-3xl font-black uppercase tracking-tighter text-white drop-shadow-md">Every incident leaves a verifiable digital trail.</p>
+                                <h3 className="text-xl font-black text-rose-500 uppercase tracking-widest mb-2">{t("auto.Fromdetectionto_9882") || "From detection to documentation"}</h3>
+                                <p className="text-3xl font-black uppercase tracking-tighter text-white drop-shadow-md">{t("auto.Everyincidentle_1811") || "Every incident leaves a verifiable digital trail."}</p>
                             </div>
                         </motion.div>
                     )}

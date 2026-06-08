@@ -73,7 +73,7 @@ export default function AreaSurveyPage() {
                 <button 
                   onClick={restartSurvey}
                   className="px-6 py-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-black text-sm uppercase tracking-widest hover:bg-cyan-500/20 transition-all active:scale-95 flex items-center gap-2"
-                  title="Wipe and Restart"
+                  title={t("auto.WipeandRestart_5089") || "Wipe and Restart"}
                 >
                   <RefreshCw className="w-4 h-4" /> {t("auto.Restart_3934") || "Restart"}
                 </button>

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { api } from "@/services/api";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 interface Structure {
     id: string;
@@ -37,7 +38,7 @@ interface Notification {
     id: string;
     title: string;
     message: string;
-    type: "info" | "warning" | "critical";
+    type: "info" | "warning" | "critical" | "success";
     time: string;
 }
 
@@ -59,6 +60,8 @@ const DEFAULT_STRUCTURES: Structure[] = [
 ];
 
 export default function ResonanceDashboard() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const [structures, setStructures] = useState<Structure[]>(DEFAULT_STRUCTURES);
     const [activeId, setActiveId] = useState<string>("s1");
@@ -229,7 +232,7 @@ export default function ResonanceDashboard() {
         addNotification("info", "Feed Removed", "Structural monitoring feed disconnected.");
     };
 
-    const addNotification = (type: "info" | "warning" | "critical", title: string, message: string) => {
+    const addNotification = (type: "info" | "warning" | "critical" | "success", title: string, message: string) => {
         const newNotif: Notification = {
             id: Date.now().toString() + Math.random().toString(),
             title,
@@ -278,12 +281,12 @@ export default function ResonanceDashboard() {
                         <div className="w-12 h-12 flex items-center justify-center bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-2xl transition-all shadow-[0_0_15px_rgba(249,115,22,0.1)]">
                             <ArrowLeft className="w-5 h-5 text-orange-500/70 group-hover:text-orange-400 transition-colors group-hover:-translate-x-0.5" />
                         </div>
-                        <span className="text-[9px] font-black tracking-[0.1em] text-orange-500/70 uppercase">Back</span>
+                        <span className="text-[9px] font-black tracking-[0.1em] text-orange-500/70 uppercase">{t("auto.Back_4341") || "Back"}</span>
                     </button>
                     <div>
                         <h1 className="text-4xl font-black uppercase tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200 flex items-center gap-4">
                             <Activity className="w-10 h-10 text-orange-500" />
-                            RESONANCE ENGINE
+                            {t("auto.RESONANCEENGINE_6329") || "RESONANCE ENGINE"}
                         </h1>
                         <p className="font-mono text-[10px] text-orange-400/80 tracking-[0.3em] uppercase mt-2 ml-14">
                             Eulerian Video Magnification (EVM) • Structural Integrity Matrix
@@ -295,7 +298,7 @@ export default function ResonanceDashboard() {
                         onClick={() => fileInputRef.current?.click()}
                         className="px-6 py-2 bg-orange-500/10 border border-orange-500/50 hover:bg-orange-500/20 text-orange-400 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all flex items-center gap-2"
                     >
-                        <Upload className="w-4 h-4" /> Upload Custom Feed
+                        <Upload className="w-4 h-4" /> {t("auto.UploadCustomFee_5110") || "Upload Custom Feed"}
                     </button>
                     <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
                 </div>
@@ -305,7 +308,7 @@ export default function ResonanceDashboard() {
                 {/* Left Sidebar: Camera/Structure List */}
                 <div className="w-80 flex flex-col gap-4">
                     <h2 className="text-xs font-black uppercase tracking-widest text-orange-500/50 border-b border-orange-500/20 pb-2 flex items-center gap-2">
-                        <Camera className="w-4 h-4" /> Active Sensor Nodes
+                        <Camera className="w-4 h-4" /> {t("auto.ActiveSensorNod_5808") || "Active Sensor Nodes"}
                     </h2>
                     
                     <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-3 pr-2">
@@ -355,8 +358,8 @@ export default function ResonanceDashboard() {
                         {isAnalyzing && (
                             <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center">
                                 <Cpu className="w-16 h-16 text-orange-500 animate-pulse mb-4" />
-                                <h3 className="text-xl font-black uppercase tracking-[0.2em] text-orange-400">Calibrating EVM Matrix</h3>
-                                <p className="text-xs font-mono text-orange-500/60 mt-2">Extracting micro-vibration baselines from video feed...</p>
+                                <h3 className="text-xl font-black uppercase tracking-[0.2em] text-orange-400">{t("auto.CalibratingEVMM_6330") || "Calibrating EVM Matrix"}</h3>
+                                <p className="text-xs font-mono text-orange-500/60 mt-2">{t("auto.Extractingmicro_328") || "Extracting micro-vibration baselines from video feed..."}</p>
                             </div>
                         )}
 
@@ -409,13 +412,13 @@ export default function ResonanceDashboard() {
                         {/* Scientific Validation Explanation Overlay */}
                         <div className="absolute top-4 right-4 z-20 bg-black/80 backdrop-blur-md p-4 rounded-xl border border-orange-500/30 max-w-sm shadow-[0_0_30px_rgba(0,0,0,0.8)]">
                             <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-2 flex items-center gap-2">
-                                <Activity className="w-3 h-3" /> Scientific Validation
+                                <Activity className="w-3 h-3" /> {t("auto.ScientificValid_5805") || "Scientific Validation"}
                             </h4>
                             <div className="text-xs font-mono text-orange-100/80 leading-relaxed space-y-2">
-                                <p><strong>Algorithm:</strong> Eulerian Video Magnification</p>
+                                <p><strong>Algorithm:</strong> {t("auto.EulerianVideoMa_9266") || "Eulerian Video Magnification"}</p>
                                 <p><strong>Research Origin:</strong> MIT CSAIL (Wu et al., 2012)</p>
                                 <p className="border-t border-orange-500/20 pt-2 text-[10px] text-slate-400">
-                                    Laminar applies spatial decomposition and temporal filtering to standard video feeds. By amplifying invisible sub-millimeter color and motion variations, the AI calculates structural resonance frequencies without physical sensors.
+                                    {t("auto.Laminarappliess_506") || "Laminar applies spatial decomposition and temporal filtering to standard video feeds. By amplifying invisible sub-millimeter color and motion variations, the AI calculates structural resonance frequencies without physical sensors."}
                                 </p>
                             </div>
                         </div>
@@ -464,7 +467,7 @@ export default function ResonanceDashboard() {
                         {activeStructure?.status !== "CRITICAL" && (
                             <div className="absolute bottom-4 left-4 z-20 bg-black/80 backdrop-blur-md p-3 rounded-xl border border-orange-500/30 max-w-md w-full font-mono text-[9px] text-orange-500/80 shadow-[0_0_20px_rgba(0,0,0,0.8)]">
                                 <div className="text-white mb-2 uppercase tracking-widest border-b border-orange-500/20 pb-1 flex items-center gap-2">
-                                    <Cpu className="w-3 h-3" /> Live Processing Matrix
+                                    <Cpu className="w-3 h-3" /> {t("auto.LiveProcessingM_9642") || "Live Processing Matrix"}
                                 </div>
                                 <div className="space-y-0.5">
                                     {evmLogs.map((log, i) => (
@@ -482,7 +485,7 @@ export default function ResonanceDashboard() {
                             </div>
                             <div className="px-3 py-1.5 rounded-md bg-black/60 border border-white/10 backdrop-blur-md flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                <span className="text-[10px] font-mono tracking-widest text-white uppercase">REC</span>
+                                <span className="text-[10px] font-mono tracking-widest text-white uppercase">{t("auto.REC_705") || "REC"}</span>
                             </div>
                         </div>
 
@@ -494,7 +497,7 @@ export default function ResonanceDashboard() {
                                     className="px-8 py-6 bg-[#050000]/90 border border-red-500 backdrop-blur-xl rounded-3xl flex flex-col items-center shadow-[0_0_100px_rgba(239,68,68,1)] max-w-lg text-center"
                                 >
                                     <AlertTriangle className="w-16 h-16 text-red-500 animate-pulse mb-4" />
-                                    <h2 className="text-3xl font-black uppercase tracking-widest text-red-400 mb-2">Structural Failure</h2>
+                                    <h2 className="text-3xl font-black uppercase tracking-widest text-red-400 mb-2">{t("auto.StructuralFailu_5361") || "Structural Failure"}</h2>
                                     <p className="text-sm font-mono text-white mb-6">Harmonic Resonance Dropped to {currentHz} Hz</p>
                                     
                                     <div className="w-full space-y-3">
@@ -504,15 +507,15 @@ export default function ResonanceDashboard() {
                                         </div>
                                         <div className="flex items-center gap-3 bg-red-900/40 border border-red-500/30 p-3 rounded-xl">
                                             <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse shrink-0" />
-                                            <span className="text-[10px] font-mono text-left text-red-200 uppercase tracking-widest">Dispatching Police & UAV Drone</span>
+                                            <span className="text-[10px] font-mono text-left text-red-200 uppercase tracking-widest">{t("auto.DispatchingPoli_4983") || "Dispatching Police & UAV Drone"}</span>
                                         </div>
                                         <div className="flex items-center gap-3 bg-red-900/40 border border-red-500/30 p-3 rounded-xl">
                                             <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                                            <span className="text-[10px] font-mono text-left text-emerald-200 uppercase tracking-widest">Green Wave Enabled For Ambulances</span>
+                                            <span className="text-[10px] font-mono text-left text-emerald-200 uppercase tracking-widest">{t("auto.GreenWaveEnable_6156") || "Green Wave Enabled For Ambulances"}</span>
                                         </div>
                                         <div className="flex items-center gap-3 bg-red-900/40 border border-red-500/30 p-3 rounded-xl">
                                             <div className="w-3 h-3 rounded-full bg-sky-500 animate-pulse shrink-0" />
-                                            <span className="text-[10px] font-mono text-left text-sky-200 uppercase tracking-widest">Email Broadcast Sent to Emergency Contacts</span>
+                                            <span className="text-[10px] font-mono text-left text-sky-200 uppercase tracking-widest">{t("auto.EmailBroadcastS_4928") || "Email Broadcast Sent to Emergency Contacts"}</span>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -520,11 +523,11 @@ export default function ResonanceDashboard() {
                                 {/* Live Dispatch Payload Proof */}
                                 <div className="absolute bottom-4 right-4 z-40 bg-[#0a0a0c]/90 border border-red-500 p-4 rounded-xl max-w-sm font-mono text-[10px] shadow-[0_0_30px_rgba(239,68,68,0.5)] backdrop-blur-md">
                                     <div className="text-red-400 font-bold mb-2 uppercase border-b border-red-500/30 pb-1 flex items-center gap-2">
-                                        <Bell className="w-3 h-3" /> Live Dispatch Payload Proof
+                                        <Bell className="w-3 h-3" /> {t("auto.LiveDispatchPay_2045") || "Live Dispatch Payload Proof"}
                                     </div>
                                     <div className="text-slate-300 space-y-1 mt-2">
                                         <p><span className="text-red-500">TO:</span> emergency_services@city.gov</p>
-                                        <p><span className="text-red-500">SUBJECT:</span> LAMINAR CRITICAL ALERT</p>
+                                        <p><span className="text-red-500">SUBJECT:</span> {t("auto.LAMINARCRITICAL_7187") || "LAMINAR CRITICAL ALERT"}</p>
                                         <p><span className="text-red-500">PAYLOAD:</span></p>
                                         <pre className="bg-black/50 p-2 rounded text-emerald-400 mt-1">
 {`{
@@ -550,14 +553,14 @@ export default function ResonanceDashboard() {
                             }`} />
                             
                             <h3 className="text-xs font-black uppercase tracking-widest text-white mb-6 flex items-center gap-2 shrink-0">
-                                <Activity className="w-4 h-4 text-orange-500" /> Structural AI Analysis
+                                <Activity className="w-4 h-4 text-orange-500" /> {t("auto.StructuralAIAna_1887") || "Structural AI Analysis"}
                             </h3>
 
                             <div className="flex-1 grid grid-cols-3 gap-6 relative z-10">
                                 {/* Column 1: Health Score & Live Twin */}
                                 <div className="flex flex-col gap-6">
                                     <div className="bg-black/40 border border-white/5 rounded-2xl p-4">
-                                        <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-2">Structural Health</div>
+                                        <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-2">{t("auto.StructuralHealt_2348") || "Structural Health"}</div>
                                         <div className={`text-6xl font-black font-mono transition-colors duration-1000 ${
                                             healthScore > 80 ? 'text-emerald-400' : healthScore > 50 ? 'text-amber-400' : 'text-red-500'
                                         }`}>
@@ -566,7 +569,7 @@ export default function ResonanceDashboard() {
                                     </div>
                                     
                                     <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex-1 flex flex-col justify-center">
-                                        <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-4">Live Digital Twin</div>
+                                        <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-4">{t("auto.LiveDigitalTwin_4194") || "Live Digital Twin"}</div>
                                         {/* CSS Bridge Model */}
                                         <div className="relative h-12 w-full flex items-end justify-between px-2">
                                             <div className="w-2 h-full bg-slate-700 rounded-t-sm" />
@@ -592,7 +595,7 @@ export default function ResonanceDashboard() {
                                 <div className="flex flex-col gap-6">
                                     <div className="bg-black/40 border border-white/5 rounded-2xl p-4">
                                         <div className="flex justify-between items-center mb-4">
-                                            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">Frequency Drift</div>
+                                            <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500">{t("auto.FrequencyDrift_5933") || "Frequency Drift"}</div>
                                             <div className={`text-[10px] font-black tracking-widest px-2 py-0.5 rounded-full ${
                                                 healthScore > 80 ? 'bg-emerald-500/20 text-emerald-400' : healthScore > 50 ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'
                                             }`}>
@@ -601,11 +604,11 @@ export default function ResonanceDashboard() {
                                         </div>
                                         <div className="flex flex-col gap-2">
                                             <div className="flex justify-between items-end border-b border-white/5 pb-2">
-                                                <span className="text-[9px] text-slate-500 uppercase tracking-widest">Baseline</span>
+                                                <span className="text-[9px] text-slate-500 uppercase tracking-widest">{t("auto.Baseline_2354") || "Baseline"}</span>
                                                 <span className="text-sm font-mono text-slate-400">{activeStructure?.hz.toFixed(3)} Hz</span>
                                             </div>
                                             <div className="flex justify-between items-end">
-                                                <span className="text-[9px] text-orange-500/50 uppercase tracking-widest">Current</span>
+                                                <span className="text-[9px] text-orange-500/50 uppercase tracking-widest">{t("auto.Current_9049") || "Current"}</span>
                                                 <span className="text-xl font-black font-mono text-white">{currentHz.toFixed(3)} Hz</span>
                                             </div>
                                         </div>
@@ -613,7 +616,7 @@ export default function ResonanceDashboard() {
 
                                     <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex-1 flex flex-col justify-center">
                                         <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-3 flex items-center justify-between">
-                                            Failure Forecast
+                                            {t("auto.FailureForecast_4833") || "Failure Forecast"}
                                             <span className="text-orange-400 bg-orange-500/10 px-1 rounded">88% CONF</span>
                                         </div>
                                         <div className="space-y-2">
@@ -641,12 +644,12 @@ export default function ResonanceDashboard() {
 
                                 {/* Column 3: Anomaly Reasoning */}
                                 <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex flex-col relative overflow-hidden">
-                                    <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-4">Anomaly Explanation</div>
+                                    <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-4">{t("auto.AnomalyExplanat_1910") || "Anomaly Explanation"}</div>
                                     
                                     <div className="flex-1 flex flex-col justify-center gap-3">
                                         <div className={`flex items-start gap-2 transition-opacity ${healthScore < 90 ? 'opacity-100' : 'opacity-20'}`}>
                                             <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${healthScore < 90 ? 'text-amber-500' : 'text-slate-600'}`} />
-                                            <span className="text-[10px] font-mono text-slate-300">Frequency Drift Detected</span>
+                                            <span className="text-[10px] font-mono text-slate-300">{t("auto.FrequencyDriftD_7731") || "Frequency Drift Detected"}</span>
                                         </div>
                                         <div className={`flex items-start gap-2 transition-opacity ${healthScore < 60 ? 'opacity-100' : 'opacity-20'}`}>
                                             <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${healthScore < 60 ? 'text-amber-500' : 'text-slate-600'}`} />
@@ -654,16 +657,16 @@ export default function ResonanceDashboard() {
                                         </div>
                                         <div className={`flex items-start gap-2 transition-opacity ${healthScore < 40 ? 'opacity-100' : 'opacity-20'}`}>
                                             <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${healthScore < 40 ? 'text-red-500' : 'text-slate-600'}`} />
-                                            <span className="text-[10px] font-mono text-slate-300">Historical Baseline Breached</span>
+                                            <span className="text-[10px] font-mono text-slate-300">{t("auto.HistoricalBasel_1348") || "Historical Baseline Breached"}</span>
                                         </div>
                                         <div className={`flex items-start gap-2 transition-opacity ${healthScore < 30 ? 'opacity-100' : 'opacity-20'}`}>
                                             <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${healthScore < 30 ? 'text-red-500' : 'text-slate-600'}`} />
-                                            <span className="text-[10px] font-mono text-slate-300">Load Distribution Unstable</span>
+                                            <span className="text-[10px] font-mono text-slate-300">{t("auto.LoadDistributio_8135") || "Load Distribution Unstable"}</span>
                                         </div>
                                     </div>
 
                                     <div className="mt-4 pt-3 border-t border-white/5 flex justify-between items-center">
-                                        <span className="text-[9px] font-mono text-slate-500">AI Confidence</span>
+                                        <span className="text-[9px] font-mono text-slate-500">{t("auto.AIConfidence_3478") || "AI Confidence"}</span>
                                         <span className="text-[12px] font-black text-white">94.2%</span>
                                     </div>
                                 </div>
@@ -673,7 +676,7 @@ export default function ResonanceDashboard() {
                         {/* Notifications Panel */}
                         <div className="flex-1 bg-[#0a0a0c] border border-orange-500/20 rounded-3xl p-6 flex flex-col overflow-hidden">
                             <h3 className="text-xs font-black uppercase tracking-widest text-orange-400 mb-4 flex items-center gap-2 border-b border-orange-500/10 pb-3 shrink-0">
-                                <Bell className="w-4 h-4" /> System Alerts
+                                <Bell className="w-4 h-4" /> {t("auto.SystemAlerts_6723") || "System Alerts"}
                             </h3>
                             
                             <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-3 pr-2">
@@ -710,7 +713,7 @@ export default function ResonanceDashboard() {
                                     {notifications.length === 0 && (
                                         <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
                                             <Bell className="w-8 h-8 mb-2" />
-                                            <p className="text-xs uppercase tracking-widest font-bold">No Alerts</p>
+                                            <p className="text-xs uppercase tracking-widest font-bold">{t("auto.NoAlerts_9837") || "No Alerts"}</p>
                                         </div>
                                     )}
                                 </AnimatePresence>

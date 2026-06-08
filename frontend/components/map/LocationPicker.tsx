@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // Fix for default Leaflet marker icon in NextJS
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -17,6 +18,7 @@ L.Icon.Default.mergeOptions({
 const { BaseLayer } = LayersControl;
 
 export default function LocationPicker({ position, setPosition }: { position: [number, number] | null, setPosition: (p: [number, number]) => void }) {
+    const { t } = useTranslation();
     const [searchQuery, setSearchQuery] = useState("");
     const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
@@ -37,6 +39,8 @@ export default function LocationPicker({ position, setPosition }: { position: [n
     };
 
     function LocationMarker() {
+  const { t } = useTranslation();
+
         const map = useMapEvents({
             click(e) {
                 setPosition([e.latlng.lat, e.latlng.lng]);
@@ -60,7 +64,7 @@ export default function LocationPicker({ position, setPosition }: { position: [n
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && executeSearch()}
-                    placeholder="Search location..."
+                    placeholder={t("auto.Searchlocation_5155") || "Search location..."}
                     className="bg-transparent text-white text-[10px] w-36 outline-none px-2 font-mono"
                 />
                 <button onClick={executeSearch} className="p-1.5 bg-indigo-500/20 hover:bg-indigo-500/40 border border-indigo-500/30 rounded transition-colors">

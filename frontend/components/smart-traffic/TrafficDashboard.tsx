@@ -41,6 +41,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { api } from "@/services/api";
 import SplashCursor from "@/components/react-bits/SplashCursor";
+import { useTranslation } from "react-i18next";
 
 // ─── Risk / density color maps ───────────────────────────────────────────────
 
@@ -54,6 +55,8 @@ const RISK_META: Record<string, { label: string; color: string; bg: string; bord
 // ─── Components ───────────────────────────────────────────────────────────────
 
 function EmptyState({ icon: Icon, label }: { icon: any; label: string }) {
+  const { t } = useTranslation();
+
   return (
     <div className="h-full flex flex-col items-center justify-center gap-3 opacity-25 py-8">
       <Icon className="w-7 h-7 text-slate-600 animate-pulse" />
@@ -65,6 +68,7 @@ function EmptyState({ icon: Icon, label }: { icon: any; label: string }) {
 function StatCard({ icon: Icon, label, value, subLabel, color }: {
   icon: any; label: string; value: string | number; subLabel: string; color: "emerald" | "amber" | "cyan" | "rose";
 }) {
+  const { t } = useTranslation();
   const c = {
     emerald: { icon: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20", bar: "bg-emerald-500" },
     amber: { icon: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", bar: "bg-amber-500" },
@@ -87,7 +91,7 @@ function StatCard({ icon: Icon, label, value, subLabel, color }: {
       <p className="mt-1 text-xs font-bold text-slate-600 uppercase tracking-tighter">{subLabel}</p>
       <div className="mt-3 h-px w-full bg-white/5" />
       {isEmpty && (
-        <p className="text-xs font-mono text-slate-700 mt-1">Awaiting live data...</p>
+        <p className="text-xs font-mono text-slate-700 mt-1">{t("auto.Awaitinglivedat_4051") || "Awaiting live data..."}</p>
       )}
     </div>
   );
@@ -225,6 +229,7 @@ function NotificationCard({ notif, index }: { notif: any; index: number }) {
 }
 
 export function TrafficDashboard() {
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const { activeVenueId, setVenue } = useActiveVenue();
   const urlVenueId = searchParams.get("venue_id");
@@ -462,19 +467,19 @@ export function TrafficDashboard() {
                 <TrafficCone className="w-4 h-4 text-emerald-400" />
               </div>
               <h1 className="text-2xl font-black text-white tracking-widest uppercase italic">
-                Traffic <span className="text-emerald-500">Intelligence</span>
+                {t("auto.Traffic_2235") || "Traffic"} <span className="text-emerald-500">{t("auto.Intelligence_328") || "Intelligence"}</span>
               </h1>
               <span className="px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-xs font-black text-emerald-400 tracking-tighter uppercase relative top-[-6px]">
-                V5 LIVE
+                {t("auto.V5LIVE_5515") || "V5 LIVE"}
               </span>
             </div>
             <p className="text-xs text-slate-500 font-mono mt-0.5 ml-[52px]">
               LIVE FEED · {cameras.length} NODE{cameras.length !== 1 ? "S" : ""} ·{" "}
               {isVideoMode ? (
-                <span className="text-emerald-400 font-black animate-pulse">VIDEO ANALYSIS MODE</span>
+                <span className="text-emerald-400 font-black animate-pulse">{t("auto.VIDEOANALYSISMO_8150") || "VIDEO ANALYSIS MODE"}</span>
               ) : liveRisk !== null
                 ? <span className={riskMeta.color}>{riskMeta.label}</span>
-                : <span className="text-slate-600">AWAITING DATA</span>
+                : <span className="text-slate-600">{t("auto.AWAITINGDATA_5604") || "AWAITING DATA"}</span>
               }
             </p>
           </div>
@@ -498,17 +503,17 @@ export function TrafficDashboard() {
           <button onClick={() => window.open("/api/v1/traffic/report/pdf", "_blank")}
             className="flex items-center gap-2 px-3 py-2 bg-emerald-500 text-black border border-emerald-400 rounded-xl text-xs font-black hover:bg-emerald-400 active:scale-95 shadow-[0_0_16px_rgba(16,185,129,0.3)] transition-all">
             <Download className="w-3.5 h-3.5" />
-            EXPORT PDF
+            {t("auto.EXPORTPDF_7156") || "EXPORT PDF"}
           </button>
         </div>
       </div>
 
       {/* ── STAT CARDS ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={Car} label="Total Vehicles" value={activeCount} subLabel={isVideoMode ? "Avg Detection Count" : "Live Detection Count"} color="emerald" />
-        <StatCard icon={Zap} label="Avg Flow Speed" value={`${activeVelocity}px/s`} subLabel="Centroid Velocity" color="cyan" />
-        <StatCard icon={Clock} label="Wait Time Est." value={`${activeWait}m`} subLabel="Queue Impact" color="amber" />
-        <StatCard icon={ShieldAlert} label="Congestion Risk" value={`${activeRisk}%`} subLabel={riskMeta.label} color={riskScore > 75 ? "rose" : riskScore > 45 ? "amber" : "emerald"} />
+        <StatCard icon={Car} label={t("auto.TotalVehicles_2202") || "Total Vehicles"} value={activeCount} subLabel={isVideoMode ? "Avg Detection Count" : "Live Detection Count"} color="emerald" />
+        <StatCard icon={Zap} label={t("auto.AvgFlowSpeed_7792") || "Avg Flow Speed"} value={`${activeVelocity}px/s`} subLabel="Centroid Velocity" color="cyan" />
+        <StatCard icon={Clock} label={t("auto.WaitTimeEst_5837") || "Wait Time Est."} value={`${activeWait}m`} subLabel="Queue Impact" color="amber" />
+        <StatCard icon={ShieldAlert} label={t("auto.CongestionRisk_4803") || "Congestion Risk"} value={`${activeRisk}%`} subLabel={riskMeta.label} color={riskScore > 75 ? "rose" : riskScore > 45 ? "amber" : "emerald"} />
       </div>
 
       {/* ── MAIN GRID ──────────────────────────────────────────────────────── */}
@@ -563,7 +568,7 @@ export function TrafficDashboard() {
               ) : (
                 <div className="h-full flex flex-col items-center justify-center gap-4 opacity-25">
                   <Camera className="w-12 h-12 text-slate-700 animate-pulse" />
-                  <p className="text-xs font-mono font-black text-slate-600 uppercase tracking-widest">No Camera Hardware Active</p>
+                  <p className="text-xs font-mono font-black text-slate-600 uppercase tracking-widest">{t("auto.NoCameraHardwar_5524") || "No Camera Hardware Active"}</p>
                 </div>
               )}
 
@@ -575,7 +580,7 @@ export function TrafficDashboard() {
                     <div className={`flex items-center gap-2 px-3 py-1.5 bg-black/70 backdrop-blur rounded-xl border ${activeSignal === "Red" ? "border-rose-500/50" : activeSignal === "Yellow" ? "border-amber-500/50" : "border-emerald-500/50"
                       }`}>
                       <Signal className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-xs font-black text-slate-400 uppercase">Signal</span>
+                      <span className="text-xs font-black text-slate-400 uppercase">{t("auto.Signal_5458") || "Signal"}</span>
                       <span className={`text-xs font-black uppercase ${activeSignal === "Red" ? "text-rose-400" : activeSignal === "Yellow" ? "text-amber-400" : "text-emerald-400"
                         }`}>{activeSignal}</span>
                     </div>
@@ -629,10 +634,10 @@ export function TrafficDashboard() {
                 <div className="p-4 border-b border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Upload className="w-3.5 h-3.5 text-amber-400" />
-                    <h4 className="text-xs font-black text-white uppercase tracking-widest">Video Upload Analysis</h4>
-                    <span className="text-xs px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded font-black text-amber-400">ANALYSIS ACTIVE</span>
+                    <h4 className="text-xs font-black text-white uppercase tracking-widest">{t("auto.VideoUploadAnal_5640") || "Video Upload Analysis"}</h4>
+                    <span className="text-xs px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded font-black text-amber-400">{t("auto.ANALYSISACTIVE_5582") || "ANALYSIS ACTIVE"}</span>
                   </div>
-                  <button onClick={handleClearVideo} className="bg-white/10 hover:bg-rose-500/20 border border-white/10 px-3 py-1 rounded-lg text-[10px] font-black text-white transition-all uppercase tracking-widest">REMOVE VIDEO</button>
+                  <button onClick={handleClearVideo} className="bg-white/10 hover:bg-rose-500/20 border border-white/10 px-3 py-1 rounded-lg text-[10px] font-black text-white transition-all uppercase tracking-widest">{t("auto.REMOVEVIDEO_9291") || "REMOVE VIDEO"}</button>
                 </div>
 
                 <div className="p-4 space-y-4">
@@ -646,7 +651,7 @@ export function TrafficDashboard() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                        <span className="text-xs font-black text-emerald-400 uppercase">Processing with YOLO...</span>
+                        <span className="text-xs font-black text-emerald-400 uppercase">{t("auto.ProcessingwithY_4369") || "Processing with YOLO..."}</span>
                       </div>
                       <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
                         <motion.div animate={{ width: `${uploadProgress}%` }} className="h-full bg-emerald-500 rounded-full" />
@@ -684,7 +689,7 @@ export function TrafficDashboard() {
                       </div>
                       {Object.keys(uploadResult.vehicle_breakdown || {}).length > 0 && (
                         <div>
-                          <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">Vehicle Types</p>
+                          <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">{t("auto.VehicleTypes_7247") || "Vehicle Types"}</p>
                           <div className="flex flex-wrap gap-2">
                             {Object.entries(uploadResult.vehicle_breakdown).map(([cls, cnt]: [string, any]) => (
                               <span key={cls} className="flex items-center gap-1.5 px-2 py-1 bg-white/5 border border-white/5 rounded-lg text-xs font-bold text-white capitalize">
@@ -716,7 +721,7 @@ export function TrafficDashboard() {
             <div className="max-w-2xl mx-auto w-full">
               {activeMatrix.length > 0
                 ? <DensityMatrixGrid matrix={activeMatrix} maxValue={activeMax} />
-                : <EmptyState icon={Grid3x3} label="Awaiting detection frames to build matrix" />
+                : <EmptyState icon={Grid3x3} label={t("auto.Awaitingdetecti_9394") || "Awaiting detection frames to build matrix"} />
               }
             </div>
           </div>
@@ -726,11 +731,11 @@ export function TrafficDashboard() {
             <div className="bg-[#0a0a0f] border border-white/5 rounded-2xl p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                <h4 className="text-xs font-black text-white uppercase tracking-widest">Vehicle Count Trend</h4>
+                <h4 className="text-xs font-black text-white uppercase tracking-widest">{t("auto.VehicleCountTre_6010") || "Vehicle Count Trend"}</h4>
               </div>
               {countTimeline.length > 1
                 ? <Sparkline data={countTimeline} color="#10b981" />
-                : <EmptyState icon={Activity} label="Collecting live events..." />
+                : <EmptyState icon={Activity} label={t("auto.Collectinglivee_4787") || "Collecting live events..."} />
               }
             </div>
 
@@ -748,22 +753,22 @@ export function TrafficDashboard() {
             <div className="bg-[#0a0a0f] border border-white/5 rounded-2xl p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                <h4 className="text-xs font-black text-white uppercase tracking-widest">Avg Speed Timeline</h4>
+                <h4 className="text-xs font-black text-white uppercase tracking-widest">{t("auto.AvgSpeedTimelin_3735") || "Avg Speed Timeline"}</h4>
               </div>
               {speedTimeline.length > 1
                 ? <Sparkline data={speedTimeline} color="#06b6d4" />
-                : <EmptyState icon={Activity} label="Collecting live events..." />
+                : <EmptyState icon={Activity} label={t("auto.Collectinglivee_4787") || "Collecting live events..."} />
               }
             </div>
 
             <div className="bg-[#0a0a0f] border border-white/5 rounded-2xl p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <Gauge className="w-3.5 h-3.5 text-amber-400" />
-                <h4 className="text-xs font-black text-white uppercase tracking-widest">Congestion Breakdown</h4>
+                <h4 className="text-xs font-black text-white uppercase tracking-widest">{t("auto.CongestionBreak_8445") || "Congestion Breakdown"}</h4>
               </div>
               {Object.values(densityBreak).some((v: any) => v > 0)
                 ? <BarChartSvg data={densityBreak} />
-                : <EmptyState icon={Gauge} label="Collecting live density data..." />
+                : <EmptyState icon={Gauge} label={t("auto.Collectinglived_2707") || "Collecting live density data..."} />
               }
             </div>
           </div>
@@ -777,7 +782,7 @@ export function TrafficDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShieldAlert className={`w-4 h-4 ${riskMeta.color}`} />
-                <h4 className="text-xs font-black text-white uppercase tracking-widest">Risk Level</h4>
+                <h4 className="text-xs font-black text-white uppercase tracking-widest">{t("auto.RiskLevel_6360") || "Risk Level"}</h4>
               </div>
               <div className={`w-2 h-2 rounded-full ${riskMeta.dot} animate-pulse`} />
             </div>
@@ -814,7 +819,7 @@ export function TrafficDashboard() {
             <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02] shrink-0">
               <div className="flex items-center gap-2">
                 <Bell className="w-3.5 h-3.5 text-amber-400" />
-                <h4 className="text-xs font-black text-white uppercase tracking-widest">Live Intelligence Alerts</h4>
+                <h4 className="text-xs font-black text-white uppercase tracking-widest">{t("auto.LiveIntelligenc_7579") || "Live Intelligence Alerts"}</h4>
               </div>
               {notifications.length > 0 && !isVideoMode && (
                 <span className="text-xs px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded font-black text-amber-400">
@@ -826,7 +831,7 @@ export function TrafficDashboard() {
               <AnimatePresence>
                 {notifications.length > 0
                   ? notifications.map((n: any, i: number) => <NotificationCard key={n.id} notif={n} index={i} />)
-                  : <EmptyState icon={Bell} label="No alerts — traffic is nominal or no camera active" />
+                  : <EmptyState icon={Bell} label={t("auto.Noalertstraffic_3832") || "No alerts — traffic is nominal or no camera active"} />
                 }
               </AnimatePresence>
             </div>
@@ -857,17 +862,17 @@ export function TrafficDashboard() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-center">
-                          <p className="text-xs text-slate-600 uppercase">Vehicles</p>
+                          <p className="text-xs text-slate-600 uppercase">{t("auto.Vehicles_1521") || "Vehicles"}</p>
                           <p className="text-sm font-black text-white">{ev.count}</p>
                         </div>
                         <div className="w-px h-5 bg-white/5" />
                         <div className="text-center">
-                          <p className="text-xs text-slate-600 uppercase">Speed</p>
+                          <p className="text-xs text-slate-600 uppercase">{t("auto.Speed_1854") || "Speed"}</p>
                           <p className="text-sm font-black text-cyan-400">{ev.velocity}<span className="text-xs">px/s</span></p>
                         </div>
                         <div className="w-px h-5 bg-white/5" />
                         <div className="text-center">
-                          <p className="text-xs text-slate-600 uppercase">Risk</p>
+                          <p className="text-xs text-slate-600 uppercase">{t("auto.Risk_5782") || "Risk"}</p>
                           <p className="text-sm font-black text-rose-400">{ev.risk_score ?? 0}%</p>
                         </div>
                         <div className="ml-auto">
@@ -880,7 +885,7 @@ export function TrafficDashboard() {
                       </div>
                     </motion.div>
                   ))
-                  : <EmptyState icon={Activity} label="Synchronizing live event bus..." />
+                  : <EmptyState icon={Activity} label={t("auto.Synchronizingli_3936") || "Synchronizing live event bus..."} />
                 }
               </AnimatePresence>
             </div>

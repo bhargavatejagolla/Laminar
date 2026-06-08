@@ -67,7 +67,7 @@ const router = useRouter();
       <button 
         onClick={() => router.push('/register')}
         className="absolute top-4 left-4 text-slate-500 hover:text-slate-300 transition-colors p-1"
-        title="Back to Registration"
+        title={t("auto.BacktoRegistrat_5533") || "Back to Registration"}
       >
         <ArrowRight className="w-5 h-5 rotate-180" />
       </button>

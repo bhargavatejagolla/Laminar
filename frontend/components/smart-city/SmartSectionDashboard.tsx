@@ -62,7 +62,7 @@ function ServiceCard({ title, description, icon: Icon, href, stats, theme }: { t
 
             <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between">
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] font-mono">Real-time Telemetry</span>
+                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] font-mono">{t("auto.RealtimeTelemet_4132") || "Real-time Telemetry"}</span>
                 <div className="flex items-center gap-4 mt-2">
                   {stats && Object.entries(stats).map(([label, value]: [string, any]) => (
                     <div key={label} className="flex flex-col">
@@ -120,7 +120,7 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
         </div>
         {isStatic && (
           <div className="bg-amber-500/10 backdrop-blur-md border border-amber-500/20 px-3 py-1.5 rounded-full text-[9px] font-mono font-black tracking-widest text-amber-500/90 flex items-center gap-2 uppercase">
-            STATIC
+            {t("auto.STATIC_5899") || "STATIC"}
           </div>
         )}
       </div>
@@ -194,9 +194,9 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className={`text-[9px] text-emerald-400 font-bold uppercase tracking-widest mb-0.5`}>Available</div>
+                    <div className={`text-[9px] text-emerald-400 font-bold uppercase tracking-widest mb-0.5`}>{t("auto.Available_2179") || "Available"}</div>
                     <div className="text-xl font-black text-white font-mono leading-none tracking-tighter">
-                      {insights.overall?.total_available || 0}<span className="text-[10px] text-slate-500 ml-1">spots</span>
+                      {insights.overall?.total_available || 0}<span className="text-[10px] text-slate-500 ml-1">{t("auto.spots_6538") || "spots"}</span>
                     </div>
                   </div>
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner bg-emerald-500/10 border border-emerald-500/20`}>
@@ -221,7 +221,7 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className={`text-[9px] text-amber-400 font-bold uppercase tracking-widest mb-0.5`}>Velocity</div>
+                    <div className={`text-[9px] text-amber-400 font-bold uppercase tracking-widest mb-0.5`}>{t("auto.Velocity_3970") || "Velocity"}</div>
                     <div className="text-xl font-black text-white font-mono leading-none tracking-tighter">
                       {Math.round(insights.signals?.[camera.id]?.avg_velocity || 0)}<span className="text-[10px] text-slate-500 ml-0.5">px/s</span>
                     </div>
@@ -462,7 +462,7 @@ const THEMES: Record<string, any> = {
 
 export function SmartSectionDashboard({ sectionType, title }: { sectionType: string; title: string }) {
   const { t } = useTranslation();
-  const Icon = SECTION_ICONS[sectionType] ?? Activity;
+  const Icon = (SECTION_ICONS[sectionType] ?? Activity) as any;
   const theme = THEMES[sectionType] || THEMES.parking;
 
   const [venues, setVenues] = useState<any[]>([]);
@@ -636,10 +636,10 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               <div className={`p-2 ${theme.headerIconBg} rounded-lg`}>
                 <Icon className={`${theme.textClass} w-5 h-5`} />
               </div>
-              <span className={`${theme.textClass}/60 font-mono text-[10px] font-black tracking-[0.3em] uppercase`}>Tactical Node Override</span>
+              <span className={`${theme.textClass}/60 font-mono text-[10px] font-black tracking-[0.3em] uppercase`}>{t("auto.TacticalNodeOve_8323") || "Tactical Node Override"}</span>
             </div>
             <h1 className="text-3xl font-black font-heading tracking-tight uppercase leading-tight">
-              LAMINAR <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/40">{title}</span> intelligence
+              {t("auto.LAMINAR_5446") || "LAMINAR"} <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/40">{title}</span> {t("auto.intelligence_3662") || "intelligence"}
             </h1>
             <p className="text-slate-500 text-xs mt-1 font-medium tracking-wide uppercase">Real-time smart {sectionType} guidance & tactical routing engine v2.1</p>
           </div>
@@ -898,7 +898,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               className="px-4 py-2.5 rounded-2xl flex items-center gap-2 backdrop-blur-md border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-all shadow-lg text-[10px] font-mono font-black tracking-[0.2em] uppercase"
             >
               <RotateCw className="w-4 h-4" />
-              Reset All Nodes
+              {t("auto.ResetAllNodes_3042") || "Reset All Nodes"}
             </button>
           )}
 
@@ -907,7 +907,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               {/* Inject AI Media — Incident */}
               <label className={`cursor-pointer px-4 py-2.5 rounded-2xl flex items-center gap-3 backdrop-blur-md border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all shadow-lg`}>
                 <Upload className="w-4 h-4" />
-                <span className="text-[10px] font-mono font-black tracking-[0.2em] uppercase mt-0.5">Inject Tactical Hit</span>
+                <span className="text-[10px] font-mono font-black tracking-[0.2em] uppercase mt-0.5">{t("auto.InjectTacticalH_1983") || "Inject Tactical Hit"}</span>
                 <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={async (e) => {
                   const files = Array.from(e.target.files || []);
                   if (files.length === 0) return;
@@ -967,7 +967,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               {/* Inject AI Media — Kinetic */}
               <label className={`cursor-pointer px-4 py-2.5 rounded-2xl flex items-center gap-3 backdrop-blur-md border ${theme.borderClass} ${theme.glowClass} ${theme.textClass} hover:bg-white/5 transition-all shadow-lg`}>
                 <Upload className="w-4 h-4" />
-                <span className="text-[10px] font-mono font-black tracking-[0.2em] uppercase mt-0.5">Inject Kinetic Media</span>
+                <span className="text-[10px] font-mono font-black tracking-[0.2em] uppercase mt-0.5">{t("auto.InjectKineticMe_1829") || "Inject Kinetic Media"}</span>
                 <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={async (e) => {
                   const files = Array.from(e.target.files || []);
                   if (files.length === 0) return;
@@ -1009,7 +1009,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                 className={`px-4 py-2.5 rounded-2xl flex items-center gap-2 backdrop-blur-md border ${theme.borderClass} text-slate-400 hover:bg-white/5 transition-all shadow-lg text-[10px] font-mono font-black tracking-[0.2em] uppercase`}
               >
                 <X className="w-4 h-4" />
-                <span className="mt-0.5">Clear Media</span>
+                <span className="mt-0.5">{t("auto.ClearMedia_2349") || "Clear Media"}</span>
               </button>
             </>
           )}
@@ -1028,7 +1028,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
             <>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
                 <ServiceCard
-                  title="Parking Intelligence"
+                  title={t("auto.ParkingIntellig_9835") || "Parking Intelligence"}
                   description="Optimize stall occupancy and predict peak demand with AI neural vision."
                   icon={Car}
                   href="/smart-parking"
@@ -1041,7 +1041,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               </motion.div>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
                 <ServiceCard
-                  title="Traffic Flow"
+                  title={t("auto.TrafficFlow_9654") || "Traffic Flow"}
                   description="Real-time vehicle counting and velocity vector analysis for urban throughput."
                   icon={Activity}
                   href="/smart-traffic"
@@ -1054,7 +1054,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               </motion.div>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}>
                 <ServiceCard
-                  title="Crowd Dynamics"
+                  title={t("auto.CrowdDynamics_4664") || "Crowd Dynamics"}
                   description="Heatmap generation and entry/exit auditing for high-traffic facility zones."
                   icon={Users}
                   href="/venues"
@@ -1067,7 +1067,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               </motion.div>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }}>
                 <ServiceCard
-                  title="Tactical Alerts"
+                  title={t("auto.TacticalAlerts_854") || "Tactical Alerts"}
                   description="Automated risk score calculation and emergency dispatch protocols."
                   icon={AlertTriangle}
                   href="/smart-incidents"
@@ -1095,7 +1095,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
           {sectionType === 'kinetic' && cameras.length > 0 && (
             <div className="col-span-full mb-2 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest font-mono">Select Camera</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest font-mono">{t("auto.SelectCamera_9328") || "Select Camera"}</span>
                 <select 
                   className={`bg-black/50 border ${theme.borderClass} ${theme.textClass} text-xs font-mono rounded-xl px-4 py-2 outline-none focus:border-${theme.primary}-500/50 transition-colors`}
                   value={activeKineticCameraId || cameras[0]?.id || ''}
@@ -1125,7 +1125,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                     onClick={() => setIsFullscreen(false)}
                     className="absolute top-12 right-12 z-50 bg-rose-500/10 text-rose-500 border border-rose-500/20 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-rose-500/20"
                   >
-                    Close Fullscreen
+                    {t("auto.CloseFullscreen_8785") || "Close Fullscreen"}
                   </button>
                 )}
                 <CameraFeedCard camera={cam} sectionType={sectionType} insights={currentInsights} showHeatmap={showHeatmap} />
@@ -1170,11 +1170,11 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
   
               <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-white/5">
                 <div>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">Venues</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">{t("auto.Venues_9902") || "Venues"}</p>
                   <p className="text-xl font-black text-white font-mono leading-none">{venues.length}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">Edge Nodes</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">{t("auto.EdgeNodes_7901") || "Edge Nodes"}</p>
                   <p className={`text-xl font-black font-mono leading-none ${theme.textSecondary}`}>{cameras.length}</p>
                 </div>
               </div>
@@ -1185,19 +1185,19 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
           {sectionType === "kinetic" && (
             <div className={`bg-[#12121a]/80 backdrop-blur-xl border ${theme.borderClass} rounded-3xl p-6 relative shadow-[0_0_40px_rgba(99,102,241,0.03)] border-t-${theme.primary}-500/40 flex flex-col gap-6`}>
               <div className="flex items-center justify-between">
-                <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Kinetic Intelligence v3</p>
+                <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>{t("auto.KineticIntellig_817") || "Kinetic Intelligence v3"}</p>
                 {(() => {
                   const active = currentInsights?.fusion_state?.sos_activated;
                   return active 
-                    ? <span className="text-[9px] font-mono font-black px-2 py-1 rounded-full border text-rose-400 bg-rose-500/10 border-rose-500/30 animate-pulse">SOS ACTIVATED</span>
-                    : <span className="text-[9px] font-mono font-black px-2 py-1 rounded-full border text-emerald-400 bg-emerald-500/10 border-emerald-500/30">MONITORING</span>;
+                    ? <span className="text-[9px] font-mono font-black px-2 py-1 rounded-full border text-rose-400 bg-rose-500/10 border-rose-500/30 animate-pulse">{t("auto.SOSACTIVATED_9666") || "SOS ACTIVATED"}</span>
+                    : <span className="text-[9px] font-mono font-black px-2 py-1 rounded-full border text-emerald-400 bg-emerald-500/10 border-emerald-500/30">{t("auto.MONITORING_8416") || "MONITORING"}</span>;
                 })()}
               </div>
 
               {/* Confidence Fusion Gauge */}
               <div className="bg-black/40 rounded-2xl p-4 border border-white/5">
                 <div className="flex justify-between items-end mb-3">
-                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">Confidence Fusion Score</span>
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-mono">{t("auto.ConfidenceFusio_3809") || "Confidence Fusion Score"}</span>
                   <span className={`font-black font-mono text-xl leading-none ${currentInsights?.fusion_state?.fusion_score > 70 ? 'text-rose-400' : 'text-emerald-400'}`}>
                     {currentInsights?.fusion_state?.fusion_score || 0}%
                   </span>
@@ -1209,10 +1209,10 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                   />
                 </div>
                 <div className="flex justify-between mt-3 px-1 text-[8px] font-mono text-slate-500">
-                  <span className={currentInsights?.fusion_state?.sos_conf > 30 ? 'text-indigo-400 font-bold' : ''}>GESTURE</span>
-                  <span className={currentInsights?.fusion_state?.audio_conf > 30 ? 'text-indigo-400 font-bold' : ''}>AUDIO</span>
-                  <span className={currentInsights?.fusion_state?.fall_conf > 30 ? 'text-indigo-400 font-bold' : ''}>FALL</span>
-                  <span className={currentInsights?.fusion_state?.motion_conf > 30 ? 'text-indigo-400 font-bold' : ''}>PANIC</span>
+                  <span className={currentInsights?.fusion_state?.sos_conf > 30 ? 'text-indigo-400 font-bold' : ''}>{t("auto.GESTURE_98") || "GESTURE"}</span>
+                  <span className={currentInsights?.fusion_state?.audio_conf > 30 ? 'text-indigo-400 font-bold' : ''}>{t("auto.AUDIO_6434") || "AUDIO"}</span>
+                  <span className={currentInsights?.fusion_state?.fall_conf > 30 ? 'text-indigo-400 font-bold' : ''}>{t("auto.FALL_3391") || "FALL"}</span>
+                  <span className={currentInsights?.fusion_state?.motion_conf > 30 ? 'text-indigo-400 font-bold' : ''}>{t("auto.PANIC_6957") || "PANIC"}</span>
                 </div>
               </div>
 
@@ -1221,7 +1221,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-50" />
                 <div className="flex items-center gap-2 mb-3">
                   <BrainCircuit className="w-4 h-4 text-indigo-400" />
-                  <span className="text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-widest">Randy AI Summary</span>
+                  <span className="text-[10px] font-mono font-bold text-indigo-300 uppercase tracking-widest">{t("auto.RandyAISummary_9579") || "Randy AI Summary"}</span>
                 </div>
                 <pre className="text-[11px] font-mono text-indigo-100/80 whitespace-pre-wrap leading-relaxed">
                   {currentInsights?.fusion_state?.randy_summary || "System optimal. No emergency signals detected."}
@@ -1231,15 +1231,15 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               {/* Emergency Timeline */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>Emergency Timeline</p>
+                  <p className={`${theme.textClass} font-bold text-[10px] uppercase tracking-[0.3em] font-mono`}>{t("auto.EmergencyTimeli_1679") || "Emergency Timeline"}</p>
                   <div className="flex items-center gap-1.5">
                     <div className={`w-1.5 h-1.5 rounded-full ${theme.pulseSecondary}`} />
-                    <span className={`text-[9px] ${theme.textClass}/70 font-mono`}>LIVE</span>
+                    <span className={`text-[9px] ${theme.textClass}/70 font-mono`}>{t("auto.LIVE_112") || "LIVE"}</span>
                   </div>
                 </div>
                 
                 {(!currentInsights?.fusion_state?.timeline || currentInsights.fusion_state.timeline.length === 0) ? (
-                  <p className="text-slate-600 text-[10px] font-mono py-2 italic border-l-2 border-white/5 pl-3">No active events.</p>
+                  <p className="text-slate-600 text-[10px] font-mono py-2 italic border-l-2 border-white/5 pl-3">{t("auto.Noactiveevents_8885") || "No active events."}</p>
                 ) : (
                   <div className="space-y-3 pl-2">
                     {currentInsights.fusion_state.timeline.map((ev: any, i: number) => (
@@ -1285,11 +1285,11 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-white/5 rounded-2xl p-3">
-                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Detected</p>
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">{t("auto.Detected_217") || "Detected"}</p>
                   <p className="text-xl font-black font-mono text-white">{currentInsights?.overall?.occupied ?? currentInsights?.occupied_spots ?? 0}</p>
                 </div>
                 <div className="bg-white/5 rounded-2xl p-3">
-                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Available</p>
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">{t("auto.Available_2179") || "Available"}</p>
                   <p className="text-xl font-black font-mono text-emerald-400">{currentInsights?.overall?.total_available ?? Math.max(0, (currentInsights?.total_slots ?? 50) - (currentInsights?.occupied_spots ?? 0))}</p>
                 </div>
               </div>
@@ -1305,7 +1305,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                   <div key={zoneId} className="flex flex-col gap-2">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-400 uppercase font-bold tracking-widest">Zone {zoneId.toUpperCase()}</span>
-                      <span className="text-white font-black font-mono">{zone.available}/{zone.capacity} <span className="text-slate-500 text-[10px] font-sans">available</span></span>
+                      <span className="text-white font-black font-mono">{zone.available}/{zone.capacity} <span className="text-slate-500 text-[10px] font-sans">{t("auto.available_5242") || "available"}</span></span>
                     </div>
                     <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden flex gap-0.5">
                       {[...Array(Math.min(20, zone.capacity > 0 ? 20 : 1))].map((_, i) => {
@@ -1332,7 +1332,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                 </div>
               </div>
               {detectionEvents.length === 0 ? (
-                <p className="text-slate-600 text-xs font-mono text-center py-4">No detections yet. Inject a frame or activate camera.</p>
+                <p className="text-slate-600 text-xs font-mono text-center py-4">{t("auto.Nodetectionsyet_2295") || "No detections yet. Inject a frame or activate camera."}</p>
               ) : (
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {detectionEvents.slice(0, 15).map((ev, i) => (
@@ -1359,8 +1359,8 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                   <BrainCircuit className="w-5 h-5 text-fuchsia-400" />
                 </div>
                 <div>
-                  <h3 className="font-black text-fuchsia-100 tracking-[0.1em] text-xs uppercase">Decision Engine</h3>
-                  <span className="text-[9px] text-fuchsia-500/60 font-mono font-bold tracking-widest uppercase">Autonomous Phase</span>
+                  <h3 className="font-black text-fuchsia-100 tracking-[0.1em] text-xs uppercase">{t("auto.DecisionEngine_1355") || "Decision Engine"}</h3>
+                  <span className="text-[9px] text-fuchsia-500/60 font-mono font-bold tracking-widest uppercase">{t("auto.AutonomousPhase_3203") || "Autonomous Phase"}</span>
                 </div>
               </div>
               <div className="relative">

@@ -819,7 +819,7 @@ export default function LandingPage() {
                     marginTop: -4,
                   }}
                 >
-                  <Typewriter words={["Surveillance", "Security", "Monitoring", "Prediction"]} />
+                  <Typewriter words={["Intelligence", "Prediction", "Resonance", "Autonomy"]} />
                 </motion.div>
               </div>
 
@@ -834,8 +834,8 @@ export default function LandingPage() {
                   maxWidth: 560, lineHeight: 1.75, marginBottom: 48,
                 }}
               >
-                Real-time footfall analysis, suspicious activity detection, zone intelligence,
-                smart alerts, and predictive monitoring —{" "}
+                Kinetic SOS behavioral tracking, AEGIS protocol deployment, Resonance structural health monitoring,
+                and AI Green Wave traffic intelligence —{" "}
                 <span style={{ color: "#ffffff", fontWeight: 600 }}>{t("auto.poweredbynextge_2611") || "powered by next-gen AI"}</span>.
               </motion.p>
 

@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import { useTranslation } from "react-i18next";
+import {
     ArrowLeft, 
     Waves, 
     Droplets,
@@ -33,6 +34,8 @@ const AquaticBackground = () => (
 );
 
 export default function SmartLiquidThreatPage() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     
@@ -357,21 +360,21 @@ export default function SmartLiquidThreatPage() {
                             <div className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all shadow-[0_0_15px_rgba(0,0,0,0.3)]">
                                 <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors group-hover:-translate-x-0.5" />
                             </div>
-                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">Back</span>
+                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">{t("auto.Back_4341") || "Back"}</span>
                         </button>
 
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <Waves className="w-5 h-5 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
                                 <span className="text-[11px] font-black uppercase tracking-[0.2em] text-cyan-400">
-                                    Innovator Demo Engine Active
+                                    {t("auto.InnovatorDemoEn_4551") || "Innovator Demo Engine Active"}
                                 </span>
                             </div>
                             <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.1)] mb-2">
-                                Laminar Flood <span className="text-cyan-400">Intelligence Network</span>
+                                {t("auto.LaminarFlood_2648") || "Laminar Flood"} <span className="text-cyan-400">{t("auto.IntelligenceNet_6671") || "Intelligence Network"}</span>
                             </h1>
                             <p className="text-xs md:text-sm font-bold text-slate-400 tracking-widest uppercase flex items-center gap-2">
-                                Multi-Node Omni-Base Calibration & City Response OS
+                                {t("auto.MultiNodeOmniBa_8797") || "Multi-Node Omni-Base Calibration & City Response OS"}
                             </p>
                         </div>
                     </div>
@@ -379,10 +382,10 @@ export default function SmartLiquidThreatPage() {
                     <div className="flex items-center gap-3">
                         <div className="px-4 py-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center gap-3 shadow-[0_0_15px_rgba(34,211,238,0.15)]">
                             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shadow-[0_0_8px_rgba(34,211,238,1)]"></span>
-                            <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em]">Sensors Active</span>
+                            <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em]">{t("auto.SensorsActive_4449") || "Sensors Active"}</span>
                         </div>
                         {isAnalyzing && (
-                            <button onClick={resetSystem} className="p-2 bg-rose-500/10 border border-rose-500/30 rounded-xl hover:bg-rose-500/20 transition-all text-rose-400" title="Reset Demo">
+                            <button onClick={resetSystem} className="p-2 bg-rose-500/10 border border-rose-500/30 rounded-xl hover:bg-rose-500/20 transition-all text-rose-400" title={t("auto.ResetDemo_1130") || "Reset Demo"}>
                                 <Trash2 className="w-5 h-5" />
                             </button>
                         )}
@@ -408,14 +411,14 @@ export default function SmartLiquidThreatPage() {
                                 <Droplets className="w-20 h-20 text-cyan-500" strokeWidth={1} />
                             </motion.div>
                             
-                            <h2 className="text-3xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">Global Flood Monitors Online</h2>
+                            <h2 className="text-3xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">{t("auto.GlobalFloodMoni_4625") || "Global Flood Monitors Online"}</h2>
                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest max-w-lg text-center leading-relaxed mb-12">
-                                Upload underpass CCTV footage containing pedestrians or vehicles. Omni-Base AI will dynamically calibrate depth and trigger the City OS.
+                                {t("auto.Uploadunderpass_3531") || "Upload underpass CCTV footage containing pedestrians or vehicles. Omni-Base AI will dynamically calibrate depth and trigger the City OS."}
                             </p>
                             
                             <label className="cursor-pointer relative z-10 group/btn flex flex-col items-center">
                                 <div className="px-8 py-4 rounded-xl bg-cyan-500 text-black font-black uppercase tracking-widest flex items-center gap-3 transition-all group-hover/btn:bg-cyan-400 group-hover/btn:scale-105 shadow-[0_0_30px_rgba(34,211,238,0.4)]">
-                                    <UploadCloud className="w-6 h-6" /> Start Intelligence Network
+                                    <UploadCloud className="w-6 h-6" /> {t("auto.StartIntelligen_4261") || "Start Intelligence Network"}
                                 </div>
                                 <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
                             </label>
@@ -430,8 +433,8 @@ export default function SmartLiquidThreatPage() {
                             <div className="lg:col-span-3 flex flex-col gap-6">
                                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-4 flex items-center justify-between">
                                     <div className="flex gap-2">
-                                        <div className="px-2 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Video className="w-3 h-3"/> Uploaded</div>
-                                        <div className="px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-black text-cyan-400 uppercase tracking-widest flex items-center gap-1 shadow-[0_0_10px_rgba(34,211,238,0.1)]"><Camera className="w-3 h-3"/> Live Stream</div>
+                                        <div className="px-2 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Video className="w-3 h-3"/> {t("auto.Uploaded_1042") || "Uploaded"}</div>
+                                        <div className="px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-black text-cyan-400 uppercase tracking-widest flex items-center gap-1 shadow-[0_0_10px_rgba(34,211,238,0.1)]"><Camera className="w-3 h-3"/> {t("auto.LiveStream_8006") || "Live Stream"}</div>
                                     </div>
                                 </div>
 
@@ -479,23 +482,23 @@ export default function SmartLiquidThreatPage() {
                                 </div>
 
                                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-5 flex-grow flex flex-col">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500 mb-4 flex items-center gap-2"><Activity className="w-4 h-4"/> Live Telemetry</h3>
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500 mb-4 flex items-center gap-2"><Activity className="w-4 h-4"/> {t("auto.LiveTelemetry_9011") || "Live Telemetry"}</h3>
                                     
                                     <div className="flex-grow space-y-3 font-mono text-[11px]">
                                         <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                            <span className="text-slate-400">Water Coverage</span>
+                                            <span className="text-slate-400">{t("auto.WaterCoverage_7278") || "Water Coverage"}</span>
                                             <span className={`font-bold ${metrics.waterCoverage > 50 ? 'text-amber-400' : 'text-cyan-400'}`}>{metrics.waterCoverage.toFixed(1)}%</span>
                                         </div>
                                         <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                            <span className="text-slate-400">Traffic Disruption</span>
+                                            <span className="text-slate-400">{t("auto.TrafficDisrupti_5226") || "Traffic Disruption"}</span>
                                             <span className={`font-bold ${metrics.trafficDisruption > 50 ? 'text-rose-400' : 'text-cyan-400'}`}>{metrics.trafficDisruption.toFixed(1)}/100</span>
                                         </div>
                                         <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                            <span className="text-slate-400">Road Visibility Loss</span>
+                                            <span className="text-slate-400">{t("auto.RoadVisibilityL_5816") || "Road Visibility Loss"}</span>
                                             <span className={`font-bold ${metrics.roadVisibility > 50 ? 'text-amber-400' : 'text-cyan-400'}`}>{metrics.roadVisibility.toFixed(1)}%</span>
                                         </div>
                                         <div className="flex justify-between items-center pb-2">
-                                            <span className="text-slate-400">Rise Trend</span>
+                                            <span className="text-slate-400">{t("auto.RiseTrend_2096") || "Rise Trend"}</span>
                                             <span className={`font-bold ${metrics.riseTrend > 20 ? 'text-rose-400' : 'text-cyan-400'}`}>+{metrics.riseTrend.toFixed(1)}%</span>
                                         </div>
                                     </div>
@@ -504,7 +507,7 @@ export default function SmartLiquidThreatPage() {
 
                             <div className="lg:col-span-5 flex flex-col gap-6">
                                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-center relative overflow-hidden h-[200px]">
-                                    <h3 className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-500 mb-0">Flood Severity Index</h3>
+                                    <h3 className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-500 mb-0">{t("auto.FloodSeverityIn_716") || "Flood Severity Index"}</h3>
                                     <motion.div 
                                         key={Math.floor(currentSeverity)}
                                         initial={{ scale: 0.8, opacity: 0 }}
@@ -519,19 +522,19 @@ export default function SmartLiquidThreatPage() {
                                 </div>
 
                                 <div className="bg-[#0f172a] border border-indigo-900/40 rounded-3xl p-6 relative overflow-hidden flex-grow flex flex-col shadow-[inset_0_0_30px_rgba(99,102,241,0.05)]">
-                                    <h3 className="text-xl font-black uppercase tracking-[0.1em] text-white mb-5">AI Real-Time Triggers</h3>
+                                    <h3 className="text-xl font-black uppercase tracking-[0.1em] text-white mb-5">{t("auto.AIRealTimeTrigg_8846") || "AI Real-Time Triggers"}</h3>
                                     <div className="space-y-4 text-sm font-mono text-slate-300 font-bold flex-grow">
-                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 25 ? 'text-emerald-500' : 'text-slate-600'}`} /> Citizen Alert Condition Met</div>
-                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 50 ? 'text-emerald-500' : 'text-slate-600'}`} /> Guardian Rerouting Triggered</div>
-                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 75 ? 'text-emerald-500' : 'text-slate-600'}`} /> Green Wave Escalation Active</div>
-                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 75 ? 'text-emerald-500' : 'text-slate-600'}`} /> Incident Hub Command Generated</div>
+                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 25 ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.CitizenAlertCon_1437") || "Citizen Alert Condition Met"}</div>
+                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 50 ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.GuardianRerouti_2059") || "Guardian Rerouting Triggered"}</div>
+                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 75 ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.GreenWaveEscala_6609") || "Green Wave Escalation Active"}</div>
+                                        <div className="flex items-center gap-3"><CheckCircle2 className={`w-5 h-5 flex-shrink-0 ${currentSeverity > 75 ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.IncidentHubComm_6887") || "Incident Hub Command Generated"}</div>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="lg:col-span-4 flex flex-col gap-5">
                                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-5 h-[280px] flex flex-col">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2 flex-shrink-0"><Bell className="w-4 h-4"/> Notification Center</h3>
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2 flex-shrink-0"><Bell className="w-4 h-4"/> {t("auto.NotificationCen_476") || "Notification Center"}</h3>
                                     <div className="flex-grow space-y-3 overflow-y-auto pr-2 flex flex-col custom-scrollbar">
                                         <AnimatePresence>
                                             {logs.map((log, i) => (
@@ -560,7 +563,7 @@ export default function SmartLiquidThreatPage() {
                                                     {log.screenshotUrl && (
                                                         <div className="mt-2 rounded border border-white/20 overflow-hidden relative shadow-[0_0_10px_rgba(0,0,0,0.5)]">
                                                             <img src={log.screenshotUrl} alt="evidence" className="w-full h-auto max-h-[100px] object-cover opacity-90" />
-                                                            <div className="absolute top-1 right-1 bg-black/80 px-2 py-1 rounded text-[8px] font-black uppercase text-cyan-400 border border-cyan-500/30 tracking-widest backdrop-blur-md">Evidence Captured</div>
+                                                            <div className="absolute top-1 right-1 bg-black/80 px-2 py-1 rounded text-[8px] font-black uppercase text-cyan-400 border border-cyan-500/30 tracking-widest backdrop-blur-md">{t("auto.EvidenceCapture_2686") || "Evidence Captured"}</div>
                                                         </div>
                                                     )}
                                                 </motion.div>
@@ -572,12 +575,12 @@ export default function SmartLiquidThreatPage() {
                                 <div className={`border rounded-3xl p-5 transition-all duration-500 ${currentSeverity > 75 ? 'bg-emerald-950/20 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'bg-[#0f172a] border-slate-800'}`}>
                                     <div className="flex items-center gap-2 mb-4">
                                         <Route className={`w-4 h-4 ${currentSeverity > 75 ? 'text-emerald-400' : 'text-slate-500'}`} />
-                                        <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${currentSeverity > 75 ? 'text-emerald-400' : 'text-slate-400'}`}>Green Wave Link</h3>
+                                        <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${currentSeverity > 75 ? 'text-emerald-400' : 'text-slate-400'}`}>{t("auto.GreenWaveLink_1433") || "Green Wave Link"}</h3>
                                     </div>
                                     {currentSeverity > 75 ? (
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 font-mono text-xs font-bold">
                                             <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-slate-300">
-                                                <div className="text-[9px] uppercase tracking-widest text-slate-500 mb-1">Old Route</div>
+                                                <div className="text-[9px] uppercase tracking-widest text-slate-500 mb-1">{t("auto.OldRoute_2351") || "Old Route"}</div>
                                                 <div className="flex justify-between items-center">
                                                     <span>{selectedCamera.replace(/_/g, ' ')}</span>
                                                     <span className="text-rose-400">❌ BLOCKED</span>
@@ -585,38 +588,38 @@ export default function SmartLiquidThreatPage() {
                                             </div>
                                             <div className="flex justify-center"><ArrowLeft className="w-4 h-4 text-emerald-500 -rotate-90" /></div>
                                             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-white">
-                                                <div className="text-[9px] uppercase tracking-widest text-emerald-600 mb-1">New Route</div>
+                                                <div className="text-[9px] uppercase tracking-widest text-emerald-600 mb-1">{t("auto.NewRoute_6040") || "New Route"}</div>
                                                 <div className="flex justify-between items-center">
-                                                    <span>Outer Ring Access</span>
+                                                    <span>{t("auto.OuterRingAccess_8066") || "Outer Ring Access"}</span>
                                                     <span className="text-emerald-400">✓ ACTIVE</span>
                                                 </div>
                                             </div>
                                         </motion.div>
                                     ) : (
-                                        <div className="text-[10px] font-mono text-slate-600 py-6 text-center">Awaiting Critical Escalation...</div>
+                                        <div className="text-[10px] font-mono text-slate-600 py-6 text-center">{t("auto.AwaitingCritica_3712") || "Awaiting Critical Escalation..."}</div>
                                     )}
                                 </div>
 
                                 <div className={`border rounded-3xl p-5 transition-all duration-500 ${currentSeverity > 25 ? 'bg-blue-950/20 border-blue-500/50' : 'bg-[#0f172a] border-slate-800'}`}>
                                     <div className="flex items-center gap-2 mb-4">
                                         <Smartphone className={`w-4 h-4 ${currentSeverity > 25 ? 'text-blue-400' : 'text-slate-500'}`} />
-                                        <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${currentSeverity > 25 ? 'text-blue-400' : 'text-slate-400'}`}>Citizen Alert Network</h3>
+                                        <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${currentSeverity > 25 ? 'text-blue-400' : 'text-slate-400'}`}>{t("auto.CitizenAlertNet_9366") || "Citizen Alert Network"}</h3>
                                     </div>
                                     {currentSeverity > 25 ? (
                                         <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
                                             <div className="grid grid-cols-2 gap-3 text-center mb-4">
                                                 <div className="bg-black/40 rounded-xl p-2 border border-white/5">
                                                     <div className="text-lg font-mono font-black text-white">3.2 <span className="text-[10px] text-slate-500">km</span></div>
-                                                    <div className="text-[8px] uppercase tracking-widest text-blue-400 mt-1">Broadcast Radius</div>
+                                                    <div className="text-[8px] uppercase tracking-widest text-blue-400 mt-1">{t("auto.BroadcastRadius_222") || "Broadcast Radius"}</div>
                                                 </div>
                                                 <div className="bg-black/40 rounded-xl p-2 border border-white/5">
                                                     <div className="text-lg font-mono font-black text-white">1,842</div>
-                                                    <div className="text-[8px] uppercase tracking-widest text-blue-400 mt-1">Devices Reached</div>
+                                                    <div className="text-[8px] uppercase tracking-widest text-blue-400 mt-1">{t("auto.DevicesReached_8210") || "Devices Reached"}</div>
                                                 </div>
                                             </div>
                                             <div className="bg-blue-600/20 border border-blue-500/50 rounded-xl p-3">
                                                 <div className="flex justify-between items-center mb-2">
-                                                    <span className="text-[10px] font-bold text-blue-200">Safe Route Generated</span>
+                                                    <span className="text-[10px] font-bold text-blue-200">{t("auto.SafeRouteGenera_7681") || "Safe Route Generated"}</span>
                                                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">✓ Sent</span>
                                                 </div>
                                                 <div className="text-[9px] text-slate-300 font-mono mt-1 border-t border-blue-500/30 pt-2">
@@ -625,7 +628,7 @@ export default function SmartLiquidThreatPage() {
                                             </div>
                                         </motion.div>
                                     ) : (
-                                        <div className="text-[10px] font-mono text-slate-600 py-4 text-center">Standby...</div>
+                                        <div className="text-[10px] font-mono text-slate-600 py-4 text-center">{t("auto.Standby_9804") || "Standby..."}</div>
                                     )}
                                 </div>
                             </div>

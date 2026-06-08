@@ -8,6 +8,7 @@ import { api } from "@/services/api";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
 import ElectricBorder from "@/components/react-bits/ElectricBorder";
 import SplashCursor from "@/components/react-bits/SplashCursor";
+import { useTranslation } from "react-i18next";
 
 // Trajectory Interface
 interface TrajectoryPoint {
@@ -22,14 +23,17 @@ interface TrajectoryPoint {
 }
 
 interface AmberResponse {
-    subject_id: str;
-    status: str;
+    subject_id: string;
+    status: string;
     total_cameras_scanned: number;
     trajectory: TrajectoryPoint[];
 }
 
 export default function AmberDashboard() {
-    const { venue } = useActiveVenue();
+  const { t } = useTranslation();
+
+    const { activeVenueId } = useActiveVenue();
+    const venue = activeVenueId ? { id: activeVenueId, name: 'Local Venue' } : null;
     const [isDragging, setIsDragging] = useState(false);
     const [imageToUpload, setImageToUpload] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -179,11 +183,11 @@ export default function AmberDashboard() {
                     </div>
                     <div>
                         <h1 className="text-4xl font-black font-heading tracking-tighter uppercase text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-300">
-                            ZERO-LATENCY AMBER RESCUE
+                            {t("auto.ZEROLATENCYAMBE_1306") || "ZERO-LATENCY AMBER RESCUE"}
                         </h1>
                         <p className="font-mono text-xs text-red-400/80 tracking-[0.2em] uppercase mt-1 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-                            Cross-Camera Neural Semantic Mapping Matrix
+                            {t("auto.CrossCameraNeur_9752") || "Cross-Camera Neural Semantic Mapping Matrix"}
                         </p>
                     </div>
                 </div>
@@ -194,7 +198,7 @@ export default function AmberDashboard() {
                     className="flex items-center gap-2 px-6 py-3 rounded-xl border border-red-500/50 bg-red-950/40 text-red-400 hover:bg-red-900/50 hover:text-red-300 transition-all font-bold uppercase tracking-widest text-xs"
                 >
                     <AlertTriangle className="w-4 h-4" />
-                    Open Public SOS Portal
+                    {t("auto.OpenPublicSOSPo_6213") || "Open Public SOS Portal"}
                 </a>
             </header>
 
@@ -227,10 +231,10 @@ export default function AmberDashboard() {
                                             className="px-8 py-4 bg-red-600 hover:bg-red-500 transition-all font-black uppercase text-xl rounded-xl shadow-[0_0_40px_rgba(239,68,68,0.6)] flex items-center gap-3 text-white tracking-widest hover:scale-105 active:scale-95"
                                         >
                                             <ScanLine className="w-6 h-6 animate-pulse" />
-                                            Issue AMBER Override
+                                            {t("auto.IssueAMBEROverr_9700") || "Issue AMBER Override"}
                                         </button>
                                         <p className="text-red-500/60 font-mono text-xs mt-4 uppercase tracking-widest text-center">
-                                            WARNING: This action bypasses standard node priorities to inject raw semantic embeddings across all spatial matrices.
+                                            {t("auto.WARNINGThisacti_667") || "WARNING: This action bypasses standard node priorities to inject raw semantic embeddings across all spatial matrices."}
                                         </p>
                                     </div>
                                 ) : (
@@ -238,8 +242,8 @@ export default function AmberDashboard() {
                                         <div className="w-24 h-24 rounded-full bg-red-950 flex items-center justify-center mb-6 shadow-inner border border-red-900">
                                             <Upload className="w-10 h-10 text-red-500 opacity-60" />
                                         </div>
-                                        <h3 className="text-xl font-bold uppercase tracking-widest mb-2 text-red-400">Upload Subject Image</h3>
-                                        <p className="text-red-500/50 font-medium text-sm">Drag and drop photo here to extract target embeddings</p>
+                                        <h3 className="text-xl font-bold uppercase tracking-widest mb-2 text-red-400">{t("auto.UploadSubjectIm_6582") || "Upload Subject Image"}</h3>
+                                        <p className="text-red-500/50 font-medium text-sm">{t("auto.Draganddropphot_9328") || "Drag and drop photo here to extract target embeddings"}</p>
                                     </>
                                 )}
                             </div>
@@ -261,7 +265,7 @@ export default function AmberDashboard() {
                                     <Target className="w-16 h-16 text-red-400 animate-spin" style={{ animationDuration: '3s' }} />
                                 </div>
                             </div>
-                            <h2 className="text-2xl font-black tracking-[0.2em] uppercase text-red-400 mb-2">Extracting Semantic Vectors</h2>
+                            <h2 className="text-2xl font-black tracking-[0.2em] uppercase text-red-400 mb-2">{t("auto.ExtractingSeman_6599") || "Extracting Semantic Vectors"}</h2>
                             <p className="text-sm text-red-500/60 font-mono tracking-widest mb-8">Cross-referencing embeddings against {venue?.name || 'Local Venue'} Matrix...</p>
 
                             <div className="w-full max-w-sm mt-8 space-y-2 text-left font-mono text-xs uppercase tracking-widest text-red-500/70">
@@ -298,22 +302,22 @@ export default function AmberDashboard() {
                             <div className="flex flex-col gap-6">
                                 <div className="bg-[#0A0000] border border-red-900/40 rounded-3xl p-6 relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 rounded-full blur-2xl" />
-                                    <h3 className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-4">Network Scale</h3>
+                                    <h3 className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-4">{t("auto.NetworkScale_1565") || "Network Scale"}</h3>
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-end border-b border-red-900/30 pb-2">
-                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">Connected Cameras</span>
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">{t("auto.ConnectedCamera_8680") || "Connected Cameras"}</span>
                                             <span className="text-lg font-mono font-black text-white">127</span>
                                         </div>
                                         <div className="flex justify-between items-end border-b border-red-900/30 pb-2">
-                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">Active Searches</span>
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">{t("auto.ActiveSearches_6683") || "Active Searches"}</span>
                                             <span className="text-lg font-mono font-black text-white">6</span>
                                         </div>
                                         <div className="flex justify-between items-end border-b border-red-900/30 pb-2">
-                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">City Coverage</span>
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">{t("auto.CityCoverage_3018") || "City Coverage"}</span>
                                             <span className="text-lg font-mono font-black text-white">8.4 KM</span>
                                         </div>
                                         <div className="flex justify-between items-end">
-                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">Scan Speed</span>
+                                            <span className="text-xs text-red-100/50 uppercase tracking-wider">{t("auto.ScanSpeed_8541") || "Scan Speed"}</span>
                                             <span className="text-lg font-mono font-black text-white">0.8 SEC</span>
                                         </div>
                                     </div>
@@ -323,7 +327,7 @@ export default function AmberDashboard() {
                                     <div className="absolute top-0 left-0 w-32 h-32 bg-sky-500/10 rounded-full blur-3xl" />
                                     <h3 className="text-[10px] font-black uppercase text-sky-400 tracking-widest mb-4 flex items-center gap-2">
                                         <ShieldAlert className="w-4 h-4" />
-                                        Randy AI Investigation
+                                        {t("auto.RandyAIInvestig_190") || "Randy AI Investigation"}
                                     </h3>
                                     
                                     <div className="space-y-4 text-xs font-mono text-sky-100/80 leading-relaxed">
@@ -340,7 +344,7 @@ export default function AmberDashboard() {
                                 <div className="absolute top-5 left-5 z-20 flex gap-3">
                                     <div className="px-4 py-2 rounded-full bg-red-500 border border-red-400 text-white font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(239,68,68,0.8)] animate-pulse flex items-center gap-2">
                                         <AlertCircle className="w-4 h-4" />
-                                        Target Acquired
+                                        {t("auto.TargetAcquired_5771") || "Target Acquired"}
                                     </div>
                                     <div className="px-4 py-2 rounded-full bg-[#110000] border border-red-900/50 text-red-500 font-mono text-xs tracking-widest">
                                         {amberData.subject_id}
@@ -362,12 +366,12 @@ export default function AmberDashboard() {
                                                 {livePoint.camera_name}
                                                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                                             </h3>
-                                            <p className="text-red-400 text-xs font-bold uppercase tracking-widest mb-4">Live Spatial Location</p>
+                                            <p className="text-red-400 text-xs font-bold uppercase tracking-widest mb-4">{t("auto.LiveSpatialLoca_23") || "Live Spatial Location"}</p>
 
                                             <div className="flex items-center gap-4 border-t border-red-900/50 pt-4">
                                                 {(livePoint.snapshot_path || previewUrl) && <img src={livePoint.snapshot_path ? (livePoint.snapshot_path.startsWith('http') ? livePoint.snapshot_path : (livePoint.snapshot_path.startsWith('/') ? livePoint.snapshot_path : `/${livePoint.snapshot_path}`)) : previewUrl!} className="w-16 h-16 rounded-xl border border-red-500/50 object-cover" />}
                                                 <div>
-                                                    <p className="text-white text-lg font-mono font-black">{formatTime(livePoint.timestamp)} <span className="text-xs text-red-500 ml-1">LST</span></p>
+                                                    <p className="text-white text-lg font-mono font-black">{formatTime(livePoint.timestamp)} <span className="text-xs text-red-500 ml-1">{t("auto.LST_4575") || "LST"}</span></p>
                                                     <p className="text-[10px] text-red-500/70 font-mono tracking-widest mt-1">CONF: {Math.round(livePoint.confidence * 100)}% MATCH</p>
                                                 </div>
                                             </div>
@@ -390,7 +394,7 @@ export default function AmberDashboard() {
                                 <div className="absolute right-0 top-0 w-32 h-32 bg-red-900/20 blur-[60px]" />
 
                                 <h2 className="font-bold text-sm tracking-widest text-red-500 uppercase flex items-center gap-2 mb-6">
-                                    <Activity className="w-4 h-4" /> Neural Trajectory Log
+                                    <Activity className="w-4 h-4" /> {t("auto.NeuralTrajector_2388") || "Neural Trajectory Log"}
                                 </h2>
 
                                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 relative">
@@ -445,14 +449,14 @@ export default function AmberDashboard() {
                                     onClick={() => setDroneDeployed(true)}
                                     className="w-full py-4 mt-4 bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white rounded-xl font-black uppercase tracking-[0.2em] text-[10px] transition-all shadow-[0_0_30px_rgba(239,68,68,0.5)] flex justify-center items-center gap-3 animate-pulse hover:scale-[1.02]"
                                 >
-                                    <Target className="w-4 h-4" /> Deploy Autonomous Drone Pursuit
+                                    <Target className="w-4 h-4" /> {t("auto.DeployAutonomou_591") || "Deploy Autonomous Drone Pursuit"}
                                 </button>
 
                                 <button
                                     onClick={() => setAmberData(null)}
                                     className="w-full py-3 bg-red-950 hover:bg-red-900 text-red-400 border border-red-900 hover:border-red-500/50 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all flex justify-center items-center gap-2 mt-4"
                                 >
-                                    <ArrowRight className="w-4 h-4 rotate-180" /> Clear Operation
+                                    <ArrowRight className="w-4 h-4 rotate-180" /> {t("auto.ClearOperation_9094") || "Clear Operation"}
                                 </button>
                             </div>
                         </motion.div>
@@ -477,7 +481,7 @@ export default function AmberDashboard() {
                                         UAV-7 "NIGHTHAWK" LIVE THERMAL FEED
                                     </div>
                                     <button onClick={() => setDroneDeployed(false)} className="text-slate-400 hover:text-white px-3 py-1.5 bg-white/5 hover:bg-red-900/50 rounded flex items-center gap-2 border border-white/10 hover:border-red-500/50 uppercase text-[10px] tracking-widest font-bold transition-all">
-                                        <ArrowRight className="w-3 h-3 rotate-180" /> Abort Protocol
+                                        <ArrowRight className="w-3 h-3 rotate-180" /> {t("auto.AbortProtocol_5530") || "Abort Protocol"}
                                     </button>
                                 </div>
                                 
@@ -541,8 +545,8 @@ export default function AmberDashboard() {
                                     <div className="absolute top-6 right-6 text-red-500 font-mono text-[10px] font-bold space-y-1 text-right opacity-80 tracking-widest">
                                         <div>MODE: <span className="text-emerald-400 animate-pulse">AUTONOMOUS_PURSUIT</span></div>
                                         <div>BAT: <span className="text-white">84%</span></div>
-                                        <div>GIMBAL: <span className="text-white">LOCKED</span></div>
-                                        <div className="pt-2 text-red-500/50 flex items-center justify-end gap-2"><div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"/> RECORDING</div>
+                                        <div>GIMBAL: <span className="text-white">{t("auto.LOCKED_3933") || "LOCKED"}</span></div>
+                                        <div className="pt-2 text-red-500/50 flex items-center justify-end gap-2"><div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"/> {t("auto.RECORDING_344") || "RECORDING"}</div>
                                     </div>
                                 </div>
                             </div>

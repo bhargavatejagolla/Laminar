@@ -254,7 +254,7 @@ export default function LoginPage() {
                   <label style={{ display: "block", fontSize: "0.58rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: "9px", color: focusedField === "email" ? "#6aabff" : "#2d3f5a", transition: "color 0.35s" }}>{t("auto.OperatorID_5484") || "Operator ID"}</label>
                   <div style={{ position: "relative" }}>
                     <Mail style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, color: focusedField === "email" ? "#5a9fff" : "#2d3f5a", transition: "color 0.35s", pointerEvents: "none" }} />
-                    <motion.input type="email" placeholder="operator@laminar.ai" value={email} onChange={e => setEmail(e.target.value)} onFocus={() => setFocusedField("email")} onBlur={() => setFocusedField(null)}
+                    <motion.input type="email" placeholder={t("auto.operatorlaminar_7295") || "operator@laminar.ai"} value={email} onChange={e => setEmail(e.target.value)} onFocus={() => setFocusedField("email")} onBlur={() => setFocusedField(null)}
                       animate={{ boxShadow: focusedField === "email" ? "0 0 0 1px rgba(80,140,255,0.55),0 0 22px rgba(80,140,255,0.12)" : "0 0 0 0px rgba(80,140,255,0)" }}
                       style={{ width: "100%", background: "rgba(6,9,28,0.9)", border: `1px solid ${focusedField === "email" ? "rgba(80,140,255,0.55)" : "rgba(80,140,255,0.1)"}`, borderRadius: "13px", color: "#e2e8f0", fontSize: "0.875rem", padding: "14px 15px 14px 42px", outline: "none", transition: "border-color 0.35s", fontFamily: "inherit" }} />
                   </div>

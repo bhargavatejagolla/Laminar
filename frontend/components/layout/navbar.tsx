@@ -67,7 +67,7 @@ export default function Navbar() {
         <button 
           onClick={toggleSidebar}
           className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-all duration-300 focus:outline-none border border-transparent hover:border-cyan-500/30"
-          title="Toggle Sidebar"
+          title={t("auto.ToggleSidebar_4486") || "Toggle Sidebar"}
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -109,7 +109,7 @@ export default function Navbar() {
         <NotificationBell />
 
         {/* Crowd Alert Bell (links to /alerts) */}
-        <Link href="/alerts" className="relative p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-300 group border border-transparent hover:border-white/20" title="Crowd Alerts">
+        <Link href="/alerts" className="relative p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-300 group border border-transparent hover:border-white/20" title={t("auto.CrowdAlerts_5587") || "Crowd Alerts"}>
           <Shield className={`w-5 h-5 transition-colors ${activeAlertsCount > 0 ? "text-rose-400 group-hover:text-rose-300" : "group-hover:text-cyan-400"}`} />
           {activeAlertsCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] flex items-center justify-center rounded-full bg-rose-500 text-[11px] font-black text-white border-[3px] border-[#000000] shadow-[0_0_15px_rgba(244,63,94,0.8)]">
@@ -161,7 +161,7 @@ export default function Navbar() {
         <button 
           onClick={handleLogoutClick}
           className="p-2.5 ml-1 rounded-xl bg-white/5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-all duration-300 border border-transparent hover:border-rose-500/30"
-          title="Sign out"
+          title={t("auto.Signout_6150") || "Sign out"}
         >
           <LogOut className="w-5 h-5" />
         </button>

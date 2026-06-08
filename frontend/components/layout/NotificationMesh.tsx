@@ -14,6 +14,7 @@ import {
   ParkingCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 interface MeshNotification {
   id: string;
@@ -27,6 +28,8 @@ interface MeshNotification {
 }
 
 export function NotificationMesh() {
+  const { t } = useTranslation();
+
   const [activeAlerts, setActiveAlerts] = useState<MeshNotification[]>([]);
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export function NotificationMesh() {
                  : n.domain === 'traffic' ? <TrafficCone className="w-4 h-4 text-amber-500" />
                  : <ParkingCircle className="w-4 h-4 text-cyan-500" />;
 
-      toast.custom((t) => (
+      toast.custom((toastId) => (
         <div className={`
           flex flex-col gap-2 p-4 min-w-[320px] bg-[#0a0a0f] border rounded-2xl shadow-2xl backdrop-blur-xl
           ${n.priority === 'CRITICAL' ? 'border-rose-500/50 shadow-rose-500/10' : 'border-white/10'}
@@ -92,7 +95,7 @@ export function NotificationMesh() {
              <div>
                 <h4 className="text-sm font-bold text-white uppercase tracking-tight flex items-center gap-2">
                     {n.type} 
-                    {n.priority === 'CRITICAL' && <div className="px-1.5 py-0.5 bg-rose-500 text-[8px] font-black rounded uppercase">Alert</div>}
+                    {n.priority === 'CRITICAL' && <div className="px-1.5 py-0.5 bg-rose-500 text-[8px] font-black rounded uppercase">{t("auto.Alert_5041") || "Alert"}</div>}
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1 leading-relaxed italic line-clamp-2">"{n.description}"</p>
              </div>
@@ -104,10 +107,10 @@ export function NotificationMesh() {
                 {n.venue_id ? "SECTOR_7_CENTRAL" : "GLOBAL_STRATUM"}
              </div>
              <button 
-               onClick={() => toast.dismiss(t)}
+               onClick={() => toast.dismiss(toastId)}
                className="text-[9px] font-black uppercase tracking-widest text-cyan-400 hover:text-cyan-300 transition-colors"
              >
-                Acknowledge
+                {t("auto.Acknowledge_6781") || "Acknowledge"}
              </button>
           </div>
         </div>
@@ -122,7 +125,7 @@ export function NotificationMesh() {
           <div className="flex items-center justify-between px-2 mb-1">
              <div className="flex items-center gap-2">
                 <Zap className="w-3 h-3 text-cyan-400 animate-pulse" />
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Neural Link Active</span>
+                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">{t("auto.NeuralLinkActiv_5696") || "Neural Link Active"}</span>
              </div>
              <span className="text-[8px] text-slate-600 font-mono uppercase tracking-widest">v5.0_Mesh</span>
           </div>

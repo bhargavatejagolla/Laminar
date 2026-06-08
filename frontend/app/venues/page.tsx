@@ -220,7 +220,7 @@ export default function VenuesPage() {
                   <button
                     onClick={e => { e.stopPropagation(); handleDelete(venue); }}
                     disabled={deletingId === venue.id}
-                    title="Delete venue"
+                    title={t("auto.Deletevenue_5669") || "Delete venue"}
                     className="absolute -top-2 -right-2 opacity-0 group-hover/wrap:opacity-100 transition-opacity p-2 rounded-full bg-rose-500/20 text-rose-400 hover:bg-rose-500/40 border border-rose-500/50 disabled:opacity-50 z-10 backdrop-blur-md shadow-[0_0_10px_rgba(244,63,94,0.3)]"
                   >
                     {deletingId === venue.id ? (

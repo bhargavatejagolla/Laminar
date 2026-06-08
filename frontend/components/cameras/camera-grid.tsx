@@ -176,14 +176,14 @@ export default function CameraGrid({ cameras, isLoading }: Props) {
                     }
                   }}
                   className="flex items-center justify-center p-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-500 hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-400 transition-all"
-                  title="Purge Node"
+                  title={t("auto.PurgeNode_954") || "Purge Node"}
                 >
                    <Trash2 className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={() => setEditingCamera(camera)}
                   className="flex items-center justify-center p-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-500 hover:bg-cyan-500/20 hover:border-cyan-500/40 hover:text-cyan-400 transition-all"
-                  title="Edit Node settings"
+                  title={t("auto.EditNodesetting_6813") || "Edit Node settings"}
                 >
                    <Edit className="w-4 h-4" />
                 </button>

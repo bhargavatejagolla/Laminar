@@ -269,7 +269,7 @@ export default function MapPickerCore({
             <button 
               onClick={() => setPosition([initialLat, initialLng])}
               className="bg-black/60 hover:bg-slate-800 backdrop-blur-xl border border-white/10 p-3 rounded-full text-white transition-all shadow-2xl"
-              title="Recenter"
+              title={t("auto.Recenter_2566") || "Recenter"}
             >
               <Navigation className="w-4 h-4" />
             </button>

@@ -47,6 +47,7 @@ const itemVariants = {
 }
 
 const AIRecommendationPanel = ({ venue, predictionData }: { venue: any, predictionData: any }) => {
+  const { t } = useTranslation();
   const [actions, setActions] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(0);
   const [timeStr, setTimeStr] = useState("");
@@ -122,11 +123,11 @@ const AIRecommendationPanel = ({ venue, predictionData }: { venue: any, predicti
             </span>
           </div>
           <p className="text-xl font-black text-white tracking-widest uppercase drop-shadow-md">
-            Operational<br />Protocol
+            {t("auto.Operational_6743") || "Operational"}<br />{t("auto.Protocol_4669") || "Protocol"}
           </p>
         </div>
         <div className="text-right">
-          <span className="block text-[8px] uppercase font-black tracking-widest text-slate-500 mb-0.5">Time</span>
+          <span className="block text-[8px] uppercase font-black tracking-widest text-slate-500 mb-0.5">{t("auto.Time_3110") || "Time"}</span>
           <span className="text-xs font-mono font-black text-indigo-300">{timeStr}</span>
         </div>
       </div>
@@ -134,7 +135,7 @@ const AIRecommendationPanel = ({ venue, predictionData }: { venue: any, predicti
       <div className="flex items-center gap-2 mb-4 border-b border-white/10 pb-3">
         <Zap className="w-3.5 h-3.5 text-indigo-400" />
         <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-indigo-400">
-          AI Recommendation
+          {t("auto.AIRecommendatio_2259") || "AI Recommendation"}
         </span>
       </div>
 
@@ -153,7 +154,7 @@ const AIRecommendationPanel = ({ venue, predictionData }: { venue: any, predicti
         {visibleCount < actions.length && (
           <div className="flex items-center gap-3 opacity-80 pt-1">
             <span className="w-3 h-3 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin mt-0.5"></span>
-            <span className="text-[10px] uppercase font-black text-indigo-400 tracking-widest animate-pulse">Computing...</span>
+            <span className="text-[10px] uppercase font-black text-indigo-400 tracking-widest animate-pulse">{t("auto.Computing_3394") || "Computing..."}</span>
           </div>
         )}
       </div>
@@ -217,13 +218,13 @@ export default function PredictionPage() {
                   {t("auto.NeuralTrajector_4361") || "Neural Trajectory Extrapolation & Live Telemetry"}
                 </p>
                 <div className="flex gap-4">
-                  <Tooltip label="ESA: Exponential Smoothing Algorithm. Prioritizes recent data surges for immediate reaction.">
+                  <Tooltip label={t("auto.ESAExponentialS_2106") || "ESA: Exponential Smoothing Algorithm. Prioritizes recent data surges for immediate reaction."}>
                     <span className="px-2 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-black text-indigo-400/80 cursor-help hover:bg-indigo-500/10 transition-colors uppercase tracking-tighter">{t("auto.EMANative_8962") || "EMA-Native"}</span>
                   </Tooltip>
-                  <Tooltip label="ARIMA: Autoregressive Integrated Moving Average. Models underlying momentum cycles and seasonality.">
+                  <Tooltip label={t("auto.ARIMAAutoregres_2530") || "ARIMA: Autoregressive Integrated Moving Average. Models underlying momentum cycles and seasonality."}>
                     <span className="px-2 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-black text-cyan-400/80 cursor-help hover:bg-cyan-500/10 transition-colors uppercase tracking-tighter">{t("auto.AR1Enabled_946") || "AR1-Enabled"}</span>
                   </Tooltip>
-                  <Tooltip label="TRAJECTORY: ML-based future state projection considering regional events and temporal shifts.">
+                  <Tooltip label={t("auto.TRAJECTORYMLbas_3230") || "TRAJECTORY: ML-based future state projection considering regional events and temporal shifts."}>
                     <span className="px-2 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-black text-slate-400/80 cursor-help hover:bg-white/10 transition-colors uppercase tracking-tighter">{t("auto.NeuralProj_4950") || "Neural-Proj"}</span>
                   </Tooltip>
                 </div>
@@ -408,7 +409,7 @@ export default function PredictionPage() {
               <div className="flex items-center gap-4 mb-6">
                 <Target className="w-5 h-5 text-indigo-400" />
                 <h3 className="text-lg font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]">
-                  Live Projection Timeline
+                  {t("auto.LiveProjectionT_4414") || "Live Projection Timeline"}
                 </h3>
                 <div className="flex-1 h-[1px] bg-gradient-to-r from-indigo-500/40 to-transparent"></div>
               </div>
@@ -474,7 +475,7 @@ export default function PredictionPage() {
                   return (
                     <div key={mins} className={`glass-panel border-l-[3px] rounded-2xl p-6 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 ${bgClass} ${glowClass}`}>
                       <div className="flex justify-between items-start mb-4">
-                        <span className="text-2xl font-black text-white font-mono tracking-tighter">+{mins} <span className="text-sm text-slate-400 font-sans tracking-widest pl-1">MINS</span></span>
+                        <span className="text-2xl font-black text-white font-mono tracking-tighter">+{mins} <span className="text-sm text-slate-400 font-sans tracking-widest pl-1">{t("auto.MINS_3777") || "MINS"}</span></span>
                         <div className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-widest ${colorClass} bg-black/40 border border-white/5`}>
                           T+{mins}
                         </div>
@@ -482,13 +483,13 @@ export default function PredictionPage() {
 
                       <div className="space-y-4">
                         <div>
-                          <span className="text-[10px] uppercase font-black text-slate-500 tracking-widest block mb-1">Projected State</span>
+                          <span className="text-[10px] uppercase font-black text-slate-500 tracking-widest block mb-1">{t("auto.ProjectedState_508") || "Projected State"}</span>
                           <span className={`text-[13px] font-black uppercase tracking-widest drop-shadow-md ${colorClass}`}>{label}</span>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-white/10 pt-3">
                           <div>
-                            <span className="text-[9px] uppercase font-black text-slate-500 tracking-widest block mb-1">Proj. Volume</span>
+                            <span className="text-[9px] uppercase font-black text-slate-500 tracking-widest block mb-1">{t("auto.ProjVolume_4031") || "Proj. Volume"}</span>
                             <div className="flex items-end gap-1.5">
                               <span className="text-lg font-mono font-black text-white leading-none">{pCount}</span>
                               <span className="text-[10px] font-mono text-slate-500 leading-none pb-[3px]">/ {cap}</span>

@@ -17,6 +17,9 @@ export interface PredictionResponse {
   holiday_context?: any;
   event_type?: string;
   forecast_explanation?: string;
+  forecast_curve?: number[];
+  forecast_upper_band?: number[];
+  forecast_lower_band?: number[];
 }
 
 export interface GraphDataResponse {

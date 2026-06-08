@@ -14,6 +14,7 @@ import {
   Brain,
 } from "lucide-react";
 import { VoiceCommandButton } from "@/components/advanced/VoiceCommandButton";
+import DotGrid from "@/components/ui/DotGrid";
 
 interface Message {
   role: "assistant" | "user";
@@ -249,6 +250,20 @@ export default function AIAssistantChat() {
             shadow-[0_0_120px_rgba(6,182,212,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)]"
           style={{ maxHeight: "85vh" }}
         >
+          {/* Animated Background */}
+          <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
+            <DotGrid
+              dotSize={5}
+              gap={15}
+              baseColor="#22d3ee"
+              activeColor="#6366f1"
+              proximity={120}
+              shockRadius={250}
+              shockStrength={5}
+              resistance={750}
+              returnDuration={1.5}
+            />
+          </div>
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-cyan-900/40 via-blue-900/40 to-[#020611] border-b border-cyan-500/20 shrink-0">
             <div className="flex items-center gap-4">
@@ -272,28 +287,28 @@ export default function AIAssistantChat() {
               <button
                 onClick={reindex}
                 disabled={isIndexing}
-                title="Re-index Data"
+                title={t("auto.ReindexData_3335") || "Re-index Data"}
                 className={`p-1.5 rounded-lg hover:bg-slate-800/60 transition-colors ${isIndexing ? 'animate-spin text-cyan-500' : 'text-slate-500 hover:text-cyan-400'}`}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={clearChat}
-                title="Clear chat"
+                title={t("auto.Clearchat_218") || "Clear chat"}
                 className="p-1.5 rounded-lg hover:bg-slate-800/60 text-slate-500 hover:text-slate-300 transition-colors"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                title="Minimize"
+                title={t("auto.Minimize_1310") || "Minimize"}
                 className="p-1.5 rounded-lg hover:bg-slate-800/60 text-slate-500 hover:text-slate-300 transition-colors"
               >
                 <ChevronDown className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                title="Close"
+                title={t("auto.Close_2271") || "Close"}
                 className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -302,7 +317,7 @@ export default function AIAssistantChat() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-[300px] scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent">
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-[300px] scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent relative z-10">
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -380,7 +395,7 @@ export default function AIAssistantChat() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about venues, alerts, crowd data..."
+                  placeholder={t("auto.Askaboutvenuesa_3310") || "Ask about venues, alerts, crowd data..."}
                   disabled={isTyping}
                   className="flex-1 bg-transparent py-2.5 pl-3.5 pr-2 text-sm text-white placeholder:text-slate-600 focus:outline-none disabled:opacity-50"
                 />

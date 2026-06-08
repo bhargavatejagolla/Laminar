@@ -248,7 +248,7 @@ export default function ProfilePage() {
             <button
               onClick={() => router.back()}
               className="p-2 rounded-xl bg-[#0a1929] border border-[#1e3a5f] text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 transition-all flex items-center justify-center shrink-0"
-              title="Go Back"
+              title={t("auto.GoBack_4483") || "Go Back"}
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
@@ -400,13 +400,13 @@ export default function ProfilePage() {
 
                   <div className="grid grid-cols-1 gap-2">
                     <StatCard
-                      label="SMS Alerts"
+                      label={t("auto.SMSAlerts_4515") || "SMS Alerts"}
                       value={data.receive_sms_alerts ? "Enabled" : "Disabled"}
                       accent={data.receive_sms_alerts ? "border-cyan-500/20" : "border-slate-700/50"}
                       icon={Bell}
                     />
                     <StatCard
-                      label="Account Access"
+                      label={t("auto.AccountAccess_3805") || "Account Access"}
                       value={roleLabel}
                       accent="border-slate-700/50"
                       icon={Shield}
@@ -442,7 +442,7 @@ export default function ProfilePage() {
                       value={data.name}
                       readOnly={!editing}
                       onChange={(e) => setData((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="Your full name"
+                      placeholder={t("auto.Yourfullname_1414") || "Your full name"}
                       className={`w-full rounded-xl pl-11 pr-4 py-2.5 text-sm transition-all duration-300
                         ${editing
                           ? "bg-[#0a1929] border border-[#1e3a5f] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10"
@@ -476,7 +476,7 @@ export default function ProfilePage() {
                       value={data.alert_email || ""}
                       readOnly={!editing}
                       onChange={(e) => setData((p) => ({ ...p, alert_email: e.target.value }))}
-                      placeholder="e.g. your-gmail@gmail.com"
+                      placeholder={t("auto.egyourgmailgmai_1437") || "e.g. your-gmail@gmail.com"}
                       className={`w-full rounded-xl pl-11 pr-4 py-2.5 text-sm transition-all duration-300
                         ${editing
                           ? "bg-[#0a1929] border border-[#1e3a5f] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10"

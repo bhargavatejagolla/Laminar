@@ -4,12 +4,11 @@ import json
 import time
 
 try:
-    from googletrans import Translator
+    from deep_translator import GoogleTranslator
     has_translator = True
-    translator = Translator()
 except:
     has_translator = False
-    print("No googletrans")
+    print("No deep_translator")
 
 ts_files = []
 for root, dirs, files in list(os.walk('app')) + list(os.walk('components')):
@@ -140,12 +139,11 @@ for code, gcode in langs.items():
         texts_to_do = [auto_dict[k] for k in missing]
         
         try:
-            results = translator.translate(texts_to_do, dest=gcode, src='en')
-            if not isinstance(results, list):
-                results = [results]
+            translator_instance = GoogleTranslator(source='en', target=gcode)
+            results = translator_instance.translate_batch(texts_to_do)
                 
             for k, res in zip(missing, results):
-                dict_files[code]['auto'][k] = res.text
+                dict_files[code]['auto'][k] = res if res else auto_dict[k]
             time.sleep(0.5)
         except Exception as e:
             print(f"Translate error for {code} on {texts_to_do}: {e}")

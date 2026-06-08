@@ -20,6 +20,7 @@
 
 import * as React from "react";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface ZoneData {
   id: string;
@@ -84,6 +85,8 @@ export function HeatmapOverlay({
   cellSize = 80,
   className = "",
 }: HeatmapOverlayProps) {
+  const { t } = useTranslation();
+
 
   // Auto-arrange zones in a grid if no x/y provided
   const arrangedZones = useMemo(() => {
@@ -133,7 +136,7 @@ export function HeatmapOverlay({
         className="relative"
         style={{ width: totalWidth, height: totalHeight }}
         role="img"
-        aria-label="Crowd density heatmap"
+        aria-label={t("auto.Crowddensityhea_685") || "Crowd density heatmap"}
       >
         {arrangedZones.map((zone) => {
           const pct = zone.capacity > 0 ? zone.current_count / zone.capacity : 0;

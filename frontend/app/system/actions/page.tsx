@@ -209,7 +209,7 @@ export default function AutomationsPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <input required value={name} onChange={e => setName(e.target.value)} className="w-full bg-[#020b16]/80 border border-[#1e3a5f]/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-indigo-400 focus:bg-[#081428] transition-all shadow-inner font-medium placeholder-slate-600" placeholder="e.g. ALPHA-LOCKDOWN-S7" />
+              <input required value={name} onChange={e => setName(e.target.value)} className="w-full bg-[#020b16]/80 border border-[#1e3a5f]/50 rounded-xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-indigo-400 focus:bg-[#081428] transition-all shadow-inner font-medium placeholder-slate-600" placeholder={t("auto.egALPHALOCKDOWN_1109") || "e.g. ALPHA-LOCKDOWN-S7"} />
             </div>
             
             <div className="group">
@@ -296,7 +296,7 @@ export default function AutomationsPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <input required value={target} onChange={e => setTarget(e.target.value)} className="w-full bg-[#020b16]/80 border border-[#1e3a5f]/50 rounded-xl px-4 py-3.5 text-[11px] text-indigo-300 font-mono focus:outline-none focus:border-indigo-400 focus:bg-[#081428] transition-all shadow-inner placeholder-slate-600" placeholder="https://api.terminal.com/lock" />
+              <input required value={target} onChange={e => setTarget(e.target.value)} className="w-full bg-[#020b16]/80 border border-[#1e3a5f]/50 rounded-xl px-4 py-3.5 text-[11px] text-indigo-300 font-mono focus:outline-none focus:border-indigo-400 focus:bg-[#081428] transition-all shadow-inner placeholder-slate-600" placeholder={t("auto.httpsapitermina_3526") || "https://api.terminal.com/lock"} />
             </div>
             
             <button type="submit" className="w-full group relative overflow-hidden bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] text-[11px] mt-6 shadow-[0_0_15px_rgba(99,102,241,0.1)]">

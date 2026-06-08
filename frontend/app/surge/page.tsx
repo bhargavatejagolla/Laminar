@@ -245,7 +245,7 @@ export default function SurgeMonitorPage() {
                         <button
                             onClick={() => router.push("/dashboard")}
                             className="group flex items-center justify-center w-10 h-10 bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/40 rounded-xl transition-all duration-300 flex-shrink-0 shadow-[0_0_15px_rgba(0,0,0,0.3)] hover:shadow-[0_0_15px_rgba(244,63,94,0.1)] self-start mt-1"
-                            aria-label="Go back"
+                            aria-label={t("auto.Goback_9246") || "Go back"}
                         >
                             <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-rose-400 transition-colors group-hover:-translate-x-0.5 transition-transform duration-200" />
                         </button>
@@ -638,7 +638,7 @@ export default function SurgeMonitorPage() {
                                             </div>
                                             <div className={`grid grid-cols-2 gap-3 relative z-10 mb-3 ${!isOnline ? "grayscale opacity-[0.4]" : ""}`}>
                                                 <MetricGauge
-                                                    label="People"
+                                                    label={t("auto.People_9483") || "People"}
                                                     value={isOnline ? (metric.person_count || 0) : "—"}
                                                     unit="live"
                                                     percent={isOnline ? Math.min(100, (metric.person_count || 0) * 5) : 0}

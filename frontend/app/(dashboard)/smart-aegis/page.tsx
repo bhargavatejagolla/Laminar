@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import { useTranslation } from "react-i18next";
+import {
     ArrowLeft, AlertTriangle, Camera, Video,
     UploadCloud, Trash2, HeartPulse, Activity, Bell,
     Map, Navigation, Users, Ambulance, Target, ShieldAlert,
@@ -28,6 +29,8 @@ declare global {
 }
 
 export default function SmartAegisPage() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     
@@ -269,7 +272,7 @@ export default function SmartAegisPage() {
                         bestMatch.maxH = Math.max(bestMatch.maxH || det.h, det.h);
                         bestMatch.lastSeen = nowTime;
                         bestMatch.yHistory.push({ y: det.cy, h: det.h, time: nowTime });
-                        bestMatch.yHistory = bestMatch.yHistory.filter((h: any) => nowTime - h.time < 1500);
+                        bestMatch.yHistory = bestMatch.yHistory.filter((h: any) => (nowTime - h.time) < 1500);
                         bestMatch.matchedThisFrame = true;
                     } else {
                         newTrackedPersons.push({
@@ -742,17 +745,17 @@ export default function SmartAegisPage() {
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <Activity className="w-5 h-5 text-rose-500" />
-                                <span className="text-[10px] font-black tracking-[0.3em] text-rose-500 uppercase">Health-Tech Response Orchestration</span>
+                                <span className="text-[10px] font-black tracking-[0.3em] text-rose-500 uppercase">{t("auto.HealthTechRespo_8500") || "Health-Tech Response Orchestration"}</span>
                             </div>
                             <h1 className="text-4xl font-black tracking-tight text-white uppercase flex items-center gap-3">
-                                Laminar <span className="text-rose-500">AEGIS</span> Protocol
+                                Laminar <span className="text-rose-500">{t("auto.AEGIS_6387") || "AEGIS"}</span> {t("auto.Protocol_4669") || "Protocol"}
                             </h1>
-                            <p className="text-slate-400 text-sm mt-2 font-mono uppercase tracking-widest text-[10px]">Autonomous Emergency Guidance & Intervention System</p>
+                            <p className="text-slate-400 text-sm mt-2 font-mono uppercase tracking-widest text-[10px]">{t("auto.AutonomousEmerg_547") || "Autonomous Emergency Guidance & Intervention System"}</p>
                         </div>
                     </div>
                     <div className="flex gap-4">
                         <div className="px-4 py-2 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                            <ShieldAlert className="w-4 h-4" /> System Armed
+                            <ShieldAlert className="w-4 h-4" /> {t("auto.SystemArmed_8369") || "System Armed"}
                         </div>
                         {videoUrl && (
                             <button onClick={resetSystem} className="p-2 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 transition-all">
@@ -772,11 +775,11 @@ export default function SmartAegisPage() {
                             <label className="flex-1 cursor-pointer">
                                 <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
                                 <div className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-[11px] font-black uppercase tracking-widest text-slate-300">
-                                    <UploadCloud className="w-4 h-4" /> Upload CCTV
+                                    <UploadCloud className="w-4 h-4" /> {t("auto.UploadCCTV_9783") || "Upload CCTV"}
                                 </div>
                             </label>
                             <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-[11px] font-black uppercase tracking-widest text-slate-300">
-                                <Camera className="w-4 h-4" /> Live Streams
+                                <Camera className="w-4 h-4" /> {t("auto.LiveStreams_2749") || "Live Streams"}
                             </button>
                         </div>
 
@@ -786,7 +789,7 @@ export default function SmartAegisPage() {
                                 {!videoUrl ? (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-600">
                                         <Video className="w-12 h-12 mb-4 opacity-20" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Awaiting Video Feed</span>
+                                        <span className="text-[10px] font-black uppercase tracking-widest">{t("auto.AwaitingVideoFe_7434") || "Awaiting Video Feed"}</span>
                                     </div>
                                 ) : (
                                     <>
@@ -810,7 +813,7 @@ export default function SmartAegisPage() {
                                             <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                                                 <div className="text-cyan-400 font-mono text-[10px] font-black uppercase animate-pulse flex flex-col items-center gap-2">
                                                     <Activity className="w-6 h-6 animate-spin" />
-                                                    Initializing Neural Engine...
+                                                    {t("auto.InitializingNeu_7790") || "Initializing Neural Engine..."}
                                                 </div>
                                             </div>
                                         )}
@@ -847,8 +850,8 @@ export default function SmartAegisPage() {
                                             ) : null}
                                             {simStep >= 2 ? (
                                                 <motion.div key="hud-motionless" initial={{opacity:0, x: 20}} animate={{opacity:1, x:0}} className="absolute top-32 right-6 bg-red-950/90 text-red-500 px-5 py-4 rounded-xl border-2 border-red-600 shadow-[0_0_40px_rgba(220,38,38,0.8)] z-30 flex flex-col items-end gap-1">
-                                                    <div className="font-mono text-xl font-black">MOTIONLESS: 18 SEC</div>
-                                                    <div className="font-bold text-sm text-yellow-400 uppercase tracking-widest animate-pulse">Cardiac Event Suspected</div>
+                                                    <div className="font-mono text-xl font-black">{t("auto.MOTIONLESS18SEC_4053") || "MOTIONLESS: 18 SEC"}</div>
+                                                    <div className="font-bold text-sm text-yellow-400 uppercase tracking-widest animate-pulse">{t("auto.CardiacEventSus_9940") || "Cardiac Event Suspected"}</div>
                                                 </motion.div>
                                             ) : null}
                                         </AnimatePresence>
@@ -859,7 +862,7 @@ export default function SmartAegisPage() {
 
                         {/* NOTIFICATION CENTER TIMELINE */}
                         <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-5 flex-grow flex flex-col min-h-[300px]">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2 flex-shrink-0"><Bell className="w-4 h-4"/> Event Log Timeline</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2 flex-shrink-0"><Bell className="w-4 h-4"/> {t("auto.EventLogTimelin_2180") || "Event Log Timeline"}</h3>
                             <div className="flex-grow space-y-3 overflow-y-auto pr-2 flex flex-col custom-scrollbar">
                                 <AnimatePresence>
                                     {logs.map((log, i) => (
@@ -888,7 +891,7 @@ export default function SmartAegisPage() {
                                             {log.screenshotUrl && (
                                                 <div className="mt-2 rounded border border-white/20 overflow-hidden relative shadow-[0_0_10px_rgba(0,0,0,0.5)] w-fit">
                                                     <img src={log.screenshotUrl} alt="evidence" className="w-[300px] h-auto object-cover opacity-90" />
-                                                    <div className="absolute top-1 right-1 bg-black/80 px-2 py-1 rounded text-[8px] font-black uppercase text-cyan-400 border border-cyan-500/30 tracking-widest backdrop-blur-md">Evidence Captured</div>
+                                                    <div className="absolute top-1 right-1 bg-black/80 px-2 py-1 rounded text-[8px] font-black uppercase text-cyan-400 border border-cyan-500/30 tracking-widest backdrop-blur-md">{t("auto.EvidenceCapture_2686") || "Evidence Captured"}</div>
                                                 </div>
                                             )}
                                         </motion.div>
@@ -918,20 +921,20 @@ export default function SmartAegisPage() {
                                     <>
                                         <AlertTriangle className="w-16 h-16 text-red-500 mb-3 animate-bounce drop-shadow-[0_0_15px_rgba(220,38,38,1)]" />
                                         <div className="text-3xl sm:text-4xl font-black tracking-tighter text-red-500 drop-shadow-[0_0_30px_rgba(220,38,38,0.8)] uppercase leading-none text-center">
-                                            AEGIS PROTOCOL<br/>ACTIVATED
+                                            {t("auto.AEGISPROTOCOL_502") || "AEGIS PROTOCOL"}<br/>{t("auto.ACTIVATED_6979") || "ACTIVATED"}
                                         </div>
                                         <div className="mt-3 bg-red-600/20 border border-red-500 text-white font-mono text-[11px] uppercase tracking-widest px-4 py-3 rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.5)] w-full max-w-[280px] text-left">
-                                            <div className="text-red-400 font-black mb-2 text-center text-xs">INCIDENT ANALYSIS</div>
+                                            <div className="text-red-400 font-black mb-2 text-center text-xs">{t("auto.INCIDENTANALYSI_1227") || "INCIDENT ANALYSIS"}</div>
                                             <div className="flex justify-between items-center mb-1">
-                                                <span>Rapid Vertical Drop</span>
+                                                <span>{t("auto.RapidVerticalDr_2325") || "Rapid Vertical Drop"}</span>
                                                 <CheckCircle className="w-3 h-3 text-red-500" />
                                             </div>
                                             <div className="flex justify-between items-center mb-1">
-                                                <span>Horizontal Posture</span>
+                                                <span>{t("auto.HorizontalPostu_4781") || "Horizontal Posture"}</span>
                                                 <CheckCircle className="w-3 h-3 text-red-500" />
                                             </div>
                                             <div className="flex justify-between items-center mb-3">
-                                                <span>Motionless 4.3 sec</span>
+                                                <span>{t("auto.Motionless43sec_5206") || "Motionless 4.3 sec"}</span>
                                                 <CheckCircle className="w-3 h-3 text-red-500" />
                                             </div>
                                             <div className="border-t border-red-500/30 pt-2 flex justify-between">
@@ -940,15 +943,15 @@ export default function SmartAegisPage() {
                                             </div>
                                             <div className="mt-1 flex flex-col">
                                                 <span className="text-[9px] text-slate-400">Classification:</span>
-                                                <span className="font-black text-red-500 text-xs">POTENTIAL MEDICAL DISTRESS</span>
+                                                <span className="font-black text-red-500 text-xs">{t("auto.POTENTIALMEDICA_3311") || "POTENTIAL MEDICAL DISTRESS"}</span>
                                             </div>
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mb-4">System Status</h3>
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mb-4">{t("auto.SystemStatus_2480") || "System Status"}</h3>
                                         <div className="text-[32px] font-black tracking-widest text-slate-700 uppercase">
-                                            STANDBY
+                                            {t("auto.STANDBY_3006") || "STANDBY"}
                                         </div>
                                     </>
                                 )}
@@ -957,7 +960,7 @@ export default function SmartAegisPage() {
 
                         {/* SPATIAL CONVERGENCE PIPELINE (Animated Story) */}
                         <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-6 relative overflow-hidden flex flex-col">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 z-10"><Map className="w-4 h-4 inline mr-2"/> Spatial Convergence</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6 z-10"><Map className="w-4 h-4 inline mr-2"/> {t("auto.SpatialConverge_8537") || "Spatial Convergence"}</h3>
                             
                             <div className="relative pl-6 flex flex-col gap-6 font-mono text-sm uppercase tracking-wider font-bold">
                                 {/* The vertical connecting line */}
@@ -975,24 +978,24 @@ export default function SmartAegisPage() {
                                 {/* Nodes */}
                                 <div className="flex items-center gap-4 relative z-10">
                                     <div className={`w-4 h-4 rounded-full flex-shrink-0 ${simStep >= 1 ? 'bg-red-500 shadow-[0_0_15px_#ef4444] ring-4 ring-red-500/30' : 'bg-slate-700'}`} />
-                                    <div className={simStep >= 1 ? 'text-red-400' : 'text-slate-600'}>Victim <span className="text-[10px] opacity-70 ml-2">Ground Zero</span></div>
+                                    <div className={simStep >= 1 ? 'text-red-400' : 'text-slate-600'}>{t("auto.Victim_9042") || "Victim"} <span className="text-[10px] opacity-70 ml-2">{t("auto.GroundZero_4197") || "Ground Zero"}</span></div>
                                 </div>
 
                                 <div className="flex items-center gap-4 relative z-10">
                                     <div className={`w-4 h-4 rounded-full flex-shrink-0 ${simStep >= 3 ? 'bg-cyan-500 shadow-[0_0_15px_#06b6d4] ring-4 ring-cyan-500/30' : 'bg-slate-700'}`} />
                                     <div className={simStep >= 3 ? 'text-cyan-400 flex items-center gap-2' : 'text-slate-600 flex items-center gap-2'}>
-                                        AED Drone <Navigation className="w-3 h-3 rotate-45" />
+                                        {t("auto.AEDDrone_4719") || "AED Drone"} <Navigation className="w-3 h-3 rotate-45" />
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-4 relative z-10">
                                     <div className={`w-4 h-4 rounded-full flex-shrink-0 ${simStep >= 4 ? 'bg-emerald-500 shadow-[0_0_15px_#10b981] ring-4 ring-emerald-500/30' : 'bg-slate-700'}`} />
-                                    <div className={simStep >= 4 ? 'text-emerald-400' : 'text-slate-600'}>Civilian Responders</div>
+                                    <div className={simStep >= 4 ? 'text-emerald-400' : 'text-slate-600'}>{t("auto.CivilianRespond_4173") || "Civilian Responders"}</div>
                                 </div>
 
                                 <div className="flex items-center gap-4 relative z-10">
                                     <div className={`w-4 h-4 rounded-full flex-shrink-0 ${simStep >= 6 ? 'bg-white shadow-[0_0_15px_#ffffff] ring-4 ring-white/30' : 'bg-slate-700'}`} />
-                                    <div className={simStep >= 6 ? 'text-white' : 'text-slate-600'}>Hospital Emergency Room</div>
+                                    <div className={simStep >= 6 ? 'text-white' : 'text-slate-600'}>{t("auto.HospitalEmergen_5585") || "Hospital Emergency Room"}</div>
                                 </div>
                             </div>
                         </div>
@@ -1000,7 +1003,7 @@ export default function SmartAegisPage() {
                         <div className="grid grid-cols-2 gap-6">
                             {/* GREEN WAVE ETA */}
                             <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-5 flex flex-col justify-center">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Hospital ETA</h3>
+                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">{t("auto.HospitalETA_5466") || "Hospital ETA"}</h3>
                                 <div className={`text-4xl font-black font-mono ${simStep >= 5 ? 'text-emerald-400' : 'text-red-400'}`}>
                                     {simStep >= 5 ? '6m' : '12m'}
                                 </div>
@@ -1014,10 +1017,10 @@ export default function SmartAegisPage() {
 
                             {/* DRONE DISPATCH ANIMATION */}
                             <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-5 flex flex-col justify-center">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500 mb-4 flex items-center gap-2"><Target className="w-4 h-4"/> Drone Launch</h3>
+                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-500 mb-4 flex items-center gap-2"><Target className="w-4 h-4"/> {t("auto.DroneLaunch_9255") || "Drone Launch"}</h3>
                                 
                                 <div className="flex justify-between items-center w-full mb-2">
-                                    <div className="text-[9px] text-slate-500 font-black uppercase">Hub</div>
+                                    <div className="text-[9px] text-slate-500 font-black uppercase">{t("auto.Hub_5887") || "Hub"}</div>
                                     <div className="flex-grow mx-3 relative h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                         <motion.div 
                                             initial={{ width: '0%' }} 
@@ -1026,14 +1029,14 @@ export default function SmartAegisPage() {
                                             className="absolute top-0 left-0 h-full bg-cyan-500 shadow-[0_0_10px_#06b6d4]"
                                         />
                                     </div>
-                                    <div className="text-[9px] text-red-500 font-black uppercase">Victim</div>
+                                    <div className="text-[9px] text-red-500 font-black uppercase">{t("auto.Victim_9042") || "Victim"}</div>
                                 </div>
                                 
                                 <div className="text-center font-mono text-3xl font-black mt-2">
                                     {simStep >= 3 ? (
                                         <span className="text-cyan-400 animate-pulse">{droneCountdown}s</span>
                                     ) : (
-                                        <span className="text-slate-700 text-xl">STANDBY</span>
+                                        <span className="text-slate-700 text-xl">{t("auto.STANDBY_3006") || "STANDBY"}</span>
                                     )}
                                 </div>
                             </div>
@@ -1041,20 +1044,20 @@ export default function SmartAegisPage() {
 
                         {/* CIVILIAN RALLY SYSTEM */}
                         <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-5 border-t-4 border-t-emerald-500/50">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-4 flex items-center gap-2"><Users className="w-4 h-4"/> Civilian Rally System</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-4 flex items-center gap-2"><Users className="w-4 h-4"/> {t("auto.CivilianRallySy_6150") || "Civilian Rally System"}</h3>
                             <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-3">Nearby Registered Responders Alerted: {simStep >= 4 ? '3' : '0'}</div>
                             
                             <div className="space-y-2">
                                 <div className={`flex justify-between items-center p-3 rounded-lg border ${simStep >= 4 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5'}`}>
                                     <div>
-                                        <div className={`text-xs font-bold uppercase tracking-wide ${simStep >= 4 ? 'text-emerald-400' : 'text-slate-600'}`}>CPR Certified</div>
-                                        <div className="text-[9px] text-slate-500 font-mono mt-1">Civilian ID: 8991</div>
+                                        <div className={`text-xs font-bold uppercase tracking-wide ${simStep >= 4 ? 'text-emerald-400' : 'text-slate-600'}`}>{t("auto.CPRCertified_5774") || "CPR Certified"}</div>
+                                        <div className="text-[9px] text-slate-500 font-mono mt-1">{t("auto.CivilianID8991_3955") || "Civilian ID: 8991"}</div>
                                     </div>
                                     <div className="text-right">
                                         {simStep >= 4 ? (
                                             <>
-                                                <div className="text-[10px] font-black text-emerald-400 flex items-center gap-1 justify-end"><CheckCircle className="w-3 h-3"/> ACCEPTED</div>
-                                                <div className="text-[11px] font-mono text-white mt-1">ETA 1m 20s</div>
+                                                <div className="text-[10px] font-black text-emerald-400 flex items-center gap-1 justify-end"><CheckCircle className="w-3 h-3"/> {t("auto.ACCEPTED_6435") || "ACCEPTED"}</div>
+                                                <div className="text-[11px] font-mono text-white mt-1">{t("auto.ETA1m20s_7244") || "ETA 1m 20s"}</div>
                                             </>
                                         ) : <div className="text-[11px] font-black font-mono text-slate-600">--</div>}
                                     </div>
@@ -1062,14 +1065,14 @@ export default function SmartAegisPage() {
 
                                 <div className={`flex justify-between items-center p-3 rounded-lg border ${simStep >= 4 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/5 border-white/5'}`}>
                                     <div>
-                                        <div className={`text-xs font-bold uppercase tracking-wide ${simStep >= 4 ? 'text-emerald-400' : 'text-slate-600'}`}>Medical Student</div>
-                                        <div className="text-[9px] text-slate-500 font-mono mt-1">Civilian ID: 2214</div>
+                                        <div className={`text-xs font-bold uppercase tracking-wide ${simStep >= 4 ? 'text-emerald-400' : 'text-slate-600'}`}>{t("auto.MedicalStudent_2312") || "Medical Student"}</div>
+                                        <div className="text-[9px] text-slate-500 font-mono mt-1">{t("auto.CivilianID2214_2853") || "Civilian ID: 2214"}</div>
                                     </div>
                                     <div className="text-right">
                                         {simStep >= 4 ? (
                                             <>
-                                                <div className="text-[10px] font-black text-emerald-400 flex items-center gap-1 justify-end"><CheckCircle className="w-3 h-3"/> RESPONDING</div>
-                                                <div className="text-[11px] font-mono text-white mt-1">ETA 2m</div>
+                                                <div className="text-[10px] font-black text-emerald-400 flex items-center gap-1 justify-end"><CheckCircle className="w-3 h-3"/> {t("auto.RESPONDING_2629") || "RESPONDING"}</div>
+                                                <div className="text-[11px] font-mono text-white mt-1">{t("auto.ETA2m_3086") || "ETA 2m"}</div>
                                             </>
                                         ) : <div className="text-[11px] font-black font-mono text-slate-600">--</div>}
                                     </div>
@@ -1077,14 +1080,14 @@ export default function SmartAegisPage() {
 
                                 <div className={`flex justify-between items-center p-3 rounded-lg border ${simStep >= 4 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/5 border-white/5'}`}>
                                     <div>
-                                        <div className={`text-xs font-bold uppercase tracking-wide ${simStep >= 4 ? 'text-amber-400' : 'text-slate-600'}`}>Volunteer</div>
-                                        <div className="text-[9px] text-slate-500 font-mono mt-1">Civilian ID: 7731</div>
+                                        <div className={`text-xs font-bold uppercase tracking-wide ${simStep >= 4 ? 'text-amber-400' : 'text-slate-600'}`}>{t("auto.Volunteer_1423") || "Volunteer"}</div>
+                                        <div className="text-[9px] text-slate-500 font-mono mt-1">{t("auto.CivilianID7731_8018") || "Civilian ID: 7731"}</div>
                                     </div>
                                     <div className="text-right">
                                         {simStep >= 4 ? (
                                             <>
-                                                <div className="text-[10px] font-black text-amber-400 flex items-center gap-1 justify-end"><Zap className="w-3 h-3"/> EN ROUTE</div>
-                                                <div className="text-[11px] font-mono text-white mt-1">ETA 3m 45s</div>
+                                                <div className="text-[10px] font-black text-amber-400 flex items-center gap-1 justify-end"><Zap className="w-3 h-3"/> {t("auto.ENROUTE_6200") || "EN ROUTE"}</div>
+                                                <div className="text-[11px] font-mono text-white mt-1">{t("auto.ETA3m45s_5513") || "ETA 3m 45s"}</div>
                                             </>
                                         ) : <div className="text-[11px] font-black font-mono text-slate-600">--</div>}
                                     </div>

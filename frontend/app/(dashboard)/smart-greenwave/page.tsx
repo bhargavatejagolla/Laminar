@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import { useTranslation } from "react-i18next";
+import {
     ArrowLeft, 
     AlertTriangle, 
     Cpu, 
@@ -33,6 +34,8 @@ const WaveBackground = () => (
 type SignalState = "red" | "green" | "yellow";
 
 export default function SmartGreenWavePage() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     
@@ -167,18 +170,18 @@ export default function SmartGreenWavePage() {
                             <div className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all shadow-[0_0_15px_rgba(0,0,0,0.3)]">
                                 <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors group-hover:-translate-x-0.5" />
                             </div>
-                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">Back to<br/>Command</span>
+                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">{t("auto.Backto_7489") || "Back to"}<br/>{t("auto.Command_9711") || "Command"}</span>
                         </button>
 
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <Activity className="w-5 h-5 text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                                 <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500">
-                                    Emergency Corridor Intelligence Engine
+                                    {t("auto.EmergencyCorrid_808") || "Emergency Corridor Intelligence Engine"}
                                 </span>
                             </div>
                             <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.1)] mb-2">
-                                Laminar Green Wave <span className="text-emerald-500">2.0</span>
+                                {t("auto.LaminarGreenWav_2687") || "Laminar Green Wave"} <span className="text-emerald-500">2.0</span>
                             </h1>
                             <p className="text-xs md:text-sm font-bold text-slate-400 tracking-widest uppercase flex items-center gap-2">
                                 Detect • Verify • Track • Predict • Clear Corridor • Measure Impact
@@ -189,10 +192,10 @@ export default function SmartGreenWavePage() {
                     <div className="flex items-center gap-3">
                         <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shadow-[0_0_8px_rgba(16,185,129,1)]"></span>
-                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">System Online</span>
+                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">{t("auto.SystemOnline_4221") || "System Online"}</span>
                         </div>
                         {isAnalyzing && (
-                            <button onClick={resetSystem} className="p-2 bg-red-500/10 border border-red-500/30 rounded-xl hover:bg-red-500/20 transition-all text-red-400" title="Delete Feed & Reset">
+                            <button onClick={resetSystem} className="p-2 bg-red-500/10 border border-red-500/30 rounded-xl hover:bg-red-500/20 transition-all text-red-400" title={t("auto.DeleteFeedReset_5940") || "Delete Feed & Reset"}>
                                 <Trash2 className="w-5 h-5" />
                             </button>
                         )}
@@ -220,14 +223,14 @@ export default function SmartGreenWavePage() {
                                     <AlertTriangle className="w-16 h-16 text-slate-500" strokeWidth={1.5} />
                                 </motion.div>
                                 
-                                <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">No Emergency Vehicle Detected</h2>
+                                <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">{t("auto.NoEmergencyVehi_4020") || "No Emergency Vehicle Detected"}</h2>
                                 <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-md text-center leading-relaxed mb-8">
-                                    Corridor Engine standby. Upload a video, stream RTSP, or trigger via Guardian SOS.
+                                    {t("auto.CorridorEngines_8976") || "Corridor Engine standby. Upload a video, stream RTSP, or trigger via Guardian SOS."}
                                 </p>
                                 
                                 <label className="cursor-pointer relative z-10 group/btn flex flex-col items-center">
                                     <div className="px-6 py-3 rounded-xl bg-emerald-500 text-black font-black uppercase tracking-widest flex items-center gap-3 transition-all group-hover/btn:bg-emerald-400 group-hover/btn:scale-105 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-                                        <UploadCloud className="w-5 h-5" /> Upload Video
+                                        <UploadCloud className="w-5 h-5" /> {t("auto.UploadVideo_8630") || "Upload Video"}
                                     </div>
                                     <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
                                     <span className="text-[10px] text-slate-500 font-mono mt-3 uppercase tracking-widest">or RTSP / Guardian Trigger</span>
@@ -237,11 +240,11 @@ export default function SmartGreenWavePage() {
                             <div className="space-y-6">
                                 {/* Infrastructure Load */}
                                 <div className="bg-[#121216] border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden shadow-[inset_0_0_20px_rgba(16,185,129,0.02)]">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-6">Infrastructure Load</h3>
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-6">{t("auto.InfrastructureL_4398") || "Infrastructure Load"}</h3>
                                     
                                     <div className="mb-8">
                                         <div className="flex justify-between items-end mb-2">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Capacity</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("auto.ActiveCapacity_4979") || "Active Capacity"}</span>
                                             <span className="text-xl font-black font-mono">0%</span>
                                         </div>
                                         <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-white/5">
@@ -251,11 +254,11 @@ export default function SmartGreenWavePage() {
 
                                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
                                         <div>
-                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">Venues</span>
+                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">{t("auto.Venues_9902") || "Venues"}</span>
                                             <span className="text-2xl font-black font-mono text-white">0</span>
                                         </div>
                                         <div>
-                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">Edge Nodes</span>
+                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">{t("auto.EdgeNodes_7901") || "Edge Nodes"}</span>
                                             <span className="text-2xl font-black font-mono text-emerald-500">0</span>
                                         </div>
                                     </div>
@@ -268,13 +271,13 @@ export default function SmartGreenWavePage() {
                                             <Cpu className="w-6 h-6 text-fuchsia-400" />
                                         </div>
                                         <div>
-                                            <h3 className="text-[12px] font-black uppercase tracking-[0.1em] text-white">Decision Engine</h3>
-                                            <span className="text-[9px] font-bold text-fuchsia-400 uppercase tracking-widest">Autonomous Phase</span>
+                                            <h3 className="text-[12px] font-black uppercase tracking-[0.1em] text-white">{t("auto.DecisionEngine_1355") || "Decision Engine"}</h3>
+                                            <span className="text-[9px] font-bold text-fuchsia-400 uppercase tracking-widest">{t("auto.AutonomousPhase_3203") || "Autonomous Phase"}</span>
                                         </div>
                                     </div>
                                     
                                     <p className="text-xs font-mono text-slate-400 leading-relaxed pt-2">
-                                        No vehicles currently detected. Maintain standard dynamic pattern.
+                                        {t("auto.Novehiclescurre_9933") || "No vehicles currently detected. Maintain standard dynamic pattern."}
                                     </p>
                                 </div>
                             </div>
@@ -291,7 +294,7 @@ export default function SmartGreenWavePage() {
                         >
                             {/* LEFT PANEL: Emergency Vehicle Discovery */}
                             <div className="space-y-6 flex flex-col">
-                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500">Emergency Vehicle Discovery</h3>
+                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500">{t("auto.EmergencyVehicl_9078") || "Emergency Vehicle Discovery"}</h3>
                                 
                                 <div className="bg-black border border-emerald-500/30 rounded-3xl overflow-hidden relative shadow-[0_0_30px_rgba(16,185,129,0.1)] group">
                                     <img 
@@ -300,40 +303,40 @@ export default function SmartGreenWavePage() {
                                         className="w-full h-[250px] object-cover opacity-80"
                                     />
                                     <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-sm border border-emerald-500/50 rounded-lg text-emerald-400 font-mono text-[10px] font-black uppercase flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> LIVE FEED
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> {t("auto.LIVEFEED_3045") || "LIVE FEED"}
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-[#121216] border border-white/5 rounded-2xl p-4 shadow-inner">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Live Traffic</div>
-                                        <div className="text-xl font-black text-white">{vehicleCount} <span className="text-xs text-slate-400">Total Vehicles</span></div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{t("auto.LiveTraffic_3435") || "Live Traffic"}</div>
+                                        <div className="text-xl font-black text-white">{vehicleCount} <span className="text-xs text-slate-400">{t("auto.TotalVehicles_7055") || "Total Vehicles"}</span></div>
                                     </div>
                                     <div className="bg-[#121216] border border-white/5 rounded-2xl p-4 shadow-inner">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Congestion</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{t("auto.Congestion_2092") || "Congestion"}</div>
                                         <div className={`text-xl font-black ${density === 'High' ? 'text-rose-400' : density === 'Medium' ? 'text-yellow-400' : 'text-emerald-400'}`}>{density}</div>
                                     </div>
                                 </div>
 
                                 <div className="bg-[#121216] border border-rose-500/20 rounded-2xl p-6 shadow-inner flex-1 flex flex-col justify-center">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-4">Emergency Candidate Panel</h4>
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-4">{t("auto.EmergencyCandid_1577") || "Emergency Candidate Panel"}</h4>
                                     {targetId ? (
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                                <span className="text-xs font-mono text-slate-400">Candidate ID</span>
+                                                <span className="text-xs font-mono text-slate-400">{t("auto.CandidateID_4007") || "Candidate ID"}</span>
                                                 <span className="text-sm font-bold font-mono text-white">{targetId}</span>
                                             </div>
                                             <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                                <span className="text-xs font-mono text-slate-400">Type</span>
-                                                <span className="text-sm font-bold font-mono text-rose-400">Emergency Vehicle</span>
+                                                <span className="text-xs font-mono text-slate-400">{t("auto.Type_7956") || "Type"}</span>
+                                                <span className="text-sm font-bold font-mono text-rose-400">{t("auto.EmergencyVehicl_3294") || "Emergency Vehicle"}</span>
                                             </div>
                                             <div className="flex justify-between items-center">
-                                                <span className="text-xs font-mono text-slate-400">Current Confidence</span>
+                                                <span className="text-xs font-mono text-slate-400">{t("auto.CurrentConfiden_3339") || "Current Confidence"}</span>
                                                 <span className="text-sm font-bold font-mono text-emerald-400">{confidence}%</span>
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="text-center text-slate-500 font-mono text-xs">Scanning for candidates...</div>
+                                        <div className="text-center text-slate-500 font-mono text-xs">{t("auto.Scanningforcand_2358") || "Scanning for candidates..."}</div>
                                     )}
                                 </div>
                             </div>
@@ -341,15 +344,15 @@ export default function SmartGreenWavePage() {
                             {/* CENTER PANEL: Emergency Lifecycle Engine */}
                             <div className="bg-[#121216] border border-white/5 rounded-3xl p-8 shadow-inner relative overflow-hidden flex flex-col">
                                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.03)_0%,transparent_70%)]"></div>
-                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-8 relative z-10">Emergency Lifecycle Engine</h3>
+                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-8 relative z-10">{t("auto.EmergencyLifecy_3512") || "Emergency Lifecycle Engine"}</h3>
                                 
                                 <div className="space-y-4 relative z-10 flex-1">
-                                    <LifecycleStep title="SEARCHING" active={simStep >= 1} current={simStep === 1} icon={Search} />
-                                    <LifecycleStep title="CANDIDATE FOUND" active={simStep >= 2} current={simStep === 2} icon={Target} />
-                                    <LifecycleStep title="VERIFYING" active={simStep >= 3} current={simStep === 3} icon={Navigation} />
-                                    <LifecycleStep title="CONFIRMED" active={simStep >= 4} current={simStep === 4} icon={CheckCircle2} />
-                                    <LifecycleStep title="CORRIDOR ACTIVE" active={simStep >= 5} current={simStep === 5} icon={Zap} />
-                                    <LifecycleStep title="MISSION COMPLETE" active={simStep >= 6} current={simStep === 6} icon={ShieldCheck} />
+                                    <LifecycleStep title={t("auto.SEARCHING_7284") || "SEARCHING"} active={simStep >= 1} current={simStep === 1} icon={Search} />
+                                    <LifecycleStep title={t("auto.CANDIDATEFOUND_9141") || "CANDIDATE FOUND"} active={simStep >= 2} current={simStep === 2} icon={Target} />
+                                    <LifecycleStep title={t("auto.VERIFYING_108") || "VERIFYING"} active={simStep >= 3} current={simStep === 3} icon={Navigation} />
+                                    <LifecycleStep title={t("auto.CONFIRMED_1167") || "CONFIRMED"} active={simStep >= 4} current={simStep === 4} icon={CheckCircle2} />
+                                    <LifecycleStep title={t("auto.CORRIDORACTIVE_1096") || "CORRIDOR ACTIVE"} active={simStep >= 5} current={simStep === 5} icon={Zap} />
+                                    <LifecycleStep title={t("auto.MISSIONCOMPLETE_6056") || "MISSION COMPLETE"} active={simStep >= 6} current={simStep === 6} icon={ShieldCheck} />
                                 </div>
                                 
                                 <AnimatePresence>
@@ -361,7 +364,7 @@ export default function SmartGreenWavePage() {
                                             className="pt-6 border-t border-white/10"
                                         >
                                             <div className="flex items-center justify-between mb-6">
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Center Map Corridor</h4>
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">{t("auto.CenterMapCorrid_212") || "Center Map Corridor"}</h4>
                                             </div>
                                             <div className="space-y-4 px-2">
                                                 <JunctionNode name="Junction A" eta={corridorNodes.A.eta} status={corridorNodes.A.status} cleared={corridorNodes.A.cleared} />
@@ -375,22 +378,22 @@ export default function SmartGreenWavePage() {
 
                             {/* RIGHT PANEL: AI Reasoning Engine & Impact */}
                             <div className="space-y-6 flex flex-col">
-                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500">AI Reasoning Engine</h3>
+                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500">{t("auto.AIReasoningEngi_141") || "AI Reasoning Engine"}</h3>
                                 
                                 <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 shadow-inner flex-1">
                                     <div className="space-y-4 mb-8">
-                                        <ReasoningRow label="Light Signature" score={reasoning.light} />
-                                        <ReasoningRow label="Route Consistency" score={reasoning.priority} />
-                                        <ReasoningRow label="Vehicle Profile" score={reasoning.vehicle} />
-                                        <ReasoningRow label="Motion Priority" score={reasoning.motion} />
+                                        <ReasoningRow label={t("auto.LightSignature_1445") || "Light Signature"} score={reasoning.light} />
+                                        <ReasoningRow label={t("auto.RouteConsistenc_2912") || "Route Consistency"} score={reasoning.priority} />
+                                        <ReasoningRow label={t("auto.VehicleProfile_9456") || "Vehicle Profile"} score={reasoning.vehicle} />
+                                        <ReasoningRow label={t("auto.MotionPriority_3768") || "Motion Priority"} score={reasoning.motion} />
                                         <div className="pt-4 mt-4 border-t border-white/10 flex justify-between items-center">
-                                            <span className="text-xs font-black uppercase tracking-widest text-white">Final Confidence</span>
+                                            <span className="text-xs font-black uppercase tracking-widest text-white">{t("auto.FinalConfidence_3314") || "Final Confidence"}</span>
                                             <span className="text-2xl font-black font-mono text-emerald-400">{confidence}%</span>
                                         </div>
                                     </div>
 
                                     <div className="bg-black/50 p-4 rounded-xl border border-white/5 mb-6">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Reasoning</h4>
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">{t("auto.Reasoning_9608") || "Reasoning"}</h4>
                                         <ul className="space-y-2">
                                             <ReasoningCheck text="Emergency light sequence detected" active={reasoning.light > 60} />
                                             <ReasoningCheck text="Persistent route trajectory" active={reasoning.priority > 60} />
@@ -402,12 +405,12 @@ export default function SmartGreenWavePage() {
                                 </div>
 
                                 <div className="bg-[#121216] border border-sky-500/20 rounded-3xl p-6 shadow-inner mt-auto">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-sky-400 mb-4">Impact Intelligence</h4>
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-sky-400 mb-4">{t("auto.ImpactIntellige_4364") || "Impact Intelligence"}</h4>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <ImpactStat label="Vehicles Analysed" value={vehicleCount * 14} />
-                                        <ImpactStat label="Emergency Vehicles" value={simStep >= 4 ? "1" : "0"} />
-                                        <ImpactStat label="Junctions Cleared" value={Object.values(corridorNodes).filter(n => n.cleared).length.toString()} />
-                                        <ImpactStat label="System Confidence" value={`${confidence}%`} />
+                                        <ImpactStat label={t("auto.VehiclesAnalyse_8158") || "Vehicles Analysed"} value={vehicleCount * 14} />
+                                        <ImpactStat label={t("auto.EmergencyVehicl_2461") || "Emergency Vehicles"} value={simStep >= 4 ? "1" : "0"} />
+                                        <ImpactStat label={t("auto.JunctionsCleare_9198") || "Junctions Cleared"} value={Object.values(corridorNodes).filter(n => n.cleared).length.toString()} />
+                                        <ImpactStat label={t("auto.SystemConfidenc_1603") || "System Confidence"} value={`${confidence}%`} />
                                     </div>
                                 </div>
                             </div>

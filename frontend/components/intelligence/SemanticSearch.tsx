@@ -67,7 +67,7 @@ export function SemanticSearch() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="e.g., 'Person wearing a red shirt near Gate 3'"
+          placeholder={t("auto.egPersonwearing_4047") || "e.g., 'Person wearing a red shirt near Gate 3'"}
           className="w-full bg-black/50 border border-neutral-800 rounded-lg pl-4 pr-12 py-3 text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono text-sm"
         />
         <button

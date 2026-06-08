@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   Bell, X, ShieldAlert, TrafficCone, ParkingCircle,
   CheckCircle2, Zap, ChevronDown, ChevronUp, Car,
@@ -109,6 +110,8 @@ function relativeTime(ts: string): string {
 function Chip({ icon, label, value, accent = "text-slate-300" }: {
   icon: React.ReactNode; label: string; value: string | number; accent?: string;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex items-center gap-1.5 bg-white/[0.04] rounded-lg px-2 py-1 border border-white/[0.06]">
       <span className="text-slate-500 w-3.5 h-3.5 shrink-0">{icon}</span>
@@ -120,24 +123,25 @@ function Chip({ icon, label, value, accent = "text-slate-300" }: {
 
 // ── Domain-specific metric chips ──────────────────────────────────────────
 function MetricChips({ n }: { n: MeshNotification }) {
+  const { t } = useTranslation();
   const m = n.metadata || {};
   if (n.domain === "traffic") {
     return (
       <div className="flex flex-wrap gap-1.5 mt-2">
         {m.vehicle_count != null && (
-          <Chip icon={<Car className="w-3.5 h-3.5" />} label="Vehicles"
+          <Chip icon={<Car className="w-3.5 h-3.5" />} label={t("auto.Vehicles_363") || "Vehicles"}
             value={m.vehicle_count} accent="text-amber-300" />
         )}
         {m.flow_speed != null && (
-          <Chip icon={<Gauge className="w-3.5 h-3.5" />} label="Speed"
+          <Chip icon={<Gauge className="w-3.5 h-3.5" />} label={t("auto.Speed_6542") || "Speed"}
             value={`${Number(m.flow_speed).toFixed(1)} px/s`} accent="text-blue-300" />
         )}
         {m.wait_time != null && (
-          <Chip icon={<Clock className="w-3.5 h-3.5" />} label="Wait"
+          <Chip icon={<Clock className="w-3.5 h-3.5" />} label={t("auto.Wait_2691") || "Wait"}
             value={`${Number(m.wait_time).toFixed(1)} min`} accent="text-orange-300" />
         )}
         {m.congestion_level && (
-          <Chip icon={<Activity className="w-3.5 h-3.5" />} label="Congestion"
+          <Chip icon={<Activity className="w-3.5 h-3.5" />} label={t("auto.Congestion_8809") || "Congestion"}
             value={m.congestion_level}
             accent={
               m.congestion_level === "Critical" ? "text-rose-400" :
@@ -147,7 +151,7 @@ function MetricChips({ n }: { n: MeshNotification }) {
           />
         )}
         {m.risk_score != null && (
-          <Chip icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Risk"
+          <Chip icon={<AlertTriangle className="w-3.5 h-3.5" />} label={t("auto.Risk_7459") || "Risk"}
             value={`${m.risk_score}%`}
             accent={Number(m.risk_score) > 70 ? "text-rose-400" : Number(m.risk_score) > 40 ? "text-orange-400" : "text-emerald-400"}
           />
@@ -160,13 +164,13 @@ function MetricChips({ n }: { n: MeshNotification }) {
     return (
       <div className="flex flex-wrap gap-1.5 mt-2">
         {occ != null && (
-          <Chip icon={<Activity className="w-3.5 h-3.5" />} label="Occupancy"
+          <Chip icon={<Activity className="w-3.5 h-3.5" />} label={t("auto.Occupancy_9528") || "Occupancy"}
             value={`${Number(occ).toFixed(0)}%`}
             accent={Number(occ) > 90 ? "text-rose-400" : Number(occ) > 70 ? "text-orange-400" : "text-emerald-400"}
           />
         )}
         {m.vehicle_count != null && (
-          <Chip icon={<Car className="w-3.5 h-3.5" />} label="Vehicles"
+          <Chip icon={<Car className="w-3.5 h-3.5" />} label={t("auto.Vehicles_363") || "Vehicles"}
             value={m.vehicle_count} accent="text-cyan-300" />
         )}
       </div>
@@ -176,11 +180,11 @@ function MetricChips({ n }: { n: MeshNotification }) {
     return (
       <div className="flex flex-wrap gap-1.5 mt-2">
         {m.avg_count != null && (
-          <Chip icon={<Users className="w-3.5 h-3.5" />} label="Count"
+          <Chip icon={<Users className="w-3.5 h-3.5" />} label={t("auto.Count_6039") || "Count"}
             value={Math.round(m.avg_count)} accent="text-fuchsia-300" />
         )}
         {m.risk_score != null && (
-          <Chip icon={<AlertTriangle className="w-3.5 h-3.5" />} label="Risk"
+          <Chip icon={<AlertTriangle className="w-3.5 h-3.5" />} label={t("auto.Risk_7459") || "Risk"}
             value={`${m.risk_score}%`} accent="text-rose-300" />
         )}
       </div>
@@ -191,6 +195,7 @@ function MetricChips({ n }: { n: MeshNotification }) {
 
 // ── Individual notification card ──────────────────────────────────────────
 function NotifCard({ n, onDismiss }: { n: MeshNotification; onDismiss: () => void }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [tick, setTick] = useState(0);
   const cfg  = PRIORITY_CONFIG[n.priority] || PRIORITY_CONFIG.LOW;
@@ -300,7 +305,7 @@ function NotifCard({ n, onDismiss }: { n: MeshNotification; onDismiss: () => voi
                       <div className="flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         <p className="text-[9px] text-emerald-400/80 font-mono uppercase tracking-[0.15em] font-black">
-                          Tactical Location Data
+                          {t("auto.TacticalLocatio_7049") || "Tactical Location Data"}
                         </p>
                       </div>
                       <p className="text-[11px] text-emerald-300 font-mono font-bold tracking-tight">{meta.coordinates}</p>
@@ -310,7 +315,7 @@ function NotifCard({ n, onDismiss }: { n: MeshNotification; onDismiss: () => voi
                     <div className="mt-2 rounded-xl overflow-hidden border border-rose-500/30 bg-black/40 shadow-inner relative group">
                       <div className="absolute top-2 left-2 bg-rose-500/80 backdrop-blur text-white text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-rose-400/50 flex items-center gap-1.5 z-10">
                         <span className="w-1 h-1 rounded-full bg-white animate-ping" />
-                        Live Feed Snapshot
+                        {t("auto.LiveFeedSnapsho_9158") || "Live Feed Snapshot"}
                       </div>
                       <img src={meta.screenshot_url} alt="Incident Snapshot" className="w-full object-cover transition-transform duration-700 group-hover:scale-105" />
                       <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-xl pointer-events-none" />
@@ -348,9 +353,9 @@ function NotifCard({ n, onDismiss }: { n: MeshNotification; onDismiss: () => voi
                   className="flex items-center gap-0.5 text-[9px] text-cyan-500/60 hover:text-cyan-400 font-bold uppercase tracking-wider transition-colors ml-auto"
                 >
                   {expanded ? (
-                    <><ChevronUp className="w-2.5 h-2.5" /> Less</>
+                    <><ChevronUp className="w-2.5 h-2.5" /> {t("auto.Less_263") || "Less"}</>
                   ) : (
-                    <><ChevronDown className="w-2.5 h-2.5" /> Details</>
+                    <><ChevronDown className="w-2.5 h-2.5" /> {t("auto.Details_6811") || "Details"}</>
                   )}
                 </button>
               )}
@@ -372,6 +377,7 @@ function NotifCard({ n, onDismiss }: { n: MeshNotification; onDismiss: () => voi
 
 // ── Main Bell ─────────────────────────────────────────────────────────────
 export function NotificationBell() {
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState<MeshNotification[]>([]);
   const [unread, setUnread]   = useState(0);
   const [open, setOpen]       = useState(false);
@@ -460,7 +466,7 @@ export function NotificationBell() {
             ? "border-rose-500/50 shadow-[0_0_16px_rgba(239,68,68,0.25)]"
             : "border-white/10 hover:border-cyan-500/40"
         }`}
-        aria-label="Notifications"
+        aria-label={t("auto.Notifications_5440") || "Notifications"}
       >
         <Bell className={`w-5 h-5 transition-colors ${
           criticalCount > 0 ? "text-rose-400 animate-pulse" : "text-slate-400 group-hover:text-cyan-300"
@@ -495,7 +501,7 @@ export function NotificationBell() {
               <div className="flex items-center gap-2">
                 <Zap className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
                 <span className="text-[11px] font-black text-white uppercase tracking-[0.15em]">
-                  Tactical Mesh
+                  {t("auto.TacticalMesh_1799") || "Tactical Mesh"}
                 </span>
                 <span className="text-[9px] text-slate-600 font-mono bg-white/[0.04] px-1.5 py-0.5 rounded">
                   {notifications.length} events
@@ -505,7 +511,7 @@ export function NotificationBell() {
                 onClick={clearAll}
                 className="text-[9px] text-slate-600 hover:text-rose-400 font-bold uppercase tracking-widest transition-colors"
               >
-                Clear All
+                {t("auto.ClearAll_2619") || "Clear All"}
               </button>
             </div>
 

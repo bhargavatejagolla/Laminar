@@ -6,6 +6,7 @@ import {
   Crosshair, Cpu, Server, AlertTriangle, Eye, RefreshCw, Target,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -85,6 +86,8 @@ function friendlyError(err: unknown): string {
 // ─────────────────────────────────────────────────────────────
 
 export default function AISearchPage() {
+  const { t } = useTranslation();
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -194,10 +197,10 @@ export default function AISearchPage() {
 
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-black uppercase tracking-[0.15em] bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">
-              AI Video Search
+              {t("auto.AIVideoSearch_767") || "AI Video Search"}
             </h1>
             <p className="text-[11px] text-slate-600 uppercase tracking-widest mt-0.5">
-              Advanced Neural Trajectory &amp; Object Core
+              {t("auto.AdvancedNeuralT_1650") || "Advanced Neural Trajectory &amp; Object Core"}
             </p>
           </div>
 
@@ -215,8 +218,8 @@ export default function AISearchPage() {
               : backendOnline
                 ? indexReady
                   ? <><Wifi className="w-3 h-3" />{(status?.total_items || status?.semantic_snapshots || 0)} Nodes Online</>
-                  : <><Wifi className="w-3 h-3" />Ready</>
-                : <><WifiOff className="w-3 h-3" />Backend Offline</>
+                  : <><Wifi className="w-3 h-3" />{t("auto.Ready_1033") || "Ready"}</>
+                : <><WifiOff className="w-3 h-3" />{t("auto.BackendOffline_1969") || "Backend Offline"}</>
             }
           </div>
         </motion.div>
@@ -235,11 +238,11 @@ export default function AISearchPage() {
               <span>
                 Backend unreachable. Run{" "}
                 <code className="font-mono bg-red-500/15 px-1.5 py-0.5 rounded text-xs">
-                  python start.py
+                  {t("auto.pythonstartpy_1993") || "python start.py"}
                 </code>{" "}
                 from the project root, then{" "}
                 <button onClick={fetchStatus} className="underline hover:text-red-300 inline-flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" />retry
+                  <RefreshCw className="w-3 h-3" />{t("auto.retry_1350") || "retry"}
                 </button>.
               </span>
             </motion.div>
@@ -261,7 +264,7 @@ export default function AISearchPage() {
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
-              placeholder="Describe target — e.g. 'Person in a red shirt'"
+              placeholder={t("auto.Describetargete_9420") || "Describe target — e.g. 'Person in a red shirt'"}
               className="flex-1 bg-transparent py-3 text-sm text-white placeholder-slate-600 outline-none"
               disabled={loading}
             />
@@ -341,7 +344,7 @@ export default function AISearchPage() {
                 onClick={() => { setError(null); handleSearch(); }}
                 className="text-xs underline hover:text-amber-300 flex items-center gap-1 shrink-0"
               >
-                <RefreshCw className="w-3 h-3" />Retry
+                <RefreshCw className="w-3 h-3" />{t("auto.Retry_4276") || "Retry"}
               </button>
             </motion.div>
           )}
@@ -355,9 +358,9 @@ export default function AISearchPage() {
             className="flex flex-col items-center gap-4 py-24 text-slate-600"
           >
             <Eye className="w-12 h-12 opacity-25" />
-            <p className="font-bold uppercase tracking-widest text-sm">No Targets Identified</p>
+            <p className="font-bold uppercase tracking-widest text-sm">{t("auto.NoTargetsIdenti_3332") || "No Targets Identified"}</p>
             <p className="text-xs text-slate-700">
-              Try a different colour or description, or ensure snapshots have been captured.
+              {t("auto.Tryadifferentco_9780") || "Try a different colour or description, or ensure snapshots have been captured."}
             </p>
           </motion.div>
         )}
@@ -408,7 +411,7 @@ export default function AISearchPage() {
                         />
                       ) : (
                         <div className="flex items-center justify-center h-full text-slate-700 text-xs">
-                          No snapshot
+                          {t("auto.Nosnapshot_4411") || "No snapshot"}
                         </div>
                       )}
 
@@ -424,7 +427,7 @@ export default function AISearchPage() {
                           }}
                         >
                           <span className="absolute -top-5 left-0 text-[9px] font-bold text-sky-400 bg-black/80 px-1 py-0.5 rounded whitespace-nowrap flex items-center gap-0.5">
-                            <Target className="w-2 h-2" /> LOCK
+                            <Target className="w-2 h-2" /> {t("auto.LOCK_2741") || "LOCK"}
                           </span>
                         </div>
                       )}
@@ -475,10 +478,10 @@ export default function AISearchPage() {
             </div>
             <div>
               <p className="font-black text-base uppercase tracking-[0.2em] text-slate-500">
-                Awaiting Target Description
+                {t("auto.AwaitingTargetD_3702") || "Awaiting Target Description"}
               </p>
               <p className="text-slate-700 text-xs mt-1">
-                Describe clothing colour, object, or behaviour to begin
+                {t("auto.Describeclothin_1623") || "Describe clothing colour, object, or behaviour to begin"}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center max-w-lg">

@@ -6,8 +6,12 @@ import { api } from "@/services/api";
 import { Plus, MessageSquare, CheckCircle, Clock, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
+import DotGrid from "@/components/ui/DotGrid";
 
 export default function SupportTicketsPage() {
+  const { t } = useTranslation();
+
   const { user, isSuperAdmin, isAdmin } = useAuth();
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,15 +52,29 @@ export default function SupportTicketsPage() {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto min-h-screen">
+    <div className="relative min-h-screen">
+      <div className="absolute inset-0 z-0 opacity-70 pointer-events-auto">
+        <DotGrid
+          dotSize={6}
+          gap={20}
+          baseColor="#1f1b2e"
+          activeColor="#22d3ee"
+          proximity={180}
+          shockRadius={350}
+          shockStrength={12}
+          resistance={500}
+          returnDuration={2.5}
+        />
+      </div>
+      <div className="relative z-10 p-8 max-w-6xl mx-auto min-h-screen pointer-events-none *:pointer-events-auto">
       <Link href="/dashboard" className="inline-flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors mb-6 group w-max">
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        Back to Dashboard
+        {t("auto.BacktoDashboard_1309") || "Back to Dashboard"}
       </Link>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2 font-heading">
-            Support Headquarters
+            {t("auto.SupportHeadquar_7369") || "Support Headquarters"}
           </h1>
           <p className="text-slate-400">
             {isAdmin || isSuperAdmin
@@ -70,19 +88,19 @@ export default function SupportTicketsPage() {
           className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-[0_0_15px_rgba(34,211,238,0.3)] hover:shadow-[0_0_25px_rgba(34,211,238,0.5)]"
         >
           <Plus className="w-4 h-4" />
-          <span>New Ticket</span>
+          <span>{t("auto.NewTicket_2827") || "New Ticket"}</span>
         </button>
       </div>
 
       <div className="bg-[#0f1219] border border-white/10 rounded-xl shadow-xl overflow-hidden backdrop-blur-md">
         {loading ? (
-          <div className="p-8 text-center text-slate-400 animate-pulse">Loading tickets...</div>
+          <div className="p-8 text-center text-slate-400 animate-pulse">{t("auto.Loadingtickets_6877") || "Loading tickets..."}</div>
         ) : tickets.length === 0 ? (
           <div className="p-12 text-center flex flex-col items-center justify-center">
             <div className="w-16 h-16 rounded-full bg-cyan-900/40 flex items-center justify-center border border-cyan-500/30 mb-4">
               <MessageSquare className="w-8 h-8 text-cyan-400" />
             </div>
-            <h3 className="text-lg font-semibold text-white">No Tickets Found</h3>
+            <h3 className="text-lg font-semibold text-white">{t("auto.NoTicketsFound_9865") || "No Tickets Found"}</h3>
             <p className="text-slate-500 max-w-sm mt-2">
               You haven't opened any support requests yet. Everything looks good!
             </p>
@@ -91,10 +109,10 @@ export default function SupportTicketsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white/5 border-b border-white/10 text-slate-400 text-xs uppercase tracking-wider font-semibold">
-                <th className="px-6 py-4">Title</th>
-                <th className="px-6 py-4">Creator</th>
-                <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-right">Created</th>
+                <th className="px-6 py-4">{t("auto.Title_7370") || "Title"}</th>
+                <th className="px-6 py-4">{t("auto.Creator_4606") || "Creator"}</th>
+                <th className="px-6 py-4 text-center">{t("auto.Status_5777") || "Status"}</th>
+                <th className="px-6 py-4 text-right">{t("auto.Created_8430") || "Created"}</th>
               </tr>
             </thead>
             <tbody>
@@ -132,7 +150,7 @@ export default function SupportTicketsPage() {
       {showNewTicketModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0f1219] w-full max-w-md border border-white/10 rounded-xl shadow-2xl p-6">
-            <h2 className="text-xl font-bold text-white mb-6">Create Support Ticket</h2>
+            <h2 className="text-xl font-bold text-white mb-6">{t("auto.CreateSupportTi_3612") || "Create Support Ticket"}</h2>
 
             <form onSubmit={handleCreateTicket} className="space-y-4">
               <div>
@@ -143,18 +161,18 @@ export default function SupportTicketsPage() {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 text-white outline-none focus:border-cyan-500/50 transition-colors"
-                  placeholder="e.g. Issue viewing CCTV stream"
+                  placeholder={t("auto.egIssueviewingC_2701") || "e.g. Issue viewing CCTV stream"}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">Description</label>
+                <label className="block text-sm font-medium text-slate-400 mb-2">{t("auto.Description_4314") || "Description"}</label>
                 <textarea
                   required
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2.5 text-white outline-none focus:border-cyan-500/50 transition-colors h-32 resize-none"
-                  placeholder="Please describe the issue in detail..."
+                  placeholder={t("auto.Pleasedescribet_8463") || "Please describe the issue in detail..."}
                 />
               </div>
 
@@ -168,19 +186,20 @@ export default function SupportTicketsPage() {
                   onClick={() => { setShowNewTicketModal(false); setError(""); }}
                   className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
                 >
-                  Cancel
+                  {t("auto.Cancel_5734") || "Cancel"}
                 </button>
                 <button
                   type="submit"
                   className="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold px-6 py-2 rounded-lg transition-colors shadow-[0_0_10px_rgba(34,211,238,0.2)]"
                 >
-                  Submit Ticket
+                  {t("auto.SubmitTicket_7020") || "Submit Ticket"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

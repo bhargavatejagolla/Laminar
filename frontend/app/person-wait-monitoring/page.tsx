@@ -1683,8 +1683,8 @@ export default function PersonWaitMonitoringPage() {
                       <AnimatePresence>
                          {showAddZone && (
                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="mb-8 space-y-4 p-5 bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden">
-                              <input placeholder="Zone_Name" value={newZoneName} onChange={e => setNewZoneName(e.target.value)} className="w-full bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs text-white focus:border-cyan-500/50 outline-none font-mono" />
-                              <input type="number" placeholder="Threshold_S" value={newZoneThreshold} onChange={e => setNewZoneThreshold(Number(e.target.value))} className="w-full bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs text-white focus:border-cyan-500/50 outline-none font-mono" />
+                              <input placeholder={t("auto.ZoneName_4942") || "Zone_Name"} value={newZoneName} onChange={e => setNewZoneName(e.target.value)} className="w-full bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs text-white focus:border-cyan-500/50 outline-none font-mono" />
+                              <input type="number" placeholder={t("auto.ThresholdS_1340") || "Threshold_S"} value={newZoneThreshold} onChange={e => setNewZoneThreshold(Number(e.target.value))} className="w-full bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs text-white focus:border-cyan-500/50 outline-none font-mono" />
                               <div className="flex gap-2">
                                  <button onClick={() => setShowAddZone(false)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-600">{t("auto.Cancel_9092") || "Cancel"}</button>
                                  <button onClick={createZone} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest bg-cyan-600 rounded-2xl text-white shadow-lg">{t("auto.Establish_9178") || "Establish"}</button>
@@ -1841,7 +1841,7 @@ export default function PersonWaitMonitoringPage() {
                        <div className="relative group w-auto lg:w-96 flex-1">
                           <Search className="w-5 h-5 absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600 transition-colors group-focus-within:text-cyan-500" />
                           <input 
-                            type="text" placeholder="Filter Vector ID..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                            type="text" placeholder={t("auto.FilterVectorID_2010") || "Filter Vector ID..."} value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                             className="w-full bg-black border border-white/10 rounded-[24px] pl-14 pr-6 py-4 text-xs text-white placeholder:text-zinc-700 outline-none focus:border-cyan-500/40 transition-all font-mono shadow-inner"
                           />
                        </div>

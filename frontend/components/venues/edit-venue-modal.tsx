@@ -211,9 +211,9 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                 <p className="text-[10px] text-slate-500 font-mono">Current Coordinates: [{formData.latitude?.toFixed(6)}, {formData.longitude?.toFixed(6)}]</p>
                 <div className="flex items-center gap-2 mt-1 px-2 py-1 rounded bg-cyan-500/5 border border-cyan-500/20 w-fit">
                   <CloudLightning className="w-3 h-3 text-cyan-400 animate-pulse" />
-                  <span className="text-[9px] font-black uppercase tracking-tighter text-cyan-300">Geo-Telemetry & Climate Sync Active</span>
+                  <span className="text-[9px] font-black uppercase tracking-tighter text-cyan-300">{t("auto.GeoTelemetryCli_3969") || "Geo-Telemetry & Climate Sync Active"}</span>
                 </div>
-                <p className="text-[9px] text-slate-600 italic leading-none mt-1">Linked to Prediction Engine for live weather & temperature ingestion.</p>
+                <p className="text-[9px] text-slate-600 italic leading-none mt-1">{t("auto.LinkedtoPredict_9113") || "Linked to Prediction Engine for live weather & temperature ingestion."}</p>
               </div>
             </div>
 
@@ -358,9 +358,9 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
 
             <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
               <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" /> AI Dynamic Response Settings
+                <AlertTriangle className="w-4 h-4" /> {t("auto.AIDynamicRespon_8442") || "AI Dynamic Response Settings"}
               </h3>
-              <p className="text-[10px] text-slate-500 font-mono mb-2">Override AI trigger thresholds specific to this venue layout.</p>
+              <p className="text-[10px] text-slate-500 font-mono mb-2">{t("auto.OverrideAItrigg_6913") || "Override AI trigger thresholds specific to this venue layout."}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">{labels.density} ({labels.unit}/min)</label>
@@ -378,7 +378,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                     value={formData.model_metadata?.velocity_threshold ?? 15.0}
                     onChange={(e) => setFormData({ ...formData, model_metadata: { ...formData.model_metadata, velocity_threshold: parseFloat(e.target.value) || 15.0 } })}
                   />
-                  <p className="text-[10px] text-slate-500 font-mono">Movement speed above this triggers an immediate threat detection.</p>
+                  <p className="text-[10px] text-slate-500 font-mono">{t("auto.Movementspeedab_9333") || "Movement speed above this triggers an immediate threat detection."}</p>
                 </div>
               </div>
             </div>

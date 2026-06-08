@@ -72,8 +72,8 @@ export default function OnboardingPage() {
             </h1>
             
             <p className="text-slate-400 text-base leading-relaxed max-w-2xl font-medium">
-              We're initializing your operator privileges. Gain full situational awareness through 
-              real-time telemetry, predictive risk assessments, and zero-trust subject tracking 
+              We're initializing your tactical operator privileges. Gain full situational awareness through 
+              AI-driven telemetry, predictive risk assessments, and zero-trust autonomous intervention capabilities
               across your entire infrastructure.
             </p>
 

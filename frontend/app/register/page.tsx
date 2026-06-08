@@ -597,7 +597,7 @@ export default function RegisterPage() {
                     }} />
                     <motion.input
                       type="text"
-                      placeholder="Your full name"
+                      placeholder={t("auto.Yourfullname_1414") || "Your full name"}
                       value={fullName}
                       onChange={e => setFullName(e.target.value)}
                       onFocus={() => setFocusedField("name")}
@@ -630,7 +630,7 @@ export default function RegisterPage() {
                     }} />
                     <motion.input
                       type="email"
-                      placeholder="new.operator@laminar.ai"
+                      placeholder={t("auto.newoperatorlami_8934") || "new.operator@laminar.ai"}
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       onFocus={() => setFocusedField("email")}

@@ -69,7 +69,7 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
             <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">{t("auto.NodeName_9376") || "Node Name"}</label>
             <input 
               type="text" 
-              placeholder="e.g. Main Lobby Cam"
+              placeholder={t("auto.egMainLobbyCam_7377") || "e.g. Main Lobby Cam"}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-[#0b1325] border border-slate-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
@@ -80,7 +80,7 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
             <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Location Description (Optional)</label>
             <input 
               type="text" 
-              placeholder="e.g. Near the main entrance, North side"
+              placeholder={t("auto.egNearthemainen_4707") || "e.g. Near the main entrance, North side"}
               value={formData.location_description}
               onChange={(e) => setFormData({ ...formData, location_description: e.target.value })}
               className="w-full bg-[#0b1325] border border-slate-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"

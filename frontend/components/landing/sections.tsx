@@ -30,12 +30,12 @@ export function SectionLabel({ children, color = "#22d3ee" }: { children: React.
    SECTION 2 — LIVE AI DASHBOARD PREVIEW
 ══════════════════════════════════════════════ */
 const dashStats = [
-  { label: "Live Cameras", value: "48", unit: "feeds", color: "#22d3ee", icon: <Eye size={14} /> },
-  { label: "People Detected", value: "2,847", unit: "today", color: "#10b981", icon: <Users size={14} /> },
-  { label: "Active Alerts", value: "3", unit: "critical", color: "#f43f5e", icon: <ShieldAlert size={14} /> },
-  { label: "Threat Score", value: "0.12", unit: "low risk", color: "#a78bfa", icon: <Target size={14} /> },
-  { label: "Zone Occupancy", value: "74%", unit: "zone A", color: "#f59e0b", icon: <MapPin size={14} /> },
-  { label: "ReID Matches", value: "189", unit: "this hour", color: "#38bdf8", icon: <Cpu size={14} /> },
+  { label: "Resonance Nodes", value: "14", unit: "active", color: "#22d3ee", icon: <Radio size={14} /> },
+  { label: "Kinetic Threats", value: "0", unit: "today", color: "#10b981", icon: <Activity size={14} /> },
+  { label: "AEGIS Dispatch", value: "1", unit: "critical", color: "#f43f5e", icon: <Zap size={14} /> },
+  { label: "Flood Index", value: "12", unit: "low risk", color: "#a78bfa", icon: <Target size={14} /> },
+  { label: "Green Corridors", value: "2", unit: "cleared", color: "#f59e0b", icon: <Globe size={14} /> },
+  { label: "Guardian Routes", value: "84", unit: "escorts", color: "#38bdf8", icon: <Shield size={14} /> },
 ];
 
 export function LiveCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
@@ -260,11 +260,11 @@ export function DashboardPreview() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {[
-                    { msg: "Loitering detected — Zone C", color: "#f59e0b", time: "5s ago" },
-                    { msg: "Crowd surge — Main Entrance", color: "#f43f5e", time: "18s ago" },
-                    { msg: "ReID match — Suspect #A112", color: "#a78bfa", time: "42s ago" },
-                    { msg: "Zone D breach attempted", color: "#f43f5e", time: "1m ago" },
-                    { msg: "Visitor peak — 340/hr", color: "#22d3ee", time: "2m ago" },
+                    { msg: "Liquid Threat detected — River Node", color: "#f59e0b", time: "5s ago" },
+                    { msg: "Kinetic SOS — Main Corridor", color: "#f43f5e", time: "18s ago" },
+                    { msg: "AEGIS Protocol Activated", color: "#a78bfa", time: "42s ago" },
+                    { msg: "Resonance Anomaly — Bridge C", color: "#f43f5e", time: "1m ago" },
+                    { msg: "AI Green Wave deployed", color: "#22d3ee", time: "2m ago" },
                   ].map((a, i) => (
                     <motion.div key={i} initial={{ opacity: 0, x: -10 }} whileInView={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
                       style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,0.03)" : "none" }}>
@@ -334,14 +334,14 @@ export function DashboardPreview() {
    SECTION 3 — FEATURE CARDS
 ══════════════════════════════════════════════ */
 const featureCards = [
-  { icon: <Eye size={20} />, title: "Real-Time Detection", desc: "Hardware-accelerated YOLO models perform sub-100ms detection and tracking with 98%+ accuracy across any camera feed.", color: "#22d3ee", rgb: "34,211,238" },
-  { icon: <Cpu size={20} />, title: "Re-Identification", desc: "Cross-camera person tracking using deep metric learning — follow individuals across your entire venue seamlessly.", color: "#3b82f6", rgb: "59,130,246" },
-  { icon: <Users size={20} />, title: "Crowd Intelligence", desc: "Real-time density maps, flow vectors, and anomaly triggers that evolve with crowd dynamics in sub-second intervals.", color: "#a78bfa", rgb: "167,139,250" },
-  { icon: <BarChart3 size={20} />, title: "Heatmap Analytics", desc: "Spatial occupancy heatmaps revealing traffic patterns, dwell clusters, and blind spots across every monitored zone.", color: "#10b981", rgb: "16,185,129" },
-  { icon: <Bell size={20} />, title: "Smart Alerts", desc: "Multi-channel alert dispatch — WebSocket, SMS, email — with configurable thresholds and escalation chains.", color: "#f59e0b", rgb: "245,158,11" },
-  { icon: <Globe size={20} />, title: "Admin Dashboard", desc: "Mission-control UI with live feeds, analytics, role-based access, and SLA compliance tracking built for enterprise.", color: "#38bdf8", rgb: "56,189,248" },
-  { icon: <TrendingUp size={20} />, title: "Predictive Monitoring", desc: "LSTM models forecasting crowd surges 60 minutes ahead with 94% accuracy, enabling pre-emptive intervention.", color: "#f43f5e", rgb: "244,63,94" },
-  { icon: <Lock size={20} />, title: "Security Insights", desc: "Behavioral anomaly scoring, perimeter breach detection, and zero-trust access logging in one unified interface.", color: "#22d3ee", rgb: "34,211,238" },
+  { icon: <Shield size={20} />, title: "Guardian Route", desc: "AI Personal Protection Network with autonomous threat tracking, suspicious following detection, and dynamic safety routing.", color: "#22d3ee", rgb: "34,211,238" },
+  { icon: <Activity size={20} />, title: "Kinetic SOS", desc: "Zero-shot behavioral threat analysis that detects panic, running, and distress gestures instantly across all camera nodes.", color: "#f43f5e", rgb: "244,63,94" },
+  { icon: <Radio size={20} />, title: "Resonance Engine", desc: "Eulerian Structural Micro-Vibration Analysis. Predicts bridge and building collapses seconds before structural failure.", color: "#a78bfa", rgb: "167,139,250" },
+  { icon: <Globe size={20} />, title: "Liquid Threat Engine", desc: "Multi-Node Urban Flood Intelligence with autonomous route intervention and dynamic morphological water segmentation.", color: "#38bdf8", rgb: "56,189,248" },
+  { icon: <TrendingUp size={20} />, title: "AI Green Wave", desc: "Autonomous emergency traffic intelligence. Clears roads and synchronizes signals seconds before emergency vehicles arrive.", color: "#10b981", rgb: "16,185,129" },
+  { icon: <CheckCircle size={20} />, title: "Liability Defense", desc: "Immutable incident documentation, automated audits, and risk intelligence to protect enterprise assets.", color: "#f59e0b", rgb: "245,158,11" },
+  { icon: <MapPin size={20} />, title: "4D Spatial Engine", desc: "Next-generation structural analytics that visualizes real-time load, crowd density, and flow in immersive 3D space.", color: "#3b82f6", rgb: "59,130,246" },
+  { icon: <Zap size={20} />, title: "AEGIS Protocol", desc: "Autonomous Emergency Guidance System orchestrating drones, civilians, and smart infrastructure for medical events.", color: "#22d3ee", rgb: "34,211,238" },
 ];
 
 export function FeaturesSection() {

@@ -86,9 +86,6 @@ export default function Sidebar() {
       label: "Smart City OS",
       items: [
         { nameKey: "nav.systemsHub", name: "Systems Hub", href: "/smart-systems", icon: Globe, show: true },
-        { nameKey: "nav.smartParking", name: "Smart Parking", href: "/smart-parking", icon: Car, show: true },
-        { nameKey: "nav.trafficControl", name: "Traffic Control", href: "/smart-traffic", icon: TrafficCone, show: isAdmin },
-        { nameKey: "nav.incidentResponse", name: "Incident Response", href: "/smart-incidents", icon: ShieldAlert, show: isAdmin },
       ].filter(i => i.show)
     },
     {
@@ -101,7 +98,6 @@ export default function Sidebar() {
       labelKey: "nav.analytics",
       items: [
         { nameKey: "nav.reports", href: "/reports", icon: FileBarChart, show: true },
-        { nameKey: "nav.systemHealth", href: "/system", icon: Activity, show: isSuperAdmin },
       ].filter(i => i.show)
     },
     {
@@ -109,15 +105,14 @@ export default function Sidebar() {
       items: [
         { nameKey: "nav.profile", href: "/profile", icon: Settings, show: true },
         { nameKey: "nav.settings", href: "/settings", icon: Settings, show: isAdmin },
-        { nameKey: "nav.accessControl", href: "/settings/access-control", icon: Users, show: isSuperAdmin },
         { nameKey: "nav.support", name: "Support", href: "/support", icon: MessageSquare, show: true },
       ].filter(i => i.show)
     },
     {
       labelKey: "nav.enterpriseAI",
       items: [
-        { nameKey: "nav.automations", href: "/system/actions", icon: Webhook, show: isSuperAdmin },
-        { nameKey: "nav.fleetHealth", href: "/system/fleet", icon: CircuitBoard, show: isSuperAdmin },
+        { nameKey: "nav.automations", href: "/system/actions", icon: Webhook, show: true },
+        { nameKey: "nav.fleetHealth", href: "/system/fleet", icon: CircuitBoard, show: true },
       ].filter(i => i.show)
     }
   ].filter(section => section.items.length > 0);

@@ -370,7 +370,7 @@ export default function AccessControlPage() {
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="Query operational roster by identity or credentials..."
+                  placeholder={t("auto.Queryoperationa_8766") || "Query operational roster by identity or credentials..."}
                   className="w-full bg-white/[0.03] border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-xs font-medium text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/30 transition-all shadow-xl"
                 />
               </div>

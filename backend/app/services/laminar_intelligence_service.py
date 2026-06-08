@@ -218,6 +218,9 @@ class LaminarIntelligenceService:
                 "camera_id": str(m.camera_id) if m.camera_id else None,
                 "avg_count": float(m.avg_count or 0),
                 "max_count": float(m.max_count or 0),
+                "avg_velocity": float(m.avg_velocity or 0),
+                "avg_variance": float(m.avg_variance or 0),
+                "avg_acceleration": float(m.avg_acceleration or 0),
                 "risk_level": m.risk_level,
                 "bucket_start": m.bucket_start.strftime("%H:%M"),
             }

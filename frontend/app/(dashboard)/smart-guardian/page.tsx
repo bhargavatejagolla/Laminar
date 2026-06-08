@@ -23,6 +23,7 @@ import {
 import { useActiveVenue } from "@/hooks/useActiveVenue";
 import dynamic from "next/dynamic";
 import { api } from "@/services/api";
+import { useTranslation } from "react-i18next";
 
 const MultiNodeMap = dynamic(() => import('@/components/guardian/MultiNodeMap'), { ssr: false });
 
@@ -48,9 +49,15 @@ type GuardianState = {
     incident_id: string | null;
     randy_summary: string;
     subject_present: boolean;
+    status?: string;
+    active_camera?: string;
+    fingerprint?: any;
+    tracking_continuity?: any;
 };
 
 export default function SmartGuardianPage() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const searchParams = useSearchParams();
     const cameraId = searchParams?.get('camera_id') || "";
@@ -341,21 +348,21 @@ export default function SmartGuardianPage() {
                             <div className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all shadow-[0_0_15px_rgba(0,0,0,0.3)]">
                                 <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors group-hover:-translate-x-0.5" />
                             </div>
-                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">Back to<br/>Command</span>
+                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">{t("auto.Backto_7489") || "Back to"}<br/>{t("auto.Command_9711") || "Command"}</span>
                         </button>
 
                         <div>
                             <div className="flex items-center gap-3 mb-1">
                                 <Shield className={`w-5 h-5 ${isEmergencyLocked ? 'text-rose-500' : 'text-sky-500'} drop-shadow-[0_0_8px_rgba(14,165,233,0.8)]`} />
                                 <span className={`text-[11px] font-black uppercase tracking-[0.2em] ${isEmergencyLocked ? 'text-rose-500' : 'text-sky-500'}`}>
-                                    AI Personal Protection Network
+                                    {t("auto.AIPersonalProte_9135") || "AI Personal Protection Network"}
                                 </span>
                             </div>
                             <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.1)] mb-2">
-                                Laminar Guardian <span className={isEmergencyLocked ? 'text-rose-500' : 'text-sky-500'}>Route</span>
+                                {t("auto.LaminarGuardian_6249") || "Laminar Guardian"} <span className={isEmergencyLocked ? 'text-rose-500' : 'text-sky-500'}>{t("auto.Route_2878") || "Route"}</span>
                             </h1>
                             <p className="text-xs md:text-sm font-bold text-slate-400 tracking-widest uppercase flex items-center gap-2">
-                                Real-Time Smart Guardian Guidance & Tactical Routing Engine V2.4
+                                {t("auto.RealTimeSmartGu_689") || "Real-Time Smart Guardian Guidance & Tactical Routing Engine V2.4"}
                             </p>
                         </div>
                     </div>
@@ -391,12 +398,12 @@ export default function SmartGuardianPage() {
                             </button>
                             <div className="px-4 py-2 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center gap-3 shadow-[0_0_15px_rgba(14,165,233,0.15)]">
                                 <span className={`w-2 h-2 rounded-full ${isEmergencyLocked ? 'bg-rose-500' : 'bg-sky-500'} animate-ping`}></span>
-                                <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isEmergencyLocked ? 'text-rose-400' : 'text-sky-400'}`}>System Online</span>
+                                <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isEmergencyLocked ? 'text-rose-400' : 'text-sky-400'}`}>{t("auto.SystemOnline_4221") || "System Online"}</span>
                             </div>
                         </div>
                         {isActive && !sessionSummary && (
                             <button onClick={endSession} className="text-[10px] font-mono text-slate-500 hover:text-white flex items-center gap-1 transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-                                <Shield className="w-3 h-3 text-emerald-500" /> Complete Route
+                                <Shield className="w-3 h-3 text-emerald-500" /> {t("auto.CompleteRoute_1545") || "Complete Route"}
                             </button>
                         )}
                     </div>
@@ -415,8 +422,8 @@ export default function SmartGuardianPage() {
                                 <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(16,185,129,0.3)]">
                                     <Shield className="w-10 h-10 text-emerald-400" />
                                 </div>
-                                <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">Guardian Session Complete</h2>
-                                <p className="text-emerald-500/70 text-center uppercase tracking-[0.2em] text-sm font-bold">Safe Arrival Verified</p>
+                                <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">{t("auto.GuardianSession_1731") || "Guardian Session Complete"}</h2>
+                                <p className="text-emerald-500/70 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.SafeArrivalVeri_5694") || "Safe Arrival Verified"}</p>
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -426,36 +433,36 @@ export default function SmartGuardianPage() {
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none"></div>
                                         
                                         <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-8 flex items-center gap-2">
-                                            <ShieldAlert className="w-4 h-4"/> Arrival Certificate
+                                            <ShieldAlert className="w-4 h-4"/> {t("auto.ArrivalCertific_3809") || "Arrival Certificate"}
                                         </h3>
 
                                         <div className="space-y-6">
                                             <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Protected Subject</div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.ProtectedSubjec_8285") || "Protected Subject"}</div>
                                                 <div className="text-2xl font-black text-white tracking-wider">{sessionSummary.subject}</div>
                                             </div>
 
                                             <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Duration</div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.Duration_8463") || "Duration"}</div>
                                                 <div className="text-xl font-bold text-sky-400 tracking-wider">
                                                     {Math.floor((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) / 60000)}m {Math.floor(((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) % 60000) / 1000)}s
                                                 </div>
                                             </div>
 
                                             <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Threat Events</div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.ThreatEvents_4966") || "Threat Events"}</div>
                                                 <div className="text-xl font-bold text-rose-400 tracking-wider">{sessionSummary.threatEvents} Detected</div>
                                             </div>
 
                                             <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Average Route Safety</div>
+                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.AverageRouteSaf_8130") || "Average Route Safety"}</div>
                                                 <div className="text-2xl font-black text-emerald-400 tracking-wider">{sessionSummary.routeSafety}%</div>
                                             </div>
                                         </div>
 
                                         <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-3">
                                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
-                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Status: Safe Arrival Verified</span>
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">{t("auto.StatusSafeArriv_2962") || "Status: Safe Arrival Verified"}</span>
                                         </div>
                                     </div>
 
@@ -466,7 +473,7 @@ export default function SmartGuardianPage() {
                                         }}
                                         className="w-full py-5 border border-white/10 rounded-2xl uppercase font-black tracking-widest text-slate-400 hover:text-white hover:bg-white/5 transition-all"
                                     >
-                                        Close Session Log
+                                        {t("auto.CloseSessionLog_538") || "Close Session Log"}
                                     </button>
                                 </div>
 
@@ -474,7 +481,7 @@ export default function SmartGuardianPage() {
                                 <div className="lg:col-span-8 space-y-6">
                                     <div className="bg-[#121216]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden h-full flex flex-col shadow-[0_0_20px_rgba(0,0,0,0.5)]">
                                         <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white mb-6 flex items-center gap-2">
-                                            <Activity className="w-4 h-4 text-sky-400"/> Session Replay & Explainability
+                                            <Activity className="w-4 h-4 text-sky-400"/> {t("auto.SessionReplayEx_197") || "Session Replay & Explainability"}
                                         </h3>
 
                                         <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar">
@@ -497,24 +504,24 @@ export default function SmartGuardianPage() {
                                                                 {isFirstAlert && (
                                                                     <div className="mt-4 p-4 rounded-xl bg-black/40 border border-rose-500/20">
                                                                         <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3 flex items-center gap-2">
-                                                                            <Cpu className="w-3 h-3 text-sky-500"/> System Decision Path
+                                                                            <Cpu className="w-3 h-3 text-sky-500"/> {t("auto.SystemDecisionP_822") || "System Decision Path"}
                                                                         </div>
                                                                         <div className="space-y-3">
                                                                             <div className="flex items-center gap-3 text-xs font-mono text-slate-300">
-                                                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div> Unknown Actor Detected
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div> {t("auto.UnknownActorDet_2232") || "Unknown Actor Detected"}
                                                                             </div>
                                                                             <div className="flex items-center gap-3 text-xs font-mono text-slate-300">
-                                                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div> Loitering 8 seconds
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div> {t("auto.Loitering8secon_9139") || "Loitering 8 seconds"}
                                                                             </div>
                                                                             <div className="flex items-center gap-3 text-xs font-mono text-slate-300">
-                                                                                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div> Distance 0.9m
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div> {t("auto.Distance09m_623") || "Distance 0.9m"}
                                                                             </div>
                                                                             <div className="flex items-center gap-3 text-xs font-mono text-rose-400 font-bold">
-                                                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div> Guardian Score Dropped
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div> {t("auto.GuardianScoreDr_7854") || "Guardian Score Dropped"}
                                                                             </div>
                                                                             {sessionSummary.sos_activated && (
                                                                                 <div className="flex items-center gap-3 text-xs font-mono text-rose-500 font-black">
-                                                                                    <Zap className="w-3 h-3"/> Kinetic SOS Triggered
+                                                                                    <Zap className="w-3 h-3"/> {t("auto.KineticSOSTrigg_6225") || "Kinetic SOS Triggered"}
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -543,8 +550,8 @@ export default function SmartGuardianPage() {
                                     <div className="w-20 h-20 bg-sky-500/10 border border-sky-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(14,165,233,0.2)]">
                                         <Shield className="w-10 h-10 text-sky-500" />
                                     </div>
-                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Select Operating Mode</h2>
-                                    <p className="text-sky-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Guardian Route Configuration</p>
+                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">{t("auto.SelectOperating_8570") || "Select Operating Mode"}</h2>
+                                    <p className="text-sky-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.GuardianRouteCo_1515") || "Guardian Route Configuration"}</p>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
                                         <button 
@@ -553,8 +560,8 @@ export default function SmartGuardianPage() {
                                         >
                                             <div className="absolute top-0 left-0 w-full h-1 bg-sky-500/50"></div>
                                             <Video className="w-10 h-10 text-sky-500 mb-2" />
-                                            <span className="text-xl font-black text-white uppercase tracking-widest">Demo Mode</span>
-                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Single Camera Setup<br/>Hackathon Safe</span>
+                                            <span className="text-xl font-black text-white uppercase tracking-widest">{t("auto.DemoMode_1486") || "Demo Mode"}</span>
+                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">{t("auto.SingleCameraSet_9525") || "Single Camera Setup"}<br/>{t("auto.HackathonSafe_4200") || "Hackathon Safe"}</span>
                                         </button>
 
                                         <button 
@@ -563,8 +570,8 @@ export default function SmartGuardianPage() {
                                         >
                                             <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
                                             <MapPin className="w-10 h-10 text-emerald-500 mb-2 group-hover:animate-bounce" />
-                                            <span className="text-xl font-black text-emerald-400 uppercase tracking-widest">Real Guardian Mode</span>
-                                            <span className="text-xs font-bold text-emerald-500/70 uppercase tracking-widest text-center">Multi-Camera Corridor<br/>Auto Handoff Engine</span>
+                                            <span className="text-xl font-black text-emerald-400 uppercase tracking-widest">{t("auto.RealGuardianMod_5414") || "Real Guardian Mode"}</span>
+                                            <span className="text-xs font-bold text-emerald-500/70 uppercase tracking-widest text-center">{t("auto.MultiCameraCorr_9735") || "Multi-Camera Corridor"}<br/>{t("auto.AutoHandoffEngi_9") || "Auto Handoff Engine"}</span>
                                         </button>
                                     </div>
                                 </motion.div>
@@ -575,8 +582,8 @@ export default function SmartGuardianPage() {
                                     <div className="w-20 h-20 bg-sky-500/10 border border-sky-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(14,165,233,0.2)]">
                                         <Shield className="w-10 h-10 text-sky-500" />
                                     </div>
-                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Guardian Assessment</h2>
-                                    <p className="text-sky-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Select Protection Context</p>
+                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">{t("auto.GuardianAssessm_7285") || "Guardian Assessment"}</h2>
+                                    <p className="text-sky-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.SelectProtectio_9018") || "Select Protection Context"}</p>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                                         {['Walking Alone', 'Late Night Travel', 'Child Monitoring', 'Elderly Assistance'].map((reason) => (
@@ -590,7 +597,7 @@ export default function SmartGuardianPage() {
                                         ))}
                                     </div>
                                     <div className="mt-10 flex gap-4 w-full">
-                                        <button onClick={() => setWizardStep(0)} className="w-full py-4 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all">Back to Mode Selection</button>
+                                        <button onClick={() => setWizardStep(0)} className="w-full py-4 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all">{t("auto.BacktoModeSelec_6526") || "Back to Mode Selection"}</button>
                                     </div>
                                 </motion.div>
                             )}
@@ -600,8 +607,8 @@ export default function SmartGuardianPage() {
                                     <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
                                         <MapPin className="w-10 h-10 text-emerald-400" />
                                     </div>
-                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Nearby Protected Zones</h2>
-                                    <p className="text-emerald-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Select Origin Node</p>
+                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">{t("auto.NearbyProtected_455") || "Nearby Protected Zones"}</h2>
+                                    <p className="text-emerald-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.SelectOriginNod_4633") || "Select Origin Node"}</p>
                                     
                                     <div className="grid grid-cols-1 gap-4 w-full max-h-[350px] overflow-y-auto pr-4 custom-scrollbar">
                                         {availableCameras.length > 0 ? availableCameras.map((cam) => (
@@ -617,14 +624,14 @@ export default function SmartGuardianPage() {
                                                     <Video className={`w-6 h-6 ${cameraId === cam.id ? 'text-emerald-400' : 'text-slate-500'}`} />
                                                     <span className={`text-lg font-black tracking-widest uppercase ${cameraId === cam.id ? 'text-white' : 'group-hover:text-white'}`}>{cam.name}</span>
                                                 </div>
-                                                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">Coverage Active</div>
+                                                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">{t("auto.CoverageActive_6512") || "Coverage Active"}</div>
                                             </button>
                                         )) : (
-                                            <div className="text-center text-rose-500 p-8 border border-rose-500/20 rounded-2xl bg-rose-500/5 text-sm font-bold tracking-widest uppercase">No protected zones available in this sector</div>
+                                            <div className="text-center text-rose-500 p-8 border border-rose-500/20 rounded-2xl bg-rose-500/5 text-sm font-bold tracking-widest uppercase">{t("auto.Noprotectedzone_4836") || "No protected zones available in this sector"}</div>
                                         )}
                                     </div>
                                     <div className="mt-10 flex gap-4 w-full">
-                                        <button onClick={() => setWizardStep(1)} className="w-full py-4 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all">Back to Context</button>
+                                        <button onClick={() => setWizardStep(1)} className="w-full py-4 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 hover:border-white/30 transition-all">{t("auto.BacktoContext_8104") || "Back to Context"}</button>
                                     </div>
                                 </motion.div>
                             )}
@@ -634,19 +641,19 @@ export default function SmartGuardianPage() {
                                     <div className="w-20 h-20 bg-purple-500/10 border border-purple-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
                                         <Footprints className="w-10 h-10 text-purple-400" />
                                     </div>
-                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Destination Vector</h2>
-                                    <p className="text-purple-400 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Optional: Enter intended destination</p>
+                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">{t("auto.DestinationVect_2984") || "Destination Vector"}</h2>
+                                    <p className="text-purple-400 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.OptionalEnterin_4889") || "Optional: Enter intended destination"}</p>
                                     
                                     <input 
                                         type="text" 
                                         value={destination}
                                         onChange={(e) => setDestination(e.target.value)}
-                                        placeholder="e.g. Metro Station, North Gate..."
+                                        placeholder={t("auto.egMetroStationN_2830") || "e.g. Metro Station, North Gate..."}
                                         className="w-full bg-[#121216] border border-white/10 rounded-2xl px-6 py-6 text-lg font-bold text-white outline-none focus:border-purple-500/50 focus:shadow-[0_0_30px_rgba(168,85,247,0.2)] transition-all placeholder:text-slate-600 mb-10"
                                     />
 
                                     <div className="flex gap-4 w-full">
-                                        <button onClick={() => setWizardStep(2)} className="flex-1 py-5 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all">Back</button>
+                                        <button onClick={() => setWizardStep(2)} className="flex-1 py-5 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all">{t("auto.Back_4341") || "Back"}</button>
                                         <button 
                                             onClick={() => {
                                                 setWizardStep(4);
@@ -657,7 +664,7 @@ export default function SmartGuardianPage() {
                                             }} 
                                             className="flex-[2] py-5 bg-purple-600 text-white rounded-xl uppercase font-black tracking-widest hover:bg-purple-500 transition-all shadow-[0_0_30px_rgba(168,85,247,0.4)]"
                                         >
-                                            Generate Assessment
+                                            {t("auto.GenerateAssessm_4362") || "Generate Assessment"}
                                         </button>
                                     </div>
                                 </motion.div>
@@ -674,11 +681,11 @@ export default function SmartGuardianPage() {
                                                     <Cpu className="w-8 h-8 text-sky-400 animate-pulse" />
                                                 </div>
                                             </div>
-                                            <h2 className="text-2xl font-black uppercase tracking-widest mb-6 text-sky-400 animate-pulse">Running Neural Assessment...</h2>
+                                            <h2 className="text-2xl font-black uppercase tracking-widest mb-6 text-sky-400 animate-pulse">{t("auto.RunningNeuralAs_6902") || "Running Neural Assessment..."}</h2>
                                             <div className="space-y-3 text-center">
                                                 <p className="text-slate-400 text-xs font-mono uppercase tracking-widest">Analyzing historical incidents for {selectedReason}...</p>
-                                                <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">Mapping dynamic route variables...</p>
-                                                <p className="text-slate-600 text-xs font-mono uppercase tracking-widest">Evaluating 127 network nodes...</p>
+                                                <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">{t("auto.Mappingdynamicr_3267") || "Mapping dynamic route variables..."}</p>
+                                                <p className="text-slate-600 text-xs font-mono uppercase tracking-widest">{t("auto.Evaluating127ne_249") || "Evaluating 127 network nodes..."}</p>
                                             </div>
                                         </div>
                                     ) : (
@@ -688,22 +695,22 @@ export default function SmartGuardianPage() {
                                                 <Shield className="w-10 h-10 text-emerald-400" />
                                             </div>
                                             <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">Session GS-{Math.floor(Math.random() * 900) + 100} Created</h2>
-                                            <p className="text-emerald-500/70 mb-10 text-center uppercase tracking-[0.2em] text-sm font-bold">Protected Subject Registered</p>
+                                            <p className="text-emerald-500/70 mb-10 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.ProtectedSubjec_3943") || "Protected Subject Registered"}</p>
                                             
                                             <div className="grid grid-cols-2 gap-4 w-full mb-10">
                                                 <div className="bg-[#121216] border border-white/5 p-5 rounded-2xl text-center shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Context</div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">{t("auto.Context_1026") || "Context"}</div>
                                                     <div className="text-sm text-sky-400 font-bold uppercase tracking-wider">{selectedReason}</div>
                                                 </div>
                                                 <div className="bg-[#121216] border border-white/5 p-5 rounded-2xl text-center shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Destination</div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">{t("auto.Destination_9409") || "Destination"}</div>
                                                     <div className="text-sm text-purple-400 font-bold uppercase tracking-wider">{destination || 'Unspecified'}</div>
                                                 </div>
                                                 <div className="bg-[#121216] border border-emerald-500/20 p-5 rounded-2xl text-center col-span-2 shadow-[0_0_20px_rgba(16,185,129,0.1)] relative overflow-hidden">
                                                     <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500/50"></div>
-                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Coverage Status</div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">{t("auto.CoverageStatus_3512") || "Coverage Status"}</div>
                                                     <div className="text-md text-emerald-400 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-                                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Tactical Network Active
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> {t("auto.TacticalNetwork_7153") || "Tactical Network Active"}
                                                     </div>
                                                 </div>
                                             </div>
@@ -712,7 +719,7 @@ export default function SmartGuardianPage() {
                                                 onClick={startSession}
                                                 className="w-full py-6 bg-emerald-500 text-black rounded-2xl uppercase font-black tracking-[0.2em] hover:bg-emerald-400 hover:scale-[1.02] transition-all shadow-[0_0_40px_rgba(16,185,129,0.4)] flex items-center justify-center gap-3 group"
                                             >
-                                                <Crosshair className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" /> Start Monitoring
+                                                <Crosshair className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" /> {t("auto.StartMonitoring_5404") || "Start Monitoring"}
                                             </button>
                                         </div>
                                     )}
@@ -725,20 +732,20 @@ export default function SmartGuardianPage() {
                                     <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
                                         <MapPin className="w-10 h-10 text-emerald-400" />
                                     </div>
-                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">Configure Corridor Nodes</h2>
-                                    <p className="text-emerald-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">Define 3-Camera Network</p>
+                                    <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">{t("auto.ConfigureCorrid_9284") || "Configure Corridor Nodes"}</h2>
+                                    <p className="text-emerald-500 mb-12 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.Define3CameraNe_8829") || "Define 3-Camera Network"}</p>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
                                         {routeNodes.map((node, i) => (
                                             <div key={node.id} className="bg-[#121216]/80 border border-white/10 rounded-3xl p-6 shadow-[0_0_20px_rgba(0,0,0,0.5)]">
                                                 <div className="flex items-center gap-2 mb-6">
                                                     <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs border border-emerald-500/50">{i + 1}</div>
-                                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Node Configuration</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("auto.NodeConfigurati_750") || "Node Configuration"}</div>
                                                 </div>
                                                 
                                                 <div className="space-y-4">
                                                     <div>
-                                                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Checkpoint Name</label>
+                                                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">{t("auto.CheckpointName_2050") || "Checkpoint Name"}</label>
                                                         <input 
                                                             type="text" 
                                                             value={node.name}
@@ -752,7 +759,7 @@ export default function SmartGuardianPage() {
                                                     </div>
 
                                                     <div>
-                                                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Source Type</label>
+                                                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">{t("auto.SourceType_5051") || "Source Type"}</label>
                                                         <div className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-emerald-400 uppercase tracking-widest">
                                                             {node.sourceType === "webcam" ? "Local Webcam" : "RTSP Stream"}
                                                         </div>
@@ -764,7 +771,7 @@ export default function SmartGuardianPage() {
                                                             <input 
                                                                 type="text" 
                                                                 value={node.url}
-                                                                placeholder="rtsp:// or http://..."
+                                                                placeholder={t("auto.rtsporhttp_2594") || "rtsp:// or http://..."}
                                                                 onChange={(e) => {
                                                                     const newNodes = [...routeNodes];
                                                                     newNodes[i].url = e.target.value;
@@ -777,7 +784,7 @@ export default function SmartGuardianPage() {
 
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <div>
-                                                            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Latitude</label>
+                                                            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">{t("auto.Latitude_4879") || "Latitude"}</label>
                                                             <input 
                                                                 type="number" 
                                                                 value={node.lat}
@@ -790,7 +797,7 @@ export default function SmartGuardianPage() {
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">Longitude</label>
+                                                            <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest block mb-2">{t("auto.Longitude_4557") || "Longitude"}</label>
                                                             <input 
                                                                 type="number" 
                                                                 value={node.lng}
@@ -809,7 +816,7 @@ export default function SmartGuardianPage() {
                                     </div>
                                     
                                     <div className="mt-10 flex gap-4 w-full">
-                                        <button onClick={() => setWizardStep(0)} className="flex-1 py-5 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all">Back to Mode Selection</button>
+                                        <button onClick={() => setWizardStep(0)} className="flex-1 py-5 border border-white/10 rounded-xl uppercase font-black tracking-widest text-slate-500 hover:text-white hover:bg-white/5 transition-all">{t("auto.BacktoModeSelec_6526") || "Back to Mode Selection"}</button>
                                         <button 
                                             onClick={() => {
                                                 setWizardStep(11);
@@ -820,7 +827,7 @@ export default function SmartGuardianPage() {
                                             }} 
                                             className="flex-[2] py-5 bg-emerald-600 text-black rounded-xl uppercase font-black tracking-widest hover:bg-emerald-500 transition-all shadow-[0_0_30px_rgba(16,185,129,0.4)]"
                                         >
-                                            Create Guardian Corridor
+                                            {t("auto.CreateGuardianC_754") || "Create Guardian Corridor"}
                                         </button>
                                     </div>
                                 </motion.div>
@@ -837,11 +844,11 @@ export default function SmartGuardianPage() {
                                                     <MapPin className="w-8 h-8 text-emerald-400 animate-pulse" />
                                                 </div>
                                             </div>
-                                            <h2 className="text-2xl font-black uppercase tracking-widest mb-6 text-emerald-400 animate-pulse">Establishing Network...</h2>
+                                            <h2 className="text-2xl font-black uppercase tracking-widest mb-6 text-emerald-400 animate-pulse">{t("auto.EstablishingNet_7279") || "Establishing Network..."}</h2>
                                             <div className="space-y-3 text-center">
                                                 <p className="text-slate-400 text-xs font-mono uppercase tracking-widest">Connecting to {routeNodes[0].name}...</p>
                                                 <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">Validating RTSP stream for {routeNodes[1].name}...</p>
-                                                <p className="text-slate-600 text-xs font-mono uppercase tracking-widest">Mapping distance and coverage gaps...</p>
+                                                <p className="text-slate-600 text-xs font-mono uppercase tracking-widest">{t("auto.Mappingdistance_6360") || "Mapping distance and coverage gaps..."}</p>
                                             </div>
                                         </div>
                                     ) : (
@@ -850,8 +857,8 @@ export default function SmartGuardianPage() {
                                                 <div className="absolute inset-0 border border-emerald-400/50 rounded-full animate-ping"></div>
                                                 <Activity className="w-10 h-10 text-emerald-400" />
                                             </div>
-                                            <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">Corridor Established</h2>
-                                            <p className="text-emerald-500/70 mb-10 text-center uppercase tracking-[0.2em] text-sm font-bold">Multi-Camera Network Ready</p>
+                                            <h2 className="text-3xl md:text-4xl font-black uppercase tracking-widest mb-2 text-center text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.2)]">{t("auto.CorridorEstabli_4143") || "Corridor Established"}</h2>
+                                            <p className="text-emerald-500/70 mb-10 text-center uppercase tracking-[0.2em] text-sm font-bold">{t("auto.MultiCameraNetw_1350") || "Multi-Camera Network Ready"}</p>
                                             
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mb-10">
                                                 {routeNodes.map((node, i) => (
@@ -868,7 +875,7 @@ export default function SmartGuardianPage() {
                                                 onClick={startSession}
                                                 className="w-full py-6 bg-emerald-500 text-black rounded-2xl uppercase font-black tracking-[0.2em] hover:bg-emerald-400 hover:scale-[1.02] transition-all shadow-[0_0_40px_rgba(16,185,129,0.4)] flex items-center justify-center gap-3 group"
                                             >
-                                                <Video className="w-6 h-6 group-hover:scale-110 transition-transform duration-500" /> Initialize Tracking
+                                                <Video className="w-6 h-6 group-hover:scale-110 transition-transform duration-500" /> {t("auto.InitializeTrack_8490") || "Initialize Tracking"}
                                             </button>
                                         </div>
                                     )}
@@ -894,19 +901,19 @@ export default function SmartGuardianPage() {
                                         <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 flex flex-col h-72 relative overflow-hidden shadow-inner group">
                                             <div className="flex items-center justify-between mb-6">
                                                 <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                                                    <MapPin className="w-4 h-4 text-sky-500"/> Route Intelligence Engine
+                                                    <MapPin className="w-4 h-4 text-sky-500"/> {t("auto.RouteIntelligen_2562") || "Route Intelligence Engine"}
                                                 </h3>
                                             </div>
                                             
                                             <div className="flex-1 flex flex-col justify-between">
                                                 <div>
-                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Protected Subject</div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.ProtectedSubjec_8285") || "Protected Subject"}</div>
                                                     <div className="text-2xl font-black text-sky-400 tracking-wider mb-4">{state?.subject_id || "Detecting..."}</div>
                                                     
-                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Current Zone</div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.CurrentZone_6559") || "Current Zone"}</div>
                                                     <div className="text-xl font-bold text-white tracking-widest mb-4">{state?.current_zone || "Scanning..."}</div>
                                                     
-                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Next Checkpoint</div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.NextCheckpoint_5049") || "Next Checkpoint"}</div>
                                                     <div className="text-md font-bold text-slate-300 tracking-widest">
                                                         {state?.current_zone === "Metro Entrance" ? "Library Walkway" : state?.current_zone === "Library Walkway" ? "Residential Gate" : "Final Destination"}
                                                     </div>
@@ -914,7 +921,7 @@ export default function SmartGuardianPage() {
                                                 
                                                 <div className="mt-4">
                                                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                                                        <span>Estimated Route Progress</span>
+                                                        <span>{t("auto.EstimatedRouteP_3843") || "Estimated Route Progress"}</span>
                                                         <span className="text-sky-400">{state?.route_progress || 0}%</span>
                                                     </div>
                                                     <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
@@ -942,7 +949,7 @@ export default function SmartGuardianPage() {
                                             <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
                                                 <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 flex items-center gap-2">
                                                     <Video className="w-3 h-3 text-white"/> 
-                                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">Live Node</span>
+                                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">{t("auto.LiveNode_4830") || "Live Node"}</span>
                                                 </div>
                                                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
                                             </div>
@@ -981,7 +988,7 @@ export default function SmartGuardianPage() {
                                                             <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-10">
                                                                 <div className="bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-white/10 flex items-center gap-2">
                                                                     <Video className="w-2 h-2 text-emerald-400"/> 
-                                                                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-400">Live Target</span>
+                                                                    <span className="text-[8px] font-black uppercase tracking-[0.2em] text-emerald-400">{t("auto.LiveTarget_7983") || "Live Target"}</span>
                                                                 </div>
                                                                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
                                                             </div>
@@ -990,7 +997,7 @@ export default function SmartGuardianPage() {
                                                         {isNodeTransit && (
                                                             <div className="absolute inset-0 bg-yellow-500/10 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-4">
                                                                 <Activity className="w-6 h-6 text-yellow-500 mb-2 animate-bounce" />
-                                                                <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest text-center">Awaiting Target...</span>
+                                                                <span className="text-[9px] font-black text-yellow-500 uppercase tracking-widest text-center">{t("auto.AwaitingTarget_9688") || "Awaiting Target..."}</span>
                                                                 <span className="text-[8px] font-mono text-yellow-500/70 mt-1">ETA: {transitETA}s</span>
                                                             </div>
                                                         )}
@@ -1013,7 +1020,7 @@ export default function SmartGuardianPage() {
                                             <div className="absolute top-4 left-4 z-[999] pointer-events-none">
                                                 <div className="bg-black/80 backdrop-blur-md px-3 py-2 rounded-xl border border-emerald-500/30 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                                                     <MapPin className="w-4 h-4 text-emerald-400"/>
-                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Corridor Route Intelligence</span>
+                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">{t("auto.CorridorRouteIn_4317") || "Corridor Route Intelligence"}</span>
                                                 </div>
                                             </div>
                                             <div className="w-full h-full rounded-2xl overflow-hidden">
@@ -1030,7 +1037,7 @@ export default function SmartGuardianPage() {
                                             onClick={endSession}
                                             className="w-full py-4 mt-2 bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 rounded-2xl uppercase font-black tracking-[0.2em] hover:bg-emerald-500 hover:text-black transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_40px_rgba(16,185,129,0.4)] flex items-center justify-center gap-3"
                                         >
-                                            <Shield className="w-5 h-5" /> End Guardian Session
+                                            <Shield className="w-5 h-5" /> {t("auto.EndGuardianSess_5878") || "End Guardian Session"}
                                         </button>
                                     </div>
                                 )}
@@ -1042,7 +1049,7 @@ export default function SmartGuardianPage() {
                                             <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/20 blur-[100px] rounded-full pointer-events-none"></div>
                                             <h2 className="text-3xl font-black uppercase tracking-[0.3em] text-rose-500 mb-6 flex items-center gap-4">
                                                 <AlertTriangle className="w-10 h-10" /> 
-                                                INCIDENT CREATED
+                                                {t("auto.INCIDENTCREATED_8340") || "INCIDENT CREATED"}
                                             </h2>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                                 <div>
@@ -1050,23 +1057,23 @@ export default function SmartGuardianPage() {
                                                     <div className="text-xl font-mono font-black text-rose-200">{state.incident_id}</div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-rose-400/70 font-black uppercase tracking-widest mb-1">Type</div>
-                                                    <div className="text-lg font-bold text-white uppercase">Guardian Distress Event</div>
+                                                    <div className="text-[10px] text-rose-400/70 font-black uppercase tracking-widest mb-1">{t("auto.Type_7956") || "Type"}</div>
+                                                    <div className="text-lg font-bold text-white uppercase">{t("auto.GuardianDistres_7430") || "Guardian Distress Event"}</div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-rose-400/70 font-black uppercase tracking-widest mb-1">Priority</div>
-                                                    <div className="text-lg font-black text-rose-500 tracking-widest uppercase">CRITICAL</div>
+                                                    <div className="text-[10px] text-rose-400/70 font-black uppercase tracking-widest mb-1">{t("auto.Priority_6744") || "Priority"}</div>
+                                                    <div className="text-lg font-black text-rose-500 tracking-widest uppercase">{t("auto.CRITICAL_9622") || "CRITICAL"}</div>
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-rose-400/70 font-black uppercase tracking-widest mb-1">Status</div>
-                                                    <div className="text-lg font-bold text-white uppercase animate-pulse">Response Initiated</div>
+                                                    <div className="text-[10px] text-rose-400/70 font-black uppercase tracking-widest mb-1">{t("auto.Status_5777") || "Status"}</div>
+                                                    <div className="text-lg font-bold text-white uppercase animate-pulse">{t("auto.ResponseInitiat_5812") || "Response Initiated"}</div>
                                                 </div>
                                             </div>
                                         </motion.div>
                                     ) : state?.reasoning && state.reasoning.length > 0 ? (
                                         <motion.div initial={{opacity:0, height:0}} animate={{opacity:1, height:"auto"}} className="bg-[#121216] border border-yellow-500/30 rounded-3xl p-6 relative overflow-hidden">
                                             <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-yellow-500 mb-4 flex items-center gap-2">
-                                                <Crosshair className="w-4 h-4"/> Reasoning Panel: Why did the score drop?
+                                                <Crosshair className="w-4 h-4"/> {t("auto.ReasoningPanelW_7435") || "Reasoning Panel: Why did the score drop?"}
                                             </h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                                 <div className="space-y-2">
@@ -1077,7 +1084,7 @@ export default function SmartGuardianPage() {
                                                     ))}
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">Risk Contribution</div>
+                                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-3">{t("auto.RiskContributio_868") || "Risk Contribution"}</div>
                                                     <div className="space-y-2">
                                                         {state.reasoning.map((r, i) => (
                                                             <div key={i} className="flex justify-between items-center text-sm font-mono font-bold">
@@ -1091,7 +1098,7 @@ export default function SmartGuardianPage() {
                                         </motion.div>
                                     ) : (
                                         <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative overflow-hidden flex items-center justify-center h-32 opacity-50">
-                                            <span className="text-xs font-black uppercase tracking-widest text-slate-600">No active threats detected. Monitoring safe parameters.</span>
+                                            <span className="text-xs font-black uppercase tracking-widest text-slate-600">{t("auto.Noactivethreats_1860") || "No active threats detected. Monitoring safe parameters."}</span>
                                         </div>
                                     )}
                                 </div>
@@ -1105,30 +1112,30 @@ export default function SmartGuardianPage() {
                                     <div className="bg-[#121216] border border-sky-500/30 rounded-3xl p-6 relative overflow-hidden shadow-[0_0_20px_rgba(14,165,233,0.1)]">
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 blur-[50px] rounded-full pointer-events-none"></div>
                                         <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-400 mb-6 flex items-center gap-2 pb-3 border-b border-white/5">
-                                            <Crosshair className="w-4 h-4" /> Subject Fingerprint Active
+                                            <Crosshair className="w-4 h-4" /> {t("auto.SubjectFingerpr_2084") || "Subject Fingerprint Active"}
                                         </h3>
                                         
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
-                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Face Match</div>
+                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.FaceMatch_1779") || "Face Match"}</div>
                                                 <div className="text-2xl font-black text-white">{state.fingerprint.face_match}%</div>
                                             </div>
                                             <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
-                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Height Est.</div>
+                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.HeightEst_7289") || "Height Est."}</div>
                                                 <div className="text-xl font-bold text-sky-400">{state.fingerprint.est_height}</div>
                                             </div>
                                         </div>
                                         
                                         <div className="mt-4 space-y-3">
                                             <div className="flex items-center justify-between text-xs font-mono font-bold bg-black/30 p-3 rounded-xl border border-white/5">
-                                                <span className="text-slate-400">Torso Hue</span>
+                                                <span className="text-slate-400">{t("auto.TorsoHue_6910") || "Torso Hue"}</span>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-white capitalize">{state.fingerprint.shirt_color}</span>
                                                     <div className="w-3 h-3 rounded-full border border-white/20" style={{backgroundColor: state.fingerprint.shirt_color === 'unknown' ? '#333' : state.fingerprint.shirt_color}}></div>
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between text-xs font-mono font-bold bg-black/30 p-3 rounded-xl border border-white/5">
-                                                <span className="text-slate-400">Lower Hue</span>
+                                                <span className="text-slate-400">{t("auto.LowerHue_3489") || "Lower Hue"}</span>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-white capitalize">{state.fingerprint.pant_color}</span>
                                                     <div className="w-3 h-3 rounded-full border border-white/20" style={{backgroundColor: state.fingerprint.pant_color === 'unknown' ? '#333' : state.fingerprint.pant_color}}></div>
@@ -1155,7 +1162,7 @@ export default function SmartGuardianPage() {
                                         </div>
                                     </div>
                                     <div className={`bg-[#121216] border ${isEmergencyLocked ? 'border-rose-500' : isRiskElevated ? 'border-yellow-500/50' : 'border-white/5'} rounded-3xl p-5 flex flex-col items-center justify-center transition-colors`}>
-                                        <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 text-center">Risk Trend</div>
+                                        <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 text-center">{t("auto.RiskTrend_4979") || "Risk Trend"}</div>
                                         <div className={`text-xl font-black font-mono transition-colors uppercase ${state?.risk_trend === 'Stable' ? 'text-emerald-400' : state?.risk_trend === 'Elevated' ? 'text-yellow-400' : 'text-rose-500 animate-pulse'}`}>
                                             {state?.risk_trend || "Stable"}
                                         </div>
@@ -1165,7 +1172,7 @@ export default function SmartGuardianPage() {
                                 {/* Ecosystem Timeline */}
                                 <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative overflow-hidden shadow-inner flex flex-col h-80">
                                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white mb-4 flex items-center gap-2 pb-3 border-b border-white/5">
-                                        <Activity className="w-4 h-4 text-sky-400"/> Ecosystem Timeline
+                                        <Activity className="w-4 h-4 text-sky-400"/> {t("auto.EcosystemTimeli_6034") || "Ecosystem Timeline"}
                                     </h3>
                                     
                                     <div className="flex-1 overflow-y-auto space-y-4 pr-2 scrollbar-hide">
@@ -1196,8 +1203,8 @@ export default function SmartGuardianPage() {
                                             <MessageSquare className="w-4 h-4 text-indigo-400" />
                                         </div>
                                         <div>
-                                            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Randy AI</h3>
-                                            <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest">Tactical Advisor</span>
+                                            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">{t("auto.RandyAI_3965") || "Randy AI"}</h3>
+                                            <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-widest">{t("auto.TacticalAdvisor_6780") || "Tactical Advisor"}</span>
                                         </div>
                                     </div>
                                     
@@ -1205,7 +1212,7 @@ export default function SmartGuardianPage() {
                                         {state?.randy_summary ? (
                                             <span>{state.randy_summary}<span className="inline-block w-1.5 h-3 ml-1 bg-indigo-400 animate-pulse"/></span>
                                         ) : (
-                                            <span className="opacity-30 italic">Monitoring session for anomalies...</span>
+                                            <span className="opacity-30 italic">{t("auto.Monitoringsessi_1888") || "Monitoring session for anomalies..."}</span>
                                         )}
                                     </div>
                                 </div>

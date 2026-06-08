@@ -7,8 +7,11 @@ import { Send, ArrowLeft, UserCircle2, Clock, CheckCircle, AlertCircle } from "l
 import Link from "next/link";
 import { format } from "date-fns";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 export default function TicketDetailPage() {
+  const { t } = useTranslation();
+
   const { id } = useParams();
   const router = useRouter();
   const { user, isSuperAdmin, isAdmin } = useAuth();
@@ -72,7 +75,7 @@ export default function TicketDetailPage() {
       <div className="p-8 max-w-4xl mx-auto flex items-center justify-center min-h-screen">
         <div className="text-slate-400 animate-pulse flex items-center gap-2">
           <Clock className="w-5 h-5 animate-spin" />
-          Loading ticket details...
+          {t("auto.Loadingticketde_5492") || "Loading ticket details..."}
         </div>
       </div>
     );
@@ -84,7 +87,7 @@ export default function TicketDetailPage() {
     <div className="p-8 max-w-4xl mx-auto min-h-screen flex flex-col">
       <Link href="/support" className="inline-flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors mb-6 group w-max">
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        Back to Support
+        {t("auto.BacktoSupport_6105") || "Back to Support"}
       </Link>
 
       {/* Ticket Header */}
@@ -134,7 +137,7 @@ export default function TicketDetailPage() {
       <div className="flex-1 bg-[#0a0c10] border-x border-white/5 p-6 flex flex-col gap-6 overflow-y-auto min-h-[400px]">
         {ticket.messages?.length === 0 ? (
           <div className="m-auto text-slate-500 italic text-sm text-center">
-            No replies yet. Send a message to start the conversation.
+            {t("auto.NorepliesyetSen_5677") || "No replies yet. Send a message to start the conversation."}
           </div>
         ) : (
           ticket.messages?.map((msg: any) => {

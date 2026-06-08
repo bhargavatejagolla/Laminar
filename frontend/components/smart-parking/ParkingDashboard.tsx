@@ -15,9 +15,12 @@ import { useParkingInsights, useParkingEvents } from "@/hooks/useTelemetry";
 import { IntelligenceMap } from "@/components/map/IntelligenceMap";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
 import { useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 // ── STAT CARD ──
 function StatCard({ label, value, icon: Icon, color, pulse }: { label: string, value: any, icon: any, color: string, pulse?: boolean }) {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-[#0a0a0f] border border-white/5 rounded-xl p-3 flex items-center gap-3">
       <div className={`p-2 rounded-lg ${color}`}>
@@ -32,6 +35,7 @@ function StatCard({ label, value, icon: Icon, color, pulse }: { label: string, v
 }
 
 export function ParkingDashboard() {
+  const { t } = useTranslation();
   const { insights: data, loading } = useParkingInsights();
   const { events: liveEvents } = useParkingEvents();
   const [analysisData, setAnalysisData] = useState<any>(null);
@@ -181,9 +185,9 @@ export function ParkingDashboard() {
           <div>
             <h1 className="text-2xl font-black text-white tracking-widest uppercase italic flex items-center gap-3">
               <Car className="text-cyan-400 w-6 h-6" />
-              Parking <span className="text-cyan-400">Intelligence</span>
+              {t("auto.Parking_3527") || "Parking"} <span className="text-cyan-400">{t("auto.Intelligence_328") || "Intelligence"}</span>
             </h1>
-            <p className="text-slate-400 text-[10px] font-mono tracking-widest uppercase mt-1">Real-time tactical spatial analytics</p>
+            <p className="text-slate-400 text-[10px] font-mono tracking-widest uppercase mt-1">{t("auto.Realtimetactica_9291") || "Real-time tactical spatial analytics"}</p>
           </div>
         </div>
 
@@ -199,7 +203,7 @@ export function ParkingDashboard() {
 
           <div className={`px-4 py-2 border rounded-xl flex items-center gap-3 ${criticalCount > 0 ? "bg-rose-500/10 border-rose-500/30" : "bg-[#0a0a0f] border-white/5"}`}>
             <div className="text-right">
-              <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest leading-none mb-1">Status</p>
+              <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest leading-none mb-1">{t("auto.Status_5777") || "Status"}</p>
               <p className={`text-[10px] font-black uppercase ${criticalCount > 0 ? "text-rose-500 animate-pulse" : "text-emerald-500"}`}>
                 {criticalCount > 0 ? "Congestion Peak" : "Spatial Nominal"}
               </p>
@@ -211,10 +215,10 @@ export function ParkingDashboard() {
 
       {/* ── STATS BAR ── */}
       <div className="grid grid-cols-4 gap-3 shrink-0">
-        <StatCard label="Total Occupancy" value={`${overall.occupancy_pct}%`} icon={Target} color="bg-cyan-500/10 text-cyan-400" pulse={overall.occupancy_pct > 80} />
-        <StatCard label="Available Slots" value={overall.total_available} icon={CheckCircle2} color="bg-emerald-500/10 text-emerald-400" />
-        <StatCard label="Total Capacity" value={overall.total_slots} icon={Server} color="bg-slate-500/10 text-slate-400" />
-        <StatCard label="AI Certainty" value="98.2%" icon={BrainCircuit} color="bg-fuchsia-500/10 text-fuchsia-400" />
+        <StatCard label={t("auto.TotalOccupancy_3152") || "Total Occupancy"} value={`${overall.occupancy_pct}%`} icon={Target} color="bg-cyan-500/10 text-cyan-400" pulse={overall.occupancy_pct > 80} />
+        <StatCard label={t("auto.AvailableSlots_7443") || "Available Slots"} value={overall.total_available} icon={CheckCircle2} color="bg-emerald-500/10 text-emerald-400" />
+        <StatCard label={t("auto.TotalCapacity_5801") || "Total Capacity"} value={overall.total_slots} icon={Server} color="bg-slate-500/10 text-slate-400" />
+        <StatCard label={t("auto.AICertainty_4217") || "AI Certainty"} value="98.2%" icon={BrainCircuit} color="bg-fuchsia-500/10 text-fuchsia-400" />
       </div>
 
       {/* ── MAIN CONTENT GRID ── */}
@@ -236,7 +240,7 @@ export function ParkingDashboard() {
                     onChange={(e) => setActiveCameraId(e.target.value)}
                     className="appearance-none bg-transparent outline-none text-[9px] font-black tracking-widest uppercase text-white px-3 py-1.5 cursor-pointer pr-8"
                   >
-                    <option value="" disabled className="bg-black text-slate-500">SELECT NODE</option>
+                    <option value="" disabled className="bg-black text-slate-500">{t("auto.SELECTNODE_7034") || "SELECT NODE"}</option>
                     {cameras.map((c, i) => (
                       <option key={c.id} value={c.id} className="bg-black text-white">
                         {c.name || `NODE ${i + 1}`}
@@ -259,7 +263,7 @@ export function ParkingDashboard() {
                   }}
                   className="bg-rose-500/20 hover:bg-rose-500/40 border border-rose-500/50 backdrop-blur px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest text-white transition-all"
                 >
-                  CLEAR
+                  {t("auto.CLEAR_133") || "CLEAR"}
                 </button>
               )}
               <label className="cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest text-white flex items-center gap-2 transition-all">
@@ -291,7 +295,7 @@ export function ParkingDashboard() {
                 }}
                 className="absolute bottom-6 right-6 bg-rose-500 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-rose-400 transition-all z-30"
               >
-                CLEAR ANALYSIS
+                {t("auto.CLEARANALYSIS_4019") || "CLEAR ANALYSIS"}
               </motion.button>
             )}
           </div>
@@ -300,14 +304,14 @@ export function ParkingDashboard() {
           <div className="bg-[#12121a] border border-fuchsia-500/30 rounded-2xl p-5 relative overflow-hidden flex-none">
             <div className="flex items-center gap-3 mb-3">
               <BrainCircuit className="w-4 h-4 text-fuchsia-400" />
-              <h3 className="font-bold text-fuchsia-100 tracking-wider text-xs uppercase">Neural Decision Engine</h3>
+              <h3 className="font-bold text-fuchsia-100 tracking-wider text-xs uppercase">{t("auto.NeuralDecisionE_5376") || "Neural Decision Engine"}</h3>
             </div>
             <p className="text-fuchsia-300 font-mono text-xs leading-relaxed italic">
               "{overall.suggestion || activeData.suggestion}"
             </p>
             <div className="mt-4 flex items-center justify-between text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">
               <span>Projection: {overall.prediction || activeData.prediction}</span>
-              <span className="text-fuchsia-500">Confidence: 0.98</span>
+              <span className="text-fuchsia-500">{t("auto.Confidence098_8544") || "Confidence: 0.98"}</span>
             </div>
           </div>
         </div>
@@ -322,7 +326,7 @@ export function ParkingDashboard() {
 
             <div className="p-4 border-b border-white/5 flex items-center justify-between relative z-20 bg-[#0a0a0f]/80 backdrop-blur">
               <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Radio className="w-3.5 h-3.5 text-cyan-500 animate-pulse" /> Tactical Event Log
+                <Radio className="w-3.5 h-3.5 text-cyan-500 animate-pulse" /> {t("auto.TacticalEventLo_7611") || "Tactical Event Log"}
               </h3>
               <span className="text-[8px] font-mono text-cyan-500 shadow-[0_0_5px_rgba(6,182,212,0.5)] bg-cyan-500/10 px-2 py-0.5 rounded-full">{liveEvents.length} Active Detections</span>
             </div>
@@ -335,7 +339,7 @@ export function ParkingDashboard() {
                       <Search className="w-10 h-10 text-cyan-500" />
                       <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full animate-pulse" />
                     </div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500 animate-pulse">Scanning Urban Grid...</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500 animate-pulse">{t("auto.ScanningUrbanGr_3132") || "Scanning Urban Grid..."}</p>
                   </div>
                 ) : (
                   liveEvents.map((ev, i) => (
@@ -363,12 +367,12 @@ export function ParkingDashboard() {
                         ) : (
                           <div className="flex items-center gap-3">
                             <div className="flex flex-col">
-                              <span className="text-[7px] text-slate-500 uppercase font-bold tracking-tighter">Certainty</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold tracking-tighter">{t("auto.Certainty_8181") || "Certainty"}</span>
                               <span className="text-[10px] font-mono text-emerald-400 font-bold">{ev.confidence}%</span>
                             </div>
                             <div className="w-px h-6 bg-white/10" />
                             <div className="flex flex-col">
-                              <span className="text-[7px] text-slate-500 uppercase font-bold tracking-tighter">Vector</span>
+                              <span className="text-[7px] text-slate-500 uppercase font-bold tracking-tighter">{t("auto.Vector_1171") || "Vector"}</span>
                               <span className="text-[10px] font-mono text-slate-300">{ev.position || "N/A"}</span>
                             </div>
                           </div>
@@ -403,7 +407,7 @@ export function ParkingDashboard() {
               ))}
               {(!activeData.zones || Object.keys(activeData.zones).length === 0) && (
                 <div className="text-center text-xs text-slate-500 mt-10 uppercase tracking-widest font-mono">
-                  No Zone Data Available
+                  {t("auto.NoZoneDataAvail_3438") || "No Zone Data Available"}
                 </div>
               )}
             </div>

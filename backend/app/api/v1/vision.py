@@ -249,8 +249,8 @@ async def video_feed(
                     + b"\r\n"
                 )
 
-                # Up to 30fps serving rate — encoding is cached so this is cheap
-                await asyncio.sleep(1 / 30.0)
+                # Up to 60fps serving rate — encoding is cached so this is cheap
+                await asyncio.sleep(1 / 60.0)
 
         except asyncio.CancelledError:
             logger.info(f"Client disconnected from feed: camera {camera_id}")

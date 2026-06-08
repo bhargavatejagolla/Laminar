@@ -84,7 +84,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
               <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">{t("auto.NodeIdentity_1928") || "Node Identity"}</label>
               <input 
                 type="text" 
-                placeholder="Node Name"
+                placeholder={t("auto.NodeName_556") || "Node Name"}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500/50 transition-all font-mono"
@@ -95,7 +95,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
               <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">Location Context (Optional)</label>
               <input 
                 type="text" 
-                placeholder="e.g. Near the main entrance, North side"
+                placeholder={t("auto.egNearthemainen_4707") || "e.g. Near the main entrance, North side"}
                 value={formData.location_description}
                 onChange={(e) => setFormData({ ...formData, location_description: e.target.value })}
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500/50 transition-all font-mono"

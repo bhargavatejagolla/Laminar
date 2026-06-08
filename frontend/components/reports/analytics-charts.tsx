@@ -239,10 +239,10 @@ export default function AnalyticsCharts({ venueId }: { venueId: string }) {
 
       {/* ── Summary Stats ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Avg Risk Score" value={avgRisk} sub="History" icon={<Activity className="w-6 h-6" />} color="cyan-400" />
-        <StatCard label="Live Volume" value={peakCount} sub="Actives" icon={<Users className="w-6 h-6" />} color="indigo-400" />
-        <StatCard label="Matrix Density" value={`${currentOcc}%`} sub="Load" icon={<TrendingUp className="w-6 h-6" />} color="amber-400" />
-        <StatCard label="AI Match" value={confidence} sub={model} icon={<Zap className="w-6 h-6" />} color="emerald-400" />
+        <StatCard label={t("auto.AvgRiskScore_1658") || "Avg Risk Score"} value={avgRisk} sub="History" icon={<Activity className="w-6 h-6" />} color="cyan-400" />
+        <StatCard label={t("auto.LiveVolume_1511") || "Live Volume"} value={peakCount} sub="Actives" icon={<Users className="w-6 h-6" />} color="indigo-400" />
+        <StatCard label={t("auto.MatrixDensity_6780") || "Matrix Density"} value={`${currentOcc}%`} sub="Load" icon={<TrendingUp className="w-6 h-6" />} color="amber-400" />
+        <StatCard label={t("auto.AIMatch_2253") || "AI Match"} value={confidence} sub={model} icon={<Zap className="w-6 h-6" />} color="emerald-400" />
       </div>
 
       {/* ── Main Forecast Chart ───────────────────────────────────────── */}

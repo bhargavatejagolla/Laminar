@@ -124,13 +124,13 @@ function AccountTab() {
 
   return (
     <div className="space-y-8">
-      <SectionHeader icon={User} title="Operator Parameters" color="cyan" />
+      <SectionHeader icon={User} title={t("auto.OperatorParamet_1570") || "Operator Parameters"} color="cyan" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <InputField label="Callsign / Name"  value={name}  onChange={setName}  accentColor="cyan" />
-        <InputField label="Clearance Level"  value="Commander (Level 5)"  disabled mono />
+        <InputField label={t("auto.CallsignName_2156") || "Callsign / Name"}  value={name}  onChange={setName}  accentColor="cyan" />
+        <InputField label={t("auto.ClearanceLevel_9845") || "Clearance Level"}  value="Commander (Level 5)"  disabled mono />
         <div className="md:col-span-2">
-          <InputField label="Authentication Email" value={email} onChange={setEmail} type="email" accentColor="cyan" mono />
+          <InputField label={t("auto.AuthenticationE_9608") || "Authentication Email"} value={email} onChange={setEmail} type="email" accentColor="cyan" mono />
         </div>
       </div>
 
@@ -182,7 +182,7 @@ function ApiTab() {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Key} title="Enterprise API Access" color="indigo" />
+      <SectionHeader icon={Key} title={t("auto.EnterpriseAPIAc_3248") || "Enterprise API Access"} color="indigo" />
       <p className="text-sm text-slate-400 leading-relaxed border-l-2 border-indigo-500/40 pl-4 -mt-2 mb-6">
         {t("auto.Manageexternali_9825") || "Manage external integrations and API tokens for automated ingestion pipelines and third-party vision systems."}
       </p>
@@ -270,7 +270,7 @@ function HealthTab() {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Activity} title="System Telemetry" color="rose" />
+      <SectionHeader icon={Activity} title={t("auto.SystemTelemetry_516") || "System Telemetry"} color="rose" />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {metrics.map((m) => {
@@ -342,7 +342,7 @@ function AlertsTab() {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Bell} title="Notification Rules" color="amber" />
+      <SectionHeader icon={Bell} title={t("auto.NotificationRul_2050") || "Notification Rules"} color="amber" />
 
       <p className="text-sm text-slate-400 leading-relaxed border-l-2 border-amber-500/40 pl-4 -mt-2 mb-6">
         {t("auto.Configureautoma_4286") || "Configure automated alert dispatches across channels. Rules apply globally to all monitored venues."}
@@ -438,7 +438,7 @@ export default function SettingsPage() {
           <button
             onClick={() => router.push("/dashboard")}
             className="group flex items-center justify-center w-10 h-10 bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-500/40 rounded-xl transition-all duration-300 flex-shrink-0 shadow-[0_0_15px_rgba(0,0,0,0.3)] hover:shadow-[0_0_15px_rgba(34,211,238,0.1)]"
-            aria-label="Go back"
+            aria-label={t("auto.Goback_9246") || "Go back"}
           >
             <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors group-hover:-translate-x-0.5 transition-transform duration-200" />
           </button>

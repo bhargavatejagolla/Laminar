@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 // ── TACTICAL CAMERA COMPONENT ──────────────────────────────────────────
 function LiveTacticalCamera({
@@ -46,6 +47,8 @@ function LiveTacticalCamera({
   venueId: string | null;
   initialCamId?: string | null;
 }) {
+  const { t } = useTranslation();
+
   const [activeCam, setActiveCam] = useState<any>(null);
   const [camsList, setCamsList] = useState<any[]>([]);
 
@@ -75,7 +78,7 @@ function LiveTacticalCamera({
       <div className="aspect-video bg-black/40 border border-white/5 rounded-2xl flex flex-col items-center justify-center gap-3">
         <Video className="w-8 h-8 text-slate-800" />
         <p className="text-[10px] text-slate-600 font-mono uppercase tracking-widest">
-          Awaiting Tactical Feed...
+          {t("auto.AwaitingTactica_1451") || "Awaiting Tactical Feed..."}
         </p>
       </div>
     );
@@ -126,13 +129,13 @@ function LiveTacticalCamera({
               </div>
             </div>
             <div className="flex gap-2 text-[7px] text-rose-400 font-mono font-bold tracking-tighter">
-              <span>LAT: 17.4411</span>
-              <span>LNG: 78.6601</span>
+              <span>{t("auto.LAT174411_5933") || "LAT: 17.4411"}</span>
+              <span>{t("auto.LNG786601_5719") || "LNG: 78.6601"}</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1">
             <span className="text-[8px] text-emerald-400 font-mono font-black animate-pulse uppercase italic">
-              Sync: Stable
+              {t("auto.SyncStable_162") || "Sync: Stable"}
             </span>
             <div className="h-0.5 w-24 bg-white/10 rounded-full overflow-hidden">
               <motion.div
@@ -150,16 +153,18 @@ function LiveTacticalCamera({
 
 // ── ALERT SOURCE BADGE ─────────────────────────────────────────────────
 function SourceBadge({ source }: { source?: string }) {
+  const { t } = useTranslation();
+  if (!source) return null;
   if (source === "SYNCHRONOUS_VIDEO_UPLOAD") {
     return (
       <span className="text-[7px] px-1.5 py-0.5 bg-violet-500/20 text-violet-400 border border-violet-500/30 rounded font-black uppercase tracking-tighter flex items-center gap-1">
-        <Video className="w-2.5 h-2.5" /> VIDEO
+        <Video className="w-2.5 h-2.5" /> {t("auto.VIDEO_6724") || "VIDEO"}
       </span>
     );
   }
   return (
     <span className="text-[7px] px-1.5 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-black uppercase tracking-tighter flex items-center gap-1">
-      <Eye className="w-2.5 h-2.5" /> LIVE
+      <Eye className="w-2.5 h-2.5" /> {t("auto.LIVE_112") || "LIVE"}
     </span>
   );
 }
@@ -195,6 +200,7 @@ function StatCard({
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────
 export function IncidentDashboard() {
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const { activeVenueId, setVenue } = useActiveVenue();
   const urlVenueId = searchParams.get("venue_id");
@@ -453,7 +459,7 @@ export function IncidentDashboard() {
               <ShieldAlert className="w-5 h-5 text-rose-500" />
               <h1 className="text-2xl font-black text-white tracking-widest uppercase italic">
                 Incident{" "}
-                <span className="text-rose-500">Intelligence</span>
+                <span className="text-rose-500">{t("auto.Intelligence_328") || "Intelligence"}</span>
               </h1>
               <span className="px-1.5 py-0.5 bg-rose-500/10 border border-rose-500/20 rounded text-[9px] font-black text-rose-500 tracking-tighter uppercase relative top-[-6px]">
                 TACTICAL_V4
@@ -486,7 +492,7 @@ export function IncidentDashboard() {
           >
             <div className="text-right">
               <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest leading-none mb-1">
-                Status
+                {t("auto.Status_5777") || "Status"}
               </p>
               <p
                 className={`text-[10px] font-black uppercase ${criticalCount > 0
@@ -510,26 +516,26 @@ export function IncidentDashboard() {
       {/* ── LIVE STATS BAR ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
-          label="Total Alerts"
+          label={t("auto.TotalAlerts_1033") || "Total Alerts"}
           value={allAlerts.length}
           icon={AlertCircle}
           color="bg-slate-500/10 text-slate-400"
         />
         <StatCard
-          label="Critical"
+          label={t("auto.Critical_3578") || "Critical"}
           value={criticalCount}
           icon={AlertTriangle}
           color={criticalCount > 0 ? "bg-rose-500/10 text-rose-500" : "bg-slate-500/10 text-slate-400"}
           pulse={criticalCount > 0}
         />
         <StatCard
-          label="Dispatched"
+          label={t("auto.Dispatched_9217") || "Dispatched"}
           value={dispatchedCount}
           icon={CheckCircle2}
           color="bg-emerald-500/10 text-emerald-500"
         />
         <StatCard
-          label="Camera Feed"
+          label={t("auto.CameraFeed_3040") || "Camera Feed"}
           value={venueId ? "ACTIVE" : "STANDBY"}
           icon={Cpu}
           color={venueId ? "bg-cyan-500/10 text-cyan-500" : "bg-slate-500/10 text-slate-400"}
@@ -550,11 +556,10 @@ export function IncidentDashboard() {
               <UploadCloud className="w-12 h-12 text-white" />
             </div>
             <h3 className="text-xs font-black text-rose-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Zap className="w-3 h-3" /> Analysis Injection
+              <Zap className="w-3 h-3" /> {t("auto.AnalysisInjecti_3475") || "Analysis Injection"}
             </h3>
             <p className="text-[10px] text-slate-500 mb-6 font-mono leading-relaxed uppercase">
-              Manual neural sweep protocol for external recordings or
-              black-box data.
+              {t("auto.Manualneuralswe_8473") || "Manual neural sweep protocol for external recordings or CCTV footage without direct streams."}
             </p>
 
             <label className="group relative w-full h-32 border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-rose-500/50 hover:bg-rose-500/5 transition-all">
@@ -564,7 +569,7 @@ export function IncidentDashboard() {
                 <>
                   <UploadCloud className="w-8 h-8 text-slate-700 group-hover:text-rose-500 transition-colors" />
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors">
-                    Inject External Vector
+                    {t("auto.InjectExternalV_4752") || "Inject External Vector"}
                   </span>
                 </>
               )}
@@ -582,7 +587,7 @@ export function IncidentDashboard() {
               <div className="mt-4 p-4 bg-rose-500/5 border border-rose-500/20 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black text-rose-400 uppercase flex items-center gap-1.5 animate-pulse">
-                    <Video className="w-3 h-3" /> Processing Vector
+                    <Video className="w-3 h-3" /> {t("auto.ProcessingVecto_3797") || "Processing Vector"}
                   </span>
                   <button
                     onClick={() => {
@@ -611,8 +616,7 @@ export function IncidentDashboard() {
         <div className="lg:col-span-8 xl:col-span-5 space-y-5">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <Radio className="w-4 h-4 text-rose-500 animate-pulse" /> Urban
-              Dispatch Stream
+              <Radio className="w-4 h-4 text-rose-500 animate-pulse" /> {t("auto.UrbanDispatchSt_2385") || "Urban Dispatch Stream"}
             </h3>
             <span className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[8px] font-mono text-slate-500 uppercase tracking-widest">
               Nodes Active: {allAlerts.length > 0 ? "204" : "–"}
@@ -629,7 +633,7 @@ export function IncidentDashboard() {
                 >
                   <Server className="w-10 h-10 mb-2" />
                   <p className="text-[10px] font-mono uppercase tracking-[0.2em]">
-                    Listening for Tactical Hits...
+                    {t("auto.ListeningforTac_6382") || "Listening for Tactical Hits..."}
                   </p>
                 </motion.div>
               ) : (
@@ -699,7 +703,7 @@ export function IncidentDashboard() {
                             <div className="flex items-center gap-2 mb-1.5">
                               <Crosshair className="w-3 h-3 text-rose-500" />
                               <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">
-                                Neural Insight Protocol
+                                {t("auto.NeuralInsightPr_2110") || "Neural Insight Protocol"}
                               </span>
                             </div>
                             <p className="text-[10px] text-slate-400 font-mono leading-relaxed line-clamp-3 group-hover:line-clamp-none transition-all">
@@ -823,10 +827,10 @@ export function IncidentDashboard() {
 
               <div className="absolute bottom-4 left-4 right-4 flex justify-between">
                 <span className="text-[8px] font-mono text-slate-600 uppercase tracking-widest">
-                  Sector 7-B Hub
+                  {t("auto.Sector7BHub_8334") || "Sector 7-B Hub"}
                 </span>
                 <span className="text-[8px] font-mono text-emerald-500 uppercase tracking-widest font-black">
-                  Sync Lock
+                  {t("auto.SyncLock_5642") || "Sync Lock"}
                 </span>
               </div>
             </div>
@@ -840,7 +844,7 @@ export function IncidentDashboard() {
               <div className="space-y-3">
                 {tacticalLogs.length === 0 ? (
                   <p className="text-[9px] text-slate-600 font-mono italic">
-                    Awaiting tactical mesh handshake...
+                    {t("auto.Awaitingtactica_3288") || "Awaiting tactical mesh handshake..."}
                   </p>
                 ) : (
                   tacticalLogs.map((log, i) => (
@@ -884,15 +888,14 @@ export function IncidentDashboard() {
               <Bell className="w-5 h-5 text-amber-500 animate-bounce" />
             </div>
             <h4 className="text-white font-bold mb-2 uppercase tracking-tight text-xs">
-              Automated Protocols
+              {t("auto.AutomatedProtoc_9248") || "Automated Protocols"}
             </h4>
             <p className="text-[10px] text-slate-400 leading-relaxed font-mono uppercase tracking-tighter">
-              Critical hits trigger persistent automated broadcasts to Law
-              Enforcement terminals via the Sector 7 High-Speed Link.
+              {t("auto.Criticalhitstri_2997") || "Critical hits trigger persistent automated broadcasts to Law Enforcement Response Nodes."}
             </p>
             <div className="mt-6 flex items-center gap-3">
               <div className="px-2 py-1 bg-amber-500 text-black text-[8px] font-black rounded uppercase tracking-widest shadow-[0_0_15px_rgba(245,158,11,0.3)]">
-                Active
+                {t("auto.Active_9776") || "Active"}
               </div>
               <div className="flex-1 h-0.5 bg-white/5 rounded-full overflow-hidden">
                 <motion.div

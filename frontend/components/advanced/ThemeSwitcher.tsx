@@ -13,6 +13,7 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
+import { useTranslation } from "react-i18next";
 
 export type Theme = "dark" | "light" | "high-contrast";
 
@@ -23,6 +24,8 @@ const THEMES: { id: Theme; label: string; Icon: React.FC }[] = [
 ];
 
 export function ThemeSwitcher({ className = "" }: { className?: string }) {
+  const { t } = useTranslation();
+
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -47,7 +50,7 @@ export function ThemeSwitcher({ className = "" }: { className?: string }) {
     <div
       className={`relative flex items-center p-1 bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl rounded-full ${className}`}
       role="group"
-      aria-label="Theme switcher"
+      aria-label={t("auto.Themeswitcher_7315") || "Theme switcher"}
     >
       {/* Animated active pill background */}
       <div 

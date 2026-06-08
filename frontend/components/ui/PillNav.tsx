@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { gsap } from 'gsap';
 import './PillNav.css';
+import { useTranslation } from "react-i18next";
 
 interface NavItem {
   label: string;
@@ -43,6 +44,8 @@ const PillNav = ({
   onMobileMenuClick,
   initialLoadAnimation = true
 }: PillNavProps) => {
+  const { t } = useTranslation();
+
   const pathname = usePathname();
   const currentActiveHref = activeHref || pathname;
   const resolvedPillTextColor = pillTextColor ?? baseColor;
@@ -319,11 +322,11 @@ const PillNav = ({
 
   return (
     <div className={`pill-nav-container ${className}`} style={{ position: "relative" }}>
-      <nav className="pill-nav" aria-label="Primary" style={cssVars}>
+      <nav className="pill-nav" aria-label={t("auto.Primary_4134") || "Primary"} style={cssVars}>
         <Link
           className="pill-logo"
           href="/"
-          aria-label="Home"
+          aria-label={t("auto.Home_2554") || "Home"}
           onMouseEnter={handleLogoEnter}
           ref={logoRef}
           onClick={(e) => {
@@ -349,7 +352,7 @@ const PillNav = ({
         <button
           className="mobile-menu-button mobile-only"
           onClick={toggleMobileMenu}
-          aria-label="Toggle menu"
+          aria-label={t("auto.Togglemenu_1961") || "Toggle menu"}
           ref={hamburgerRef}
         >
           <span className="hamburger-line" />

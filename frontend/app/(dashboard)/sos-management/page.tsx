@@ -22,8 +22,11 @@ interface SOSReport {
 }
 
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 export default function SOSManagementPage() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const queryClient = useQueryClient();
     const [selectedReport, setSelectedReport] = useState<SOSReport | null>(null);
@@ -71,13 +74,13 @@ export default function SOSManagementPage() {
                         className="mb-4 flex items-center gap-2 text-slate-400 hover:text-slate-300 uppercase tracking-widest text-xs font-bold transition-colors"
                     >
                         <ChevronRight className="w-4 h-4 rotate-180" />
-                        Back to Command
+                        {t("auto.BacktoCommand_4755") || "Back to Command"}
                     </button>
                     <h1 className="text-2xl font-black uppercase tracking-widest text-slate-100 flex items-center gap-3">
                         <ShieldAlert className="w-6 h-6 text-rose-500" />
-                        SOS Crisis Management
+                        {t("auto.SOSCrisisManage_2417") || "SOS Crisis Management"}
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">Manage, triage, and resolve incoming public SOS reports.</p>
+                    <p className="text-slate-400 text-sm mt-1">{t("auto.Managetriageand_4267") || "Manage, triage, and resolve incoming public SOS reports."}</p>
                 </div>
             </header>
 
@@ -85,7 +88,7 @@ export default function SOSManagementPage() {
                 {/* Master List */}
                 <div className="lg:col-span-2 bg-[#0a0a0a] border border-slate-800 rounded-xl overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-slate-800 bg-[#111] flex items-center justify-between">
-                        <span className="font-bold text-sm uppercase tracking-wider text-slate-300">Incoming Reports</span>
+                        <span className="font-bold text-sm uppercase tracking-wider text-slate-300">{t("auto.IncomingReports_7335") || "Incoming Reports"}</span>
                         <span className="text-xs font-mono bg-rose-500/20 text-rose-400 px-2 py-1 rounded">
                             {reports.filter(r => r.status === 'OPEN').length} OPEN
                         </span>
@@ -99,7 +102,7 @@ export default function SOSManagementPage() {
                         ) : reports.length === 0 ? (
                             <div className="text-center py-20 text-slate-500 flex flex-col items-center">
                                 <CheckCircle className="w-12 h-12 mb-3 opacity-20" />
-                                <p>No SOS Reports logged.</p>
+                                <p>{t("auto.NoSOSReportslog_8209") || "No SOS Reports logged."}</p>
                             </div>
                         ) : reports.map(report => (
                             <div 
@@ -136,7 +139,7 @@ export default function SOSManagementPage() {
                                         </span>
                                         <span>ID: {report.tracking_id}</span>
                                         {report.match_found && (
-                                            <span className="text-rose-400 font-bold">AI MATCHED</span>
+                                            <span className="text-rose-400 font-bold">{t("auto.AIMATCHED_3301") || "AI MATCHED"}</span>
                                         )}
                                     </div>
                                 </div>
@@ -148,27 +151,27 @@ export default function SOSManagementPage() {
                 {/* Detail View */}
                 <div className="bg-[#0a0a0a] border border-slate-800 rounded-xl overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-slate-800 bg-[#111]">
-                        <span className="font-bold text-sm uppercase tracking-wider text-slate-300">Triage Action</span>
+                        <span className="font-bold text-sm uppercase tracking-wider text-slate-300">{t("auto.TriageAction_4796") || "Triage Action"}</span>
                     </div>
                     
                     <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
                         {!selectedReport ? (
                             <div className="text-center py-20 text-slate-500">
-                                <p>Select a report to manage.</p>
+                                <p>{t("auto.Selectareportto_1167") || "Select a report to manage."}</p>
                             </div>
                         ) : (
                             <div className="flex flex-col h-full">
                                 <div className="mb-6 pb-6 border-b border-slate-800">
                                     <div className="flex items-center gap-2 text-rose-500 mb-2">
                                         <ShieldAlert className="w-5 h-5" />
-                                        <h2 className="font-black text-lg tracking-wide uppercase">Report Details</h2>
+                                        <h2 className="font-black text-lg tracking-wide uppercase">{t("auto.ReportDetails_7504") || "Report Details"}</h2>
                                     </div>
                                     <p className="text-xs text-slate-400 font-mono">ID: {selectedReport.tracking_id}</p>
                                 </div>
                                 
                                 <div className="space-y-6 flex-1">
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Missing Person</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">{t("auto.MissingPerson_5227") || "Missing Person"}</label>
                                         <div className="flex items-center gap-4 mt-2">
                                             <div className="w-16 h-16 rounded-xl border border-slate-700 bg-black overflow-hidden flex shrink-0">
                                                 {selectedReport.image_url ? (
@@ -182,7 +185,7 @@ export default function SOSManagementPage() {
                                     </div>
                                     
                                     <div className="p-3 rounded-lg bg-[#111] border border-slate-800">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Reporter Details</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">{t("auto.ReporterDetails_3882") || "Reporter Details"}</label>
                                         <div className="flex items-center gap-2 text-sm text-slate-300 mb-1">
                                             <User className="w-4 h-4 text-slate-500" />
                                             {selectedReport.reporter_name}
@@ -193,7 +196,7 @@ export default function SOSManagementPage() {
                                     </div>
                                     
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Last Seen Location</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">{t("auto.LastSeenLocatio_6852") || "Last Seen Location"}</label>
                                         <div className="text-slate-300 flex items-start gap-2">
                                             <MapPin className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
                                             <span>{selectedReport.last_seen_location}</span>
@@ -202,7 +205,7 @@ export default function SOSManagementPage() {
                                     
                                     {selectedReport.match_found && (
                                         <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/30">
-                                            <label className="text-[10px] font-bold text-rose-500 uppercase tracking-widest block mb-1">AI Detection</label>
+                                            <label className="text-[10px] font-bold text-rose-500 uppercase tracking-widest block mb-1">{t("auto.AIDetection_6583") || "AI Detection"}</label>
                                             <div className="text-rose-400 text-sm font-medium">
                                                 Match acquired in: {selectedReport.camera_location}
                                             </div>
@@ -211,14 +214,14 @@ export default function SOSManagementPage() {
                                 </div>
                                 
                                 <div className="mt-8 pt-6 border-t border-slate-800">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">Resolution Status</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">{t("auto.ResolutionStatu_4494") || "Resolution Status"}</label>
                                     <div className="grid grid-cols-1 gap-2">
                                         {selectedReport.status !== 'OPEN' && (
                                             <button 
                                                 onClick={() => updateStatus.mutate({ id: selectedReport.id, status: 'OPEN' })}
                                                 className="w-full py-3 rounded-lg font-bold text-xs uppercase tracking-wider text-rose-400 bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 transition-all"
                                             >
-                                                RE-OPEN CASE
+                                                {t("auto.REOPENCASE_4080") || "RE-OPEN CASE"}
                                             </button>
                                         )}
                                         {selectedReport.status === 'OPEN' && (
@@ -228,14 +231,14 @@ export default function SOSManagementPage() {
                                                     className="w-full py-3 rounded-lg font-bold text-xs uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2"
                                                 >
                                                     <CheckCircle className="w-4 h-4" />
-                                                    Mark as Resolved
+                                                    {t("auto.MarkasResolved_396") || "Mark as Resolved"}
                                                 </button>
                                                 <button 
                                                     onClick={() => updateStatus.mutate({ id: selectedReport.id, status: 'FALSE_ALARM' })}
                                                     className="w-full py-3 rounded-lg font-bold text-xs uppercase tracking-wider text-slate-400 bg-slate-800 hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
                                                 >
                                                     <XCircle className="w-4 h-4" />
-                                                    Mark as False Alarm
+                                                    {t("auto.MarkasFalseAlar_956") || "Mark as False Alarm"}
                                                 </button>
                                             </>
                                         )}

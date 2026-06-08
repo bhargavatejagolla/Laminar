@@ -20,6 +20,7 @@ import {
     HeartPulse
 } from "lucide-react";
 import Lightfall from "@/components/ui/Lightfall";
+import { useTranslation } from "react-i18next";
 
 const MODULES = [
     {
@@ -138,6 +139,8 @@ const COLOR_MAP: Record<string, { text: string, bg: string, border: string, shad
 };
 
 export default function SentinelCommandPage() {
+  const { t } = useTranslation();
+
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
 
@@ -184,16 +187,16 @@ export default function SentinelCommandPage() {
                         className="absolute left-0 top-0 flex items-center gap-2 text-slate-400 hover:text-cyan-400 uppercase tracking-widest text-[10px] font-black transition-colors bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg"
                     >
                         <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
-                        Main Dashboard
+                        {t("auto.MainDashboard_2771") || "Main Dashboard"}
                     </button>
 
                     <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 mb-6 shadow-[0_0_20px_rgba(34,211,238,0.15)] mt-4 md:mt-0">
                         <ScanLine className="w-4 h-4 text-cyan-400" />
-                        <span className="text-[10px] font-black tracking-[0.2em] uppercase text-cyan-400">Autonomous Protection Layer</span>
+                        <span className="text-[10px] font-black tracking-[0.2em] uppercase text-cyan-400">{t("auto.AutonomousProte_6894") || "Autonomous Protection Layer"}</span>
                     </div>
                     
                     <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase text-transparent bg-clip-text bg-gradient-to-b from-white to-white/50 drop-shadow-[0_0_20px_rgba(255,255,255,0.2)] mb-4">
-                        Sentinel Command
+                        {t("auto.SentinelCommand_3381") || "Sentinel Command"}
                     </h1>
                     
                     <p className="text-sm md:text-base font-mono text-slate-400 max-w-2xl">
@@ -218,26 +221,26 @@ export default function SentinelCommandPage() {
                             </div>
                         </div>
                         <div>
-                            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-1">Global System Health</h2>
-                            <div className="text-2xl font-black uppercase tracking-widest text-white">Sentinel Readiness Score</div>
+                            <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-1">{t("auto.GlobalSystemHea_2679") || "Global System Health"}</h2>
+                            <div className="text-2xl font-black uppercase tracking-widest text-white">{t("auto.SentinelReadine_1930") || "Sentinel Readiness Score"}</div>
                         </div>
                     </div>
 
                     <div className="flex gap-12">
                         <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 flex items-center gap-2"><Cpu className="w-3 h-3"/> Neural Cores</span>
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 flex items-center gap-2"><Cpu className="w-3 h-3"/> {t("auto.NeuralCores_498") || "Neural Cores"}</span>
                             <span className="text-2xl font-black font-mono text-white">7/7</span>
-                            <span className="text-[10px] font-bold text-emerald-400 mt-1 uppercase tracking-widest">Active</span>
+                            <span className="text-[10px] font-bold text-emerald-400 mt-1 uppercase tracking-widest">{t("auto.Active_9776") || "Active"}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 flex items-center gap-2"><Radio className="w-3 h-3"/> Telemetry</span>
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 flex items-center gap-2"><Radio className="w-3 h-3"/> {t("auto.Telemetry_9888") || "Telemetry"}</span>
                             <span className="text-2xl font-black font-mono text-white">12ms</span>
-                            <span className="text-[10px] font-bold text-cyan-400 mt-1 uppercase tracking-widest">Latency</span>
+                            <span className="text-[10px] font-bold text-cyan-400 mt-1 uppercase tracking-widest">{t("auto.Latency_4943") || "Latency"}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 flex items-center gap-2"><Fingerprint className="w-3 h-3"/> Authorization</span>
-                            <span className="text-2xl font-black font-mono text-white">CMD</span>
-                            <span className="text-[10px] font-bold text-rose-400 mt-1 uppercase tracking-widest">Lvl 5</span>
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 flex items-center gap-2"><Fingerprint className="w-3 h-3"/> {t("auto.Authorization_300") || "Authorization"}</span>
+                            <span className="text-2xl font-black font-mono text-white">{t("auto.CMD_6973") || "CMD"}</span>
+                            <span className="text-[10px] font-bold text-rose-400 mt-1 uppercase tracking-widest">{t("auto.Lvl5_2589") || "Lvl 5"}</span>
                         </div>
                     </div>
                 </motion.div>
@@ -264,20 +267,20 @@ export default function SentinelCommandPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className={`w-1.5 h-1.5 rounded-full bg-current ${style.text} animate-pulse ${style.glow}`}></span>
-                                        <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${style.text}`}>{mod.status}</span>
+                                        <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${style.text}`}>{t(`auto.sentinel_${mod.id}_status`) || mod.status}</span>
                                     </div>
                                 </div>
 
-                                <h3 className="text-xl font-black uppercase tracking-widest text-white mb-2 relative z-10">{mod.name}</h3>
-                                <p className="text-xs font-mono text-slate-400 mb-8 min-h-[40px] leading-relaxed relative z-10">{mod.desc}</p>
+                                <h3 className="text-xl font-black uppercase tracking-widest text-white mb-2 relative z-10">{t(`auto.sentinel_${mod.id}_name`) || mod.name}</h3>
+                                <p className="text-xs font-mono text-slate-400 mb-8 min-h-[40px] leading-relaxed relative z-10">{t(`auto.sentinel_${mod.id}_desc`) || mod.desc}</p>
                                 
                                 <div className="flex items-center justify-between border-t border-white/10 pt-4 relative z-10 mt-auto">
                                     <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                        <Activity className="w-3 h-3" /> {mod.metric}
+                                        <Activity className="w-3 h-3" /> {t(`auto.sentinel_${mod.id}_metric`) || mod.metric}
                                     </div>
                                     
                                     <button className={`text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-lg bg-white/5 border border-white/10 group-hover:bg-white/10 transition-colors ${style.text}`}>
-                                        Open Module
+                                        {t("auto.OpenModule_2720") || "Open Module"}
                                     </button>
                                 </div>
                             </motion.div>

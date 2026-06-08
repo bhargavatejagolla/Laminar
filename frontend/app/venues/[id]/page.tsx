@@ -110,14 +110,14 @@ export default function VenueDetailPage({ params }: { params: Promise<{ id: stri
               className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-xs font-bold text-amber-500 transition-all group"
             >
               <Activity className="w-4 h-4" />
-              Inbound Traffic
+              {t("auto.InboundTraffic_9793") || "Inbound Traffic"}
             </Link>
             <Link
               href={`/smart-incidents?venue_id=${venueId}`}
               className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-lg text-xs font-bold text-rose-500 transition-all group"
             >
               <ShieldAlert className="w-4 h-4" />
-              Active Incident Hub
+              {t("auto.ActiveIncidentH_8645") || "Active Incident Hub"}
             </Link>
             <button
               onClick={() => setIsEditVenueOpen(true)}

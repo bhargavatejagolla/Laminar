@@ -320,7 +320,7 @@ class CameraService:
 
         # Validate stream type
         if "stream_type" in fields and fields["stream_type"]:
-            valid_types = {"rtsp", "http", "https", "file", "edge"}
+            valid_types = {"rtsp", "http", "https", "file", "edge", "device", "cctv", "rtmp", "browser"}
             if fields["stream_type"] not in valid_types:
                 raise ValueError(f"stream_type must be one of: {valid_types}")
             update_data["stream_type"] = fields["stream_type"]

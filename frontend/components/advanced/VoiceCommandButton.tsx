@@ -128,7 +128,7 @@ export function VoiceCommandButton({
       <button
         disabled
         className={`relative flex items-center justify-center w-9 h-9 rounded-full bg-neutral-800 text-neutral-500 cursor-not-allowed ${className}`}
-        title="Voice input not supported in this browser (use Chrome or Edge)"
+        title={t("auto.Voiceinputnotsu_3562") || "Voice input not supported in this browser (use Chrome or Edge)"}
       >
         <MicIcon crossed />
       </button>

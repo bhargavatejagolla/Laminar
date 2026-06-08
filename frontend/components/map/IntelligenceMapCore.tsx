@@ -297,18 +297,18 @@ export default function IntelligenceMapCore({ venues = [] }: IntelligenceMapCore
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-                <h3 className="text-xs font-black text-white uppercase tracking-widest">Tactical Intel</h3>
+                <h3 className="text-xs font-black text-white uppercase tracking-widest">{t("auto.TacticalIntel_6129") || "Tactical Intel"}</h3>
               </div>
               <Globe className="w-4 h-4 text-slate-500" />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                <span className="text-[8px] uppercase font-bold text-slate-500 block mb-1">Detected</span>
+                <span className="text-[8px] uppercase font-bold text-slate-500 block mb-1">{t("auto.Detected_217") || "Detected"}</span>
                 <span className="text-2xl font-mono font-black text-white">{pois.length}</span>
               </div>
               <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                <span className="text-[8px] uppercase font-bold text-slate-500 block mb-1">Active Nodes</span>
+                <span className="text-[8px] uppercase font-bold text-slate-500 block mb-1">{t("auto.ActiveNodes_6260") || "Active Nodes"}</span>
                 <span className="text-2xl font-mono font-black text-cyan-400">{venues.length}</span>
               </div>
             </div>
@@ -417,19 +417,19 @@ export default function IntelligenceMapCore({ venues = [] }: IntelligenceMapCore
 
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1 bg-black/40 rounded-lg p-2 border border-white/5">
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">Crowd Density</span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.CrowdDensity_9092") || "Crowd Density"}</span>
                         <span className={`text-[10px] font-mono font-black tracking-wider ${densityPct > 0.8 ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : densityPct > 0.5 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'text-emerald-400'}`}>{densityLabel}</span>
                       </div>
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">Volume Count</span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.VolumeCount_7") || "Volume Count"}</span>
                         <span className="text-[10px] font-mono font-bold text-white">{Math.round(current)} <span className="text-[9px] text-slate-500 font-normal">/ {capacity}</span></span>
                       </div>
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">Predicted Cong.</span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.PredictedCong_8759") || "Predicted Cong."}</span>
                         <span className="text-[10px] font-mono font-bold text-orange-400">~{predictedMins} mins</span>
                       </div>
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">Activity Spike</span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.ActivitySpike_6078") || "Activity Spike"}</span>
                         <span className="text-[10px] font-mono font-bold text-fuchsia-400">Noise {noiseSpike}</span>
                       </div>
                     </div>
@@ -452,7 +452,7 @@ export default function IntelligenceMapCore({ venues = [] }: IntelligenceMapCore
                     <div className="mt-2.5 pt-2 border-t border-white/10 -mx-3 px-3 pb-0.5">
                       <span className="text-[8px] uppercase tracking-widest text-slate-500 font-black flex items-center gap-1.5 mb-1">
                         <Zap className="w-3 h-3 text-amber-500" />
-                        Suggested Action
+                        {t("auto.SuggestedAction_6207") || "Suggested Action"}
                       </span>
                       <span className={`text-[10px] font-black uppercase leading-snug block tracking-wide ${densityPct > 0.85 || v.current_risk >= 75 ? 'text-red-300' : 'text-emerald-300'}`}>
                         {suggestedAction}

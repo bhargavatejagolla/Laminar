@@ -207,9 +207,9 @@ export default function RandyAssistant({ stepIndex, onNext, onFinish }: { stepIn
       id: 1,
       message: (
         <>
-          <p className="mb-3 font-semibold text-slate-100">{t("auto.OverviewPanel_485") || "Overview Panel."}</p>
-          <p>{t("auto.Ontheleftyoucan_8735") || "On the left, you can see the main sections of Laminar."}</p>
-          <p>{t("auto.From_6593") || "From"} <strong>{t("auto.Monitoring_3070") || "Monitoring"}</strong> {t("auto.livefeedstoproc_920") || "live feeds to processing"} <strong>{t("auto.SurgeAlerts_933") || "Surge Alerts"}</strong> {t("auto.andtrackingindi_4526") || "and tracking individuals using our"} <strong>{t("auto.ReID_6793") || "Re-ID"}</strong> {t("auto.engine_3206") || "engine."}</p>
+          <p className="mb-3 font-semibold text-slate-100">{t("auto.OverviewPanel_485") || "Tactical Command Overview."}</p>
+          <p>{t("auto.Ontheleftyoucan_8735") || "On the left, you can access the core Laminar tactical modules."}</p>
+          <p>{t("auto.From_6593") || "From"} <strong>{t("auto.Monitoring_3070") || "Guardian Routes"}</strong> {t("auto.livefeedstoproc_920") || "for VIP tracking, to"} <strong>{t("auto.SurgeAlerts_933") || "Kinetic SOS"}</strong> {t("auto.andtrackingindi_4526") || "for behavioral threat detection, and"} <strong>{t("auto.ReID_6793") || "AEGIS Protocol"}</strong> {t("auto.engine_3206") || "for autonomous dispatch."}</p>
         </>
       ),
     },
@@ -231,8 +231,8 @@ export default function RandyAssistant({ stepIndex, onNext, onFinish }: { stepIn
       id: 3,
       message: (
         <>
-          <p className="mb-3 font-semibold text-slate-100">You’re all set.</p>
-          <p>Start with Monitoring to see live activity instantly. I’ll be here if you need help understanding anything.</p>
+          <p className="mb-3 font-semibold text-slate-100">You’re all set, Operator.</p>
+          <p>Initialize the Sentinel Command Center to view live intelligence. I’ll be actively scanning for anomalies in the background.</p>
         </>
       ),
     }

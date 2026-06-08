@@ -251,14 +251,14 @@ export default function CameraStreamPage() {
           <button
             onClick={reloadStream}
             className="p-2 bg-[#0f172a] border border-slate-700 hover:border-cyan-500/50 rounded-lg text-slate-400 hover:text-cyan-400 transition-all"
-            title="Reload stream"
+            title={t("auto.Reloadstream_3611") || "Reload stream"}
           >
             <RefreshCw className="w-5 h-5" />
           </button>
           <button
             onClick={toggleFullscreen}
             className="p-2 bg-[#0f172a] border border-slate-700 hover:border-cyan-500/50 rounded-lg text-slate-400 hover:text-cyan-400 transition-all"
-            title="Fullscreen"
+            title={t("auto.Fullscreen_1039") || "Fullscreen"}
           >
             <Maximize2 className="w-5 h-5" />
           </button>

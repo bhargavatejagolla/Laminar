@@ -1,56 +1,56 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Camera, Zap, BarChart2, AlertTriangle, Map, FileText, UserCheck, Settings } from "lucide-react";
+import { Camera, Zap, BarChart2, AlertTriangle, Map, FileText, UserCheck, Settings, Shield, Activity, Radio, Droplets, Globe, CheckCircle } from "lucide-react";
 
 const sections = [
   {
-    icon: <Camera size={20} />,
+    icon: <Shield size={20} />,
     color: "blue",
-    title: "Monitoring",
-    desc: "View live camera feeds, track individuals, and observe real-time activity across zones.",
+    title: "Guardian Route",
+    desc: "AI Protection Network with autonomous threat tracking and dynamic safety routing.",
   },
   {
-    icon: <Zap size={20} />,
-    color: "yellow",
-    title: "Surge Monitor",
-    desc: "Detect abnormal movement patterns like sudden rush, panic, or instability using velocity analysis.",
-  },
-  {
-    icon: <BarChart2 size={20} />,
-    color: "blueLight",
-    title: "Prediction Engine",
-    desc: "Forecast crowd risk based on current trends and identify potential congestion pre-emptively.",
-  },
-  {
-    icon: <AlertTriangle size={20} />,
+    icon: <Activity size={20} />,
     color: "red",
-    title: "Alerts Center",
-    desc: "Receive real-time alerts with clear reasons, risk levels, and recommended actions.",
+    title: "Kinetic SOS",
+    desc: "Zero-shot behavioral threat analysis that detects panic and distress gestures instantly.",
+  },
+  {
+    icon: <Radio size={20} />,
+    color: "purple",
+    title: "Resonance Engine",
+    desc: "Eulerian Structural Analysis. Predicts structural failure via micro-vibrations.",
+  },
+  {
+    icon: <Droplets size={20} />,
+    color: "blueLight",
+    title: "Liquid Threat",
+    desc: "Urban Flood Intelligence with autonomous route intervention and water segmentation.",
+  },
+  {
+    icon: <Globe size={20} />,
+    color: "yellow",
+    title: "AI Green Wave",
+    desc: "Autonomous emergency traffic intelligence. Clears roads before emergency vehicles arrive.",
   },
   {
     icon: <Map size={20} />,
     color: "indigo",
-    title: "Command Map",
-    desc: "Monitor multiple locations and camera nodes in a centralized geographical view.",
+    title: "4D Spatial Engine",
+    desc: "Visualizes real-time structural load, crowd density, and flow in immersive 3D space.",
   },
   {
-    icon: <FileText size={20} />,
-    color: "purple",
-    title: "Reports",
-    desc: "Generate AI-powered reports with insights on crowd behavior and system performance.",
-  },
-  {
-    icon: <UserCheck size={20} />,
+    icon: <Zap size={20} />,
     color: "blueDark",
-    title: "Tracking (Re-ID)",
-    desc: "Track individuals across cameras and analyze movement paths without duplication.",
+    title: "AEGIS Protocol",
+    desc: "Autonomous Emergency Guidance System orchestrating drones and civilians for medical events.",
   },
   {
-    icon: <Settings size={20} />,
+    icon: <CheckCircle size={20} />,
     color: "slate",
-    title: "Settings",
-    desc: "Configure thresholds, manage users, and control system behavior boundaries.",
+    title: "Liability Defense",
+    desc: "Immutable incident documentation, automated audits, and enterprise risk intelligence.",
   },
 ];
 

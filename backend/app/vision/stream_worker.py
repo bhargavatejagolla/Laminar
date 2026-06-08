@@ -433,13 +433,13 @@ class StreamWorker:
                     self._cached_frame_bytes = buf.tobytes()
                 except Exception: pass
 
-                # Enforce readout FPS
+                # Enforce readout FPS (High speed for lag-free playback, up to 60 FPS)
                 elapsed = time.time() - loop_start
-                target_interval = 1.0 / (self.target_fps or 15)
+                target_interval = 1.0 / 60.0
                 if elapsed < target_interval:
                     await asyncio.sleep(target_interval - elapsed)
                 else:
-                    await asyncio.sleep(0.005)
+                    await asyncio.sleep(0.001)
 
             except Exception as e:
                 logger.error(f"Stream readout loop error: {e}")
@@ -450,12 +450,18 @@ class StreamWorker:
         logger.warning(f"STREAM_WORKER_DETECTION_START: Camera {self.camera_id}")
         while self._running:
             try:
+                loop_start = time.time()
                 if self._current_raw_frame is not None:
                     # Run the heavy processing pipeline
                     await self._process_frame(self._current_raw_frame.copy())
                 
-                # Dynamic interval based on processing load
-                await asyncio.sleep(0.1) 
+                # Dynamic interval based on processing load to allow higher FPS
+                elapsed = time.time() - loop_start
+                target_interval = 1.0 / (self.target_fps or 15)
+                if elapsed < target_interval:
+                    await asyncio.sleep(target_interval - elapsed)
+                else:
+                    await asyncio.sleep(0.01) 
             except Exception as e:
                 logger.error(f"Detection loop error: {e}")
                 await asyncio.sleep(1)

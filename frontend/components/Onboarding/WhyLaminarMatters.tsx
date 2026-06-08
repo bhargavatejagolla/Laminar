@@ -31,17 +31,17 @@ export default function WhyLaminarMatters() {
           <div className="p-10 flex flex-col h-full z-10 relative">
             <div className="flex items-center gap-4 mb-6 text-blue-400">
               <div className="p-2 bg-blue-500/10 rounded-lg"><ShieldAlert size={24} /></div>
-              <h3 className="uppercase tracking-[0.25em] font-black text-[0.75rem]">{t("auto.RiskIntelligenc_9503") || "Risk Intelligence"}</h3>
+              <h3 className="uppercase tracking-[0.25em] font-black text-[0.75rem]">{t("auto.RiskIntelligenc_9503") || "Kinetic Risk Analysis"}</h3>
             </div>
             
             <p className="text-slate-300 text-[0.9rem] leading-relaxed mb-8 flex-1 font-medium">
-              Crowd congestion can escalate within seconds. Laminar's predictive telemetry identifies instability markers before they reach critical thresholds.
+              Behavioral anomalies and crowd panics escalate within seconds. Laminar's Kinetic SOS identifies distress gestures instantly before reaching critical thresholds.
             </p>
             
             <div className="w-full h-48 bg-[#050510] rounded-2xl border border-white/5 flex items-center justify-center overflow-hidden relative group-hover:border-blue-500/30 transition-all">
                 <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1517457373958-b7bdd4587205?q=80&w=800&auto=format&fit=crop')] bg-cover bg-center grayscale contrast-125"></div>
                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-blue-600/20 to-transparent" />
-                <span className="absolute bottom-4 left-6 text-[0.6rem] uppercase tracking-[0.3em] text-blue-400 font-black z-10">{t("auto.NeuralHeatmapv2_3784") || "Neural Heatmap v2.4"}</span>
+                <span className="absolute bottom-4 left-6 text-[0.6rem] uppercase tracking-[0.3em] text-blue-400 font-black z-10">{t("auto.NeuralHeatmapv2_3784") || "Kinetic Heatmap v4.0"}</span>
                 <div className="w-4 h-4 rounded-full bg-blue-500 absolute top-4 right-4 animate-ping opacity-50" />
             </div>
           </div>
@@ -61,17 +61,17 @@ export default function WhyLaminarMatters() {
           <div className="p-10 flex flex-col h-full z-10 relative">
             <div className="flex items-center gap-4 mb-6 text-indigo-400">
               <div className="p-2 bg-indigo-500/10 rounded-lg"><TrendingUp size={24} /></div>
-              <h3 className="uppercase tracking-[0.25em] font-black text-[0.75rem]">{t("auto.OperationalEffi_6827") || "Operational Efficacy"}</h3>
+              <h3 className="uppercase tracking-[0.25em] font-black text-[0.75rem]">{t("auto.OperationalEffi_6827") || "Autonomous Intervention"}</h3>
             </div>
             
             <p className="text-slate-300 text-[0.9rem] leading-relaxed mb-8 flex-1 font-medium">
-              Understanding operational flow helps optimize resource allocation, reduce subjects' wait times, and improve overall system throughput.
+              Deploy the AEGIS Protocol to orchestrate emergency responses, optimize Guardian Routes, and synchronize AI Green Waves for priority vehicles.
             </p>
             
             <div className="w-full h-48 bg-[#050510] rounded-2xl border border-white/5 flex items-center justify-center overflow-hidden relative group-hover:border-indigo-500/30 transition-all">
                 <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1556740738-b6a63e27c4df?q=80&w=800&auto=format&fit=crop')] bg-cover bg-center grayscale hue-rotate-180"></div>
                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-indigo-600/20 to-transparent" />
-                <span className="absolute bottom-4 left-6 text-[0.6rem] uppercase tracking-[0.3em] text-indigo-400 font-black z-10">{t("auto.FlowAnalysisMod_9863") || "Flow Analysis Mode"}</span>
+                <span className="absolute bottom-4 left-6 text-[0.6rem] uppercase tracking-[0.3em] text-indigo-400 font-black z-10">{t("auto.FlowAnalysisMod_9863") || "AEGIS Command Mode"}</span>
                 <div className="w-4 h-4 rounded-full bg-indigo-500 absolute top-4 right-4 opacity-50" />
             </div>
           </div>

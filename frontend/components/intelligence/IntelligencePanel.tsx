@@ -109,7 +109,7 @@ export default function IntelligencePanel({ venueId }: Props) {
               {/* Situation Analysis */}
               <Section
                 icon={<Target className="w-4 h-4 text-cyan-400" />}
-                label="Situation Analysis"
+                label={t("auto.SituationAnalys_8851") || "Situation Analysis"}
                 content={data.situation_analysis}
                 borderColor="border-cyan-500/20"
               />
@@ -117,7 +117,7 @@ export default function IntelligencePanel({ venueId }: Props) {
               {/* Observed Trends */}
               <Section
                 icon={<TrendingUp className="w-4 h-4 text-indigo-400" />}
-                label="Observed Trends"
+                label={t("auto.ObservedTrends_1082") || "Observed Trends"}
                 content={data.observed_trends}
                 borderColor="border-indigo-500/20"
               />
@@ -133,7 +133,7 @@ export default function IntelligencePanel({ venueId }: Props) {
               {/* Predicted Outcome */}
               <Section
                 icon={<Zap className="w-4 h-4 text-fuchsia-400" />}
-                label="Predicted Outcome"
+                label={t("auto.PredictedOutcom_2041") || "Predicted Outcome"}
                 content={data.predicted_outcome}
                 borderColor="border-fuchsia-500/20"
               />

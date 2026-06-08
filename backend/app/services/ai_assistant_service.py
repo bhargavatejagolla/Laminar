@@ -11,7 +11,7 @@ Key fixes:
   - Auto-detects best available Ollama model (not hardcoded to deepseek-coder)
   - Strict system prompt: ONLY answers from Laminar data, never general knowledge
   - Live system snapshot injected into every query (active alerts, top risk venue)
-  - Rule-based fallback when Ollama is offline — still answers from real DB data
+  - Rule-based fallback when Ollama is offline - still answers from real DB data
   - last_indexed_at tracked for /status endpoint
   - Model detection cached per process restart
 """
@@ -50,8 +50,8 @@ INDEX_FILE = os.path.join(VECTOR_INDEX_DIR, "index.faiss")
 DOCS_FILE = os.path.join(VECTOR_INDEX_DIR, "docs.json")
 OLLAMA_BASE = "http://localhost:11434"
 
-# Preferred model order — instruction-tuned models first, code last
-# Preferred model order — Focus on Llama 3.2 as primary high-performance model
+# Preferred model order - instruction-tuned models first, code last
+# Preferred model order - Focus on Llama 3.2 as primary high-performance model
 PREFERRED_MODELS = ["llama3.2", "llama3", "mistral", "phi3"]
 
 # In-memory query cache
@@ -235,7 +235,7 @@ class AIAssistantService:
 
         except Exception as e:
             logger.warning(f"Could not fetch live snapshot: {e}")
-            return f"### LIVE SYSTEM STATUS\n- (Live snapshot unavailable — {e})"
+            return f"### LIVE SYSTEM STATUS\n- (Live snapshot unavailable - {e})"
 
     # ─── Status Report ────────────────────────────────────────────────────────
 
@@ -256,7 +256,7 @@ class AIAssistantService:
     async def extract_and_index(self, session: AsyncSession) -> None:
         """Extract DB data, embed documents, and save FAISS index to disk."""
         if not FAISS_AVAILABLE:
-            logger.warning("FAISS not installed — vector indexing skipped. Run: pip install faiss-cpu")
+            logger.warning("FAISS not installed - vector indexing skipped. Run: pip install faiss-cpu")
             return
 
         logger.info("Starting RAG index extraction from database...")
@@ -285,9 +285,9 @@ class AIAssistantService:
             created_str = a.created_at.strftime("%Y-%m-%d %H:%M UTC")
         # ── 0. Static Project Knowledge Document ────────────────────────────────
         docs.append("""
-LAMINAR PLATFORM — COMPLETE PROJECT KNOWLEDGE DOCUMENT
+LAMINAR PLATFORM - COMPLETE PROJECT KNOWLEDGE DOCUMENT
 =======================================================
-Laminar is a real-time AI-powered crowd intelligence and venue management platform.
+Laminar is a real-time AI-powered crowd intelligence, autonomous emergency response, and venue management platform.
 
 TECH STACK:
 - Backend: Python (FastAPI + SQLAlchemy async + PostgreSQL + APScheduler)
@@ -295,21 +295,21 @@ TECH STACK:
 - AI Stack: FAISS (vector search), SentenceTransformers, Groq API, Gemini API, local llama.cpp
 - Vision: YOLOv8 for real-time person detection via camera streams (RTSP/HTTP)
 - Re-ID: ResNet-18 deep learning embeddings for cross-camera identity tracking
-- Scheduler: APScheduler (minute pipeline every 60s, hourly pipeline every 3600s)
 
-CORE FEATURES:
-1. Venues — Physical locations monitored 24/7. Each venue has capacity, warning/critical thresholds, active cameras.
-2. Smart City Modules — High-fidelity tracking for Traffic Volume, Vehicle/Pedestrian Velocity, and Parking Slot Occupancy.
-3. Multi-Modal IoT Sensor Matrix — If cameras are offline or unavailable, Laminar ingests alternative telemetry data (LiDAR, Wi-Fi Mac Address Sniffing, BLE Beacons, Acoustic/Gunshot Sensors) to maintain uninterrupted zone coverage.
-4. Autonomous Liability Defense — Real-time slip, fall, and hazard detection algorithms protecting corporations from lawsuits.
-5. Guardian Route — Turns cameras into an AI Personal Escort, tracking kinetic panic and stalking geometries for personal safety.
-6. AI Green Wave — Predictive traffic seizure system that instantly turns city lights green for dispatched emergency vehicles.
-7. Instant AMBER Rescue — Zero-latency multi-node semantic tracking capable of locating and trailing missing persons over time.
-8. 4D Spatial Playback Engine — A "Time Machine" utilizing WebGL pseudo-homography to stitch multiple live/past feeds into a fully navigable 3D environment.
-9. Cameras — IP/RTSP cameras attached to venues, each streaming live video for AI detection.
-10. Crowd Metrics & Surge Monitor — Minute and hourly aggregate stats and predictive surge detection.
-11. Intelligence Reports — AI-written executive situation reports.
-12. Randy AI Chat — This AI assistant; understands everything about the platform and answers questions flawlessly using this robust context.
+CORE FEATURES AND TACTICAL MODULES:
+1. Venues & Cameras - Physical locations monitored 24/7. Each venue has capacity, warning/critical thresholds, active IP/RTSP cameras.
+2. Crowd Intelligence & Metrics - Sub-second density maps, flow vectors, and anomaly triggers. Minute and hourly aggregate stats predicting crowd surges before they happen.
+3. Guardian Route (AI Protection Network) - Turns cameras into an AI Personal Escort, autonomously tracking kinetic panic, suspicious following behaviors, and generating dynamic safety routing for individuals in distress.
+4. Instant AMBER Rescue - Zero-latency multi-node semantic tracking capable of locating and trailing missing persons over time across an entire city grid.
+5. Kinetic SOS (Behavioral Analysis) - Zero-shot behavioral threat analysis that detects panic, running, and distress gestures (like waving arms) instantly across all camera nodes.
+6. AI Green Wave (Emergency Traffic Intelligence) - Predictive traffic seizure system that autonomously clears roads and synchronizes city lights to green seconds before dispatched emergency vehicles arrive at intersections.
+7. Resonance Engine (Structural Micro-Vibration Analysis) - Eulerian Structural Analysis system that predicts bridge and building collapses seconds before structural failure by monitoring invisible micro-vibrations in concrete and steel.
+8. Liquid Threat Engine (Flood Intelligence) - Multi-Node Urban Flood Intelligence with autonomous route intervention and dynamic morphological water segmentation to detect rising water levels and redirect traffic.
+9. AEGIS Protocol (Autonomous Emergency Guidance System) - Orchestrates drones, civilians, and smart infrastructure for medical events, creating an autonomous mesh network for disaster response.
+10. 4D Spatial Playback Engine - A "Time Machine" utilizing WebGL pseudo-homography to stitch multiple live/past video feeds into a fully navigable, immersive 3D environment for structural load and crowd density visualization.
+11. Liability Defense - Immutable incident documentation, automated audits, and enterprise risk intelligence to protect corporations from lawsuits via real-time slip, fall, and hazard detection.
+12. Smart City OS - High-fidelity tracking for Traffic Volume, Vehicle/Pedestrian Velocity, and Parking Slot Occupancy.
+13. Randy AI Chat - The omniscient AI assistant (that's you!) that understands everything about the Laminar platform, crowd dynamics, and tactical emergency responses, answering flawlessly using this robust context.
 
 DATABASE MODELS:
 - Venue: id, name, venue_type (parking, traffic, crowd), location, capacity, is_active, is_deleted, warning_threshold, critical_threshold
@@ -322,15 +322,15 @@ DATABASE MODELS:
 - PersonWaitRecord: id, venue_id, entered_at, exited_at, wait_duration_seconds
 
 API ENDPOINTS (Backend port 8000):
-- GET/POST /api/v1/venues — List and create venues
-- GET /api/v1/venues/{id}/stats — Live venue stats
-- GET/POST /api/v1/cameras — Camera management
-- GET /api/v1/alerts — List crowd alerts
-- GET /api/v1/crowd-metrics — Aggregated metrics
-- POST /api/v1/assistant/query — Randy AI chat
-- GET /api/v1/intelligence/summary — AI-generated intelligence report
-- GET /api/v1/system/dashboard-stats — System health dashboard
-- GET /api/v1/journeys — Cross-camera journey records
+- GET/POST /api/v1/venues - List and create venues
+- GET /api/v1/venues/{id}/stats - Live venue stats
+- GET/POST /api/v1/cameras - Camera management
+- GET /api/v1/alerts - List crowd alerts
+- GET /api/v1/crowd-metrics - Aggregated metrics
+- POST /api/v1/assistant/query - Randy AI chat
+- GET /api/v1/intelligence/summary - AI-generated intelligence report
+- GET /api/v1/system/dashboard-stats - System health dashboard
+- GET /api/v1/journeys - Cross-camera journey records
 """.strip())
 
         # ── 1. ALL Venues (active + inactive) ───────────────────────────────────
@@ -418,7 +418,7 @@ API ENDPOINTS (Backend port 8000):
         except Exception as e:
             logger.warning(f"RAG: Could not index events: {e}")
 
-        # ── 5. Hourly Crowd Metrics — last 30 days (venue-level) ────────────────
+        # ── 5. Hourly Crowd Metrics - last 30 days (venue-level) ────────────────
         try:
             thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
             metrics_result = await session.execute(
@@ -442,7 +442,7 @@ API ENDPOINTS (Backend port 8000):
         except Exception as e:
             logger.warning(f"RAG: Could not index hourly metrics: {e}")
 
-        # ── 6. Per-Camera Hourly Metrics — last 7 days ──────────────────────────
+        # ── 6. Per-Camera Hourly Metrics - last 7 days ──────────────────────────
         try:
             seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
             cam_metrics_result = await session.execute(
@@ -466,7 +466,7 @@ API ENDPOINTS (Backend port 8000):
             logger.warning(f"RAG: Could not index camera metrics: {e}")
 
         if not docs:
-            logger.warning("No documents extracted for RAG index — database may be empty.")
+            logger.warning("No documents extracted for RAG index - database may be empty.")
             return
 
         await self._lazy_load_model_async()
@@ -514,7 +514,7 @@ API ENDPOINTS (Backend port 8000):
         if any(kw in q for kw in ("status", "current", "now", "today", "active")):
             return (
                 f"Here is the current Laminar system data I have indexed:\n\n{formatted}\n\n"
-                f"_(Randy AI is operating in Safe Mode — this is a direct data summary without advanced analysis.)_"
+                f"_(Randy AI is operating in Safe Mode - this is a direct data summary without advanced analysis.)_"
             )
 
         if any(kw in q for kw in ("alert", "risk", "critical", "high", "threat")):
@@ -574,7 +574,7 @@ API ENDPOINTS (Backend port 8000):
                 if 0 <= idx < len(self.documents) and self.documents[idx] not in context_docs:
                     context_docs.append(self.documents[idx])
         else:
-            logger.warning("FAISS index not ready — answering with live snapshot only.")
+            logger.warning("FAISS index not ready - answering with live snapshot only.")
 
         # ── Live snapshot ─────────────────────────────────────────────────────
         live_snapshot = ""
@@ -585,7 +585,7 @@ API ENDPOINTS (Backend port 8000):
         model = await self._detect_ollama_model()
 
         if not model:
-            logger.info("Ollama offline — using rule-based response.")
+            logger.info("Ollama offline - using rule-based response.")
             combined_docs = [live_snapshot] + context_docs
             return self._rule_based_response(question, combined_docs)
 

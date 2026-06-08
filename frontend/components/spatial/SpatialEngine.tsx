@@ -11,6 +11,7 @@ import { useActiveVenue } from "@/hooks/useActiveVenue";
 import { toast } from "sonner";
 import Loading from "@/app/loading";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 interface Tracklet {
     time: number;
@@ -81,6 +82,8 @@ function getDensityColor(cameraName: string, timeSec: number) {
 // Helper Component: Entity Node
 // -------------------------------------------------------------
 function EntityNode({ entity, currentFrame }: { entity: SpatialEntity, currentFrame: number }) {
+  const { t } = useTranslation();
+
     const pos = useMemo(() => {
         if (entity.tracklets.length === 0) return null;
         if (currentFrame < entity.tracklets[0].time || currentFrame > entity.tracklets[entity.tracklets.length - 1].time) return null;
@@ -139,6 +142,7 @@ function EntityNode({ entity, currentFrame }: { entity: SpatialEntity, currentFr
 }
 
 function CameraZones({ currentFrame }: { currentFrame: number }) {
+    const { t } = useTranslation();
     return (
         <group>
             {CAMERAS.map((cam) => {
@@ -164,10 +168,10 @@ function CameraZones({ currentFrame }: { currentFrame: number }) {
                             <div className="bg-black/80 backdrop-blur-md border border-white/20 rounded-lg px-2 py-1 flex flex-col items-center">
                                 <span className="text-[10px] font-bold text-white whitespace-nowrap">{cam.name}</span>
                                 {color === DENSITY_COLORS.CRITICAL && (
-                                    <span className="text-[8px] font-mono text-purple-400 font-bold uppercase animate-pulse">Critical Density</span>
+                                    <span className="text-[8px] font-mono text-purple-400 font-bold uppercase animate-pulse">{t("auto.CriticalDensity_9239") || "Critical Density"}</span>
                                 )}
                                 {isPrediction && (
-                                    <span className="text-[8px] font-mono text-yellow-400 font-bold uppercase">PREDICTED</span>
+                                    <span className="text-[8px] font-mono text-yellow-400 font-bold uppercase">{t("auto.PREDICTED_8310") || "PREDICTED"}</span>
                                 )}
                             </div>
                         </Html>
@@ -182,8 +186,9 @@ function CameraZones({ currentFrame }: { currentFrame: number }) {
 // Main Component
 // -------------------------------------------------------------
 export default function SpatialEngine() {
+    const { t } = useTranslation();
     const router = useRouter();
-    const { venue } = useActiveVenue();
+    const { activeVenueId } = useActiveVenue();
     const [spatialData, setSpatialData] = useState<SpatialData | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -242,7 +247,7 @@ export default function SpatialEngine() {
             });
             
             setSpatialData({
-                venue_id: venue?.id || "demo-venue",
+                venue_id: activeVenueId || "demo-venue",
                 duration_minutes: TOTAL_DURATION_MINS,
                 resolution_fps: 1,
                 entities: mockEntities
@@ -253,12 +258,12 @@ export default function SpatialEngine() {
             toast.success("Spatial Matrix Initialized with Intelligence Sync");
         };
 
-        if (!venue) {
+        if (!activeVenueId) {
             setTimeout(mockFallback, 800);
             return;
         }
 
-        api.get(`/spatial/scene/${venue.id}?minutes=${TOTAL_DURATION_MINS}`)
+        api.get(`/spatial/scene/${activeVenueId}?minutes=${TOTAL_DURATION_MINS}`)
             .then(res => {
                 setSpatialData(res.data);
                 setLoading(false);
@@ -267,7 +272,7 @@ export default function SpatialEngine() {
                 console.warn("API failed, using simulated matrix data.");
                 mockFallback();
             });
-    }, [venue]);
+    }, [activeVenueId]);
 
     useEffect(() => {
         if (!isPlaying) return;
@@ -318,7 +323,7 @@ export default function SpatialEngine() {
                     <button 
                         onClick={() => router.back()} 
                         className="w-12 h-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex justify-center items-center transition backdrop-blur-md cursor-pointer shadow-lg group"
-                        title="Go Back"
+                        title={t("auto.GoBack_4483") || "Go Back"}
                     >
                         <ArrowLeft className="w-6 h-6 text-white/80 group-hover:-translate-x-1 transition-transform" />
                     </button>
@@ -327,7 +332,7 @@ export default function SpatialEngine() {
                     </div>
                     <div>
                         <h1 className="text-2xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70 drop-shadow-md">
-                            4D SPATIAL <span className="text-indigo-400">PLAYBACK ENGINE</span>
+                            4D SPATIAL <span className="text-indigo-400">{t("auto.PLAYBACKENGINE_2042") || "PLAYBACK ENGINE"}</span>
                         </h1>
                         <p className="text-indigo-400/90 text-[10px] font-mono tracking-[0.25em] font-bold mt-1 flex items-center gap-2">
                             <span className={`w-1.5 h-1.5 rounded-full ${isPrediction ? 'bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,1)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,1)]'} animate-pulse`} /> 
@@ -364,18 +369,18 @@ export default function SpatialEngine() {
                         >
                             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(168,85,247,0.15)_0%,transparent_70%)]"></div>
                             <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-purple-400 mb-5 flex items-center gap-2 relative z-10">
-                                <Activity className="w-3 h-3" /> Prediction Factors
+                                <Activity className="w-3 h-3" /> {t("auto.PredictionFacto_3903") || "Prediction Factors"}
                             </h3>
                             <div className="space-y-4 font-mono text-xs font-bold text-slate-300 relative z-10">
-                                <div className="flex items-center gap-3"><span className="text-rose-400 font-black text-sm">↑</span> Food Court inflow surge</div>
-                                <div className="flex items-center gap-3"><span className="text-rose-400 font-black text-sm">↑</span> Exit West severe congestion</div>
-                                <div className="flex items-center gap-3"><span className="text-amber-400 font-black text-sm">↑</span> Historical Saturday pattern match</div>
-                                <div className="flex items-center gap-3"><span className="text-purple-400 font-black text-sm">↑</span> Event ending in 12 min</div>
+                                <div className="flex items-center gap-3"><span className="text-rose-400 font-black text-sm">↑</span> {t("auto.FoodCourtinflow_5507") || "Food Court inflow surge"}</div>
+                                <div className="flex items-center gap-3"><span className="text-rose-400 font-black text-sm">↑</span> {t("auto.ExitWestseverec_7849") || "Exit West severe congestion"}</div>
+                                <div className="flex items-center gap-3"><span className="text-amber-400 font-black text-sm">↑</span> {t("auto.HistoricalSatur_2429") || "Historical Saturday pattern match"}</div>
+                                <div className="flex items-center gap-3"><span className="text-purple-400 font-black text-sm">↑</span> {t("auto.Eventendingin12_6657") || "Event ending in 12 min"}</div>
                             </div>
                             <div className="mt-6 pt-5 border-t border-purple-500/20 relative z-10">
-                                <div className="text-[9px] uppercase tracking-widest text-purple-400/60 mb-1">AI Confidence</div>
+                                <div className="text-[9px] uppercase tracking-widest text-purple-400/60 mb-1">{t("auto.AIConfidence_3478") || "AI Confidence"}</div>
                                 <div className="text-2xl font-black text-white flex items-baseline gap-2">
-                                    94.2% <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest animate-pulse">High Conviction</span>
+                                    94.2% <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest animate-pulse">{t("auto.HighConviction_1133") || "High Conviction"}</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -392,33 +397,33 @@ export default function SpatialEngine() {
                         >
                             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] opacity-20"></div>
                             <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-indigo-400 mb-5 flex items-center gap-2 relative z-10">
-                                <Database className="w-3 h-3" /> Cross-System Timeline
+                                <Database className="w-3 h-3" /> {t("auto.CrossSystemTime_5903") || "Cross-System Timeline"}
                             </h3>
                             <div className="space-y-5 font-mono text-xs font-bold text-slate-300 relative z-10 before:absolute before:inset-0 before:ml-[11px] before:w-[2px] before:bg-gradient-to-b before:from-indigo-500 before:via-emerald-500 before:to-amber-500">
                                 <div className="relative pl-8">
                                     <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-indigo-500 -translate-x-1/2"></div>
                                     <div className="text-indigo-400 mb-1 font-black">18:52</div>
-                                    <div className="text-[10px] leading-relaxed">Spatial Engine predicts surge.</div>
+                                    <div className="text-[10px] leading-relaxed">{t("auto.SpatialEnginepr_5875") || "Spatial Engine predicts surge."}</div>
                                 </div>
                                 <div className="relative pl-8">
                                     <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-rose-500 -translate-x-1/2"></div>
                                     <div className="text-rose-400 mb-1 font-black">18:54</div>
-                                    <div className="text-[10px] leading-relaxed">Kinetic SOS alerted.</div>
+                                    <div className="text-[10px] leading-relaxed">{t("auto.KineticSOSalert_5716") || "Kinetic SOS alerted."}</div>
                                 </div>
                                 <div className="relative pl-8">
                                     <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-emerald-500 -translate-x-1/2 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
                                     <div className="text-emerald-400 mb-1 font-black">18:55</div>
-                                    <div className="text-[10px] leading-relaxed">Guardian Route rerouted civilians.</div>
+                                    <div className="text-[10px] leading-relaxed">{t("auto.GuardianRoutere_6322") || "Guardian Route rerouted civilians."}</div>
                                 </div>
                                 <div className="relative pl-8">
                                     <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-emerald-500 -translate-x-1/2"></div>
                                     <div className="text-emerald-400 mb-1 font-black">18:56</div>
-                                    <div className="text-[10px] leading-relaxed">Green Wave prepared emergency access.</div>
+                                    <div className="text-[10px] leading-relaxed">{t("auto.GreenWaveprepar_1317") || "Green Wave prepared emergency access."}</div>
                                 </div>
                                 <div className="relative pl-8">
                                     <div className="absolute left-3 top-1.5 w-3 h-3 rounded-full bg-[#050508] border-2 border-amber-500 -translate-x-1/2"></div>
                                     <div className="text-amber-400 mb-1 font-black">18:57</div>
-                                    <div className="text-[10px] leading-relaxed">Liability Engine started evidence capture.</div>
+                                    <div className="text-[10px] leading-relaxed">{t("auto.LiabilityEngine_2135") || "Liability Engine started evidence capture."}</div>
                                 </div>
                             </div>
                         </motion.div>
@@ -435,36 +440,36 @@ export default function SpatialEngine() {
                         >
                             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(16,185,129,0.1)_0%,transparent_70%)]"></div>
                             <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-emerald-400 mb-5 flex items-center gap-2 relative z-10">
-                                <Video className="w-3 h-3" /> Live Telemetry
+                                <Video className="w-3 h-3" /> {t("auto.LiveTelemetry_9011") || "Live Telemetry"}
                             </h3>
                             <div className="grid grid-cols-2 gap-4 relative z-10">
                                 <div className="bg-white/5 border border-white/5 p-3 rounded-xl">
-                                    <div className="text-[8px] uppercase tracking-widest text-slate-400 mb-1">Live Pop</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-400 mb-1">{t("auto.LivePop_8069") || "Live Pop"}</div>
                                     <div className="text-2xl font-black text-white font-mono">842</div>
                                 </div>
                                 <div className="bg-white/5 border border-white/5 p-3 rounded-xl">
-                                    <div className="text-[8px] uppercase tracking-widest text-slate-400 mb-1">Active Cams</div>
+                                    <div className="text-[8px] uppercase tracking-widest text-slate-400 mb-1">{t("auto.ActiveCams_9609") || "Active Cams"}</div>
                                     <div className="text-2xl font-black text-white font-mono">24</div>
                                 </div>
                             </div>
                             <div className="mt-5 space-y-4 pt-5 border-t border-white/10 relative z-10">
                                 <div>
                                     <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1.5">
-                                        <span className="text-slate-400 uppercase tracking-widest">Main Hall Density</span>
-                                        <span className="text-rose-400">HIGH</span>
+                                        <span className="text-slate-400 uppercase tracking-widest">{t("auto.MainHallDensity_2399") || "Main Hall Density"}</span>
+                                        <span className="text-rose-400">{t("auto.HIGH_765") || "HIGH"}</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-rose-500 w-[85%]"></div></div>
                                 </div>
                                 <div>
                                     <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1.5">
-                                        <span className="text-slate-400 uppercase tracking-widest">Food Court Density</span>
-                                        <span className="text-amber-400">MEDIUM</span>
+                                        <span className="text-slate-400 uppercase tracking-widest">{t("auto.FoodCourtDensit_6146") || "Food Court Density"}</span>
+                                        <span className="text-amber-400">{t("auto.MEDIUM_8448") || "MEDIUM"}</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-amber-500 w-[55%]"></div></div>
                                 </div>
                                 <div>
                                     <div className="flex justify-between items-center text-[10px] font-mono font-bold mb-1.5">
-                                        <span className="text-slate-400 uppercase tracking-widest">Exit West Capacity</span>
+                                        <span className="text-slate-400 uppercase tracking-widest">{t("auto.ExitWestCapacit_3614") || "Exit West Capacity"}</span>
                                         <span className="text-emerald-400">68%</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 w-[68%]"></div></div>
@@ -486,7 +491,7 @@ export default function SpatialEngine() {
                         >
                             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,rgba(168,85,247,0.15)_0%,transparent_70%)]"></div>
                             <h3 className="text-[10px] font-black tracking-[0.2em] uppercase text-purple-400 mb-5 flex items-center gap-2 relative z-10">
-                                <Clock className="w-3 h-3" /> Forecast Horizon
+                                <Clock className="w-3 h-3" /> {t("auto.ForecastHorizon_4056") || "Forecast Horizon"}
                             </h3>
                             <div className="space-y-5 font-mono text-xs relative z-10">
                                 <div>
@@ -512,7 +517,7 @@ export default function SpatialEngine() {
                                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span> +15 min
                                     </div>
                                     <div className="p-3 bg-gradient-to-r from-rose-500/20 to-rose-600/10 border border-rose-500/40 rounded-xl text-rose-400 font-black text-center uppercase tracking-[0.15em] shadow-[inset_0_0_20px_rgba(244,63,94,0.1)]">
-                                        Critical Surge Expected
+                                        {t("auto.CriticalSurgeEx_446") || "Critical Surge Expected"}
                                     </div>
                                 </div>
                             </div>
@@ -575,24 +580,24 @@ export default function SpatialEngine() {
                     </div>
 
                     <div className="flex items-center gap-4 bg-black/50 border border-white/10 px-6 py-2 rounded-xl">
-                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase">Status</span>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase">{t("auto.Status_5777") || "Status"}</span>
                         {isPrediction ? (
                             <span className="text-sm font-bold text-yellow-400 tracking-wider flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" /> FUTURE SIMULATION
+                                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" /> {t("auto.FUTURESIMULATIO_4204") || "FUTURE SIMULATION"}
                             </span>
                         ) : isHistorical ? (
                             <span className="text-sm font-bold text-slate-300 tracking-wider flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-slate-400" /> HISTORICAL REPLAY
+                                <span className="w-2 h-2 rounded-full bg-slate-400" /> {t("auto.HISTORICALREPLA_6181") || "HISTORICAL REPLAY"}
                             </span>
                         ) : (
                             <span className="text-sm font-bold text-emerald-400 tracking-wider flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> LIVE REALITY
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> {t("auto.LIVEREALITY_8256") || "LIVE REALITY"}
                             </span>
                         )}
                     </div>
 
                     <div className={`flex items-center gap-4 px-6 py-2 rounded-xl border ${isPrediction ? 'bg-purple-950/30 border-purple-500/30' : 'bg-indigo-950/30 border-indigo-500/30'}`}>
-                        <span className={`text-[10px] font-bold tracking-[0.2em] uppercase ${isPrediction ? 'text-purple-400' : 'text-indigo-400'}`}>Timeline</span>
+                        <span className={`text-[10px] font-bold tracking-[0.2em] uppercase ${isPrediction ? 'text-purple-400' : 'text-indigo-400'}`}>{t("auto.Timeline_8435") || "Timeline"}</span>
                         <span className="text-2xl font-mono font-black text-white w-24 text-center tabular-nums">
                             {formatRealTime(currentFrame)}
                         </span>
@@ -608,7 +613,7 @@ export default function SpatialEngine() {
                         <span>18:30</span>
                         <span className="text-red-400">18:45 (Incident)</span>
                         <span className="text-emerald-400">19:00 (Live)</span>
-                        <span className="text-yellow-400">Predicted 19:15</span>
+                        <span className="text-yellow-400">{t("auto.Predicted1915_5308") || "Predicted 19:15"}</span>
                     </div>
 
                     {/* Timeline background with historical / prediction zones */}

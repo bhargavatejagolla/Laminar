@@ -1,6 +1,9 @@
 import json
 import time
+import sys
 from deep_translator import GoogleTranslator
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 langs = {'hi': 'hi', 'te': 'te', 'gu': 'gu', 'ta': 'ta'}
 

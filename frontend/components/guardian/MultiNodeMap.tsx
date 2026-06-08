@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useTranslation } from "react-i18next";
 
 // Fix leaflet icon issue in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -71,6 +72,8 @@ const MapController = ({ nodes }: { nodes: Node[] }) => {
 };
 
 export default function MultiNodeMap({ nodes, currentNodeId, targetNodeId, isTransit }: MultiNodeMapProps) {
+  const { t } = useTranslation();
+
     if (!nodes || nodes.length === 0) return null;
 
     const positions: [number, number][] = nodes.map(n => [n.lat, n.lng]);
@@ -118,7 +121,7 @@ export default function MultiNodeMap({ nodes, currentNodeId, targetNodeId, isTra
             
             {/* Overlay Info */}
             <div className="absolute bottom-4 left-4 z-[1000] bg-[#121216]/80 backdrop-blur-md border border-white/10 rounded-xl p-3 shadow-lg">
-                <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Coverage Network</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">{t("auto.CoverageNetwork_9675") || "Coverage Network"}</div>
                 <div className="flex flex-col gap-2">
                     {nodes.map(node => (
                         <div key={node.id} className="flex items-center gap-2">

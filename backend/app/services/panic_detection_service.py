@@ -25,23 +25,8 @@ class PanicDetectionService:
         self.density_threshold = density_threshold
         self.trigger_cooldown = trigger_cooldown
         
-        # Initialize the MediaPipe Pose Estimator for full-body tracking kinetics
-        try:
-            from mediapipe.python.solutions import pose as mp_pose
-            self.mp_pose = mp_pose
-            self.pose = self.mp_pose.Pose(
-                static_image_mode=False,
-                min_detection_confidence=0.5,
-                model_complexity=0   # Fast processing mode!
-            )
-            self._available = True
-        except (ImportError, ModuleNotFoundError):
-            logger.warning("MediaPipe not installed. Panic detection (velocity tracking) will be disabled.")
-            self.pose = None
-            self._available = False
-        
-        # Track 33 keypoints over consecutive frames to extract vector magnitudes
-        self.prev_landmarks = None
+        # Initialize Dense Optical Flow
+        self.prev_gray = None
         
         self.last_trigger_time: Optional[datetime] = None
         self.avg_velocity = 0.0
@@ -75,41 +60,51 @@ class PanicDetectionService:
         d_thresh = config.get("density_threshold", self.density_threshold) if config else self.density_threshold
         c_window = config.get("trigger_cooldown", self.trigger_cooldown) if config else self.trigger_cooldown
 
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        try:
-            pose_results = self.pose.process(rgb_frame)
-        except Exception as e:
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        if self.prev_gray is None:
+            self.prev_gray = gray_frame
             return result
-        
-        valid_magnitudes = []
-        
-        if pose_results and pose_results.pose_landmarks:
-            curr_landmarks = pose_results.pose_landmarks.landmark
-            if self.prev_landmarks is not None:
-                h, w = frame.shape[:2]
-                
-                # Iterate precisely through all 33 intrinsic joint keypoints
-                for i in range(33):
-                    curr = curr_landmarks[i]
-                    prev = self.prev_landmarks[i]
-                    
-                    if curr.visibility > 0.5 and prev.visibility > 0.5:
-                        dx = (curr.x - prev.x) * w
-                        dy = (curr.y - prev.y) * h
-                        mag = np.hypot(dx, dy)
-                        
-                        # Filter micromovement noise and extremely unstable edge jumps
-                        if 0.5 < mag < (v_thresh * 5.0):
-                            valid_magnitudes.append(mag)
-                            
-            self.prev_landmarks = curr_landmarks
-        else:
-            self.prev_landmarks = None
             
-        if len(valid_magnitudes) > 0:
-            # Scale from px/frame to approximate px/second (assume ~15 fps effective processing timeline)
-            avg_vel = float(np.mean(valid_magnitudes)) * 15.0
-            variance = float(np.var(valid_magnitudes)) * 15.0
+        try:
+            # Calculate dense optical flow using Farneback algorithm
+            flow = cv2.calcOpticalFlowFarneback(
+                self.prev_gray, gray_frame, None, 
+                pyr_scale=0.5, levels=3, winsize=15, 
+                iterations=3, poly_n=5, poly_sigma=1.2, flags=0
+            )
+            
+            # Compute magnitude of flow vectors
+            mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+            
+            # Filter out tiny camera jitters (static background noise)
+            # Threshold: only consider pixels moving more than 0.5 pixels per frame
+            moving_pixels = mag[mag > 0.5]
+            
+            if len(moving_pixels) > 0:
+                # Scale from px/frame to approximate px/second (assume ~15 fps)
+                # To make it more "accurate", we use the 90th percentile to track the fastest moving parts of the crowd
+                # rather than the mean, which gets diluted by standing people.
+                avg_vel = float(np.percentile(moving_pixels, 85)) * 15.0
+                variance = float(np.var(moving_pixels)) * 15.0
+                
+                if np.isnan(variance):
+                    variance = 0.0
+                    
+                self.avg_velocity = avg_vel
+                self.avg_variance = variance
+                self.acceleration = float(avg_vel - self.last_velocity)
+                self.last_velocity = avg_vel
+                
+                result["avg_velocity"] = self.avg_velocity
+                result["variance"] = self.avg_variance
+                result["acceleration"] = self.acceleration
+                
+            self.prev_gray = gray_frame
+            
+        except Exception as e:
+            logger.error(f"Optical flow failed: {e}")
+            return result
             
             if np.isnan(variance):
                 variance = 0.0
@@ -122,7 +117,6 @@ class PanicDetectionService:
             result["avg_velocity"] = self.avg_velocity
             result["variance"] = self.avg_variance
             result["acceleration"] = self.acceleration
-            
             # Evaluate Surge matrix logic based on verified keypoint velocities
             if (self.avg_velocity > v_thresh and 
                 current_crowd_count >= d_thresh):

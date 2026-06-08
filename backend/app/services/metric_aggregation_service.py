@@ -636,6 +636,9 @@ class MetricAggregationService:
                 func.max(CrowdMetric.max_count),
                 func.sum(CrowdMetric.total_samples),
                 func.avg(CrowdMetric.avg_confidence),
+                func.avg(CrowdMetric.avg_velocity),
+                func.avg(CrowdMetric.avg_variance),
+                func.avg(CrowdMetric.avg_acceleration),
             )
             .where(CrowdMetric.venue_id == venue_id)
             .where(CrowdMetric.camera_id.is_not(None))
@@ -645,7 +648,7 @@ class MetricAggregationService:
 
         result = await session.execute(stmt)
         row = result.one()
-        sum_avg, max_val, total_samples, avg_conf = row
+        sum_avg, max_val, total_samples, avg_conf, avg_vel, avg_var, avg_acc = row
 
         if sum_avg is None or total_samples == 0:
             return None
@@ -655,9 +658,13 @@ class MetricAggregationService:
         max_val = int(max_val) if max_val is not None else 0
         total_samples = int(total_samples)
         avg_conf = float(avg_conf) if avg_conf is not None else 1.0
+        avg_vel = float(avg_vel) if avg_vel is not None else 0.0
+        avg_var = float(avg_var) if avg_var is not None else 0.0
+        avg_acc = float(avg_acc) if avg_acc is not None else 0.0
 
         # Calculate derived metrics for venue
         occupancy_percent = (min((sum_avg / venue.capacity) * 100, 100.0) if venue.capacity else 0)
+
         
         # For simplicity, venue-wide risk level is the MAX risk level found among cameras
         risk_stmt = (
@@ -698,6 +705,9 @@ class MetricAggregationService:
             occupancy_percent=round(occupancy_percent, 2),
             risk_level=venue_risk_level,
             dynamic_risk_score=round(venue_risk_score, 2),
+            avg_velocity=round(avg_vel, 2),
+            avg_variance=round(avg_var, 2),
+            avg_acceleration=round(avg_acc, 2),
         )
 
         created = await self.metric_repo.create(session, venue_metric, commit=True)

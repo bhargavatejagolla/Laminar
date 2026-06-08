@@ -281,7 +281,7 @@ async def update_camera(
     camera_id: UUID,
     camera_data: CameraUpdate,
     db: AsyncSession = Depends(get_db),
-    # ✅ RBAC: Admin only
+    # 🛡️ RBAC: Admin and Manager
     user=Depends(require_role(UserRole.SUPER_ADMIN, UserRole.ADMIN)),
 ):
     """
