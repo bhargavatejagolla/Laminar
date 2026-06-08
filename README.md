@@ -135,6 +135,16 @@
 
 ---
 
+## Resonance Engine (Structural Health Monitoring)
+
+* Eulerian Video Magnification (EVM)
+* Structural Vibration Analysis & Frequency Extraction
+* Real-time Resonance Hazard Alerts
+* Cable-Stayed & Pillar Health Tracking
+* Visual Displacements Magnification
+
+---
+
 ## Flood Intelligence Network (Multi-Node Omni-Base Calibration)
 
 * Real-Time Flood Severity Index (0-100)
@@ -204,6 +214,18 @@
 * Smart Infrastructure Activation
 * Live Location Sharing
 * Human‑Centered Safety Intelligence
+
+---
+
+## AEGIS Protocol (Autonomous Emergency Guidance & Intervention System)
+
+* Medical Event Classification & Cardiac Event Detection
+* Kinetic Anomaly Tracking (Zero-Shot Fall Detection)
+* Multi-Scale YOLO-Pose Image Pyramid
+* Automated Hospital & Police Notification via SMTP
+* AED Drone Launch Authorization
+* Real-Time Incident Hub Generation
+* Motionless Progress Ring HUD
 
 ---
 
@@ -327,6 +349,7 @@
 * Next.js 16 (React 19)
 * Tailwind CSS
 * Framer Motion
+* Lightfall UI Elements
 * GSAP
 
 ### Backend
