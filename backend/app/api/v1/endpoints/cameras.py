@@ -101,6 +101,7 @@ async def create_camera(
         name=camera_data.name,
         stream_url=camera_data.stream_url,
         stream_type=camera_data.stream_type,
+        camera_type=camera_data.camera_type,
         username=camera_data.username,
         password=camera_data.password,
         location_description=camera_data.location_description,
@@ -150,6 +151,7 @@ async def list_cameras(
     is_active: Optional[bool] = None,
     is_online: Optional[bool] = None,
     stream_type: Optional[str] = None,
+    camera_type: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -158,7 +160,7 @@ async def list_cameras(
     """
     List all cameras with optional filters.
     
-    - Filter by venue, active status, online status, stream type
+    - Filter by venue, active status, online status, stream type, camera type
     - Pagination with skip/limit
     - Any authenticated user can access
     """
@@ -173,6 +175,8 @@ async def list_cameras(
         query = query.where(Camera.is_online == is_online)
     if stream_type:
         query = query.where(Camera.stream_type == stream_type)
+    if camera_type:
+        query = query.where(Camera.camera_type == camera_type)
 
     if not user.is_super_admin:
         allowed_venue_ids = {v.id for v in user.venues}

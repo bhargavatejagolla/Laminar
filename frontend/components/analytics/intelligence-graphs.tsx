@@ -107,7 +107,7 @@ export default function IntelligenceGraphs() {
 
       <div className="h-[220px] mt-4 w-full">
         {history.length > 1 ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <AreaChart data={history} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 {camKeys.map((key, i) => (

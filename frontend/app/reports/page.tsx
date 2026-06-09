@@ -250,7 +250,7 @@ export default function ReportsPage() {
                   <h3 className={`text-4xl font-black tracking-tighter ${stat.text} drop-shadow-md`}>{stat.value}</h3>
                   <div className="mt-4 h-8 opacity-40 group-hover:opacity-100 transition-opacity">
                     {/* Micro Sparkline */}
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <LineChart data={histData.slice(-15)}>
                         <Line type="monotone" dataKey={i === 0 ? "crowdCount" : i === 1 ? "alerts" : "riskScore"} stroke="currentColor" strokeWidth={2} dot={false} className={stat.text} />
                       </LineChart>
@@ -355,7 +355,7 @@ export default function ReportsPage() {
                   <Activity className="w-4 h-4 text-amber-400" /> {t("auto.RiskDistributio_5869") || "Risk Distribution"}
                 </h3>
                 <div className="flex-1 relative h-[250px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                     <PieChart>
                       <Pie
                         data={distributionData}
@@ -406,7 +406,7 @@ export default function ReportsPage() {
               </div>
               
               <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <AreaChart data={mergedRisk} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">

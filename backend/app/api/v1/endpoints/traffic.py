@@ -36,6 +36,8 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 router = APIRouter()
 
+_last_injected_frame_bytes = {} # Global cache for injected photos
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Rich Rule-Based AI Insight Engine (no external API — deterministic)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -140,6 +142,9 @@ async def _fire_traffic_notification(
     insight: str,
     recommendation: str,
     screenshot_path: str = None,
+    camera_id: str = None,
+    lat: float = None,
+    lng: float = None,
 ):
     """Sends a unified traffic alert via NotificationService (email + SMS + SSE bell)."""
     priority = tier_label.upper()
@@ -177,6 +182,9 @@ async def _fire_traffic_notification(
         # AI insight fields rendered by NotificationBell expandable card
         "insight": insight,
         "recommendation": recommendation,
+        "camera_id": str(camera_id) if 'camera_id' in locals() else None,
+        "coordinates": f"{lat}, {lng}" if 'lat' in locals() and 'lng' in locals() else None,
+        "camera_location": f"Camera ID: {camera_id}" if 'camera_id' in locals() else None,
     }
     try:
         async with db_manager.session() as sess:
@@ -311,7 +319,7 @@ def push_traffic_event(
 
             # Fire unified notification via NotificationService (non-blocking)
             if venue_id:
-                async def _fire_live_traffic_notification(vid, cnt, den, vel, wt, rs, tier, ins, rec):
+                async def _fire_live_traffic_notification(vid, cnt, den, vel, wt, rs, tier, ins, rec, cid, latitude, longitude):
                     try:
                         from app.models.venue import Venue as VenueModel
                         async with db_manager.session() as sess:
@@ -326,14 +334,15 @@ def push_traffic_event(
                                 count=cnt, density=den, velocity=vel,
                                 wait_time=wt, risk_score=rs, tier_label=tier,
                                 insight=ins, recommendation=rec,
-                                screenshot_path=screenshot_path
+                                screenshot_path=screenshot_path,
+                                camera_id=cid, lat=latitude, lng=longitude
                             )
                     except Exception as ex:
                         logger.error(f"Live traffic notification failed: {ex}")
 
                 try:
                     asyncio.get_running_loop().create_task(
-                        _fire_live_traffic_notification(venue_id, count, density, velocity, wait_time, risk_score, tier_label, insight, recommendation)
+                        _fire_live_traffic_notification(venue_id, count, density, velocity, wait_time, risk_score, tier_label, insight, recommendation, camera_id, lat, lng)
                     )
                 except RuntimeError:
                     pass  # No running loop — worker is not in async context, skip
@@ -749,7 +758,7 @@ async def upload_traffic_video(
         screenshot_path = None
         peak_risk_score = max((r.get("risk_score", 0) for r in frame_results), default=0)
 
-        if peak_density in ("High", "Critical") and frame_results:
+        if frame_results:
             worst_idx = max(range(len(frame_results)), key=lambda i: frame_results[i]["count"])
             try:
                 cap2 = cv2.VideoCapture(tmp_path)
@@ -760,6 +769,11 @@ async def upload_traffic_video(
                     worst_res = frame_results[worst_idx]
                     annotated_frame = draw_vehicle_overlays(worst_frame.copy(), worst_res.get("vehicles", []))
                     annotated_frame = draw_hud(annotated_frame, worst_res)
+                    
+                    # Store for stream fallback
+                    _, buffer = cv2.imencode(".jpg", annotated_frame)
+                    _last_injected_frame_bytes[camera_id] = buffer.tobytes()
+                    
                     os.makedirs("screenshots/traffic", exist_ok=True)
                     rel_path = f"screenshots/traffic/alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
                     screenshot_path = os.path.abspath(rel_path)
@@ -777,9 +791,11 @@ async def upload_traffic_video(
                     if not v_obj:
                         stmt = select(VenueModel).limit(1)
                         res = await sess.execute(stmt)
-                        v_obj = res.scalar_one_or_none()
+                    if not v_obj:
+                        from app.models.venue import Venue as VenueModel
+                        v_obj = VenueModel(id="00000000-0000-0000-0000-000000000000", name="Upload Analysis")
                     
-                    if v_obj:
+                    if True:
                         tier = "CRITICAL" if peak_density == "Critical" else "HIGH"
                         insight = f"Video analysis of '{file.filename}': Peak {peak_density} with {max_count} vehicles. Avg speed {avg_speed:.1f} px/s."
                         await _fire_traffic_notification(
@@ -897,16 +913,21 @@ async def upload_traffic_image(
     risk_score = result.get("risk_score", 0)
 
     screenshot_path = None
-    if density in ("High", "Critical"):
-        try:
-            annotated_frame = draw_vehicle_overlays(img.copy(), result.get("vehicles", []))
-            annotated_frame = draw_hud(annotated_frame, result)
+    try:
+        annotated_frame = draw_vehicle_overlays(img.copy(), result.get("vehicles", []))
+        annotated_frame = draw_hud(annotated_frame, result)
+        
+        # Store for stream fallback
+        _, buffer = cv2.imencode(".jpg", annotated_frame)
+        _last_injected_frame_bytes[camera_id] = buffer.tobytes()
+        
+        if density in ("High", "Critical"):
             os.makedirs("screenshots/traffic", exist_ok=True)
             rel_path = f"screenshots/traffic/alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
             screenshot_path = os.path.abspath(rel_path)
             cv2.imwrite(screenshot_path, annotated_frame)
-        except Exception as e:
-            logger.warning(f"Screenshot failed for image upload: {e}")
+    except Exception as e:
+        logger.warning(f"Screenshot/Injection failed for image upload: {e}")
 
     # Push as a live event so the SSE feed and dashboard pick it up
     push_traffic_event(camera_id, count, density, velocity, wait_time, risk_score, venue_id, screenshot_path)
@@ -1462,8 +1483,21 @@ async def stream_traffic_camera(camera_id: str):
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
         last_yielded = None
         while True:
-            worker = ORCHESTRATOR._workers.get(cam_uuid)
-            frame_bytes = getattr(worker, "_cached_frame_bytes", None) if worker else None
+            frame_bytes = None
+            
+            # 1. Prioritize injected frame
+            if camera_id and camera_id in _last_injected_frame_bytes:
+                frame_bytes = _last_injected_frame_bytes[camera_id]
+                
+            # 2. Check active workers
+            if not frame_bytes:
+                worker = ORCHESTRATOR._workers.get(cam_uuid)
+                frame_bytes = getattr(worker, "_cached_frame_bytes", None) if worker else None
+                
+            # 3. Fallback to upload-demo or first injected frame
+            if not frame_bytes and _last_injected_frame_bytes:
+                fallback_key = "upload-demo" if "upload-demo" in _last_injected_frame_bytes else list(_last_injected_frame_bytes.keys())[0]
+                frame_bytes = _last_injected_frame_bytes[fallback_key]
             
             if frame_bytes and frame_bytes != last_yielded:
                 yield boundary + frame_bytes + b"\r\n"

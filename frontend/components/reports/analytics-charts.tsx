@@ -296,7 +296,7 @@ export default function AnalyticsCharts({ venueId }: { venueId: string }) {
           </AnimatePresence>
 
           <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <AreaChart data={mergedRisk}>
                 <defs>
                   <linearGradient id="gRisk" x1="0" y1="0" x2="0" y2="1">
@@ -372,7 +372,7 @@ export default function AnalyticsCharts({ venueId }: { venueId: string }) {
             </AnimatePresence>
 
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <BarChart data={histData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                   <XAxis dataKey="time" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} minTickGap={30} />
@@ -442,7 +442,7 @@ export default function AnalyticsCharts({ venueId }: { venueId: string }) {
               )}
             </AnimatePresence>
             <div className="h-[230px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                 <LineChart data={histData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                   <XAxis dataKey="time" stroke="#475569" fontSize={9} tickLine={false} axisLine={false} minTickGap={30} />
@@ -527,7 +527,7 @@ export default function AnalyticsCharts({ venueId }: { venueId: string }) {
 
             <div className="h-[280px]">
               {escalationData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                   <BarChart data={escalationData}>
                     <defs>
                        <linearGradient id="gRose" x1="0" y1="0" x2="0" y2="1">

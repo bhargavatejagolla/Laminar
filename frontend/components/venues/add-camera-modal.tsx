@@ -25,6 +25,7 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
     name: "",
     stream_url: "0",
     stream_type: "device",
+    camera_type: "generic",
     fps: 15,
     resolution_width: 1920,
     resolution_height: 1080,
@@ -126,7 +127,7 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">{t("auto.StreamType_3011") || "Stream Type"}</label>
+              <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">{t("auto.StreamType_3011") || "Stream Protocol"}</label>
               <select 
                 value={formData.stream_type}
                 onChange={(e) => {
@@ -145,7 +146,22 @@ export default function AddCameraModal({ venueId, isOpen, onClose }: Props) {
                 <option value="http">{t("auto.HTTPVideo_6890") || "HTTP Video"}</option>
               </select>
             </div>
-            
+            <div className="space-y-1">
+              <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">Feature Category</label>
+              <select 
+                value={formData.camera_type || "generic"}
+                onChange={(e) => setFormData({ ...formData, camera_type: e.target.value })}
+                className="w-full bg-[#0b1325] border border-slate-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-500 appearance-none"
+              >
+                <option value="generic">Generic (All Modules)</option>
+                <option value="parking">Smart Parking</option>
+                <option value="traffic">Smart Traffic</option>
+                <option value="security">Security & Incidents</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1">
               <label className="text-xs uppercase tracking-widest text-slate-400 font-semibold">{t("auto.TargetFPS_4660") || "Target FPS"}</label>
               <input 

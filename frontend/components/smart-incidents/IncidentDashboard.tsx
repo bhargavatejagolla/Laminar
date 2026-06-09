@@ -57,7 +57,7 @@ function LiveTacticalCamera({
     const fetchCams = async () => {
       try {
         // Use auth-aware api service (attaches JWT automatically)
-        const res = await api.get(`/cameras?venue_id=${venueId}&stream_type=security`);
+        const res = await api.get(`/cameras?venue_id=${venueId}&camera_type=security`);
         const cams = res.data;
         if (cams && cams.length > 0) {
           setCamsList(cams);

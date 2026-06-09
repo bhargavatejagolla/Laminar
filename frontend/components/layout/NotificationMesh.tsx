@@ -47,6 +47,12 @@ export function NotificationMesh() {
         }
 
         const notification = data as MeshNotification;
+
+        try {
+          const audio = new Audio("/notfication-sound.wav");
+          audio.volume = 0.5;
+          audio.play().catch(() => {});
+        } catch (e) {}
         
         // Add to active alerts for the HUD
         setActiveAlerts(prev => [notification, ...prev].slice(0, 5));

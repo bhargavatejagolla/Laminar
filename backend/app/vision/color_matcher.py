@@ -121,7 +121,7 @@ def _colour_ratio(hsv_roi: np.ndarray, colour: str) -> float:
 
 
 def _inner_roi(hsv: np.ndarray,
-               x_margin: float = 0.15,
+               x_margin: float = 0.25,
                y_top: float = 0.05,
                y_bot: float = 0.95) -> np.ndarray:
     """Return the central region of an HSV crop (strips noisy edges)."""
@@ -159,6 +159,7 @@ def color_confidence(
     crop_bgr: np.ndarray,
     target_color: str,
     threshold_ratio: float = 0.12,
+    query_context: str = "",
 ) -> float:
     """
     Returns a confidence score [0.0 – 1.0] representing how strongly
@@ -167,10 +168,11 @@ def color_confidence(
     Strategy
     --------
     1. Split the crop into torso zone (top 60 %) and legs zone (bottom 40 %).
-    2. Strip 15 % horizontal margins from each zone to avoid wall bleed.
+    2. Strip 25 % horizontal margins from each zone to avoid wall bleed.
     3. Measure colour ratio in each zone.
-    4. Score = max(torso_ratio, legs_ratio) so either zone can anchor a match.
-       This handles "blue jeans + white shirt" → still a hit for 'blue'.
+    4. Smart Zone Weighting: If query contains "shirt", "jacket", etc., heavily weight torso.
+       If it contains "pants", "jeans", etc., heavily weight legs.
+       Otherwise, Score = max(torso_ratio, legs_ratio) so either zone can anchor a match.
     5. Normalise so that threshold_ratio maps to 0.5 confidence.
     """
     if target_color not in COLOR_RANGES or crop_bgr is None or crop_bgr.size == 0:
@@ -189,12 +191,22 @@ def color_confidence(
     torso_ratio = _colour_ratio(torso_roi, target_color)
     legs_ratio  = _colour_ratio(legs_roi,  target_color)
 
-    best = max(torso_ratio, legs_ratio)
+    # Smart zone NLP weighting
+    q = query_context.lower()
+    has_top = any(w in q for w in ["shirt", "top", "jacket", "hoodie", "sweater", "t-shirt", "coat"])
+    has_bot = any(w in q for w in ["pants", "jeans", "shorts", "shoes", "trousers", "bottom", "skirt"])
+
+    if has_top and not has_bot:
+        best = torso_ratio * 1.2 + legs_ratio * 0.2
+    elif has_bot and not has_top:
+        best = legs_ratio * 1.2 + torso_ratio * 0.2
+    else:
+        best = max(torso_ratio, legs_ratio)
 
     # Normalise: at threshold → 0.5 confidence, linear above/below
     if threshold_ratio <= 0:
         return float(best)
-    return min(1.0, best / (threshold_ratio * 2))
+    return min(1.0, float(best) / (threshold_ratio * 2))
 
 def extract_dominant_color(crop_bgr: np.ndarray) -> str:
     """

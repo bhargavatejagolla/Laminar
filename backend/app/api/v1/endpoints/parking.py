@@ -35,6 +35,22 @@ _last_alert_state = {}
 _last_injected_frame_bytes = {} # Fixes NameError in feed
 
 async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, tier_label):
+    # Fetch DB recipients first
+    db_recipients = []
+    try:
+        from app.core.database import db_manager
+        from app.models.user import User
+        async with db_manager.session() as session:
+            stmt = select(User.email, User.alert_email).where(
+                User.receive_email_alerts == True,
+                User.is_active == True
+            )
+            res = await session.execute(stmt)
+            for email, alert_email in res.all():
+                db_recipients.append(alert_email if alert_email else email)
+    except Exception as e:
+        logger.warning(f"Failed to fetch DB recipients for parking email: {e}")
+
     def _sync_send():
         try:
             msg = EmailMessage()
@@ -50,7 +66,9 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
             if tier_label in ["HIGH", "CRITICAL"] and settings.POLICE_EMAILS:
                 recipients.extend([e.strip() for e in settings.POLICE_EMAILS.split(",") if e.strip()])
             
+            recipients.extend(db_recipients)
             recipients = list(set(recipients))
+            
             if not recipients:
                 logger.warning("No recipients found for dedicated email.")
                 return
@@ -136,7 +154,7 @@ def _push_event(camera_id: str, event: dict):
             pass  # Slow consumer, drop
 
 
-def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue_id: Optional[str] = None, avg_velocity: float = 0.0, occupancy_pct: float = 0.0, capacity: int = 100, occupancy: int = 0, warn_thresh_override: int = None, crit_thresh_override: int = None, venue_name_override: str = None, lat_override: float = None, lng_override: float = None, force: bool = False):
+def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue_id: Optional[str] = None, avg_velocity: float = 0.0, occupancy_pct: float = 0.0, capacity: int = 100, occupancy: int = 0, warn_thresh_override: int = None, crit_thresh_override: int = None, venue_name_override: str = None, lat_override: float = None, lng_override: float = None, force: bool = False, screenshot_path: str = None):
     # ΓöÇΓöÇ Calculate Current Risk Context ΓöÇΓöÇ
     count = len(vehicles)
 
@@ -262,7 +280,7 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
         return
     _last_alert_state[camera_id] = risk_level
 
-    if risk_level != "low":
+    if risk_level != "low" or camera_id == "upload-demo" or force:
         insight = _generate_parking_insight(count, density, capacity)
         prediction = _generate_parking_prediction(density)
         recommendation = _generate_parking_recommendation(density)
@@ -304,14 +322,14 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
                         v_obj = res.scalar_one_or_none()
                         if v_obj: v_id = str(v_obj.id)
 
-                    if v_id:
+                    if True:
                         await notification_service.notify_realtime_event(
                             session=session,
                             domain="parking",
                             type=f"Parking {density} Alert",
                             priority=risk_level.upper(),
                             description=insight,
-                            venue_id=v_id,
+                            venue_id=v_id or "00000000-0000-0000-0000-000000000000",
                             venue_name="Parking Facility",
                             camera_id=camera_id,
                             metadata={
@@ -319,7 +337,10 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
                                 "occupancy_pct": round(calc_occ_pct, 1), 
                                 "insight": insight,
                                 "prediction": prediction,
-                                "recommendation": recommendation
+                                "recommendation": recommendation,
+                                "snapshot_path": screenshot_path if 'screenshot_path' in locals() else None,
+                                "coordinates": f"{lat}, {lng}",
+                                "camera_location": f"Camera ID: {camera_id}"
                             }
                         )
             except Exception as e:
@@ -597,6 +618,17 @@ async def upload_parking_source(
 
         _, buffer = cv2.imencode(".jpg", img)
         frame_bytes = buffer.tobytes()
+
+        screenshot_path = None
+        try:
+            rel_path = f"screenshots/parking/alert_{int(time.time())}.jpg"
+            import os
+            os.makedirs(os.path.dirname(rel_path), exist_ok=True)
+            screenshot_path = os.path.abspath(rel_path)
+            with open(screenshot_path, "wb") as f:
+                f.write(frame_bytes)
+        except Exception as e:
+            logger.warning(f"Screenshot failed: {e}")
         
         # ── 7. Global State Update ──
         from app.core.global_state import GLOBAL_STATE
@@ -953,7 +985,7 @@ async def stream_parking_camera(camera_id: str):
 # ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 @router.get("/feed")
-async def parking_video_feed():
+async def parking_video_feed(camera_id: Optional[str] = Query(None)):
     """Active visual stream relay for the global dashboard."""
     from app.vision.orchestrator import ORCHESTRATOR
     from app.vision.parking_worker import ParkingWorker
@@ -964,12 +996,19 @@ async def parking_video_feed():
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
         while True:
             frame_bytes = None
-            for w in ORCHESTRATOR._workers.values():
-                if isinstance(w, ParkingWorker):
-                    frame_bytes = getattr(w, "_cached_frame_bytes", None)
-                    break
             
-            # Fallback to general upload-demo or the first available injected cache item
+            # 1. Prioritize injected frame if explicitly requested via camera_id
+            if camera_id and camera_id in _last_injected_frame_bytes:
+                frame_bytes = _last_injected_frame_bytes[camera_id]
+                
+            # 2. Check active workers
+            if not frame_bytes:
+                for w in ORCHESTRATOR._workers.values():
+                    if isinstance(w, ParkingWorker):
+                        frame_bytes = getattr(w, "_cached_frame_bytes", None)
+                        break
+            
+            # 3. Fallback to general upload-demo or the first available injected cache item
             if not frame_bytes and _last_injected_frame_bytes:
                 fallback_key = "upload-demo" if "upload-demo" in _last_injected_frame_bytes else list(_last_injected_frame_bytes.keys())[0]
                 frame_bytes = _last_injected_frame_bytes[fallback_key]

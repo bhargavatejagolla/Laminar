@@ -1798,7 +1798,7 @@ export default function PersonWaitMonitoringPage() {
                      </div>
                      <div className="h-[450px] w-full">
                         {hourlyData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height="100%">
+                          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                              <AreaChart data={hourlyData}>
                                 <defs>
                                    <linearGradient id="dwellGrad" x1="0" y1="0" x2="0" y2="1">

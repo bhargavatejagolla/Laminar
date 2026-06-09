@@ -272,10 +272,11 @@ async def process_incident_video(
                             venue_id=str(venue_id) if venue_id else "00000000-0000-0000-0000-000000000001",
                             venue_name=venue_name,
                             metadata={
-                                "requires_police_only": True,
                                 "snapshot_path": snapshot_path,
                                 "latitude": lat,
                                 "longitude": lng,
+                                "coordinates": f"{lat}, {lng}",
+                                "camera_location": f"Camera ID: {camera_id}",
                                 "vehicle_count": vehicle_count,
                                 "insight": incident_payload.get("explanation"),
                                 "clip_path": file.filename

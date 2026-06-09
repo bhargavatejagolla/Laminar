@@ -132,7 +132,7 @@ const DotGrid = ({
 
         ctx.save();
         ctx.translate(dot.cx + dot.xOffset, dot.cy + dot.yOffset);
-        ctx.fillStyle = \gb(\, \, \)\;
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fill(circlePath);
         ctx.restore();
       }
@@ -209,7 +209,7 @@ const DotGrid = ({
   }, [maxSpeed, speedTrigger, proximity, resistance, returnDuration, shockRadius, shockStrength]);
 
   return (
-    <section className={\dot-grid \\} style={style}>
+    <section className={`dot-grid ${className}`} style={style}>
       <div ref={wrapperRef} className="dot-grid__wrap">
         <canvas ref={canvasRef} className="dot-grid__canvas" />
       </div>

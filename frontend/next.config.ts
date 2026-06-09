@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   reactStrictMode: false, // Disabled: Strict Mode double-mounts effects in dev, creating duplicate WS connections
   allowedDevOrigins: ["*.ngrok-free.app", "*.ngrok-free.dev", "*.ngrok.io"],
+  turbopack: {
+    root: path.join(__dirname, ".."),
+  },
   async rewrites() {
     return [
       {

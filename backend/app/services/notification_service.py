@@ -657,6 +657,18 @@ class NotificationService:
         }
         risk_level = risk_map.get(priority.upper(), "low")
 
+        # Always push to SSE mesh for the bell notification!
+        await self.push_notification(
+            type=type,
+            priority=priority,
+            description=description,
+            venue_id=venue_id,
+            venue_name=venue_name,
+            camera_id=camera_id,
+            domain=domain,
+            metadata=metadata
+        )
+
         # Get recipients
         role_recipients = await self._resolve_recipients(session, risk_level, metadata)
         if not role_recipients:

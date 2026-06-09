@@ -574,7 +574,7 @@ export default function SurgeMonitorPage() {
                     {/* Advanced Live Graphing Display */}
                     {history.length > 0 && displayAlerts.length === 0 && (
                         <div className="w-full h-48 border border-slate-800 rounded-3xl overflow-hidden glass-panel relative group shadow-[inset_0_0_20px_rgba(255,255,255,0.02)] mb-8">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <AreaChart data={history} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">

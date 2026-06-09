@@ -136,6 +136,14 @@ class Camera(BaseModel):
         nullable=False,
         index=True,
     )
+    
+    camera_type: Mapped[str] = mapped_column(
+        String(50),
+        default="generic",  # generic | parking | traffic | security
+        nullable=False,
+        index=True,
+    )
+    
     health_status:Mapped[str]=mapped_column(
         String(50),
         default="unknown",

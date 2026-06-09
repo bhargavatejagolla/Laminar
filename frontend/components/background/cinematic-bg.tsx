@@ -2,8 +2,6 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import Galaxy from "./Galaxy";
-
 /* ═══════════════════════════════════════════════════════════════
    LAYER 1: Galaxy WebGL star field — the true hero
 ═══════════════════════════════════════════════════════════════ */
@@ -13,24 +11,8 @@ function GalaxyLayer() {
       {/* Pure black base */}
       <div style={{ position: "absolute", inset: 0, background: "#000000" }} />
 
-      {/* Galaxy WebGL */}
+      {/* Galaxy WebGL Removed for Performance */}
       <div style={{ position: "absolute", inset: 0 }}>
-        <Galaxy
-          mouseRepulsion={true}
-          mouseInteraction={true}
-          density={1.2}
-          glowIntensity={0.5}
-          saturation={0}
-          hueShift={140}
-          twinkleIntensity={0.6}
-          rotationSpeed={0.05}
-          starSpeed={0.5}
-          speed={0.9}
-          repulsionStrength={0.8}
-          autoCenterRepulsion={0}
-          transparent={true}
-          style={{ width: "100%", height: "100%" }}
-        />
       </div>
 
       {/* Very subtle top fade so navbar glass reads clearly */}

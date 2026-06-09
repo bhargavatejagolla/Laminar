@@ -23,6 +23,8 @@ class CameraCreate(BaseModel):
         None, description="RTSP URL, device index, or file path")
     stream_type: str = Field(
         "rtsp", description="rtsp, http, device, file, edge, or browser")
+    camera_type: str = Field(
+        "generic", description="generic, parking, traffic, or security")
     username: Optional[str] = Field(
         None, description="Authentication username")
     password: Optional[str] = Field(
@@ -89,6 +91,13 @@ class CameraCreate(BaseModel):
             raise ValueError(f'Stream type must be one of: {valid_types}')
         return v
 
+    @validator('camera_type')
+    def validate_camera_type(cls, v):
+        valid_types = {'generic', 'parking', 'traffic', 'security'}
+        if v not in valid_types:
+            raise ValueError(f'Camera type must be one of: {valid_types}')
+        return v
+
 
 class CameraUpdate(BaseModel):
     """Schema for updating an existing camera."""
@@ -98,6 +107,7 @@ class CameraUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     stream_url: Optional[str] = Field(None, min_length=1, max_length=1000)
     stream_type: Optional[str] = Field(None)
+    camera_type: Optional[str] = Field(None)
     username: Optional[str] = Field(None, min_length=1, max_length=255)
     password: Optional[str] = Field(None, min_length=1, max_length=255)
     location_description: Optional[str] = Field(None, max_length=500)
@@ -113,6 +123,15 @@ class CameraUpdate(BaseModel):
     static_mode_enabled: Optional[bool] = None
     static_image_url: Optional[str] = None
 
+    @validator('camera_type')
+    def validate_camera_type_update(cls, v):
+        if v is None:
+            return v
+        valid_types = {'generic', 'parking', 'traffic', 'security'}
+        if v not in valid_types:
+            raise ValueError(f'Camera type must be one of: {valid_types}')
+        return v
+
 
 class CameraResponse(BaseModel):
     """Schema for camera response data."""
@@ -125,6 +144,7 @@ class CameraResponse(BaseModel):
     name: str
     stream_url: Optional[str]
     stream_type: str
+    camera_type: str
     location_description: Optional[str]
     resolution_width: Optional[int]
     resolution_height: Optional[int]
@@ -153,6 +173,7 @@ class CameraListResponse(BaseModel):
     is_active: bool
     is_online: bool
     stream_type: str
+    camera_type: str
     last_heartbeat_at: Optional[datetime]
 
     model_config = ConfigDict(

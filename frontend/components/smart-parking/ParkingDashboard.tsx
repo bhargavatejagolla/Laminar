@@ -77,7 +77,7 @@ export function ParkingDashboard() {
   useEffect(() => {
     if (!venueId) return;
     let mounted = true;
-    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&stream_type=parking` : "/cameras?stream_type=parking")
+    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&camera_type=parking` : "/cameras?camera_type=parking")
       .then((r) => {
         if (!mounted) return;
         const cams = Array.isArray(r.data) ? r.data : [];

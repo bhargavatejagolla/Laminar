@@ -265,7 +265,7 @@ export function TrafficDashboard() {
 
   useEffect(() => {
     let mounted = true;
-    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&stream_type=traffic` : "/cameras?stream_type=traffic")
+    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&camera_type=traffic` : "/cameras?camera_type=traffic")
       .then((r) => {
         if (!mounted) return;
         const cams = Array.isArray(r.data) ? r.data : [];
@@ -304,7 +304,7 @@ export function TrafficDashboard() {
 
     const uploadVideo = async (file: File) => {
       setUploadedVideoUrl(URL.createObjectURL(file));
-      const progTimer = setInterval(() => setUploadProgress((p) => p < 90 ? p + 5 : p), 500);
+      const progTimer = setInterval(() => setUploadProgress((p) => p < 99 ? p + Math.max(1, (99 - p) * 0.1) : p), 500);
       const fd = new FormData();
       fd.append("file", file);
 

@@ -104,6 +104,7 @@ class SearchResult(BaseModel):
     image_url: Optional[str] = None
     confidence: float
     bbox: Optional[List[float]] = None
+    distance: float = 0.0
 
 # ──────────────────────────────────────────────────────────────
 # Helpers
@@ -138,7 +139,7 @@ def _extract_coco_classes(query: str) -> List[int]:
 # Core Surgical Worker (v7 Parallel)
 # ──────────────────────────────────────────────────────────────
 
-async def _yolo_surgical_task(path: str, color: Optional[str], classes: List[int], primary_label: str):
+async def _yolo_surgical_task(path: str, color: Optional[str], classes: List[int], primary_label: str, query: str = ""):
     """
     Individual async worker for v7 parallel engine.
     """
@@ -164,6 +165,10 @@ async def _yolo_surgical_task(path: str, color: Optional[str], classes: List[int
             best_conf = 0.0
 
             for detection in res.bounding_boxes:
+                # Require a minimum baseline YOLO confidence to filter out noise
+                if detection["confidence"] < 0.40:
+                    continue
+                    
                 x1, y1, x2, y2 = detection["bbox"]
                 
                 if color:
@@ -172,7 +177,7 @@ async def _yolo_surgical_task(path: str, color: Optional[str], classes: List[int
                     crop = frame[cy1:cy2, cx1:cx2]
                     if crop.size == 0: continue
                     
-                    c_conf = color_confidence(crop, color)
+                    c_conf = color_confidence(crop, color, query_context=query)
                     # v8.1 Surgical Absolute: 25% YOLO / 75% Color bias (High Accuracy Mode)
                     total_conf = (detection["confidence"] * 0.25) + (c_conf * 0.75)
                     
@@ -242,6 +247,10 @@ async def _faiss_search(query: str, top_k: int) -> List[SearchResult]:
     except Exception: return []
 
 async def _enrich(hits: List[dict]) -> None:
+    # Set a fallback description immediately so Pydantic validation never fails
+    for h in hits:
+        h["description"] = f"CRITICAL HIT! {h.get('_label', 'Object')} detected ({h.get('confidence', 0):.0f}% AI confidence)"
+
     try:
         cam_ids = {h["camera_id"] for h in hits if h["camera_id"] != "unknown"}
         venue_map: dict[str, str] = {}
@@ -274,7 +283,7 @@ async def _surgical_pipeline(query: str, color: Optional[str], top_k: int) -> Li
 
     logger.info(f"v7 Machine Start: {len(candidates)} surgical threads | Query: {query}")
 
-    tasks = [_yolo_surgical_task(f, color, classes, primary_label) for f in candidates]
+    tasks = [_yolo_surgical_task(f, color, classes, primary_label, query) for f in candidates]
     # v8: Safety guard for parallel execution
     try:
         results = await asyncio.gather(*tasks, return_exceptions=True)

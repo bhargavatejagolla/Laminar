@@ -23,6 +23,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
     name: "",
     stream_url: "",
     stream_type: "",
+    camera_type: "generic",
     fps: 15,
     resolution_width: 1920,
     resolution_height: 1080,
@@ -39,6 +40,7 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
         name: camera.name || "",
         stream_url: (camera as any).stream_url || "",
         stream_type: camera.stream_type || "device",
+        camera_type: (camera as any).camera_type || "generic",
         fps: camera.fps || 15,
         resolution_width: (camera as any).resolution_width || 1920,
         resolution_height: (camera as any).resolution_height || 1080,
@@ -139,6 +141,20 @@ export default function EditCameraModal({ camera, isOpen, onClose }: Props) {
                 <option value="device">Internal Node (Webcam)</option>
                 <option value="rtsp">Network Stream (RTSP)</option>
                 <option value="http">Hypertext (HTTP/MJPEG)</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-[0.2em] text-cyan-400/70 font-black">Feature Category</label>
+              <select 
+                value={formData.camera_type || "generic"}
+                onChange={(e) => setFormData({ ...formData, camera_type: e.target.value })}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500/50 transition-all appearance-none font-mono"
+              >
+                <option value="generic">Generic (All Modules)</option>
+                <option value="parking">Smart Parking</option>
+                <option value="traffic">Smart Traffic</option>
+                <option value="security">Security & Incidents</option>
               </select>
             </div>
             

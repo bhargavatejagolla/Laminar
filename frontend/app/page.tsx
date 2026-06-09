@@ -14,7 +14,7 @@ import {
   UseCasesSection, TestimonialsSection, PricingSection, FAQSection, FinalCTA,
   Reveal, SectionLabel, LiveCounter,
 } from "@/components/landing/sections";
-import { CinematicBackground } from "@/components/background/cinematic-bg";
+
 import Orb from "@/components/ui/Orb";
 import BlurText from "@/components/ui/BlurText";
 import GooeyNav from "@/components/ui/GooeyNav";
@@ -418,53 +418,6 @@ function Navbar({ router, mounted }: { router: ReturnType<typeof useRouter>; mou
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   BG CONTROL WIDGET — floating premium toggle
-   ══════════════════════════════════════════════════════ */
-function BGControlWidget({ mode, setMode }: { mode: 'galaxy' | 'hyperspeed', setMode: (m: 'galaxy' | 'hyperspeed') => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      style={{
-        position: "fixed", bottom: 20, left: "50%", x: "-50%", // Center on mobile
-        zIndex: 100,
-        background: "rgba(1,4,16,0.85)",
-        borderRadius: 999,
-        padding: "4px",
-        border: "1px solid rgba(255,255,255,0.08)",
-        display: "flex", gap: 4,
-        backdropFilter: "blur(16px)",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.6)",
-      }}
-      className="md:left-8 md:translate-x-0 bottom-6 left-1/2 -translate-x-1/2"
-    >
-      {(['galaxy', 'hyperspeed'] as const).map((m) => (
-        <motion.button
-          key={m}
-          onClick={() => setMode(m)}
-          style={{
-            padding: "8px 24px",
-            borderRadius: 999,
-            border: "none",
-            background: mode === m ? "#22d3ee" : "transparent",
-            color: mode === m ? "#000" : "#64748b",
-            fontSize: "0.58rem",
-            fontWeight: 800,
-            textTransform: "uppercase",
-            letterSpacing: "0.15em",
-            cursor: "pointer",
-            transition: "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-            boxShadow: mode === m ? "0 0 20px rgba(34,211,238,0.3)" : "none"
-          }}
-        >
-          {m}
-        </motion.button>
-      ))}
-    </motion.div>
-  );
-}
-
 
 
 /* ══════════════════════════════════════════════════════
@@ -655,7 +608,6 @@ export default function LandingPage() {
 
   const { t } = useTranslation();
   const router = useRouter();
-  const [bgMode, setBgMode] = useState<'galaxy' | 'hyperspeed'>('hyperspeed');
   const { scrollY } = useScroll();
   const heroParallax = useTransform(scrollY, [0, 600], [0, -80]);
 
@@ -713,27 +665,15 @@ export default function LandingPage() {
 
 
       {/* ── Cinematic background system ── */}
-      <AnimatePresence mode="wait">
-        {bgMode === 'galaxy' ? (
-          <motion.div key="galaxy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "fixed", inset: 0, zIndex: 0, transform: "translateZ(0)", willChange: "transform", pointerEvents: "none" }}>
-            <CinematicBackground />
-          </motion.div>
-        ) : (
-          <motion.div key="hyperspeed" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: "fixed", inset: 0, zIndex: 0, transform: "translateZ(0)", willChange: "transform" }}>
-            <Hyperspeed effectOptions={hyperspeedOptions} />
-          </motion.div>
-        )}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, transform: "translateZ(0)", willChange: "transform" }}>
+        <Hyperspeed effectOptions={hyperspeedOptions} />
+      </div>
 
-
-
-      </AnimatePresence>
-
-      <Reflections mode={bgMode} />
+      <Reflections mode="hyperspeed" />
 
       {/* ── Page content ── */}
       <div style={{ position: "relative", zIndex: 10 }}>
         <Navbar router={router} mounted={mounted} />
-        <BGControlWidget mode={bgMode} setMode={setBgMode} />
 
 
         {/* ═══════ HERO SECTION ═══════ */}
@@ -879,7 +819,6 @@ export default function LandingPage() {
           onLogin={() => router.push("/login")}
         />
         <Footer />
-        <BGControlWidget mode={bgMode} setMode={setBgMode} />
       </div>
 
     </div>

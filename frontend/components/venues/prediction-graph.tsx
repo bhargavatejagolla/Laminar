@@ -163,7 +163,7 @@ export default function PredictionGraph({ venueId }: Props) {
       <div>
         <p className="text-xs text-slate-500 font-medium mb-2 uppercase tracking-wider">{t("auto.RiskScoreOverTi_3290") || "Risk Score Over Time"}</p>
         <div className="h-[180px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
             <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="histGrad" x1="0" y1="0" x2="0" y2="1">
@@ -245,7 +245,7 @@ export default function PredictionGraph({ venueId }: Props) {
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Escalation Probability (Next {data?.meta?.horizon_minutes ?? 15} min)</p>
           </div>
           <div className="h-[120px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <ComposedChart data={escalationData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="escalGrad" x1="0" y1="0" x2="0" y2="1">
