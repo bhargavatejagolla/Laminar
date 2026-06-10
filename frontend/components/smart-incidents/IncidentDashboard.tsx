@@ -43,9 +43,11 @@ import { useTranslation } from "react-i18next";
 function LiveTacticalCamera({
   venueId,
   initialCamId,
+  onCameraChange,
 }: {
   venueId: string | null;
   initialCamId?: string | null;
+  onCameraChange?: (cam: any) => void;
 }) {
   const { t } = useTranslation();
 
@@ -56,11 +58,18 @@ function LiveTacticalCamera({
     if (!venueId) return;
     const fetchCams = async () => {
       try {
-        // Use auth-aware api service (attaches JWT automatically)
-        const res = await api.get(`/cameras?venue_id=${venueId}&camera_type=security`);
-        const cams = res.data;
-        if (cams && cams.length > 0) {
-          setCamsList(cams);
+        const res = await api.get("/cameras");
+        const allCams = Array.isArray(res.data) ? res.data : [];
+        const relevantCams = allCams.filter((c: any) => ['security', 'generic'].includes(c.camera_type));
+        let cams = relevantCams.filter((c: any) => !venueId || c.venue_id === venueId);
+        
+        // If current venue has no relevant cameras, fallback to all relevant cameras
+        if (cams.length === 0 && relevantCams.length > 0) {
+            cams = relevantCams;
+        }
+
+        setCamsList(cams);
+        if (cams.length > 0 && !activeCam) {
           const selected = initialCamId
             ? cams.find((c: any) => c.id === initialCamId) || cams[0]
             : cams[0];
@@ -112,11 +121,17 @@ function LiveTacticalCamera({
 
         <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
           <div className="space-y-1">
-            <div className="relative inline-block mb-1">
+            <div className="relative inline-block mb-1 pointer-events-auto">
               <select
                 value={activeCam.id}
-                onChange={(e) => setActiveCam(camsList.find(c => c.id === e.target.value))}
-                className="appearance-none bg-black/80 backdrop-blur-md border border-white/10 hover:border-rose-500/50 text-[10px] text-white font-black uppercase tracking-widest shadow-black drop-shadow-md rounded-lg pl-2.5 pr-7 py-1.5 cursor-pointer focus:outline-none transition-colors"
+                onChange={(e) => {
+                  const selected = camsList.find(c => c.id === e.target.value);
+                  setActiveCam(selected);
+                  if (selected && onCameraChange) {
+                    onCameraChange(selected);
+                  }
+                }}
+                className="appearance-none pointer-events-auto bg-black/80 backdrop-blur-md border border-white/10 hover:border-rose-500/50 text-[10px] text-white font-black uppercase tracking-widest shadow-black drop-shadow-md rounded-lg pl-2.5 pr-7 py-1.5 cursor-pointer focus:outline-none transition-colors"
               >
                 {camsList.map((c: any) => (
                   <option key={c.id} value={c.id} className="bg-[#0a0a0f] text-white">
@@ -548,7 +563,16 @@ export function IncidentDashboard() {
         {/* COL 1: Live Feed & Analysis (4) */}
         <div className="lg:col-span-12 xl:col-span-4 space-y-6">
           <div className="bg-[#0a0a0f] border border-white/5 rounded-2xl overflow-hidden p-1 shadow-2xl">
-            <LiveTacticalCamera venueId={venueId} initialCamId={urlCamId} />
+            <LiveTacticalCamera 
+              venueId={venueId} 
+              initialCamId={urlCamId} 
+              onCameraChange={(cam) => {
+                if (cam && cam.venue_id && cam.venue_id !== venueId) {
+                  setVenueId(cam.venue_id);
+                  setVenue(cam.venue_id);
+                }
+              }}
+            />
           </div>
 
           <div className="bg-[#0a0a0f] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">

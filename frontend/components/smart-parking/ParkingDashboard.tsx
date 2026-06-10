@@ -75,20 +75,31 @@ export function ParkingDashboard() {
   }, [venueId, setVenue]);
 
   useEffect(() => {
-    if (!venueId) return;
     let mounted = true;
-    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&camera_type=parking` : "/cameras?camera_type=parking")
+    api.get("/cameras")
       .then((r) => {
         if (!mounted) return;
-        const cams = Array.isArray(r.data) ? r.data : [];
+        const allCams = Array.isArray(r.data) ? r.data : [];
+        const relevantCams = allCams.filter((c: any) => ['parking', 'generic'].includes(c.camera_type));
+        let cams = relevantCams.filter((c: any) => !venueId || c.venue_id === venueId);
+        
+        // If current venue has no relevant cameras, fallback to all relevant cameras
+        if (cams.length === 0 && relevantCams.length > 0) {
+            cams = relevantCams;
+        }
+
         setCameras(cams);
         if(cams.length > 0 && !activeCameraId) {
             const selected = urlCamId ? cams.find((c: any) => c.id === urlCamId) || cams[0] : cams[0];
             setActiveCameraId(selected.id);
+            if (selected.venue_id && selected.venue_id !== venueId) {
+              setVenueId(selected.venue_id);
+              setVenue(selected.venue_id);
+            }
         }
     }).catch(console.error);
     return () => { mounted = false; };
-  }, [venueId, urlCamId, activeCameraId]);
+  }, [urlCamId, activeCameraId, venueId]);
 
   // ── PDF Export ──
   const handleExportPDF = useCallback(async () => {
@@ -122,18 +133,35 @@ export function ParkingDashboard() {
     const uploadFile = async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`/api/v1/parking/upload?camera_id=${activeCameraId || 'upload-demo'}${venueId ? `&venue_id=${venueId}` : ""}`, {
+      const uploadCamId = activeCameraId || 'upload-demo';
+      const uploadVenueId = venueId;
+      const res = await fetch(`/api/v1/parking/upload?camera_id=${uploadCamId}${uploadVenueId ? `&venue_id=${uploadVenueId}` : ""}`, {
         method: "POST",
         body: formData,
       });
       const result = await res.json();
       if (result.status === "success" || result.success) {
         setFeedTimestamp(Date.now());
-        // Fetch full insights to populate UI properly instead of using raw upload response
+        // Use result for immediate local insight reflection to avoid racing with insights API
+        setAnalysisData({
+          overall: {
+            status: result.occupancy >= (result.total_slots || 100) * 0.9 ? "CRITICAL" : "NORMAL",
+            occupancy_pct: result.occupancy ? Math.round((result.occupancy / (result.total_slots || 100)) * 100) : 0,
+            total_slots: result.total_slots || 100,
+            total_available: (result.total_slots || 100) - (result.occupancy || 0),
+            suggestion: "Tactical analysis complete",
+            prediction: "Monitoring feed"
+          },
+          zones: result.slot_states || {}
+        });
+        
         try {
           const insightRes = await fetch('/api/v1/parking/insights');
           const insightData = await insightRes.json();
-          setAnalysisData(insightData);
+          // We can merge or override with global insights if we want, but local result is best
+          if(insightData && insightData.overall) {
+            setAnalysisData(prev => ({...prev, ...insightData, overall: {...insightData.overall, ...prev?.overall}}));
+          }
         } catch (e) {
           console.error("Failed to fetch updated insights", e);
         }
@@ -233,25 +261,33 @@ export function ParkingDashboard() {
                 LIVE_SPATIAL_FEED
               </div>
               
-              {cameras.length > 0 && (
-                <div className="flex gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/10 rounded-xl relative">
-                  <select
-                    value={activeCameraId || ""}
-                    onChange={(e) => setActiveCameraId(e.target.value)}
-                    className="appearance-none bg-transparent outline-none text-[9px] font-black tracking-widest uppercase text-white px-3 py-1.5 cursor-pointer pr-8"
-                  >
-                    <option value="" disabled className="bg-black text-slate-500">{t("auto.SELECTNODE_7034") || "SELECT NODE"}</option>
-                    {cameras.map((c, i) => (
-                      <option key={c.id} value={c.id} className="bg-black text-white">
-                        {c.name || `NODE ${i + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                  </div>
+              <div className="flex gap-1 p-1 bg-black/50 backdrop-blur-xl border border-white/10 rounded-xl relative">
+                <select
+                  value={activeCameraId || ""}
+                  onChange={(e) => {
+                    const newCamId = e.target.value;
+                    setActiveCameraId(newCamId);
+                    const selected = cameras.find(c => c.id === newCamId);
+                    if (selected && selected.venue_id && selected.venue_id !== venueId) {
+                      setVenueId(selected.venue_id);
+                      setVenue(selected.venue_id);
+                    }
+                  }}
+                  className="appearance-none bg-transparent outline-none text-[9px] font-black tracking-widest uppercase text-white px-3 py-1.5 cursor-pointer pr-8"
+                >
+                  <option value="" disabled className="bg-black text-slate-500">
+                    {cameras.length === 0 ? "NO PARKING CAMERAS FOUND" : (t("auto.SELECTNODE_7034") || "SELECT NODE")}
+                  </option>
+                  {cameras.map((c, i) => (
+                    <option key={c.id} value={c.id} className="bg-black text-white">
+                      {c.name || `NODE ${i + 1}`}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="absolute top-4 right-4 z-20 flex gap-2">
@@ -275,11 +311,11 @@ export function ParkingDashboard() {
 
             <div className="w-full h-full bg-[url('/grid.svg')] bg-center relative flex items-center justify-center">
               <img
-                src={isAnalysisMode ? `/api/v1/parking/feed?t=${feedTimestamp}&camera_id=${activeCameraId || 'upload-demo'}` : (activeCameraId ? `/api/v1/parking/stream/${activeCameraId}?t=${feedTimestamp}` : `/api/v1/parking/feed?t=${feedTimestamp}`)}
+                src={`/api/v1/parking/stream/${activeCameraId || 'upload-demo'}?t=${feedTimestamp}`}
                 alt="Tactical Feed"
-                className={`max-w-full max-h-full object-contain transition-opacity duration-500 ${isAnalysisMode ? 'opacity-100' : 'opacity-80 mix-blend-screen'}`}
+                className={`max-w-full max-h-full object-contain transition-opacity duration-500 opacity-100`}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = `/api/v1/parking/feed?t=${feedTimestamp}`;
+                  (e.target as HTMLImageElement).src = `/api/v1/parking/stream/${activeCameraId || 'upload-demo'}?t=${feedTimestamp}&fallback=true`;
                 }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a10] via-transparent to-transparent pointer-events-none" />

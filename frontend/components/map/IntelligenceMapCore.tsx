@@ -385,6 +385,43 @@ export default function IntelligenceMapCore({ venues = [] }: IntelligenceMapCore
           if (densityPct > 0.85 || v.current_risk >= 75) suggestedAction = "→ Deploy rapid response teams";
           else if (densityPct > 0.6 || v.current_risk >= 50) suggestedAction = "→ Redirect flow & Open auxiliary exits";
 
+          const vType = (v.type || "crowd").toLowerCase();
+          
+          let metrics = {
+            label1: t("auto.CrowdDensity_9092") || "Crowd Density", val1: densityLabel, class1: densityPct > 0.8 ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : densityPct > 0.5 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'text-emerald-400',
+            label2: t("auto.VolumeCount_7") || "Volume Count", val2: (
+              <>
+                {Math.round(current)} <span className="text-[9px] text-slate-500 font-normal">/ {capacity}</span>
+              </>
+            ), class2: "text-white",
+            label3: t("auto.PredictedCong_8759") || "Predicted Cong.", val3: `~${predictedMins} mins`, class3: "text-orange-400",
+            label4: t("auto.ActivitySpike_6078") || "Activity Spike", val4: `Noise ${noiseSpike}`, class4: "text-fuchsia-400",
+          };
+
+          if (vType === 'traffic') {
+            metrics = {
+              label1: "Traffic Density", val1: densityLabel, class1: densityPct > 0.8 ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : densityPct > 0.5 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'text-emerald-400',
+              label2: "Vehicle Count", val2: (
+                <>
+                  {Math.round(current)} <span className="text-[9px] text-slate-500 font-normal">/ {capacity}</span>
+                </>
+              ), class2: "text-white",
+              label3: "Flow Rate", val3: `${Math.round(v.avg_velocity || 0)} px/s`, class3: "text-cyan-400",
+              label4: "Expected Delay", val4: `~${predictedMins} mins`, class4: "text-orange-400",
+            };
+          } else if (vType === 'parking') {
+            metrics = {
+              label1: "Parking Occupancy", val1: densityLabel, class1: densityPct > 0.8 ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : densityPct > 0.5 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'text-emerald-400',
+              label2: "Vehicles Parked", val2: (
+                <>
+                  {Math.round(current)} <span className="text-[9px] text-slate-500 font-normal">/ {capacity}</span>
+                </>
+              ), class2: "text-white",
+              label3: "Available Slots", val3: `${Math.max(0, capacity - Math.round(current))}`, class3: "text-emerald-400",
+              label4: "Turnover Rate", val4: "High", class4: "text-cyan-400",
+            };
+          }
+
           return (
             <Marker
               key={v.id}
@@ -417,20 +454,20 @@ export default function IntelligenceMapCore({ venues = [] }: IntelligenceMapCore
 
                     <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1 bg-black/40 rounded-lg p-2 border border-white/5">
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.CrowdDensity_9092") || "Crowd Density"}</span>
-                        <span className={`text-[10px] font-mono font-black tracking-wider ${densityPct > 0.8 ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]' : densityPct > 0.5 ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : 'text-emerald-400'}`}>{densityLabel}</span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{metrics.label1}</span>
+                        <span className={`text-[10px] font-mono font-black tracking-wider ${metrics.class1}`}>{metrics.val1}</span>
                       </div>
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.VolumeCount_7") || "Volume Count"}</span>
-                        <span className="text-[10px] font-mono font-bold text-white">{Math.round(current)} <span className="text-[9px] text-slate-500 font-normal">/ {capacity}</span></span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{metrics.label2}</span>
+                        <span className={`text-[10px] font-mono font-bold ${metrics.class2}`}>{metrics.val2}</span>
                       </div>
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.PredictedCong_8759") || "Predicted Cong."}</span>
-                        <span className="text-[10px] font-mono font-bold text-orange-400">~{predictedMins} mins</span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{metrics.label3}</span>
+                        <span className={`text-[10px] font-mono font-bold ${metrics.class3}`}>{metrics.val3}</span>
                       </div>
                       <div>
-                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{t("auto.ActivitySpike_6078") || "Activity Spike"}</span>
-                        <span className="text-[10px] font-mono font-bold text-fuchsia-400">Noise {noiseSpike}</span>
+                        <span className="text-[8px] uppercase tracking-widest text-slate-500 font-bold block mb-0.5">{metrics.label4}</span>
+                        <span className={`text-[10px] font-mono font-bold ${metrics.class4}`}>{metrics.val4}</span>
                       </div>
                     </div>
 

@@ -129,16 +129,16 @@ export default function Sidebar() {
 
       <aside className={`
         fixed lg:relative inset-y-0 left-0 z-30 w-64 h-screen
-        bg-[#000000]
-        border-r border-white/5
+        bg-[#020617]/30 backdrop-blur-[40px]
+        border-r border-white/[0.08] shadow-[4px_0_40px_rgba(0,0,0,0.5)]
         transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
         flex flex-col shrink-0 overflow-hidden
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:hidden"}
       `}>
 
         {/* ── Brand Header ─────────────────────────── */}
-        <div className="h-20 flex items-center justify-between px-6 border-b border-white/5 shrink-0 relative overflow-hidden bg-[rgba(10,10,15,0.4)] backdrop-blur-3xl">
-          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+        <div className="h-20 flex items-center justify-between px-6 border-b border-white/[0.08] shrink-0 relative overflow-hidden bg-white/[0.02] backdrop-blur-2xl">
+          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent"></div>
 
           <div className="flex items-center gap-4 z-10 w-full">
             <div className="relative flex items-center justify-center">
@@ -186,8 +186,8 @@ export default function Sidebar() {
                       className={`
                         group flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 relative overflow-hidden
                         ${isActive
-                          ? "bg-cyan-950/30 text-cyan-300 border border-cyan-500/30 shadow-[inset_0_0_20px_rgba(34,211,238,0.1)]"
-                          : "text-slate-400 hover:bg-white/5 hover:text-white border border-transparent"
+                          ? "bg-cyan-950/40 text-cyan-300 border border-cyan-400/30 shadow-[0_0_20px_rgba(34,211,238,0.15)] backdrop-blur-md"
+                          : "text-slate-400 hover:bg-white/[0.08] hover:text-white border border-white/0 hover:border-white/10 hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)] backdrop-blur-sm"
                         }
                       `}
                     >
@@ -223,9 +223,9 @@ export default function Sidebar() {
         </nav>
 
         {/* ── Status Footer ─────────────────────────── */}
-        <div className="p-5 border-t border-white/5 shrink-0 bg-[rgba(10,10,15,0.6)] backdrop-blur-xl relative">
-          <div className="rounded-xl border border-white/5 bg-[#000000] px-4 py-3.5 overflow-hidden relative shadow-inner">
-            <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent scan-line opacity-50" />
+        <div className="p-5 border-t border-white/[0.08] shrink-0 bg-white/[0.02] backdrop-blur-[30px] relative">
+          <div className="rounded-xl border border-white/[0.08] bg-[#000000]/40 px-4 py-3.5 overflow-hidden relative shadow-[inset_0_0_20px_rgba(255,255,255,0.02)] backdrop-blur-md">
+            <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent scan-line opacity-50" />
 
             <div className="flex items-center justify-between relative z-10">
               <div>

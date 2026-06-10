@@ -120,6 +120,9 @@ async def _enrich_traffic_insight(
     rule_insight: str, rule_recommendation: str,
 ) -> tuple[str, str]:
     """Returns rich rule-based insight/recommendation, ignoring Groq entirely."""
+    if rule_insight and "Video analysis of" in rule_insight:
+        return rule_insight, rule_recommendation
+        
     insight, recommendation = _build_rich_insight(
         venue_name, count, density, velocity, wait_time, risk_score, tier_label
     )
@@ -791,6 +794,7 @@ async def upload_traffic_video(
                     if not v_obj:
                         stmt = select(VenueModel).limit(1)
                         res = await sess.execute(stmt)
+                        v_obj = res.scalar_one_or_none()
                     if not v_obj:
                         from app.models.venue import Venue as VenueModel
                         v_obj = VenueModel(id="00000000-0000-0000-0000-000000000000", name="Upload Analysis")
@@ -1415,24 +1419,26 @@ async def download_traffic_report(camera_id: Optional[str] = None):
         pdf.set_text_color(140, 140, 140)
         pdf.cell(0, 8, "No detection events recorded yet. Awaiting live camera data.", ln=True)
 
-    # ── Section 9: Latest Alert Evidence ──────────────────────────────────
+    # ── Section 9: Recent Alert Evidence ──────────────────────────────────
     import glob
-    latest_screenshot = None
     try:
         screenshots = glob.glob(os.path.abspath("screenshots/traffic/*.jpg"))
         if screenshots:
-            latest_screenshot = max(screenshots, key=os.path.getctime)
+            screenshots.sort(key=os.path.getctime, reverse=True)
+            pdf.add_page()
+            pdf.section_title("9. RECENT ALERT EVIDENCE (SCREENSHOTS)", color=(180, 0, 0))
+            
+            for scr in screenshots[:5]:  # Top 5 most recent
+                if os.path.exists(scr):
+                    if pdf.get_y() > 180:
+                        pdf.add_page()
+                    try:
+                        pdf.image(scr, x=15, y=pdf.get_y() + 5, w=160)
+                        pdf.ln(100)
+                    except Exception as e:
+                        logger.error(f"Failed to embed screenshot in PDF: {e}")
     except Exception:
         pass
-
-    if latest_screenshot and os.path.exists(latest_screenshot):
-        pdf.add_page()
-        pdf.section_title("9. LATEST ALERT EVIDENCE (SCREENSHOT)", color=(180, 0, 0))
-        try:
-            pdf.image(latest_screenshot, x=15, y=pdf.get_y() + 5, w=180)
-            pdf.ln(120)
-        except Exception as e:
-            logger.error(f"Failed to embed screenshot in PDF: {e}")
 
     # ── Footer note ────────────────────────────────────────────────────────
     pdf.ln(6)

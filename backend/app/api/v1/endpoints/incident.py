@@ -542,6 +542,25 @@ async def download_incident_report():
                 pdf.set_text_color(100, 100, 100)
                 pdf.cell(0, 5, f"  Dispatch Status: {disp}", ln=True)
 
+                b64_frame = inc.get("annotated_frame")
+                if b64_frame:
+                    try:
+                        import tempfile, base64, os
+                        fd, tmp_img_path = tempfile.mkstemp(suffix=".jpg")
+                        with os.fdopen(fd, "wb") as f:
+                            f.write(base64.b64decode(b64_frame))
+                        
+                        # Check if we need to add a page (prevent image cutoff)
+                        if pdf.get_y() > 200:
+                            pdf.add_page()
+                            
+                        pdf.ln(2)
+                        pdf.image(tmp_img_path, x=15, w=100)
+                        pdf.ln(5)
+                        os.remove(tmp_img_path)
+                    except Exception as img_e:
+                        logger.error(f"Could not embed incident screenshot: {img_e}")
+
                 pdf.set_draw_color(220, 210, 210)
                 pdf.line(10, pdf.get_y() + 1, 200, pdf.get_y() + 1)
                 pdf.ln(4)

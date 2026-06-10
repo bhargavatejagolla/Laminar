@@ -265,17 +265,27 @@ export function TrafficDashboard() {
 
   useEffect(() => {
     let mounted = true;
-    api.get(activeVenueId ? `/cameras?venue_id=${activeVenueId}&camera_type=traffic` : "/cameras?camera_type=traffic")
+    api.get("/cameras")
       .then((r) => {
         if (!mounted) return;
-        const cams = Array.isArray(r.data) ? r.data : [];
-        setCameras(cams);
-        if (cams.length > 0 && !activeCameraId) {
-          const selected = urlCamId ? cams.find((c: any) => c.id === urlCamId) || cams[0] : cams[0];
-          setActiveCameraId(selected.id);
+        const allCams = Array.isArray(r.data) ? r.data : [];
+        const relevantCams = allCams.filter((c: any) => ['traffic', 'generic'].includes(c.camera_type));
+        let cams = relevantCams.filter((c: any) => !activeVenueId || c.venue_id === activeVenueId);
+        
+        // If current venue has no relevant cameras, fallback to all relevant cameras
+        if (cams.length === 0 && relevantCams.length > 0) {
+            cams = relevantCams;
         }
-      })
-      .catch(() => { });
+
+        setCameras(cams);
+        if(cams.length > 0 && !activeCameraId) {
+            const selected = urlCamId ? cams.find((c: any) => c.id === urlCamId) || cams[0] : cams[0];
+            setActiveCameraId(selected.id);
+            if (selected.venue_id && selected.venue_id !== activeVenueId) {
+              setVenue(selected.venue_id);
+            }
+        }
+    }).catch(console.error);
     return () => { mounted = false; };
   }, [activeCameraId, urlCamId, activeVenueId]);
 
@@ -533,27 +543,28 @@ export function TrafficDashboard() {
                 </span>
               </div>
 
-              {cameras.length > 0 && (
-                <div className="relative flex items-center">
-                  <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                    <Camera className="w-3.5 h-3.5 text-emerald-400" />
-                  </div>
-                  <select
-                    value={activeCameraId || ""}
-                    onChange={(e) => setActiveCameraId(e.target.value)}
-                    className="appearance-none bg-black/60 backdrop-blur-xl border border-white/10 hover:border-emerald-500/50 text-white text-xs font-black uppercase tracking-wider rounded-xl pl-8 pr-8 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
-                  >
-                    {cameras.map((c, i) => (
-                      <option key={c.id} value={c.id} className="bg-[#0a0a0f] text-white">
-                        {c.name || `Node ${i + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
-                    <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                  </div>
+              <div className="relative flex items-center">
+                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                  <Camera className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-              )}
+                <select
+                  value={activeCameraId || ""}
+                  onChange={(e) => setActiveCameraId(e.target.value)}
+                  className="appearance-none bg-black/60 backdrop-blur-xl border border-white/10 hover:border-emerald-500/50 text-white text-xs font-black uppercase tracking-wider rounded-xl pl-8 pr-8 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
+                >
+                  <option value="" disabled className="bg-black text-slate-500">
+                    {cameras.length === 0 ? "NO TRAFFIC CAMERAS FOUND" : "SELECT CAMERA"}
+                  </option>
+                  {cameras.map((c, i) => (
+                    <option key={c.id} value={c.id} className="bg-[#0a0a0f] text-white">
+                      {c.name || `Node ${i + 1}`}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none">
+                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+              </div>
             </div>
 
             {/* Stream */}

@@ -3,10 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search, Loader2, Wifi, WifiOff, Scan, Activity,
-  Crosshair, Cpu, Server, AlertTriangle, Eye, RefreshCw, Target,
+  Crosshair, Cpu, Server, AlertTriangle, Eye, RefreshCw, Target, ArrowLeft
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import { useRouter } from "next/navigation";
+import Ferrofluid from "@/components/ui/Ferrofluid";
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -87,6 +89,7 @@ function friendlyError(err: unknown): string {
 
 export default function AISearchPage() {
   const { t } = useTranslation();
+  const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -175,14 +178,38 @@ export default function AISearchPage() {
       style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
     >
       {/* ── Background ─────────────────────────────────────── */}
-      <div className="fixed inset-0 pointer-events-none select-none">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(56,189,248,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,0.025)_1px,transparent_1px)] bg-[size:72px_72px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_-10%,rgba(56,189,248,0.06),transparent)]" />
-        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-[#030508] to-transparent" />
+      <div className="fixed inset-0 pointer-events-none select-none z-0">
+        <Ferrofluid
+          colors={["#0ea5e9", "#0284c7", "#0f172a"]}
+          speed={0.5}
+          scale={1.6}
+          turbulence={1}
+          fluidity={0.1}
+          rimWidth={0.2}
+          sharpness={2.5}
+          shimmer={1.5}
+          glow={2}
+          flowDirection="down"
+          opacity={0.8}
+          mouseInteraction={true}
+          mouseStrength={1}
+          mouseRadius={0.35}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_40%_at_50%_-10%,rgba(56,189,248,0.1),transparent)] pointer-events-none mix-blend-screen" />
+        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-[#030508] to-transparent pointer-events-none" />
       </div>
 
       {/* ── Content ────────────────────────────────────────── */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-10">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-10 pointer-events-auto">
+
+        {/* Back Button */}
+        <button 
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-6 text-sm font-bold uppercase tracking-widest group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Back to Dashboard
+        </button>
 
         {/* Header */}
         <motion.div
@@ -196,10 +223,10 @@ export default function AISearchPage() {
           </div>
 
           <div className="flex-1">
-            <h1 className="text-3xl md:text-4xl font-black uppercase tracking-[0.15em] bg-gradient-to-r from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">
+            <h1 className="text-3xl md:text-4xl font-black uppercase tracking-[0.15em] bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]">
               {t("auto.AIVideoSearch_767") || "AI Video Search"}
             </h1>
-            <p className="text-[11px] text-slate-600 uppercase tracking-widest mt-0.5">
+            <p className="text-[11px] font-bold text-sky-200/80 uppercase tracking-widest mt-1 drop-shadow-md">
               {t("auto.AdvancedNeuralT_1650") || "Advanced Neural Trajectory &amp; Object Core"}
             </p>
           </div>
@@ -257,7 +284,7 @@ export default function AISearchPage() {
           className="mb-6"
         >
           <div className="flex gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl focus-within:border-sky-500/50 focus-within:shadow-[0_0_28px_rgba(56,189,248,0.08)] transition-all duration-300">
-            <Search className="ml-3 my-auto h-4 w-4 text-slate-500 shrink-0" />
+            <Search className="ml-3 my-auto h-4 w-4 text-sky-400 shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -265,7 +292,7 @@ export default function AISearchPage() {
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
               placeholder={t("auto.Describetargete_9420") || "Describe target — e.g. 'Person in a red shirt'"}
-              className="flex-1 bg-transparent py-3 text-sm text-white placeholder-slate-600 outline-none"
+              className="flex-1 bg-transparent py-3 text-sm text-white placeholder-slate-400 outline-none drop-shadow-sm font-medium"
               disabled={loading}
             />
             <button
@@ -281,13 +308,13 @@ export default function AISearchPage() {
           </div>
 
           {/* Preset chips */}
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-4">
             {PRESET_QUERIES.map(q => (
               <button
                 key={q}
                 onClick={() => { setQuery(q); handleSearch(q); }}
                 disabled={loading}
-                className="px-3 py-1.5 rounded-full text-xs text-slate-400 border border-white/8 bg-white/[0.03] hover:border-sky-500/40 hover:text-sky-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150"
+                className="px-3 py-1.5 rounded-full text-xs font-medium text-white border border-white/20 bg-white/5 hover:border-sky-400 hover:text-sky-300 hover:bg-sky-500/20 backdrop-blur-md shadow-[0_0_10px_rgba(0,0,0,0.5)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150"
               >
                 {q}
               </button>
@@ -477,10 +504,10 @@ export default function AISearchPage() {
               <div className="absolute inset-0 rounded-full border border-sky-500/10 animate-ping" />
             </div>
             <div>
-              <p className="font-black text-base uppercase tracking-[0.2em] text-slate-500">
+              <p className="font-black text-base uppercase tracking-[0.2em] text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
                 {t("auto.AwaitingTargetD_3702") || "Awaiting Target Description"}
               </p>
-              <p className="text-slate-700 text-xs mt-1">
+              <p className="text-sky-200/80 font-medium text-xs mt-2 drop-shadow-md">
                 {t("auto.Describeclothin_1623") || "Describe clothing colour, object, or behaviour to begin"}
               </p>
             </div>
@@ -489,7 +516,7 @@ export default function AISearchPage() {
                 <button
                   key={q}
                   onClick={() => { setQuery(q); handleSearch(q); }}
-                  className="px-3 py-1.5 rounded-full text-xs text-slate-500 border border-white/8 bg-white/[0.03] hover:border-sky-500/40 hover:text-sky-400 transition-all duration-150"
+                  className="px-3 py-1.5 rounded-full text-xs font-medium text-white border border-white/20 bg-white/5 hover:border-sky-400 hover:text-sky-300 hover:bg-sky-500/20 backdrop-blur-md shadow-[0_0_10px_rgba(0,0,0,0.5)] transition-all duration-150"
                 >
                   {q}
                 </button>

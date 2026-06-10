@@ -34,7 +34,7 @@ _sse_subscribers = set()
 _last_alert_state = {}
 _last_injected_frame_bytes = {} # Fixes NameError in feed
 
-async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, tier_label):
+async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, tier_label, screenshot_path: Optional[str] = None, camera_name: str = "Unknown Camera"):
     # Fetch DB recipients first
     db_recipients = []
     try:
@@ -51,10 +51,15 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
     except Exception as e:
         logger.warning(f"Failed to fetch DB recipients for parking email: {e}")
 
+    # Extract properties before thread
+    v_name = getattr(venue_obj, 'name', 'Unknown Venue')
+    v_lat = getattr(venue_obj, 'latitude', 'Unknown')
+    v_lng = getattr(venue_obj, 'longitude', 'Unknown')
+
     def _sync_send():
         try:
             msg = EmailMessage()
-            msg["Subject"] = f"[LAMINAR] {tier_label} ALERT: {venue_obj.name} Parking Capacity"
+            msg["Subject"] = f"[LAMINAR] {tier_label} ALERT: {v_name} Parking Capacity"
             msg["From"] = settings.SMTP_USER
             
             # Fetch emails directly from settings
@@ -75,9 +80,7 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
                 
             msg["To"] = ", ".join(recipients)
             
-            lat = getattr(venue_obj, 'latitude', 'Unknown')
-            lng = getattr(venue_obj, 'longitude', 'Unknown')
-            maps_link = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+            maps_link = f"https://www.google.com/maps/search/?api=1&query={v_lat},{v_lng}"
             
             color = "#dc2626" if tier_label == "CRITICAL" else "#ea580c" if tier_label == "HIGH" else "#eab308"
             
@@ -86,12 +89,12 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
             <body style="font-family: sans-serif; background: #f8fafc; padding: 20px;">
                 <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
                     <div style="background: {color}; color: white; padding: 20px; text-align: center;">
-                        <h1 style="margin: 0; font-size: 24px;">≡ƒÜ¿ {tier_label} PARKING ALERT</h1>
+                        <h1 style="margin: 0; font-size: 24px;">🚨 {tier_label} PARKING ALERT</h1>
                     </div>
                     <div style="padding: 30px;">
-                        <h2 style="margin-top: 0; color: #1e293b;">≡ƒôì {venue_obj.name}</h2>
+                        <h2 style="margin-top: 0; color: #1e293b;">📍 {v_name}</h2>
                         <p style="font-size: 16px; color: #334155; line-height: 1.5;">
-                            The <strong>{venue_obj.name}</strong> parking facility has reached <strong>{int(occ_pct)}% capacity</strong> and triggered a {tier_label} alert.
+                            The <strong>{v_name}</strong> parking facility has reached <strong>{int(occ_pct)}% capacity</strong> and triggered a {tier_label} alert.
                         </p>
                         
                         <table style="width: 100%; border-collapse: collapse; margin: 25px 0; background: #f1f5f9; border-radius: 6px;">
@@ -104,8 +107,12 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
                                 <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-size: 18px; color: #0f172a;">{capacity}</td>
                             </tr>
                             <tr>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; color: #475569;"><strong>Camera:</strong></td>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; color: #0f172a;">{camera_name}</td>
+                            </tr>
+                            <tr>
                                 <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; color: #475569;"><strong>Coordinates:</strong></td>
-                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace; color: #3b82f6;">{lat}, {lng}</td>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: right; font-family: monospace; color: #3b82f6;">{v_lat}, {v_lng}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 12px 15px; color: #475569;"><strong>Threshold Reached:</strong></td>
@@ -114,7 +121,7 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
                         </table>
                         
                         <div style="text-align: center; margin-top: 30px;">
-                            <a href="{maps_link}" style="display: inline-block; background: #0f172a; color: white; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; letter-spacing: 1px;">OPEN IN GOOGLE MAPS Γåù</a>
+                            <a href="{maps_link}" style="display: inline-block; background: #0f172a; color: white; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; letter-spacing: 1px;">OPEN IN GOOGLE MAPS ↗</a>
                         </div>
                     </div>
                 </div>
@@ -123,6 +130,15 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
             """
             
             msg.add_alternative(html, subtype="html")
+
+            if screenshot_path and os.path.exists(screenshot_path):
+                import mimetypes
+                ctype, encoding = mimetypes.guess_type(screenshot_path)
+                if ctype is None or encoding is not None:
+                    ctype = "application/octet-stream"
+                maintype, subtype = ctype.split("/", 1)
+                with open(screenshot_path, "rb") as fp:
+                    msg.add_attachment(fp.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(screenshot_path))
             
             with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
                 if settings.SMTP_USE_TLS:
@@ -130,16 +146,16 @@ async def send_dedicated_parking_email(venue_obj, occ_pct, occupancy, capacity, 
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                 server.send_message(msg)
                 
-            logger.info(f"Γ£à DEDICATED PARKING EMAIL SENT for {venue_obj.name} to {recipients}")
+            logger.info(f"✅ DEDICATED PARKING EMAIL SENT for {venue_obj.name} to {recipients}")
             
         except Exception as e:
-            logger.error(f"Γ¥î DEDICATED PARKING EMAIL FAILED: {e}")
+            logger.error(f"❌ DEDICATED PARKING EMAIL FAILED: {e}")
             
     await asyncio.to_thread(_sync_send)
 
-# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# --------------------------------------------------
 # SSE Subscribers
-# ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# --------------------------------------------------
 
 def _push_event(camera_id: str, event: dict):
     """Push a detection event to central store and all SSE subscribers."""
@@ -187,7 +203,6 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
             else:
                 from app.core.database import db_manager
                 # fallback to db if not in state
-                import asyncio
                 # Use a background task or run_until_complete if we must, but since this is synchronous, 
                 # we can't easily await. We rely on the unified `GLOBAL_STATE` or passing thresholds correctly.
                 pass
@@ -252,13 +267,13 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
     })
 
     # Classify risk
-    if occupancy_pct >= crit_pct:
+    if calc_occ_pct >= crit_pct:
         risk_level = "critical"
         density = "Critical"
-    elif occupancy_pct >= warn_pct:
+    elif calc_occ_pct >= warn_pct:
         risk_level = "high"
         density = "High"
-    elif occupancy_pct >= warn_pct * 0.75: # e.g. if warning is 80%, this triggers at 60%
+    elif calc_occ_pct >= warn_pct * 0.75: # e.g. if warning is 80%, this triggers at 60%
         risk_level = "medium"
         density = "Medium"
     else:
@@ -351,6 +366,7 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
             try:
                 from app.core.database import db_manager
                 from app.models.venue import Venue as VenueModel
+                from app.models.camera import Camera as CameraModel
                 async with db_manager.session() as session:
                     v_id = venue_id
                     if v_id == "undefined" or not v_id:
@@ -365,8 +381,16 @@ def push_parking_event(camera_id: str, vehicles: list, frame_shape: tuple, venue
                         res = await session.execute(stmt)
                         v_obj = res.scalar_one_or_none()
                     
+                    cam_name = f"Camera ID: {camera_id}"
+                    try:
+                        c_obj = await session.get(CameraModel, UUID(camera_id))
+                        if c_obj:
+                            cam_name = c_obj.name
+                    except Exception:
+                        pass
+                    
                     if v_obj:
-                        await send_dedicated_parking_email(v_obj, calc_occ_pct, count, capacity, risk_level.upper())
+                        await send_dedicated_parking_email(v_obj, calc_occ_pct, count, capacity, risk_level.upper(), screenshot_path=screenshot_path if 'screenshot_path' in locals() else None, camera_name=cam_name)
             except Exception as e:
                 logger.error(f"Email notification failed: {e}")
 
@@ -655,7 +679,8 @@ async def upload_parking_source(
             push_parking_event(
                 camera_id=camera_id, vehicles=best_vehicles, frame_shape=img.shape if img is not None else (0,0,0),
                 venue_id=venue_id, avg_velocity=avg_velocity, occupancy_pct=occ_pct,
-                capacity=capacity, occupancy=occupancy, force=True
+                capacity=capacity, occupancy=occupancy, force=True,
+                screenshot_path=screenshot_path if 'screenshot_path' in locals() else None
             )
         except Exception as e:
             logger.error(f"FAILURE IN push_parking_event: {str(e)}", exc_info=True)
@@ -947,8 +972,7 @@ async def stream_parking_camera(camera_id: str):
     try:
         cam_uuid = UUID(camera_id)
     except Exception:
-        from fastapi import HTTPException
-        raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
+        cam_uuid = None
 
     blank = np.zeros((360, 640, 3), dtype=np.uint8)
     cv2.putText(blank, "PARKING FEED INITIALIZING", (120, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 200), 2)
@@ -958,14 +982,17 @@ async def stream_parking_camera(camera_id: str):
     async def frame_generator():
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
         while True:
-            worker = ORCHESTRATOR._workers.get(cam_uuid)
+            worker = ORCHESTRATOR._workers.get(cam_uuid) if cam_uuid else None
             
             # Prioritize injected frame (if analysis mode is active)
             injected = _last_injected_frame_bytes.get(camera_id)
+            frame_bytes = None
             if injected:
                 frame_bytes = injected
-            elif worker and isinstance(worker, ParkingWorker):
-                frame_bytes = getattr(worker, "_cached_frame_bytes", None)
+            elif worker:
+                from app.vision.parking_worker import ParkingWorker
+                if isinstance(worker, ParkingWorker):
+                    frame_bytes = getattr(worker, "_cached_frame_bytes", None)
                 
             yield boundary + (frame_bytes if frame_bytes else blank_bytes) + b"\r\n"
             await asyncio.sleep(0.08)

@@ -80,23 +80,42 @@ def draw_pose_overlay(frame: np.ndarray, result, anomalies: list = None) -> np.n
                     bg_color = (0, 150, 0)
                     
             if is_primary:
-                box_color = (255, 0, 255) # Magenta for the primary subject
-                # Draw Safety Bubble (2 meters estimated radius)
+                box_color = (0, 255, 0) # Green for primary subject
                 bubble_radius = int(max(x2-x1, y2-y1) * 1.5)
                 cx, cy = int((x1+x2)/2), int((y1+y2)/2)
-                cv2.circle(overlay, (cx, cy), bubble_radius, (255, 0, 255), 1, cv2.LINE_AA)
+                cv2.circle(overlay, (cx, cy), bubble_radius, (0, 255, 0), 2, cv2.LINE_AA)
                 
-                label = "PROTECTED SUBJECT A91"
+                label = "PROTECTED SUBJECT"
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
                 text_y = max(th + 5, y1 - 25)
-                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), (150, 0, 150), -1)
+                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), (0, 150, 0), -1)
                 cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
             elif threat_level:
                 label = f"THREAT: {threat_level.upper()}"
+                bubble_radius = int(max(x2-x1, y2-y1) * 0.8)
+                cx, cy = int((x1+x2)/2), int((y1+y2)/2)
+                dist_str = "1.2m" # mock distance
+                
+                if threat_level == "Red":
+                    box_color = (0, 0, 255)
+                    bg_color = (0, 0, 150)
+                    cv2.circle(overlay, (cx, cy), bubble_radius, (0, 0, 255), 2, cv2.LINE_AA)
+                    dist_str = "0.5m"
+                    label = "THREAT ACTOR"
+                elif threat_level == "Orange":
+                    box_color = (0, 165, 255)
+                    bg_color = (0, 100, 200)
+                    cv2.circle(overlay, (cx, cy), bubble_radius, (0, 165, 255), 2, cv2.LINE_AA)
+                    dist_str = "0.8m"
+                    label = "UNKNOWN PERSON"
+                else:
+                    cv2.circle(overlay, (cx, cy), bubble_radius, box_color, 1, cv2.LINE_AA)
+
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
                 text_y = max(th + 5, y1 - 8)
                 cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), bg_color, -1)
                 cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.putText(overlay, f"Dist: {dist_str}", (cx - 20, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, box_color, 1, cv2.LINE_AA)
             # Draw glowing bounding box
             cv2.rectangle(overlay, (x1, y1), (x2, y2), box_color, thickness)
             

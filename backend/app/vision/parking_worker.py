@@ -158,17 +158,7 @@ class ParkingWorker:
                     slot_states = await self.detector.detect_occupancy(frame, vehicles)
                     occupancy = sum(1 for s in slot_states.values() if s["occupied"])
                     
-                    # Push events for reports and SSE stream (Inline import to avoid circular dependency)
-                    try:
-                        from app.api.v1.endpoints.parking import push_parking_event
-                        push_parking_event(
-                            camera_id=str(self.camera_id),
-                            vehicles=vehicles,
-                            frame_shape=frame.shape,
-                            venue_id=str(self.venue_id) if hasattr(self, 'venue_id') else None
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to push parking event: {e}")
+                    # Push events for reports and SSE stream will be handled below after DB fetch
                     
                     # ── Advanced YOLO & Zone Visualization ────────────────────
                     overlay = frame.copy()
@@ -249,66 +239,50 @@ class ParkingWorker:
                                     }
                                 )
 
-                                # Threshold Notifications
-                                current_status = "ok"
-                                if occupancy_pct >= crit_pct:
-                                    current_status = "critical"
-                                elif occupancy_pct >= warn_pct:
-                                    current_status = "warning"
-                                elif occupancy_pct >= 50.0:
-                                    current_status = "elevated"
-                                
-                                if current_status != self._last_status:
-                                    # Create a safe wrapper to spawn a background task with its own DB session
-                                    async def _fire_notification(status_type: str, desc: str):
-                                        try:
-                                            from app.core.database import db_manager
-                                            async with db_manager.session() as ns_session:
-                                                if status_type == "critical":
-                                                    n_type = "Saturation Reached"
-                                                    n_prio = "CRITICAL"
-                                                elif status_type == "warning":
-                                                    n_type = "Entry Warning"
-                                                    n_prio = "HIGH"
-                                                else:
-                                                    n_type = "Load Update"
-                                                    n_prio = "MEDIUM"
-
-                                                await notification_service.notify_realtime_event(
-                                                    session=ns_session,
-                                                    domain="parking", 
-                                                    type=n_type, 
-                                                    priority=n_prio,
-                                                    description=desc, 
-                                                    venue_id=str(self.venue_id),
-                                                    venue_name=venue_obj.name, 
-                                                    metadata={"occupancy": occupancy, "link": "/smart-parking"}
-                                                )
-                                                
-                                                await notification_service.push_notification(
-                                                    type=n_type,
-                                                    priority=n_prio,
-                                                    description=f"[LIVE] {n_prio}: {desc}",
-                                                    venue_id=str(self.venue_id),
-                                                    venue_name=venue_obj.name,
-                                                    camera_id=str(self.camera_id),
-                                                    domain="parking",
-                                                    metadata={"occupancy": occupancy, "link": "/smart-parking"}
-                                                )
-                                        except Exception as e:
-                                            logger.error(f"Failed to fire realtime notification: {e}")
-
-                                    if current_status == "critical":
-                                        description = f"Parking sector at {venue_obj.name} is at CRITICAL capacity ({occupancy}/{venue_obj.capacity}). Gridlock risk detected."
-                                        asyncio.create_task(_fire_notification("critical", description))
-                                    elif current_status == "warning":
-                                        description = f"Parking sector at {venue_obj.name} is approaching capacity ({occupancy}/{venue_obj.capacity}). Consider overflow routing."
-                                        asyncio.create_task(_fire_notification("warning", description))
-                                    elif current_status == "elevated":
-                                        description = f"Parking sector at {venue_obj.name} has reached 50% capacity ({occupancy}/{venue_obj.capacity})."
-                                        asyncio.create_task(_fire_notification("elevated", description))
+                                # Push events for reports, SSE, and Emails
+                                try:
+                                    # We only want to generate the screenshot IF the state is going to change.
+                                    # Calculate risk level identical to push_parking_event
+                                    warn_pct = (warn_cnt / capacity) * 100 if capacity > 0 else 75.0
+                                    crit_pct = (crit_cnt / capacity) * 100 if capacity > 0 else 100.0
+                                    calc_occ_pct = occupancy_pct
+                                    risk_level = "low"
+                                    if calc_occ_pct >= crit_pct: risk_level = "critical"
+                                    elif calc_occ_pct >= warn_pct: risk_level = "high"
+                                    elif calc_occ_pct >= warn_pct * 0.75: risk_level = "medium"
+                                    
+                                    from app.api.v1.endpoints.parking import _last_alert_state
+                                    last_state = _last_alert_state.get(str(self.camera_id), "low")
+                                    
+                                    screenshot_path = None
+                                    if risk_level != last_state and risk_level != "low":
+                                        rel_path = f"screenshots/parking/live_{int(time.time())}.jpg"
+                                        import os
+                                        os.makedirs(os.path.dirname(rel_path), exist_ok=True)
+                                        abs_path = os.path.abspath(rel_path)
+                                        _, jpeg = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                        with open(abs_path, "wb") as f:
+                                            f.write(jpeg.tobytes())
+                                        screenshot_path = abs_path
                                         
-                                    self._last_status = current_status
+                                    from app.api.v1.endpoints.parking import push_parking_event
+                                    push_parking_event(
+                                        camera_id=str(self.camera_id),
+                                        vehicles=vehicles,
+                                        frame_shape=frame.shape,
+                                        venue_id=str(self.venue_id) if hasattr(self, 'venue_id') else None,
+                                        occupancy_pct=occupancy_pct,
+                                        capacity=capacity,
+                                        occupancy=occupancy,
+                                        warn_thresh_override=warn_cnt,
+                                        crit_thresh_override=crit_cnt,
+                                        venue_name_override=venue_obj.name,
+                                        lat_override=venue_obj.latitude,
+                                        lng_override=venue_obj.longitude,
+                                        screenshot_path=screenshot_path
+                                    )
+                                except Exception as e:
+                                    logger.error(f"Failed to push parking event: {e}")
                     except Exception: pass
 
                 # Update Camera Health in DB (Every detection cycle)

@@ -22,6 +22,7 @@ import Hyperspeed from "@/components/ui/Hyperspeed";
 import Reflections from "@/components/ui/Reflections";
 import BorderGlow from "@/components/ui/BorderGlow";
 import PillNav from "@/components/ui/PillNav";
+import LightPillar from "@/components/ui/LightPillar";
 
 /* ══════════════════════════════════════════════════════
    CURSOR SPOTLIGHT — follows mouse with premium glow
@@ -602,6 +603,7 @@ function Footer() {
 ══════════════════════════════════════════════════════ */
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
+  const [bgMode, setBgMode] = useState<"hyperspeed" | "lightpillar">("hyperspeed");
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -665,11 +667,78 @@ export default function LandingPage() {
 
 
       {/* ── Cinematic background system ── */}
-      <div style={{ position: "fixed", inset: 0, zIndex: 0, transform: "translateZ(0)", willChange: "transform" }}>
-        <Hyperspeed effectOptions={hyperspeedOptions} />
-      </div>
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={bgMode}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 1 }}
+          style={{ position: "fixed", inset: 0, zIndex: 0, transform: "translateZ(0)", willChange: "transform" }}
+        >
+          {bgMode === "hyperspeed" ? (
+            <Hyperspeed effectOptions={hyperspeedOptions} />
+          ) : (
+            <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
+              <LightPillar
+                topColor="#5227FF"
+                bottomColor="#FF9FFC"
+                intensity={1}
+                rotationSpeed={0.8}
+                glowAmount={0.002}
+                pillarWidth={3}
+                pillarHeight={0.4}
+                noiseIntensity={0.5}
+                pillarRotation={25}
+                interactive={true}
+                mixBlendMode="screen"
+                quality="high"
+              />
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       <Reflections mode="hyperspeed" />
+
+      {/* ── Background Toggle ── */}
+      <motion.div 
+        initial={{ y: 50, x: "-50%", opacity: 0 }}
+        animate={{ y: 0, x: "-50%", opacity: 1 }}
+        transition={{ delay: 1, type: "spring", stiffness: 200, damping: 20 }}
+        style={{ position: "fixed", bottom: 40, left: "50%", zIndex: 100000 }}
+      >
+        <div style={{ display: "flex", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(24px)", padding: 6, borderRadius: 999, border: "1px solid rgba(255,255,255,0.15)", gap: 6, boxShadow: "0 20px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.05)" }}>
+          <button 
+            onClick={() => setBgMode("hyperspeed")}
+            style={{ 
+              padding: "8px 24px", 
+              borderRadius: 999, 
+              background: bgMode === "hyperspeed" ? "rgba(34,211,238,0.2)" : "transparent",
+              color: bgMode === "hyperspeed" ? "#22d3ee" : "#94a3b8",
+              fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em",
+              border: bgMode === "hyperspeed" ? "1px solid rgba(34,211,238,0.3)" : "1px solid transparent",
+              transition: "all 0.3s", cursor: "pointer"
+            }}
+          >
+            Hyperspeed
+          </button>
+          <button 
+            onClick={() => setBgMode("lightpillar")}
+            style={{ 
+              padding: "8px 24px", 
+              borderRadius: 999, 
+              background: bgMode === "lightpillar" ? "rgba(34,211,238,0.2)" : "transparent",
+              color: bgMode === "lightpillar" ? "#22d3ee" : "#94a3b8",
+              fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em",
+              border: bgMode === "lightpillar" ? "1px solid rgba(34,211,238,0.3)" : "1px solid transparent",
+              transition: "all 0.3s", cursor: "pointer"
+            }}
+          >
+            Light Pillar
+          </button>
+        </div>
+      </motion.div>
 
       {/* ── Page content ── */}
       <div style={{ position: "relative", zIndex: 10 }}>

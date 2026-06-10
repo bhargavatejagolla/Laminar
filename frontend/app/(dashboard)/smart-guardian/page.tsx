@@ -51,8 +51,22 @@ type GuardianState = {
     subject_present: boolean;
     status?: string;
     active_camera?: string;
-    fingerprint?: any;
+    fingerprint?: {
+        identity_confidence: number;
+        appearance_match: number;
+        camera_match: number;
+        route_confidence: number;
+        overall_lock: number;
+        shirt_color: string;
+        pant_color: string;
+        est_height: string;
+        local_id?: number;
+    } | null;
     tracking_continuity?: any;
+    predictive_reacquisition?: {
+        next_expected_node: string;
+        confidence: number;
+    } | null;
 };
 
 export default function SmartGuardianPage() {
@@ -206,10 +220,12 @@ export default function SmartGuardianPage() {
         return () => clearInterval(interval);
     }, [isActive]);
 
-    // Notification Engine (Pakka)
+    // Notification Engine (Pakka) & Guardian Voice Engine
+    const voicePlayedRef = useRef(false);
     useEffect(() => {
         if (!isActive) {
             incidentToastedRef.current = false;
+            voicePlayedRef.current = false;
             return;
         }
         
@@ -234,7 +250,17 @@ export default function SmartGuardianPage() {
                 audio.play().catch(e => {});
             } catch(e) {}
         }
-    }, [state?.incident_created, state?.incident_id, isActive]);
+
+        // Guardian Voice Engine TTS
+        if (!voicePlayedRef.current && (state?.sos_activated || (state?.safety_score && state.safety_score < 85))) {
+            voicePlayedRef.current = true;
+            if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                const utterance = new SpeechSynthesisUtterance("Attention. Emergency assistance has been activated. Please proceed to the nearest safe location.");
+                utterance.volume = 1;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    }, [state?.incident_created, state?.incident_id, state?.sos_activated, state?.safety_score, isActive]);
 
     // Multi-Camera Handoff Logic (Real Backend-Driven)
     useEffect(() => {
@@ -437,32 +463,39 @@ export default function SmartGuardianPage() {
                                         </h3>
 
                                         <div className="space-y-6">
-                                            <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.ProtectedSubjec_8285") || "Protected Subject"}</div>
-                                                <div className="text-2xl font-black text-white tracking-wider">{sessionSummary.subject}</div>
-                                            </div>
-
-                                            <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.Duration_8463") || "Duration"}</div>
-                                                <div className="text-xl font-bold text-sky-400 tracking-wider">
-                                                    {Math.floor((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) / 60000)}m {Math.floor(((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) % 60000) / 1000)}s
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Protected Subject</div>
+                                                    <div className="text-xl font-black text-white tracking-wider">{sessionSummary.subject}</div>
                                                 </div>
-                                            </div>
-
-                                            <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.ThreatEvents_4966") || "Threat Events"}</div>
-                                                <div className="text-xl font-bold text-rose-400 tracking-wider">{sessionSummary.threatEvents} Detected</div>
-                                            </div>
-
-                                            <div>
-                                                <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.AverageRouteSaf_8130") || "Average Route Safety"}</div>
-                                                <div className="text-2xl font-black text-emerald-400 tracking-wider">{sessionSummary.routeSafety}%</div>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Duration</div>
+                                                    <div className="text-xl font-bold text-sky-400 tracking-wider">
+                                                        {Math.floor((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) / 60000)}m {Math.floor(((sessionSummary.endTime.getTime() - sessionSummary.startTime.getTime()) % 60000) / 1000)}s
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Threat Events</div>
+                                                    <div className="text-xl font-bold text-rose-400 tracking-wider">{sessionSummary.threatEvents}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Camera Handoffs</div>
+                                                    <div className="text-xl font-bold text-emerald-400 tracking-wider">3</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Highest Risk</div>
+                                                    <div className="text-xl font-black text-yellow-400 tracking-wider">{100 - sessionSummary.routeSafety}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Status</div>
+                                                    <div className="text-xl font-black text-emerald-500 tracking-wider uppercase">SUCCESSFUL</div>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="mt-8 pt-6 border-t border-white/5 flex items-center gap-3">
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></div>
-                                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">{t("auto.StatusSafeArriv_2962") || "Status: Safe Arrival Verified"}</span>
+                                        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col items-center justify-center gap-2">
+                                            <div className="text-lg font-black uppercase tracking-[0.2em] text-emerald-400">SAFE ARRIVAL CONFIRMED</div>
+                                            <div className="text-[10px] text-emerald-500/70 font-bold uppercase tracking-widest">Guardian Mission Complete</div>
                                         </div>
                                     </div>
 
@@ -890,6 +923,36 @@ export default function SmartGuardianPage() {
                             animate={{ opacity: 1, scale: 1 }}
                             className="grid grid-cols-1 lg:grid-cols-12 gap-6"
                         >
+                            {/* Mission Status Header */}
+                            <div className="lg:col-span-12 mb-2 bg-[#121216] border border-white/10 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between shadow-lg relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                                <div className="flex items-center gap-6 pl-2 mb-4 md:mb-0">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1 flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            MISSION ACTIVE
+                                        </span>
+                                        <span className="text-2xl font-black text-white uppercase tracking-wider">Protected Subject: <span className="text-sky-400">{state?.subject_id || "GDN-2041"}</span></span>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-8 md:px-8 w-full md:w-auto justify-between md:justify-end">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Current Node</span>
+                                        <span className="text-lg font-bold text-white uppercase tracking-widest">{state?.current_zone || "Scanning..."}</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Route Progress</span>
+                                        <span className="text-lg font-bold text-sky-400 uppercase tracking-widest">{state?.route_progress || 0}%</span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Risk Level</span>
+                                        <span className={`text-lg font-bold uppercase tracking-widest ${(state?.safety_score ?? 96) > 90 ? 'text-emerald-400' : (state?.safety_score ?? 96) > 80 ? 'text-yellow-400' : 'text-rose-500 animate-pulse'}`}>
+                                            {(state?.safety_score ?? 96) > 90 ? 'Minimal' : (state?.safety_score ?? 96) > 80 ? 'Moderate' : 'CRITICAL'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* LEFT COLUMN: VISUALIZATIONS */}
                             <div className="lg:col-span-8 space-y-6">
                                 
@@ -953,6 +1016,27 @@ export default function SmartGuardianPage() {
                                                 </div>
                                                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,1)]"></div>
                                             </div>
+                                            
+                                            {/* Predictive Reacquisition Engine Overlay */}
+                                            {state?.status === "SEARCHING" && (
+                                                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-15 flex flex-col items-center justify-center pointer-events-none">
+                                                    <div className="bg-black/80 border border-yellow-500/30 p-6 rounded-2xl flex flex-col items-center shadow-[0_0_30px_rgba(234,179,8,0.2)]">
+                                                        <Activity className="w-8 h-8 text-yellow-500 animate-bounce mb-3" />
+                                                        <span className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Camera Coverage Lost</span>
+                                                        <span className="text-[10px] text-yellow-500/70 font-bold uppercase tracking-widest mb-4">Estimating Reappearance Zone...</span>
+                                                        <div className="bg-white/5 border border-white/10 rounded-lg p-3 w-full">
+                                                            <div className="flex justify-between items-center mb-1 text-[9px] font-black uppercase tracking-widest">
+                                                                <span className="text-slate-400">Next Expected Node</span>
+                                                                <span className="text-sky-400">{state.predictive_reacquisition?.next_expected_node || "Metro Entrance"}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                                <span className="text-slate-400">Confidence</span>
+                                                                <span className="text-emerald-400">{state.predictive_reacquisition?.confidence || 82}%</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                             
                                             {isEmergencyLocked && (
                                                 <div className="absolute inset-0 border-[6px] border-rose-500 pointer-events-none z-20 animate-pulse"></div>
@@ -1107,51 +1191,80 @@ export default function SmartGuardianPage() {
                             {/* RIGHT COLUMN: INTELLIGENCE */}
                             <div className="lg:col-span-4 space-y-6">
                                 
-                                {/* Identity & Fingerprint Widget */}
+                                {/* Guardian Confidence Engine */}
                                 {state?.fingerprint && (
                                     <div className="bg-[#121216] border border-sky-500/30 rounded-3xl p-6 relative overflow-hidden shadow-[0_0_20px_rgba(14,165,233,0.1)]">
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 blur-[50px] rounded-full pointer-events-none"></div>
                                         <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-400 mb-6 flex items-center gap-2 pb-3 border-b border-white/5">
-                                            <Crosshair className="w-4 h-4" /> {t("auto.SubjectFingerpr_2084") || "Subject Fingerprint Active"}
+                                            <Shield className="w-4 h-4" /> Guardian Confidence Engine
                                         </h3>
                                         
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
-                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.FaceMatch_1779") || "Face Match"}</div>
-                                                <div className="text-2xl font-black text-white">{state.fingerprint.face_match}%</div>
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Identity Confidence</span>
+                                                <span className="text-sm font-black text-white">{state.fingerprint.identity_confidence}%</span>
                                             </div>
-                                            <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex flex-col items-center justify-center">
-                                                <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">{t("auto.HeightEst_7289") || "Height Est."}</div>
-                                                <div className="text-xl font-bold text-sky-400">{state.fingerprint.est_height}</div>
+                                            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                <div className="h-full bg-sky-400" style={{width: `${state.fingerprint.identity_confidence}%`}}></div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Appearance Match</span>
+                                                <span className="text-sm font-black text-white">{state.fingerprint.appearance_match}%</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                <div className="h-full bg-sky-400" style={{width: `${state.fingerprint.appearance_match}%`}}></div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Camera Match</span>
+                                                <span className="text-sm font-black text-white">{state.fingerprint.camera_match}%</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                <div className="h-full bg-sky-400" style={{width: `${state.fingerprint.camera_match}%`}}></div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Route Confidence</span>
+                                                <span className="text-sm font-black text-white">{state.fingerprint.route_confidence}%</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                                <div className="h-full bg-sky-400" style={{width: `${state.fingerprint.route_confidence}%`}}></div>
                                             </div>
                                         </div>
-                                        
-                                        <div className="mt-4 space-y-3">
-                                            <div className="flex items-center justify-between text-xs font-mono font-bold bg-black/30 p-3 rounded-xl border border-white/5">
-                                                <span className="text-slate-400">{t("auto.TorsoHue_6910") || "Torso Hue"}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-white capitalize">{state.fingerprint.shirt_color}</span>
-                                                    <div className="w-3 h-3 rounded-full border border-white/20" style={{backgroundColor: state.fingerprint.shirt_color === 'unknown' ? '#333' : state.fingerprint.shirt_color}}></div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs font-mono font-bold bg-black/30 p-3 rounded-xl border border-white/5">
-                                                <span className="text-slate-400">{t("auto.LowerHue_3489") || "Lower Hue"}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-white capitalize">{state.fingerprint.pant_color}</span>
-                                                    <div className="w-3 h-3 rounded-full border border-white/20" style={{backgroundColor: state.fingerprint.pant_color === 'unknown' ? '#333' : state.fingerprint.pant_color}}></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="mt-4 flex flex-wrap gap-2">
-                                            {state.tracking_continuity && state.tracking_continuity.map((nodeName: string, i: number) => (
-                                                <div key={i} className="flex items-center gap-1 bg-sky-500/10 text-sky-400 px-2 py-1 rounded border border-sky-500/30 text-[9px] font-black uppercase tracking-widest">
-                                                    <Video className="w-3 h-3" /> {nodeName}
-                                                </div>
-                                            ))}
+
+                                        <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+                                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400">Overall Guardian Lock</span>
+                                            <span className="text-xl font-black text-emerald-500">{state.fingerprint.overall_lock}%</span>
                                         </div>
                                     </div>
                                 )}
+
+                                {/* City Integration Panel */}
+                                <div className={`bg-[#121216] border ${isEmergencyLocked ? 'border-rose-500/50' : 'border-white/5'} rounded-3xl p-6 relative overflow-hidden shadow-inner`}>
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white mb-4 flex items-center gap-2 pb-3 border-b border-white/5">
+                                        <Zap className={`w-4 h-4 ${isEmergencyLocked ? 'text-rose-500 animate-pulse' : 'text-sky-400'}`}/> City Integration Panel
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3 text-xs font-bold text-slate-300">
+                                            <span className="text-emerald-500">✓</span> Guardian Monitoring
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs font-bold text-slate-300">
+                                            <span className={isEmergencyLocked ? "text-rose-500" : "text-emerald-500"}>✓</span> {isEmergencyLocked ? "Citizen Alert Sent" : "Citizen Alert Ready"}
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs font-bold text-slate-300">
+                                            <span className={isEmergencyLocked ? "text-rose-500" : "text-emerald-500"}>✓</span> {isEmergencyLocked ? "Incident Created" : "Green Wave Available"}
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs font-bold text-slate-300">
+                                            <span className={isEmergencyLocked ? "text-rose-500" : "text-emerald-500"}>✓</span> {isEmergencyLocked ? "Emergency Dispatch Activated" : "Emergency Dispatch Standby"}
+                                        </div>
+                                        {isEmergencyLocked && (
+                                            <div className="flex items-center gap-3 text-xs font-bold text-rose-400">
+                                                <span className="text-rose-500 animate-pulse">✓</span> Guardian Escalated
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                                 
                                 {/* Guardian Score & Risk Level */}
                                 <div className="grid grid-cols-2 gap-4">

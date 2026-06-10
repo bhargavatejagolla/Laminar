@@ -582,10 +582,18 @@ class VenueService:
             avg_velocity = 0.0
 
         if current_occupancy == 0.0:
-            # 🔥 SMART CITY SYNC: Check all live telemetry domains for this venue
+            # 🔥 SMART CITY SYNC: Check live telemetry domains for this venue
             try:
                 from app.core.global_state import GLOBAL_STATE
-                for check_domain in ["traffic", "parking", "people", "crowd"]:
+                check_domains = ["traffic", "parking", "people", "crowd"]
+                if venue.venue_type == "parking":
+                    check_domains = ["parking"]
+                elif venue.venue_type == "traffic":
+                    check_domains = ["traffic"]
+                elif venue.venue_type in ["people", "crowd"]:
+                    check_domains = ["people", "crowd"]
+                
+                for check_domain in check_domains:
                     v_payload = GLOBAL_STATE.get_venue_state(check_domain, venue_id)
                     if v_payload:
                         # Extract count based on domain conventions
@@ -607,7 +615,7 @@ class VenueService:
             except Exception as e:
                 logger.warning(f"Global state sync failed for venue {venue_id}: {e}")
 
-        if current_occupancy == 0.0:
+        if current_occupancy == 0.0 and venue.venue_type in ["people", "crowd"]:
             try:
                 from datetime import datetime, timedelta, timezone
                 from app.models.crowd_frame import CrowdFrame

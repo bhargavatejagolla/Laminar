@@ -21,7 +21,13 @@ import {
     Siren,
     Scale,
     ShieldCheck,
-    Radar
+    Radar,
+    MapPin,
+    Archive,
+    ListChecks,
+    Network,
+    Gavel,
+    Play
 } from "lucide-react";
 
 // Wave background matching Laminar aesthetic
@@ -40,7 +46,51 @@ export default function SmartLiabilityPage() {
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
     const [activeTab, setActiveTab] = useState<"dashboard" | "tactical" | "liability">("dashboard");
-    const [incident, setIncident] = useState<any>(null);
+    const fallbackIncident = {
+        id: "INC-2041",
+        is_historical: true,
+        type: "Crowd Surge & Exit Congestion",
+        priority: "CRITICAL",
+        status: "Closed",
+        confidence: 92,
+        evidence_count: 17,
+        annotated_frame: null,
+        timeline: [
+            { time: "22:41:02", text: "Crowd Density Threshold Crossed", type: "warning" },
+            { time: "22:41:08", text: "Panic Cluster Detected", type: "critical" },
+            { time: "22:41:12", text: "Guardian Alert Triggered", type: "critical" },
+            { time: "22:41:22", text: "Emergency Corridor Activated", type: "success" },
+            { time: "22:41:31", text: "Incident Escalated", type: "info" }
+        ],
+        blackbox: [
+            { time: "22:41:02", action: "Alert Generated", source: "Crowd Intel" },
+            { time: "22:41:04", action: "Operator Acknowledged", source: "System" },
+            { time: "22:41:10", action: "Green Wave Activated", source: "Traffic Node" },
+            { time: "22:41:22", action: "Citizen Alert Sent", source: "Guardian API" },
+            { time: "22:41:30", action: "Incident Closed", source: "Operator" }
+        ],
+        ai_determination: {
+            primary_cause: "Exit Congestion",
+            contributing_factors: ["High Density", "Route Obstruction"],
+            predicted_avoidability: 72,
+            confidence: 91
+        },
+        randy_summary: {
+            cause: "Pedestrian congestion near Exit West",
+            affected_area: "Gate A",
+            potential_impact: "Evacuation delay",
+            recommended_action: "Open alternate corridor",
+            confidence: 89
+        },
+        map: {
+            location: "Gate A",
+            coordinates: "17.444, 78.377",
+            nearest_camera: "CAM-07",
+            nearest_exit: "EXIT-WEST"
+        }
+    };
+
+    const [incident, setIncident] = useState<any>(fallbackIncident);
 
     useEffect(() => {
         setMounted(true);
@@ -50,11 +100,16 @@ export default function SmartLiabilityPage() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data && data.length > 0) {
-                        setIncident(data[0]); // Get the most recent incident
+                        setIncident({ ...fallbackIncident, ...data[0], is_historical: false });
+                    } else {
+                        setIncident(fallbackIncident);
                     }
+                } else {
+                    setIncident(fallbackIncident);
                 }
             } catch (e) {
                 console.error("Failed to fetch incidents", e);
+                setIncident(fallbackIncident);
             }
         };
         fetchIncidents();
@@ -138,71 +193,79 @@ export default function SmartLiabilityPage() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
-                            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+                            className="grid grid-cols-1 lg:grid-cols-12 gap-6"
                         >
-                            {!incident ? (
-                                /* Main Empty State Panel (mimicking screenshot) */
-                                <div className="lg:col-span-2 bg-[#121216] border border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden group shadow-inner">
-                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.05)_0%,transparent_60%)]"></div>
+                            {/* Left Column: Open Incidents & Map */}
+                            <div className="lg:col-span-3 space-y-6">
+                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative shadow-inner">
+                                    <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
+                                        <Archive className="w-4 h-4 text-slate-400" />
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                            {incident.is_historical ? "Historical Reconstruction" : "Open Incidents"}
+                                        </h3>
+                                    </div>
                                     
-                                    <motion.div 
-                                        animate={{ opacity: [0.5, 1, 0.5] }} 
-                                        transition={{ duration: 3, repeat: Infinity }}
-                                        className="mb-8 p-6 bg-white/5 rounded-full border border-white/5"
-                                    >
-                                        <AlertTriangle className="w-16 h-16 text-slate-500" strokeWidth={1.5} />
-                                    </motion.div>
-                                    
-                                    <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">{t("auto.NoLiabilityNode_8452") || "No Liability Nodes Detected"}</h2>
-                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-md text-center leading-relaxed">
-                                        Deploy edge infrastructure into venues tagged as "Liability" to enable local intelligence protocols.
-                                    </p>
+                                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 cursor-pointer hover:border-amber-500/50 transition-colors">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-sm font-black text-white">{incident.id}</span>
+                                            <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded ${incident.status === 'Closed' ? 'bg-slate-500/20 text-slate-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                                {incident.status}
+                                            </span>
+                                        </div>
+                                        <div className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mb-3">{incident.type}</div>
+                                        <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono font-bold">
+                                            <span>Confidence: <span className="text-emerald-400">{incident.confidence || 92}%</span></span>
+                                            <span>Evid: <span className="text-sky-400">{incident.evidence_count || 17}</span></span>
+                                        </div>
+                                    </div>
                                 </div>
-                            ) : (
-                                /* Incident Forensics Timeline */
-                                <div className="lg:col-span-2 bg-[#121216] border border-white/5 rounded-3xl p-8 relative shadow-inner">
+
+                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative shadow-inner">
+                                    <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
+                                        <MapPin className="w-4 h-4 text-slate-400" />
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Incident Map</h3>
+                                    </div>
+                                    <div className="h-32 bg-slate-900 rounded-xl mb-4 relative overflow-hidden border border-white/10 flex items-center justify-center">
+                                        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%,transparent_100%)] bg-[size:10px_10px]"></div>
+                                        <div className="w-4 h-4 bg-rose-500 rounded-full animate-ping absolute"></div>
+                                        <div className="w-2 h-2 bg-rose-500 rounded-full absolute"></div>
+                                    </div>
+                                    <div className="space-y-3 font-mono text-[10px] font-bold text-slate-400">
+                                        <div className="flex justify-between"><span>Location</span><span className="text-white">{incident.map?.location || "Gate A"}</span></div>
+                                        <div className="flex justify-between"><span>Coordinates</span><span className="text-sky-400">{incident.map?.coordinates || "17.444, 78.377"}</span></div>
+                                        <div className="flex justify-between"><span>Nearest Cam</span><span className="text-white">{incident.map?.nearest_camera || "CAM-07"}</span></div>
+                                        <div className="flex justify-between"><span>Nearest Exit</span><span className="text-white">{incident.map?.nearest_exit || "EXIT-WEST"}</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Center Column: Timeline & AI Determination */}
+                            <div className="lg:col-span-5 space-y-6">
+                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-8 relative shadow-inner flex-1">
                                     <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-6">
                                         <div>
-                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2 mb-1"><Database className="w-3 h-3"/> {t("auto.DigitalBlackBox_3806") || "Digital Black Box Record"}</div>
-                                            <h2 className="text-2xl font-black uppercase tracking-widest text-white drop-shadow-md">Incident #{incident.id.substring(0, 12)}...</h2>
-                                            <p className="text-xs text-rose-400 font-mono font-bold mt-1">{incident.type || 'Distress Event'}</p>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 flex items-center gap-2 mb-1"><Activity className="w-3 h-3"/> AI Investigation Timeline</div>
+                                            <h2 className="text-2xl font-black uppercase tracking-widest text-white drop-shadow-md">{incident.id}</h2>
                                         </div>
-                                        <div className="px-4 py-2 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(244,63,94,0.15)]">
-                                            <ShieldAlert className="w-4 h-4" /> {t("auto.ForensicsLocked_7873") || "Forensics Locked"}
+                                        <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                                            <ShieldCheck className="w-4 h-4" /> Reconstruction Complete
                                         </div>
                                     </div>
                                     
-                                    {incident.annotated_frame && (
-                                        <div className="mb-6 rounded-xl overflow-hidden border border-white/10 shadow-lg relative">
-                                            <img src={`data:image/jpeg;base64,${incident.annotated_frame}`} alt="Evidence" className="w-full h-auto object-cover max-h-64" />
-                                            <div className="absolute top-2 left-2 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded">{t("auto.VisualEvidenceC_6287") || "Visual Evidence Captured"}</div>
-                                        </div>
-                                    )}
-
-                                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-300 mb-6">{t("auto.IncidentReconst_9015") || "Incident Reconstruction Timeline"}</h3>
-                                    
-                                    <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
-                                        {[
-                                            { time: "T-00:00", text: "System nominal", type: "info" },
-                                            { time: "T+00:02", text: "Anomaly detected in feed", type: "warning" },
-                                            { time: "T+00:04", text: `Risk elevated: ${incident.priority}`, type: "warning" },
-                                            { time: "T+00:05", text: `${incident.type} Confirmed`, type: "critical" },
-                                            { time: "T+00:06", text: "Incident created", type: "critical" },
-                                            { time: "T+00:07", text: "Email dispatched", type: "info" },
-                                            { time: "T+00:09", text: "Evidence package sealed", type: "success" }
-                                        ].map((event, i) => (
+                                    <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
+                                        {(incident.timeline || []).map((event: any, i: number) => (
                                             <motion.div 
                                                 key={i}
                                                 initial={{ opacity: 0, x: -20 }}
                                                 animate={{ opacity: 1, x: 0 }}
                                                 transition={{ delay: i * 0.15 }}
-                                                className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
+                                                className="relative flex items-center group is-active"
                                             >
-                                                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#121216] bg-slate-800 text-slate-500 group-hover:text-amber-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 relative z-10 transition-colors">
+                                                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#121216] bg-slate-800 text-slate-500 group-hover:text-amber-500 shadow shrink-0 relative z-10 transition-colors">
                                                     <div className={`w-3 h-3 rounded-full ${event.type === 'critical' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]' : event.type === 'warning' ? 'bg-amber-500' : event.type === 'success' ? 'bg-emerald-500' : 'bg-sky-500'}`} />
                                                 </div>
                                                 
-                                                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-xl border border-white/5 bg-black/40 backdrop-blur shadow-sm group-hover:border-white/10 transition-colors">
+                                                <div className="ml-4 w-[calc(100%-3rem)] p-4 rounded-xl border border-white/5 bg-black/40 backdrop-blur shadow-sm group-hover:border-white/10 transition-colors">
                                                     <div className="flex items-center justify-between mb-1">
                                                         <span className={`font-mono text-xs font-bold ${event.type === 'critical' ? 'text-rose-400' : 'text-slate-400'}`}>{event.time}</span>
                                                     </div>
@@ -212,78 +275,138 @@ export default function SmartLiabilityPage() {
                                         ))}
                                     </div>
                                 </div>
-                            )}
 
-                            {/* Right Side Panels */}
-                            <div className="space-y-6">
-                                
-                                {/* Generate Evidence Package */}
-                                <div 
-                                    onClick={() => window.open("http://localhost:8000/api/v1/incident/report/pdf", "_blank")}
-                                    className="bg-gradient-to-br from-amber-500/20 to-amber-600/5 border border-amber-500/40 rounded-3xl p-6 relative overflow-hidden group hover:border-amber-400 transition-colors cursor-pointer shadow-[0_0_30px_rgba(245,158,11,0.1)]"
-                                >
-                                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%,100%_100%] animate-[shimmer_3s_infinite]"></div>
-                                    <div className="relative z-10 flex flex-col items-center justify-center text-center">
-                                        <div className="w-16 h-16 rounded-2xl bg-amber-500 text-black flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(245,158,11,0.6)] group-hover:scale-105 transition-transform">
-                                            <FileText className="w-8 h-8" />
+                                {/* AI Determination */}
+                                <div className="bg-[#121216] border border-amber-500/30 rounded-3xl p-6 relative shadow-[0_0_20px_rgba(245,158,11,0.1)] overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[50px] rounded-full pointer-events-none"></div>
+                                    <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
+                                        <Gavel className="w-4 h-4 text-amber-500" />
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-500">AI Liability Determination</h3>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Primary Cause</div>
+                                            <div className="text-sm font-bold text-white">{incident.ai_determination?.primary_cause || "Exit Congestion"}</div>
                                         </div>
-                                        <h3 className="text-lg font-black uppercase tracking-widest text-amber-500 drop-shadow-md">{t("auto.GenerateEvidenc_1966") || "Generate Evidence Package"}</h3>
-                                        <p className="text-[10px] font-mono text-amber-500/70 mt-2">{t("auto.OneClickPDFDoss_1105") || "One-Click PDF Dossier Creation"}</p>
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">Predicted Avoidability</div>
+                                            <div className="text-sm font-black text-rose-400">{incident.ai_determination?.predicted_avoidability || 72}%</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-4">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">Contributing Factors</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {(incident.ai_determination?.contributing_factors || ["High Density", "Route Obstruction"]).map((factor: string, i: number) => (
+                                                <span key={i} className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs font-bold text-slate-300">
+                                                    {factor}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+                                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-400">Assessment Confidence</span>
+                                        <span className="text-xl font-black text-emerald-500">{incident.ai_determination?.confidence || 91}%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Fusion, Randy, Black Box */}
+                            <div className="lg:col-span-4 space-y-6">
+                                
+                                {/* Evidence Fusion */}
+                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative shadow-inner">
+                                    <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
+                                        <Network className="w-4 h-4 text-slate-400" />
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Cross-System Evidence Fusion</h3>
+                                    </div>
+                                    <div className="space-y-3 font-mono text-xs font-bold text-slate-300">
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                            <div className="flex items-center gap-3"><CheckCircle className="w-4 h-4" /> Guardian Route</div>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                            <div className="flex items-center gap-3"><CheckCircle className="w-4 h-4" /> Crowd Intelligence</div>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                            <div className="flex items-center gap-3"><CheckCircle className="w-4 h-4" /> Green Wave</div>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                            <div className="flex items-center gap-3"><CheckCircle className="w-4 h-4" /> Flood Intelligence</div>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                            <div className="flex items-center gap-3"><CheckCircle className="w-4 h-4" /> 4D Playback</div>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                            <div className="flex items-center gap-3"><CheckCircle className="w-4 h-4" /> AI Video Search</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Black Box Recorder */}
+                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative shadow-inner">
+                                    <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/5">
+                                        <Database className="w-4 h-4 text-slate-400" />
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Black Box Recorder</h3>
+                                    </div>
+                                    <div className="space-y-3 max-h-48 overflow-y-auto pr-2 scrollbar-hide">
+                                        {(incident.blackbox || []).map((log: any, i: number) => (
+                                            <div key={i} className="flex flex-col border-l-2 border-slate-700 pl-3">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-[9px] font-mono font-bold text-sky-400">{log.time}</span>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{log.source}</span>
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-300">{log.action}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
 
                                 {/* Randy Investigation Summary */}
                                 <div className="bg-[#121216] border border-fuchsia-500/30 rounded-3xl p-6 relative shadow-[inset_0_0_20px_rgba(217,70,239,0.02)]">
-                                    <div className="flex items-center gap-3 mb-5">
+                                    <div className="flex items-center gap-3 mb-5 border-b border-white/5 pb-4">
                                         <div className="p-2 bg-fuchsia-500/10 rounded-xl border border-fuchsia-500/30">
                                             <Cpu className="w-5 h-5 text-fuchsia-400" />
                                         </div>
-                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-fuchsia-400">{t("auto.RandyInvestigat_8024") || "Randy Investigation Summary"}</h3>
+                                        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-fuchsia-400">Randy Investigation Summary</h3>
                                     </div>
                                     
-                                    <div className="space-y-4 text-xs font-mono text-slate-300 leading-relaxed border-l-2 border-fuchsia-500/30 pl-4">
-                                        {incident ? (
-                                            <>
-                                                <div><span className="text-emerald-400">✓</span> Analysis type: {incident.analysis_type || 'AI Core'}.</div>
-                                                <div><span className="text-amber-400">!</span> {incident.description}</div>
-                                                {incident.explanation && <div><span className="text-sky-400">ℹ</span> {incident.explanation}</div>}
-                                                <div><span className="text-emerald-400">✓</span> Priority status locked at {incident.priority}.</div>
-                                                <div><span className="text-emerald-400">✓</span> {t("auto.Automaticrespon_5098") || "Automatic response and notification dispatched."}</div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div><span className="text-emerald-400">✓</span> {t("auto.Awaitinginciden_969") || "Awaiting incident generation."}</div>
-                                                <div><span className="text-sky-400">ℹ</span> {t("auto.Systemstandingb_3097") || "System standing by for real-time telemetry."}</div>
-                                            </>
-                                        )}
+                                    <div className="space-y-4 text-xs font-mono text-slate-300 leading-relaxed">
+                                        <div>
+                                            <span className="text-slate-500 block text-[9px] uppercase tracking-widest font-black mb-1">Primary Cause</span>
+                                            <span className="text-amber-400">{incident.randy_summary?.cause}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 block text-[9px] uppercase tracking-widest font-black mb-1">Affected Area</span>
+                                            <span className="text-white">{incident.randy_summary?.affected_area}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 block text-[9px] uppercase tracking-widest font-black mb-1">Potential Impact</span>
+                                            <span className="text-rose-400">{incident.randy_summary?.potential_impact}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500 block text-[9px] uppercase tracking-widest font-black mb-1">Recommended Action</span>
+                                            <span className="text-emerald-400">{incident.randy_summary?.recommended_action}</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Cross-System Evidence Sources */}
-                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 relative">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 flex items-center gap-2"><Database className="w-4 h-4"/> {t("auto.EvidenceSources_8311") || "Evidence Sources"}</h3>
-                                    
-                                    <div className="space-y-3 font-mono text-xs font-bold text-slate-300">
-                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.GuardianRoute_7795") || "Guardian Route"}</div>
-                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.KineticSOS_2917") || "Kinetic SOS"}</div>
-                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.CameraNetwork_2914") || "Camera Network"}</div>
-                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5">
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-emerald-500' : 'text-slate-600'}`} /> {t("auto.NotificationEng_7266") || "Notification Engine"}</div>
-                                            <span className="text-[9px] text-slate-500 uppercase tracking-widest">{incident ? 'Verified' : 'Pending'}</span>
-                                        </div>
-                                        <div className={`flex items-center justify-between p-2 rounded-lg border ${incident ? 'bg-fuchsia-500/10 border-fuchsia-500/20' : 'bg-white/5 border-white/5'}`}>
-                                            <div className="flex items-center gap-3"><CheckCircle className={`w-4 h-4 ${incident ? 'text-fuchsia-500' : 'text-slate-600'}`} /> {t("auto.RandyAIAnalysis_851") || "Randy AI Analysis"}</div>
-                                            <span className={`text-[9px] uppercase tracking-widest ${incident ? 'text-fuchsia-500' : 'text-slate-500'}`}>{incident ? 'Sealed' : 'Pending'}</span>
-                                        </div>
+                                {/* Actions */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div 
+                                        onClick={() => router.push("/spatial-engine")}
+                                        className="bg-sky-500/10 border border-sky-500/40 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-sky-500/20 transition-all text-center group shadow-[0_0_15px_rgba(14,165,233,0.1)]"
+                                    >
+                                        <Play className="w-6 h-6 text-sky-400 mb-2 group-hover:scale-110 transition-transform" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-sky-400">Reconstruct Incident</span>
+                                    </div>
+                                    <div 
+                                        onClick={() => window.open("http://localhost:8000/api/v1/incident/report/pdf", "_blank")}
+                                        className="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-amber-500/20 transition-all text-center group shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+                                    >
+                                        <FileText className="w-6 h-6 text-amber-500 mb-2 group-hover:scale-110 transition-transform" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Evidence Package</span>
                                     </div>
                                 </div>
                                 

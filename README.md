@@ -184,6 +184,9 @@
 * Secure Email Notifications
 * Autonomous Response Coordination
 * Tactical Incident Workflows
+* AI Incident Reconstruction Engine
+* Automated Evidence Fusion (Video, Logs, Telemetry)
+* Black Box Incident Auditing & Timelines
 
 ---
 
@@ -349,7 +352,8 @@
 * Next.js 16 (React 19)
 * Tailwind CSS
 * Framer Motion
-* Lightfall UI Elements
+* Lightfall UI Elements & Glassmorphism
+* Three.js Interactive Visuals (LightPillars, Hyperspeed)
 * GSAP
 
 ### Backend

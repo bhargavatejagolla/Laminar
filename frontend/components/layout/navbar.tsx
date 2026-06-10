@@ -57,10 +57,11 @@ export default function Navbar() {
   };
 
   return (
-    <header className="h-20 bg-[rgba(10,10,15,0.7)] backdrop-blur-3xl border-b border-white/5 flex items-center justify-between px-6 shrink-0 z-[100] sticky top-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+    <header className="h-20 bg-[#020617]/40 backdrop-blur-[40px] border-b border-white/[0.08] flex items-center justify-between px-6 shrink-0 z-[100] sticky top-0 shadow-[0_4px_40px_rgba(0,0,0,0.4)]">
       
       {/* Decorative Top Glow */}
-      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent pointer-events-none"></div>
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent pointer-events-none"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_100%_at_50%_0%,rgba(34,211,238,0.03),transparent)] pointer-events-none"></div>
 
       {/* Left: hamburger + live clock */}
       <div className="flex items-center gap-6">
@@ -73,7 +74,7 @@ export default function Navbar() {
         </button>
 
         {/* System clock / Status */}
-        <div className="hidden lg:flex items-center gap-3 font-mono text-xs font-bold px-4 py-2 rounded-xl bg-black/50 border border-white/5 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
+        <div className="hidden lg:flex items-center gap-3 font-mono text-xs font-bold px-4 py-2 rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] shadow-[0_4px_15px_rgba(0,0,0,0.2)]">
           <div className="relative flex h-3 w-3 items-center justify-center">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]"></span>
@@ -86,8 +87,8 @@ export default function Navbar() {
 
       {/* Center: Brand name (Hidden on mobile) */}
       <div className="hidden lg:flex items-center gap-3 text-sm font-black tracking-[0.3em] text-cyan-500/50 uppercase select-none relative group">
-        <div className="absolute -inset-4 bg-cyan-500/5 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <div className="relative p-1.5 rounded-lg bg-cyan-950/30 border border-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+        <div className="absolute -inset-4 bg-cyan-400/10 blur-[20px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        <div className="relative p-1.5 rounded-lg bg-white/[0.03] backdrop-blur-md border border-cyan-500/20 shadow-[0_0_20px_rgba(34,211,238,0.15)] group-hover:border-cyan-400/40 transition-colors">
           <Zap className="w-4 h-4 text-cyan-400 pulse-glow" />
         </div>
         <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-300 to-slate-500 group-hover:from-cyan-100 group-hover:to-cyan-400 transition-all duration-500">
@@ -109,10 +110,10 @@ export default function Navbar() {
         <NotificationBell />
 
         {/* Crowd Alert Bell (links to /alerts) */}
-        <Link href="/alerts" className="relative p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-300 group border border-transparent hover:border-white/20" title={t("auto.CrowdAlerts_5587") || "Crowd Alerts"}>
+        <Link href="/alerts" className="relative p-2.5 rounded-xl bg-white/5 hover:bg-white/[0.08] text-slate-400 hover:text-white transition-all duration-300 group border border-transparent hover:border-white/10 hover:shadow-[0_4px_15px_rgba(0,0,0,0.2)] backdrop-blur-md" title={t("auto.CrowdAlerts_5587") || "Crowd Alerts"}>
           <Shield className={`w-5 h-5 transition-colors ${activeAlertsCount > 0 ? "text-rose-400 group-hover:text-rose-300" : "group-hover:text-cyan-400"}`} />
           {activeAlertsCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] flex items-center justify-center rounded-full bg-rose-500 text-[11px] font-black text-white border-[3px] border-[#000000] shadow-[0_0_15px_rgba(244,63,94,0.8)]">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[24px] h-[24px] flex items-center justify-center rounded-full bg-rose-500 text-[11px] font-black text-white border-[3px] border-[#020617] shadow-[0_0_15px_rgba(244,63,94,0.8)]">
               {activeAlertsCount > 99 ? "99+" : activeAlertsCount}
             </span>
           )}
@@ -129,8 +130,8 @@ export default function Navbar() {
         <div className="h-8 w-px bg-white/10 mx-1 rounded-full" />
 
         {/* User pill */}
-        <Link href="/profile" className="flex items-center gap-3 bg-black/40 border border-white/10 py-1.5 px-2 rounded-full hover:border-cyan-500/50 hover:bg-cyan-950/20 transition-all cursor-pointer group shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
-          <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.4)] group-hover:scale-105 transition-transform border-2 border-cyan-500/30">
+        <Link href="/profile" className="flex items-center gap-3 bg-white/[0.03] backdrop-blur-md border border-white/[0.08] py-1.5 px-2 rounded-full hover:border-cyan-500/40 hover:bg-cyan-950/30 transition-all cursor-pointer group shadow-[0_4px_20px_rgba(0,0,0,0.2)]">
+          <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 shadow-[0_0_15px_rgba(34,211,238,0.4)] group-hover:scale-105 transition-transform border border-cyan-500/40">
             {user?.profile_picture ? (
               <img
                 src={user.profile_picture.startsWith('http') ? user.profile_picture : `${(process.env.NEXT_PUBLIC_API_URL || "").replace(/\/api\/v1$/, '')}${user.profile_picture}`}

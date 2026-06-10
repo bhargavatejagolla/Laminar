@@ -671,7 +671,9 @@ class NotificationService:
 
         # Get recipients
         role_recipients = await self._resolve_recipients(session, risk_level, metadata)
+        logger.info(f"Resolved role_recipients for {domain} {type}: {role_recipients}")
         if not role_recipients:
+            logger.info("role_recipients is empty, returning early")
             return
 
         # Fetch venue for location context
@@ -1081,13 +1083,8 @@ class NotificationService:
             
             screenshot_url = extra.get("screenshot_url")
             if screenshot_url:
-                import os
                 img_path = screenshot_url.lstrip("/")
                 if os.path.isfile(img_path):
-                    from email.mime.multipart import MIMEMultipart
-                    from email.mime.text import MIMEText
-                    from email.mime.image import MIMEImage
-                    
                     outer = MIMEMultipart("related")
                     outer["From"] = msg["From"]
                     outer["Subject"] = msg["Subject"]
@@ -1168,6 +1165,8 @@ class NotificationService:
                 required_staff = t(lang, "dynamic", "Dynamic Deployment")
 
         # ── Metric Mapping (Bridge domain-specific keys to standard variables) ──
+        occupancy_pct = 0.0
+        growth_rate = 0.0
         if domain == "traffic":
             avg_count     = extra.get("vehicle_count") or extra.get("count") or live.get("avg_count", 0)
             max_count     = extra.get("vehicle_count") or extra.get("max_count", 0)
@@ -1176,10 +1175,11 @@ class NotificationService:
             if capacity and avg_count:
                 occupancy_pct = min(100, (avg_count / capacity) * 100)
         elif domain == "parking":
-            avg_count     = extra.get("occupancy") or live.get("avg_count", 0)
-            max_count     = extra.get("occupancy") or live.get("max_count", 0)
+            avg_count     = extra.get("occupancy") or extra.get("total_vehicles") or live.get("avg_count", 0)
+            max_count     = extra.get("occupancy") or extra.get("total_vehicles") or live.get("max_count", 0)
             risk_score    = extra.get("risk_score") or live.get("dynamic_risk_score", 0)
-            if capacity and avg_count:
+            occupancy_pct = extra.get("occupancy_pct", 0.0)
+            if capacity and avg_count and occupancy_pct == 0.0:
                 occupancy_pct = min(100, (avg_count / capacity) * 100)
         else:
             avg_count     = live.get("avg_count", 0)
@@ -1681,7 +1681,6 @@ class NotificationService:
                     sms_msg += f"\n⚠️ Action: {metadata['recommended_action']}"
             
             # Send to a default emergency number (or load from env)
-            import os
             phone = os.environ.get("EMERGENCY_PHONE_NUMBER", "+15550199")
             asyncio.create_task(self.sms_service.send_sms(phone, sms_msg))
             
