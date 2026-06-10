@@ -75,6 +75,8 @@
 
 ## Zero‑Shot Behavioral Intelligence (Pre‑Crime Engine)
 
+* Zero-Shot Panic Dispersal Detection
+* Predictive Aggression & Altercation Tracking
 * Panic Movement Detection
 * Aggression Detection
 * Suspicious Motion Analysis
@@ -171,6 +173,9 @@
 
 ## Incident Intelligence & Mission Control
 
+* J.A.R.V.I.S. Autonomous Voice Overwatch (Real-Time Synthesized P.A.)
+* Hive-Mind Dynamic Evacuation Engine (Live Safe-Pathing)
+* Instant LLM Threat Dossier Generation
 * Tactical Alert Generation
 * Incident Risk Classification
 * Emergency Escalation Management
