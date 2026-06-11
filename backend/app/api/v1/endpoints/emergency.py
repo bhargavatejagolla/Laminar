@@ -5,7 +5,7 @@ from pydantic import BaseModel
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from twilio.rest import Client
+
 import asyncio
 import logging
 
@@ -112,31 +112,7 @@ def send_emergency_email(profile: EmergencyProfile, lat: float, lng: float):
         logger.error(f"Failed to send emergency email: {str(e)}")
         return False
 
-def make_emergency_call(profile: EmergencyProfile, lat: float, lng: float):
-    """Makes a real phone call using Twilio."""
-    try:
-        if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN or not settings.TWILIO_FROM_NUMBER:
-            logger.warning("Twilio credentials missing. Skipping real phone call.")
-            return False
-            
-        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        
-        # Format the phone number. If it's just 10 digits, assume India (+91)
-        phone = profile.emergency_contact_phone.strip()
-        if len(phone) == 10 and phone.isdigit():
-            phone = f"+91{phone}"
-        elif not phone.startswith('+'):
-            phone = f"+{phone}"
 
-        twiml = f"""
-        <Response>
-            <Say voice="alice">Emergency alert from Laminar SafeLink.</Say>
-            <Say voice="alice">{profile.full_name} has activated their emergency beacon.</Say>
-            <Say voice="alice">Their location has been captured and shared via email.</Say>
-            <Say voice="alice">Immediate attention may be required.</Say>
-        </Response>
-        """
-        
 @router.post("/trigger")
 async def trigger_emergency(trigger_data: EmergencyTrigger, db: AsyncSession = Depends(get_db)):
     """Triggers the emergency sequence (Email + Global Mesh Notification). WhatsApp is handled client-side."""
@@ -146,24 +122,7 @@ async def trigger_emergency(trigger_data: EmergencyTrigger, db: AsyncSession = D
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    # Broadcast to the Laminar Global Mesh (SSE / UI Notifications)
-    maps_link = f"https://maps.google.com/?q={trigger_data.latitude},{trigger_data.longitude}"
-    
-    await notification_service.push_notification(
-        type="emergency_beacon",
-        priority="CRITICAL",
-        description=f"Beacon Activated: {profile.full_name}. Location: {trigger_data.latitude}, {trigger_data.longitude}",
-        venue_id=str(profile.id),
-        venue_name=profile.default_address,
-        domain="EMERGENCY_BEACON",
-        metadata={
-            "lat": trigger_data.latitude, 
-            "lng": trigger_data.longitude, 
-            "phone": profile.emergency_contact_phone,
-            "camera_location": f"GPS: {trigger_data.latitude}, {trigger_data.longitude}",
-            "maps_url": maps_link
-        }
-    )
+
 
     # Run network tasks concurrently in background thread pool to not block async loop
     loop = asyncio.get_event_loop()

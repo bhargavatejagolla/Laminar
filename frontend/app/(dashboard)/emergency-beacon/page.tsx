@@ -82,7 +82,7 @@ export default function EmergencyBeaconPage() {
                 
                 setTimeline(2); // Location Acquired
                 
-                // 2. Trigger Backend (Real Email & SSE Mesh)
+                // 2. Trigger Backend (Real Email)
                 try {
                     setTimeline(3); // Contacting Backend
                     await axios.post(`${API_BASE}/trigger`, {
@@ -91,11 +91,7 @@ export default function EmergencyBeaconPage() {
                         longitude: lng
                     });
                     
-                    setTimeline(4); // Email Sent & WhatsApp
-                    
-                    const phone = formData.emergency_contact_phone ? formData.emergency_contact_phone.replace('+', '') : "918919349090";
-                    const message = `🚨 EMERGENCY ALERT\n\nLocation:\nhttps://maps.google.com/?q=${lat},${lng}\n\nImmediate assistance required.`;
-                    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+                    setTimeline(4); // Email Sent
                     
                     setTimeout(() => setTimeline(5), 3000); // Guardian Route
                     setTimeout(() => setTimeline(6), 6000); // Liability Case
@@ -104,10 +100,6 @@ export default function EmergencyBeaconPage() {
                 } catch (error) {
                     console.error("Trigger failed", error);
                     setTimeline(4); // Fallback to timeline if backend fails
-                    
-                    const phone = formData.emergency_contact_phone ? formData.emergency_contact_phone.replace('+', '') : "918919349090";
-                    const message = `🚨 EMERGENCY ALERT\n\nLocation:\nhttps://maps.google.com/?q=${lat},${lng}\n\nImmediate assistance required.`;
-                    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
                     
                     setTimeout(() => setTimeline(5), 3000);
                     setTimeout(() => setTimeline(6), 6000);
@@ -278,7 +270,7 @@ export default function EmergencyBeaconPage() {
                                             active={timeline >= 4} 
                                             icon={PhoneCall} 
                                             title="Contact Alerted" 
-                                            desc="WhatsApp Alert & SMTP Email Dispatched" 
+                                            desc="SMTP Email Dispatched" 
                                             pulse={timeline === 4}
                                         />
                                         <TimelineItem 
@@ -304,7 +296,7 @@ export default function EmergencyBeaconPage() {
                                     {timeline >= 4 && (
                                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8 flex items-center justify-center gap-3 text-red-400 bg-red-500/10 border border-red-500/30 p-3 rounded-xl animate-pulse">
                                             <PhoneCall className="w-4 h-4" />
-                                            <span className="text-xs font-black tracking-widest uppercase">WhatsApp Dispatched</span>
+                                            <span className="text-xs font-black tracking-widest uppercase">Email Dispatched</span>
                                         </motion.div>
                                     )}
                                 </div>
