@@ -225,6 +225,17 @@
 
 ---
 
+## 🚨 Sentinel Emergency Beacon (Laminar SafeLink)
+
+* **Zero-Friction SOS Generation**: One-touch emergency activation system.
+* **Instant WhatsApp Dispatch**: Automatically bridges the alert to WhatsApp with real-time GPS coordinates.
+* **Global Mesh Integration (SSE)**: Pushes critical, real-time popup alerts directly to all active Laminar dashboards.
+* **Automated Email Escalation**: Secures the digital liability chain by instantly dispatching incident records to management, supervisors, and authorities via SMTP.
+* **Real-time GPS Capture**: Extracts exact user telemetry and injects it into Google Maps links for immediate response.
+* **Silent Liability Tracking**: Automatically initializes an incident dossier (e.g., LMNR-EMG-XXXX) upon activation.
+
+---
+
 ## AEGIS Protocol (Autonomous Emergency Guidance & Intervention System)
 
 * Medical Event Classification & Cardiac Event Detection

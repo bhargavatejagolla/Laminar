@@ -122,6 +122,16 @@ const MODULES = [
         color: "rose",
         metric: "1 Active Dispatch",
         status: "ARMED"
+    },
+    {
+        id: "beacon",
+        name: "Sentinel Emergency Beacon",
+        desc: "One-Touch Laminar SafeLink. Captures GPS, notifies contacts, and escalates directly to Liability Engine.",
+        href: "/emergency-beacon",
+        icon: Zap,
+        color: "red",
+        metric: "Active Connection",
+        status: "ARMED"
     }
 ];
 

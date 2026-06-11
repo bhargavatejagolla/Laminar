@@ -276,6 +276,13 @@ class Settings(BaseSettings):
     )
 
     # ---------------------------------------------------------
+    # Twilio Configuration
+    # ---------------------------------------------------------
+    TWILIO_ACCOUNT_SID: Optional[str] = Field(default=None)
+    TWILIO_AUTH_TOKEN: Optional[str] = Field(default=None)
+    TWILIO_FROM_NUMBER: Optional[str] = Field(default=None)
+
+    # ---------------------------------------------------------
     # Rate Limiting
     # ---------------------------------------------------------
     RATE_LIMIT_ENABLED: bool = Field(default=True)
