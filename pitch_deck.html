@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Laminar - Pitch Deck - W!NNOVX HACKFEST 2026</title>
+    
+    <!-- Reveal.js Core -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/theme/black.min.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyan: '#00f0ff',
+                        purple: '#7a00ff',
+                        dark: '#050510',
+                        glass: 'rgba(20, 20, 30, 0.45)',
+                        glassborder: 'rgba(0, 240, 255, 0.15)'
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Overrides & Effects */
+        body {
+            background: radial-gradient(circle at 50% 50%, #0f0c29 0%, #302b63 50%, #24243e 100%) !important;
+            font-family: 'Outfit', sans-serif !important;
+            color: #fff;
+        }
+
+        .reveal .slides {
+            width: 100% !important;
+            max-width: 1280px !important;
+            height: 100% !important;
+            margin-top: 2rem !important;
+        }
+
+        .reveal section {
+            height: 100%;
+        }
+
+        /* Prevent Reveal from altering our tailwind typography */
+        .reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5, .reveal h6, .reveal p, .reveal ul, .reveal li {
+            margin: 0; padding: 0; text-transform: none; line-height: 1.5; color: inherit; font-family: inherit;
+        }
+
+        .glass-card {
+            background: var(--glass);
+            border: 1px solid var(--glassborder);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 1.25rem;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.4s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(0, 240, 255, 0.5);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 240, 255, 0.15);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #00f0ff 0%, #7a00ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(0, 240, 255, 0.3);
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 240, 255, 0.6);
+        }
+
+        .bg-grid-pattern {
+            background-image: linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- SLIDE 1: Title Slide -->
+            <section data-transition="zoom" class="h-full flex flex-col justify-center items-center">
+                <div class="animate__animated animate__fadeInDown text-center w-full mt-20">
+                    <h4 class="text-cyan tracking-[0.3em] uppercase text-xl mb-4 font-semibold">W!NNOVX HACKFEST 2026</h4>
+                    <h1 class="text-8xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan to-purple mb-4 drop-shadow-[0_0_25px_rgba(0,240,255,0.4)]">LAMINAR</h1>
+                    <h3 class="text-4xl text-gray-300 font-light mb-16">The AI Operating System for Cities</h3>
+                    
+                    <div class="grid grid-cols-2 gap-8 text-left glass-card mx-auto w-full max-w-4xl shadow-[0_0_40px_rgba(122,0,255,0.2)] animate__animated animate__fadeInUp animate__delay-1s">
+                        <div>
+                            <p class="text-gray-400 text-sm uppercase tracking-widest mb-1">Team Name</p>
+                            <p class="text-3xl font-semibold text-white">Quantum Quotients</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm uppercase tracking-widest mb-1">Domain</p>
+                            <p class="text-3xl font-semibold text-white">Smart Cities & Future Living</p>
+                        </div>
+                        <div class="col-span-2 border-t border-white/10 pt-6 mt-2">
+                            <p class="text-gray-400 text-sm uppercase tracking-widest mb-2">Project Title</p>
+                            <p class="text-2xl font-semibold text-cyan">Laminar - Next-Generation AI-Powered Analytics & Vision Intelligence</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 2: Abstract & Problem Statement -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-10">Abstract & Problem Statement</h2>
+                
+                <div class="grid grid-cols-2 gap-10 mt-8 h-[60vh]">
+                    <!-- The Problem -->
+                    <div class="glass-card flex flex-col fragment fade-right">
+                        <div class="flex items-center gap-5 mb-6">
+                            <div class="w-14 h-14 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-400 text-3xl shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <h3 class="text-3xl font-bold text-white">The Challenge</h3>
+                        </div>
+                        <div class="space-y-6 text-gray-300 text-xl flex-1">
+                            <div class="flex items-start gap-4">
+                                <i class="fas fa-times-circle text-red-500 mt-1 text-2xl"></i> 
+                                <p>Modern cities generate vast amounts of data (surveillance, traffic, IoT), but systems operate in <strong>isolated silos</strong>.</p>
+                            </div>
+                            <div class="flex items-start gap-4">
+                                <i class="fas fa-times-circle text-red-500 mt-1 text-2xl"></i> 
+                                <p>Fragmentation leads to delayed emergency responses, disjointed decision-making, and inefficient incident management.</p>
+                            </div>
+                            <div class="flex items-start gap-4">
+                                <i class="fas fa-times-circle text-red-500 mt-1 text-2xl"></i> 
+                                <p>Existing setups are purely <strong>reactive</strong>, relying on post-incident analysis rather than proactive intelligence.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Objective & Impact -->
+                    <div class="flex flex-col gap-6 h-full">
+                        <div class="glass-card fragment fade-left flex-1 border-cyan/30">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="w-12 h-12 rounded-xl bg-cyan/20 flex items-center justify-center text-cyan text-2xl">
+                                    <i class="fas fa-bullseye"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold text-white">The Objective</h3>
+                            </div>
+                            <p class="text-gray-300 text-lg leading-relaxed">
+                                To architect a <strong>unified intelligence platform</strong> that can observe, predict, and autonomously coordinate city-wide responses in real-time, functioning as the city's central nervous system.
+                            </p>
+                        </div>
+
+                        <div class="glass-card fragment fade-left flex-1 border-purple/30" data-fragment-index="2">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="w-12 h-12 rounded-xl bg-purple/20 flex items-center justify-center text-purple text-2xl">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <h3 class="text-2xl font-bold text-white">Target Users & Impact</h3>
+                            </div>
+                            <ul class="space-y-3 text-gray-300 text-lg pl-0">
+                                <li class="flex items-center gap-3"><i class="fas fa-check-circle text-cyan"></i> City Administration & Control Centers</li>
+                                <li class="flex items-center gap-3"><i class="fas fa-check-circle text-cyan"></i> Police & Law Enforcement</li>
+                                <li class="flex items-center gap-3"><i class="fas fa-check-circle text-cyan"></i> Emergency & Medical Responders</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 3: Proposed Solution -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-4">Proposed Solution</h2>
+                <p class="text-2xl text-gray-400 mb-10 font-light"><strong>Laminar</strong> is an ultra-responsive, full-stack AI OS fusing Computer Vision, LLMs, and 4D spatial analytics.</p>
+                
+                <div class="grid grid-cols-3 gap-8">
+                    <div class="glass-card fragment zoom-in">
+                        <i class="fas fa-eye text-5xl text-cyan mb-6"></i>
+                        <h4 class="text-2xl font-bold text-white mb-3">Real-Time Vision</h4>
+                        <p class="text-gray-300 leading-relaxed text-lg">YOLOv11-powered object detection, cross-camera crowd density tracking, and anomaly recognition across thousands of live streams.</p>
+                    </div>
+                    
+                    <div class="glass-card fragment zoom-in" data-fragment-index="1">
+                        <i class="fas fa-brain text-5xl text-purple mb-6"></i>
+                        <h4 class="text-2xl font-bold text-white mb-3">Randy AI & Gemini</h4>
+                        <p class="text-gray-300 leading-relaxed text-lg">Embedded AI Assistant capable of contextual reasoning, executing natural language video search, and generating tactical incident dossiers instantly.</p>
+                    </div>
+                    
+                    <div class="glass-card fragment zoom-in" data-fragment-index="2">
+                        <i class="fas fa-cube text-5xl text-blue-400 mb-6"></i>
+                        <h4 class="text-2xl font-bold text-white mb-3">Immersive 3D UI</h4>
+                        <p class="text-gray-300 leading-relaxed text-lg">Next-gen React Three Fiber dashboard offering spatial intelligence mapping and interactive data visualization for command operators.</p>
+                    </div>
+                </div>
+
+                <div class="glass-card mt-8 border-yellow-500/30 fragment fade-up">
+                    <h4 class="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                        <i class="fas fa-lightbulb text-yellow-400 text-3xl"></i> Breakthrough Innovation
+                    </h4>
+                    <div class="grid grid-cols-2 gap-8 mt-4">
+                        <div class="flex items-start gap-4">
+                            <div class="mt-1 w-2 h-2 rounded-full bg-cyan shadow-[0_0_10px_#00f0ff]"></div>
+                            <p class="text-lg text-gray-300"><strong>Zero-Shot Behavioral Intelligence:</strong> Predicts panic dispersal and aggressive altercations <em>before</em> they escalate without prior explicit training.</p>
+                        </div>
+                        <div class="flex items-start gap-4">
+                            <div class="mt-1 w-2 h-2 rounded-full bg-cyan shadow-[0_0_10px_#00f0ff]"></div>
+                            <p class="text-lg text-gray-300"><strong>AI Green Wave:</strong> Autonomous traffic signal synchronization prioritizing ambulances and firetrucks dynamically to clear paths instantly.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 4: Methodology / Workflow -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-12">Methodology & Workflow</h2>
+                
+                <div class="flex flex-col gap-8 relative px-4">
+                    <!-- Connecting Gradient Line -->
+                    <div class="absolute left-[3.25rem] top-12 bottom-12 w-1.5 bg-gradient-to-b from-cyan via-purple to-green-400 rounded-full opacity-60 z-0 shadow-[0_0_15px_rgba(0,240,255,0.5)]"></div>
+                    
+                    <!-- Step 1 -->
+                    <div class="fragment fade-right relative z-10 flex items-center gap-10">
+                        <div class="w-24 h-24 rounded-2xl bg-dark border-2 border-cyan flex items-center justify-center text-4xl text-cyan shrink-0 shadow-[0_0_25px_rgba(0,240,255,0.4)]">
+                            <i class="fas fa-satellite-dish"></i>
+                        </div>
+                        <div class="glass-card flex-1 p-6">
+                            <h4 class="text-2xl font-bold text-white mb-2 text-cyan">1. Data Ingestion & Edge Sensing</h4>
+                            <p class="text-gray-300 text-lg">Aggregates live multi-venue camera streams, IoT sensor data, and infrastructure telemetry. Utilizes WebSockets for ultra-low latency transmission.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 2 -->
+                    <div class="fragment fade-right relative z-10 flex items-center gap-10" data-fragment-index="1">
+                        <div class="w-24 h-24 rounded-2xl bg-dark border-2 border-purple flex items-center justify-center text-4xl text-purple shrink-0 shadow-[0_0_25px_rgba(122,0,255,0.4)]">
+                            <i class="fas fa-microchip"></i>
+                        </div>
+                        <div class="glass-card flex-1 p-6">
+                            <h4 class="text-2xl font-bold text-white mb-2 text-purple">2. Edge Processing & Vision AI</h4>
+                            <p class="text-gray-300 text-lg">YOLOv11 and OpenCV process frames at the edge. Performs structural health monitoring, flood segmentation, and crowd velocity tracking simultaneously.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 3 -->
+                    <div class="fragment fade-right relative z-10 flex items-center gap-10" data-fragment-index="2">
+                        <div class="w-24 h-24 rounded-2xl bg-dark border-2 border-blue-400 flex items-center justify-center text-4xl text-blue-400 shrink-0 shadow-[0_0_25px_rgba(96,165,250,0.4)]">
+                            <i class="fas fa-network-wired"></i>
+                        </div>
+                        <div class="glass-card flex-1 p-6">
+                            <h4 class="text-2xl font-bold text-white mb-2 text-blue-400">3. Predictive AI & LLM Fusion</h4>
+                            <p class="text-gray-300 text-lg">Data flows into Google Gemini API and Prophet models to map escalation probabilities, execute temporal intelligence, and generate automated threat dossiers.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 4 -->
+                    <div class="fragment fade-right relative z-10 flex items-center gap-10" data-fragment-index="3">
+                        <div class="w-24 h-24 rounded-2xl bg-dark border-2 border-green-400 flex items-center justify-center text-4xl text-green-400 shrink-0 shadow-[0_0_25px_rgba(74,222,128,0.4)]">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div class="glass-card flex-1 p-6 border-green-400/30">
+                            <h4 class="text-2xl font-bold text-white mb-2 text-green-400">4. Autonomous Action & Command</h4>
+                            <p class="text-gray-300 text-lg">System triggers AEGIS protocols: automated SMTP escalation to police, Live Safe-Pathing for civilians, and dynamic alerts on the 3D dashboard.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 5: System Architecture -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-10">System Architecture</h2>
+                
+                <div class="flex gap-10 items-stretch h-[60vh]">
+                    <!-- Diagram Placeholder -->
+                    <div class="w-1/2 glass-card flex flex-col items-center justify-center relative overflow-hidden group">
+                        <div class="absolute inset-0 bg-grid-pattern opacity-10"></div>
+                        <div class="text-center z-10 px-8">
+                            <div class="w-24 h-24 rounded-full bg-gray-800/50 flex items-center justify-center mx-auto mb-6 border border-gray-600 group-hover:border-cyan transition-colors">
+                                <i class="fas fa-project-diagram text-5xl text-gray-400 group-hover:text-cyan transition-colors"></i>
+                            </div>
+                            <h4 class="text-2xl text-white font-bold mb-2">[ Insert Architecture Diagram ]</h4>
+                            <p class="text-lg text-gray-400">Please replace this section with the Laminar Mermaid Flowchart or Architecture Visual.</p>
+                        </div>
+                    </div>
+
+                    <!-- Flow Details -->
+                    <div class="w-1/2 flex flex-col gap-4 justify-between">
+                        <div class="glass-card fragment fade-left p-5">
+                            <h4 class="text-2xl font-bold text-cyan mb-2 flex items-center"><i class="fas fa-desktop mr-3"></i> Client UI Interface</h4>
+                            <p class="text-gray-300 text-lg">Next.js 16 interacting via secure REST APIs and WebSockets for real-time telemetry synchronization.</p>
+                        </div>
+                        
+                        <div class="glass-card fragment fade-left p-5" data-fragment-index="1">
+                            <h4 class="text-2xl font-bold text-purple mb-2 flex items-center"><i class="fas fa-server mr-3"></i> FastAPI Gateway</h4>
+                            <p class="text-gray-300 text-lg">High-performance async Python backend handling event-driven routing and throughput data streams.</p>
+                        </div>
+                        
+                        <div class="glass-card fragment fade-left p-5" data-fragment-index="2">
+                            <h4 class="text-2xl font-bold text-blue-400 mb-2 flex items-center"><i class="fas fa-database mr-3"></i> Distributed Data Layer</h4>
+                            <p class="text-gray-300 text-lg">PostgreSQL with SQLAlchemy for complex relational data. Faiss vector databases for lightning-fast AI semantic search.</p>
+                        </div>
+                        
+                        <div class="glass-card fragment fade-left p-5" data-fragment-index="3">
+                            <h4 class="text-2xl font-bold text-green-400 mb-2 flex items-center"><i class="fas fa-brain mr-3"></i> Intelligence Nodes</h4>
+                            <p class="text-gray-300 text-lg">Decoupled microservices architecture running YOLOv11 processing, Google Gemini API, and Groq LLM pipelines.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 6: Technology Stack -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-12">Technology Stack</h2>
+                
+                <div class="grid grid-cols-2 gap-8">
+                    <!-- Frontend -->
+                    <div class="glass-card fragment zoom-in p-8 border-cyan/20 hover:border-cyan transition-colors">
+                        <h3 class="text-3xl font-bold text-white mb-6 flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-cyan/10 flex items-center justify-center mr-4"><i class="fab fa-react text-cyan"></i></div>
+                            Frontend & UI
+                        </h3>
+                        <div class="flex flex-wrap gap-3 mt-4">
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium"><i class="text-cyan mr-2">⚡</i> Next.js 16</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">Tailwind CSS</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">React Three Fiber</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">GSAP Animations</span>
+                        </div>
+                    </div>
+
+                    <!-- Backend -->
+                    <div class="glass-card fragment zoom-in p-8 border-yellow-400/20 hover:border-yellow-400 transition-colors" data-fragment-index="1">
+                        <h3 class="text-3xl font-bold text-white mb-6 flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-yellow-400/10 flex items-center justify-center mr-4"><i class="fab fa-python text-yellow-400"></i></div>
+                            Backend & Database
+                        </h3>
+                        <div class="flex flex-wrap gap-3 mt-4">
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">FastAPI (Python)</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">PostgreSQL</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">Node.js</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">SQLAlchemy (Async)</span>
+                        </div>
+                    </div>
+
+                    <!-- AI Engine -->
+                    <div class="glass-card fragment zoom-in p-8 border-purple/20 hover:border-purple transition-colors" data-fragment-index="2">
+                        <h3 class="text-3xl font-bold text-white mb-6 flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-purple/10 flex items-center justify-center mr-4"><i class="fas fa-robot text-purple"></i></div>
+                            AI & Computer Vision
+                        </h3>
+                        <div class="flex flex-wrap gap-3 mt-4">
+                            <span class="px-5 py-2.5 rounded-xl bg-purple/10 border border-purple/40 text-white text-lg font-bold shadow-[0_0_10px_rgba(122,0,255,0.3)]">Google Gemini API</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-purple/10 border border-purple/40 text-white text-lg font-bold shadow-[0_0_10px_rgba(122,0,255,0.3)]">Groq API</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">YOLOv11</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">OpenCV</span>
+                        </div>
+                    </div>
+
+                    <!-- Infrastructure -->
+                    <div class="glass-card fragment zoom-in p-8 border-green-400/20 hover:border-green-400 transition-colors" data-fragment-index="3">
+                        <h3 class="text-3xl font-bold text-white mb-6 flex items-center">
+                            <div class="w-12 h-12 rounded-lg bg-green-400/10 flex items-center justify-center mr-4"><i class="fas fa-network-wired text-green-400"></i></div>
+                            Cloud & Infrastructure
+                        </h3>
+                        <div class="flex flex-wrap gap-3 mt-4">
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">Edge AI / Federated Learning</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">MQTT</span>
+                            <span class="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-lg font-medium">WebSockets</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 7: Features & Implementation -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-10">Features & Implementation</h2>
+                
+                <div class="grid grid-cols-12 gap-10 h-[60vh]">
+                    <!-- Features List -->
+                    <div class="col-span-7 flex flex-col gap-5 overflow-y-auto pr-4 custom-scrollbar">
+                        
+                        <div class="glass-card fragment fade-right p-6 border-l-4 border-l-cyan">
+                            <h4 class="text-2xl font-bold text-white mb-3">Guardian Route (AI Personal Safety)</h4>
+                            <p class="text-lg text-gray-300 leading-relaxed">A "Walk Me Home" AI offering personal safety tracking. Uses Zero-Shot Fall Detection, SOS gesture tracking, and generates automated liability dossiers (LMNR-EMG-XXXX).</p>
+                        </div>
+                        
+                        <div class="glass-card fragment fade-right p-6 border-l-4 border-l-purple" data-fragment-index="1">
+                            <h4 class="text-2xl font-bold text-white mb-3">J.A.R.V.I.S. Autonomous Overwatch</h4>
+                            <p class="text-lg text-gray-300 leading-relaxed">Real-time synthesized Voice PA system capable of hive-mind dynamic evacuation safe-pathing and directing civilian traffic autonomously during crises.</p>
+                        </div>
+                        
+                        <div class="glass-card fragment fade-right p-6 border-l-4 border-l-blue-400" data-fragment-index="2">
+                            <h4 class="text-2xl font-bold text-white mb-3">Resonance Engine</h4>
+                            <p class="text-lg text-gray-300 leading-relaxed">Applies Eulerian Video Magnification (EVM) to detect structural vibration hazards in bridges, stadiums, and pillars that are entirely invisible to the human eye.</p>
+                        </div>
+                        
+                        <div class="glass-card fragment fade-right p-6 border-l-4 border-l-green-400" data-fragment-index="3">
+                            <h4 class="text-2xl font-bold text-white mb-3">AI Natural Language Video Search</h4>
+                            <p class="text-lg text-gray-300 leading-relaxed">Instantly search surveillance using natural language ("Person wearing red shirt running"). Uses cross-camera Re-ID to trace suspect trajectories city-wide.</p>
+                        </div>
+
+                    </div>
+
+                    <!-- Image Placeholder -->
+                    <div class="col-span-5 glass-card flex flex-col items-center justify-center relative fragment fade-in" data-fragment-index="4">
+                        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-cyan/5 rounded-xl"></div>
+                        <i class="fas fa-images text-7xl text-cyan/50 mb-6 drop-shadow-[0_0_15px_rgba(0,240,255,0.3)]"></i>
+                        <h4 class="text-2xl text-white font-bold text-center mb-4">[ UI Screenshots Area ]</h4>
+                        <p class="text-lg text-gray-400 text-center px-6">Perfect place to insert high-res shots of the Laminar Dashboard, Crowd Heatmaps, or Threat Dossiers.</p>
+                        
+                        <!-- UI Mac buttons decoration -->
+                        <div class="absolute top-5 left-5 flex gap-2">
+                            <div class="w-3.5 h-3.5 rounded-full bg-red-500 shadow-md"></div>
+                            <div class="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-md"></div>
+                            <div class="w-3.5 h-3.5 rounded-full bg-green-500 shadow-md"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 8: Results & Demo -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-12">Results & Live Demo</h2>
+                
+                <div class="grid grid-cols-2 gap-10 h-[55vh]">
+                    <!-- Demo Box -->
+                    <div class="glass-card border-2 border-cyan relative overflow-hidden group cursor-pointer fragment zoom-in flex flex-col items-center justify-center shadow-[0_0_30px_rgba(0,240,255,0.2)] hover:shadow-[0_0_50px_rgba(0,240,255,0.4)]">
+                        <div class="absolute inset-0 bg-gradient-to-tr from-cyan/20 to-purple/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        
+                        <div class="relative z-10 text-center group-hover:scale-110 transition-transform duration-500">
+                            <div class="w-32 h-32 rounded-full bg-cyan/10 flex items-center justify-center text-cyan text-5xl mx-auto mb-6 backdrop-blur-md border border-cyan/50 shadow-[0_0_20px_rgba(0,240,255,0.5)]">
+                                <i class="fas fa-play animate-pulse group-hover:animate-none ml-2"></i>
+                            </div>
+                            <h3 class="text-4xl font-bold text-white tracking-widest drop-shadow-lg">LAUNCH LIVE DEMO</h3>
+                        </div>
+                        
+                        <p class="absolute bottom-6 text-cyan/80 text-lg font-bold tracking-[0.2em] uppercase">Initialize Telemetry Feed</p>
+                    </div>
+
+                    <!-- Metrics -->
+                    <div class="flex flex-col justify-between gap-6">
+                        <div class="glass-card fragment fade-up flex-1 flex flex-col justify-center px-8 relative overflow-hidden">
+                            <div class="absolute right-[-20px] top-[-20px] text-8xl text-white/5"><i class="fas fa-bullseye"></i></div>
+                            <div class="flex items-center gap-6 mb-2">
+                                <h3 class="text-6xl font-display font-bold text-white">99<span class="text-4xl text-cyan">%</span></h3>
+                                <p class="text-2xl text-gray-300 font-bold leading-tight">Threat Detection<br><span class="text-cyan">Accuracy</span></p>
+                            </div>
+                            <p class="text-lg text-gray-400 mt-2 font-light">Powered by YOLOv11 Multi-Scale Image Pyramid.</p>
+                        </div>
+
+                        <div class="glass-card fragment fade-up flex-1 flex flex-col justify-center px-8 relative overflow-hidden" data-fragment-index="1">
+                            <div class="absolute right-[-20px] top-[-20px] text-8xl text-white/5"><i class="fas fa-stopwatch"></i></div>
+                            <div class="flex items-center gap-6 mb-2">
+                                <h3 class="text-6xl font-display font-bold text-white">&lt; 1<span class="text-4xl text-purple">s</span></h3>
+                                <p class="text-2xl text-gray-300 font-bold leading-tight">End-to-End<br><span class="text-purple">Latency</span></p>
+                            </div>
+                            <p class="text-lg text-gray-400 mt-2 font-light">From camera capture to dashboard alert & AI synthesis.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 9: Future Scope & Scalability -->
+            <section data-transition="slide" class="py-12 px-16 text-left">
+                <h2 class="text-5xl font-display font-bold gradient-text mb-12">Future Scope & Scalability</h2>
+                
+                <div class="grid grid-cols-3 gap-8">
+                    <!-- Digital Twin -->
+                    <div class="glass-card fragment fade-up text-center px-8 py-14 hover:border-cyan transition-all duration-500 group">
+                        <div class="w-24 h-24 mx-auto rounded-full bg-cyan/10 flex items-center justify-center mb-8 group-hover:bg-cyan/20 transition-colors">
+                            <i class="fas fa-vr-cardboard text-5xl text-cyan"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-4">Digital Twin Integration</h3>
+                        <p class="text-lg text-gray-300 leading-relaxed font-light">Implementing NeRF-Based 3D Gaussian Splatting for photorealistic, fully navigable virtual replicas of entire city infrastructures.</p>
+                    </div>
+
+                    <!-- Federated AI -->
+                    <div class="glass-card fragment fade-up text-center px-8 py-14 hover:border-purple transition-all duration-500 group" data-fragment-index="1">
+                        <div class="w-24 h-24 mx-auto rounded-full bg-purple/10 flex items-center justify-center mb-8 group-hover:bg-purple/20 transition-colors">
+                            <i class="fas fa-project-diagram text-5xl text-purple"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-4">Federated Edge AI</h3>
+                        <p class="text-lg text-gray-300 leading-relaxed font-light">Decentralized model training directly on edge cameras. Ensures strict GDPR compliance via Differential Privacy while maintaining accuracy.</p>
+                    </div>
+
+                    <!-- Global Deployment -->
+                    <div class="glass-card fragment fade-up text-center px-8 py-14 hover:border-blue-400 transition-all duration-500 group" data-fragment-index="2">
+                        <div class="w-24 h-24 mx-auto rounded-full bg-blue-400/10 flex items-center justify-center mb-8 group-hover:bg-blue-400/20 transition-colors">
+                            <i class="fas fa-globe-americas text-5xl text-blue-400"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-white mb-4">Global Deployment</h3>
+                        <p class="text-lg text-gray-300 leading-relaxed font-light">Mass horizontal scalability ready for Smart City Command Centers, International Airport Security grids, and Mega-Venue crowd management.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 10: Conclusion -->
+            <section data-transition="zoom" class="h-full flex flex-col justify-center items-center text-center py-12">
+                <div class="w-full max-w-5xl">
+                    <h2 class="text-7xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan via-purple to-cyan bg-[length:200%_auto] animate-pulse mb-10">Conclusion</h2>
+                    
+                    <div class="glass-card p-12 relative overflow-hidden fragment zoom-in shadow-[0_0_50px_rgba(122,0,255,0.2)] border-purple/30">
+                        <div class="absolute -top-32 -right-32 w-64 h-64 bg-cyan/20 blur-[80px] rounded-full pointer-events-none"></div>
+                        <div class="absolute -bottom-32 -left-32 w-64 h-64 bg-purple/20 blur-[80px] rounded-full pointer-events-none"></div>
+                        
+                        <i class="fas fa-quote-left text-6xl text-gray-600 mb-8 block opacity-50"></i>
+                        <p class="text-4xl text-white font-light italic leading-relaxed font-display tracking-wide drop-shadow-md">
+                            "Transforming streams of raw data into oceans of predictive, autonomous intelligence."
+                        </p>
+                        
+                        <div class="mt-12 pt-10 border-t border-white/10 flex justify-around">
+                            <div class="text-center group">
+                                <div class="w-16 h-16 mx-auto rounded-xl bg-cyan/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-shield-alt text-3xl text-cyan"></i>
+                                </div>
+                                <h4 class="text-white font-bold text-xl tracking-wide">Proactive Security</h4>
+                            </div>
+                            <div class="text-center group">
+                                <div class="w-16 h-16 mx-auto rounded-xl bg-yellow-400/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-bolt text-3xl text-yellow-400"></i>
+                                </div>
+                                <h4 class="text-white font-bold text-xl tracking-wide">Real-Time Action</h4>
+                            </div>
+                            <div class="text-center group">
+                                <div class="w-16 h-16 mx-auto rounded-xl bg-purple/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-users-cog text-3xl text-purple"></i>
+                                </div>
+                                <h4 class="text-white font-bold text-xl tracking-wide">Human-Centered</h4>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-16 fragment fade-up">
+                        <h3 class="text-5xl font-bold gradient-text drop-shadow-[0_0_15px_rgba(0,240,255,0.5)] mb-4 tracking-wider">Thank You!</h3>
+                        <p class="text-2xl text-gray-400 font-light tracking-widest uppercase">Open for Questions & Answers</p>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            controls: true,
+            progress: true,
+            center: false, /* Disabled to allow Tailwind layout control */
+            width: 1400, /* Widescreen optimal */
+            height: 850,
+            margin: 0.04,
+            minScale: 0.2,
+            maxScale: 2.0,
+            transition: 'slide', 
+            backgroundTransition: 'fade',
+            autoAnimateEasing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            autoAnimateDuration: 1.0,
+        });
+    </script>
+</body>
+</html>

@@ -14,7 +14,7 @@ class SpatialEntity(BaseModel):
     id: str
     type: str # 'person', 'vehicle'
     color: str # hex for UI styling
-    tracklets: List[Dict[str, float]] # [{'x': 0.0, 'y': 0.0, 'z': 0.0, 'time': 0.0}]
+    tracklets: List[Dict[str, Any]] # [{'x': 0.0, 'y': 0.0, 'z': 0.0, 'time': 0.0, 'sensor': 'optical_camera'}]
 
 class SpatialSceneResponse(BaseModel):
     venue_id: str
