@@ -17,24 +17,13 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-class ParkingDetector:
+class ParkingIntelligence:
     """
-    Vehicle-optimized detector for Smart Parking.
-    Uses COCO classes: 2 (car), 3 (motorcycle), 5 (bus), 7 (truck).
+    Vehicle-optimized intelligence for Smart Parking (v2.0)
+    Consumes VisionState to map vehicles to parking zones.
     """
-    _model_cache = {}
-    _load_lock = asyncio.Lock()
-
-    def __init__(self, model_name: str = "yolov8x.pt", conf: float = 0.15, iou: float = 0.45):
-        self.model_name = model_name
-        self.conf = conf
-        self.iou = iou
-        self.device = "cpu"
-        self.model = None
-        # COCO vehicle class IDs: 2=car, 3=motorcycle, 5=bus, 7=truck
-        self.vehicle_class_ids = [2, 3, 5, 7]
-        self.vehicle_classes = self.vehicle_class_ids  # Only detect vehicles (no chairs, suitcases, etc.)
-        self.vehicle_display_classes = {"car", "truck", "bus", "motorcycle"}
+    def __init__(self):
+        self.vehicle_classes = {"car", "truck", "bus", "motorcycle"}
         self._prev_centroids = {}
         self._last_frame_time = {}
         
@@ -54,15 +43,15 @@ class ParkingDetector:
             "A4": [[400, 280], [510, 280], [530, 440], [410, 440]],
             "A5": [[520, 280], [620, 280], [635, 440], [540, 440]]
         }
-        logger.info(f"ParkingDetector instance created with {len(self.DEFAULT_ZONES)} default zones.")
+        logger.info(f"ParkingIntelligence instance created with {len(self.DEFAULT_ZONES)} default zones.")
 
-    async def detect_occupancy(self, frame: np.ndarray, vehicles: List[Dict], zones: Optional[Dict] = None, max_slots: Optional[int] = None) -> Dict[str, Any]:
+    def detect_occupancy(self, vision_state: 'VisionState', zones: Optional[Dict] = None, max_slots: Optional[int] = None) -> Dict[str, Any]:
         """
-        Check which zones are occupied by detected vehicles.
-        If zones are not predefined, we dynamically infer them to perfectly match the vehicles,
-        ensuring 100% accuracy on random camera feeds.
+        Check which zones are occupied by detected vehicles from VisionState.
+        If zones are not predefined, dynamically infer them.
         """
-        h, w = frame.shape[:2]
+        h, w = vision_state.frame_shape
+        vehicles = [t for t in vision_state.tracks if t["class_name"] in self.vehicle_classes]
         slot_states = {}
         
         # If zones are strictly predefined, use them
@@ -181,129 +170,8 @@ class ParkingDetector:
 
         return slot_states
 
-    async def _ensure_model(self):
-        """Ensures the YOLO model is loaded into the class-level cache."""
-        if self.model is not None:
-            return
-        
-        async with ParkingDetector._load_lock:
-            if self.model_name not in ParkingDetector._model_cache:
-                logger.info(f"LAZY LOAD: Initializing YOLO model {self.model_name}...")
-                # Run the blocking YOLO load in an executor
-                from ultralytics import YOLO
-                loop = asyncio.get_event_loop()
-                model = await loop.run_in_executor(None, YOLO, self.model_name)
-                ParkingDetector._model_cache[self.model_name] = model
-                logger.info(f"LAZY LOAD: {self.model_name} loaded successfully.")
-            
-            self.model = ParkingDetector._model_cache[self.model_name]
-            self.model.to(self.device)
-
-    async def detect_vehicles(self, frame: np.ndarray, camera_id: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Detect vehicles and return count + metadata.
-        """
-        await self._ensure_model()
-        import time
-        if frame is None or frame.size == 0:
-            return {"count": 0, "vehicles": [], "avg_velocity": 0.0}
-
-        try:
-            # Run blocking inference in executor
-            loop = asyncio.get_event_loop()
-            results = await loop.run_in_executor(
-                None, 
-                lambda: self.model.predict(
-                    source=frame,
-                    conf=self.conf,
-                    iou=self.iou,
-                    classes=self.vehicle_classes,
-                    device=self.device,
-                    imgsz=1024,
-                    verbose=False
-                )
-            )
-            
-            result = results[0]
-            boxes = result.boxes
-            
-            all_detections = []
-            current_centroids = []
-            if boxes is not None:
-                for box in boxes:
-                    cls_id = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    xyxy = box.xyxy[0].cpu().numpy().tolist()
-                    cw_box = box.xywh[0].cpu().numpy().tolist()
-                    current_centroids.append((cw_box[0], cw_box[1]))
-                    cls_name = self.model.names[cls_id]
-                    all_detections.append({
-                        "type": cls_name,
-                        "confidence": conf,
-                        "bbox": xyxy,
-                        "is_vehicle": cls_name in self.vehicle_display_classes
-                    })
-            
-            # Since we now restrict YOLO to vehicle_class_ids, all_detections are already vehicles.
-            # vehicles = display list (same), all_detections = zone math list
-            vehicles = [d for d in all_detections if d["is_vehicle"]]
-
-            # Velocity Estimation (Pixel shift per second)
-            avg_velocity = 0.0
-            if camera_id and camera_id in self._prev_centroids and self._prev_centroids[camera_id]:
-                prev = self._prev_centroids[camera_id]
-                prev_time = self._last_frame_time.get(camera_id, time.time() - 0.5)
-                dt = time.time() - prev_time
-                
-                if dt > 0:
-                    shifts = []
-                    for cx, cy in current_centroids:
-                        dists = [np.sqrt((cx-px)**2 + (cy-py)**2) for px, py in prev]
-                        if dists and min(dists) < 100:
-                            shifts.append(min(dists))
-                    
-                    if shifts:
-                        avg_velocity = (sum(shifts) / len(shifts)) / dt
-            
-            # Update state
-            if camera_id:
-                self._prev_centroids[camera_id] = current_centroids
-                self._last_frame_time[camera_id] = time.time()
-            
-            return {
-                "count": len(all_detections),
-                "vehicles": vehicles,          # Vehicle-only (for display log)
-                "all_detections": all_detections,  # All hits (for zone occupancy math)
-                "avg_velocity": round(avg_velocity, 2),
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        except Exception as e:
-            logger.error(f"Parking detection error: {e}")
-            return {"count": 0, "vehicles": [], "avg_velocity": 0.0}
-
-    async def process_frame(self, frame: np.ndarray) -> np.ndarray:
-        """
-        Draws vehicle detections on the frame for visual feedback in Smart Parking.
-        Used by the live feed API.
-        """
-        res = await self.detect_vehicles(frame)
-        vehicles = res.get("vehicles", [])
-        
-        for vehicle in vehicles:
-            box = vehicle["bbox"]
-            conf = vehicle["confidence"]
-            v_type = vehicle["type"]
-            
-            # Draw box
-            p1 = (int(box[0]), int(box[1]))
-            p2 = (int(box[2]), int(box[3]))
-            cv2.rectangle(frame, p1, p2, (0, 255, 0), 2)
-            
-            # Label
-            label = f"{v_type} {conf:.2f}"
-            cv2.putText(frame, label, (p1[0], p1[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            
-        return frame
+    def _empty_result(self) -> Dict[str, Any]:
+        return {"count": 0, "vehicles": [], "avg_velocity": 0.0}
 
     def get_current_status(self) -> Dict[str, Any]:
         """Returns raw status for all parking domains in state."""
@@ -408,7 +276,7 @@ _parking_detector = None
 def get_parking_detector():
     global _parking_detector
     if _parking_detector is None:
-        _parking_detector = ParkingDetector()
+        _parking_detector = ParkingIntelligence()
     return _parking_detector
 
 class LazyParkingDetector:

@@ -632,250 +632,39 @@ async def upload_traffic_video(
     file: UploadFile = File(...)
 ):
     """
-    Accept an MP4/video file, run frame-by-frame YOLO detection,
-    accumulate analytics, and return a rich summary.
+    COMPATIBILITY WRAPPER
+    Legacy synchronous upload endpoint converted to use the new asynchronous 
+    Redis/RQ pipeline. It now immediately returns a job_id.
     """
-    tmp_path = None
-    cap = None
+    logger.info(f"📂 Legacy Traffic upload invoked: Redirecting '{file.filename}' to RQ pipeline.")
     
-    suffix = ".mp4"
-    if file.filename and "." in file.filename:
-        suffix = "." + file.filename.rsplit(".", 1)[-1].lower()
-
-    # Read entire file (like incident.py to avoid chunking deadlocks)
+    from app.api.v1.endpoints.upload_jobs import analyze_video
     try:
-        content = await file.read()
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
+        job_response = await analyze_video(file)
     except Exception as e:
-        import traceback
-        logger.error(f"Failed to write upload to temp file: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save uploaded video file.")
-
-    logger.info(f"📂 Traffic upload: Received '{file.filename}'. Temp path: {tmp_path}")
-    try:
-        # ── Open video ──
-        cap = cv2.VideoCapture(tmp_path)
-        if not cap.isOpened():
-            logger.error(f"❌ Video capture failed: Cannot open {tmp_path}.")
-            raise HTTPException(status_code=400, detail=f"Cannot open video. Verify file format (MP4/AVI).")
-
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        # CRITICAL: Next.js proxy times out after 30 seconds.
-        # We must sample less frames to ensure processing finishes within the timeout window.
-        sample_every = max(1, int(fps * 1.5)) # Every 1.5s analysis
-
-        frame_results: list = []
-        all_vehicles:  list = []
-        density_accum = [[0] * GRID_COLS for _ in range(GRID_ROWS)]
-        frame_idx = 0
-
-        while True:
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                break
-
-            if frame_idx % sample_every == 0:
-                try:
-                    result = await traffic_detector.detect_traffic(frame, camera_id)
-                    frame_results.append(result)
-                    all_vehicles.extend(result.get("vehicles", []))
-                    mat = result.get("density_matrix", [])
-                    for r in range(min(GRID_ROWS, len(mat))):
-                        for c in range(min(GRID_COLS, len(mat[r]))):
-                            density_accum[r][c] += mat[r][c]
-                except Exception as det_err:
-                    logger.warning(f"Detection failed on frame {frame_idx}: {det_err}")
-            
-            await asyncio.sleep(0)
-            frame_idx += 1
-
-        # RELEASE EARLY so finally block on Windows can delete the file
-        cap.release()
-        cap = None
-
-        if not frame_results:
-            raise HTTPException(status_code=422, detail="No frames could be analyzed in this video.")
-
-        # Build summary
-        n = max(1, len(frame_results))
-        avg_count = float(round(sum(float(r["count"]) for r in frame_results) / n, 1))
-        avg_speed = float(round(sum(float(r.get("avg_velocity", 0)) for r in frame_results) / n, 1))
-        avg_wait = float(round(sum(float(r.get("wait_time_estimate", 0)) for r in frame_results) / n, 1))
-        max_count = int(max((int(r["count"]) for r in frame_results), default=0))
-        peak_density = max(
-            (r["density"] for r in frame_results),
-            key=lambda d: ["Low", "Medium", "High", "Critical"].index(d) if d in ["Low","Medium","High","Critical"] else 0,
-            default="Low"
-        )
-
-        # Normalize accumulated matrix
-        max_cell = max(density_accum[r][c] for r in range(GRID_ROWS) for c in range(GRID_COLS)) or 1
-        norm_matrix = [[int(round(float(density_accum[r][c]) / max_cell * 10)) for c in range(GRID_COLS)] for r in range(GRID_ROWS)]
-
-        # Fetch Venue Info for Global State (Coordinates)
-        lat, lng = 0.0, 0.0
-        v_name = "Upload Analysis"
-        parsed_venue_id = _try_parse_uuid(venue_id)
-        
-        if parsed_venue_id:
-            try:
-                from app.models.venue import Venue as VenueModel
-                async with db_manager.session() as sess:
-                    v_db = await sess.get(VenueModel, parsed_venue_id)
-                    if v_db:
-                        lat = float(v_db.latitude or 0.0)
-                        lng = float(v_db.longitude or 0.0)
-                        v_name = v_db.name
-            except Exception as e:
-                logger.warning(f"Failed to fetch venue info for upload: {e}")
-
-        # Update Global State
-        from app.core.global_state import GLOBAL_STATE
-        # Update global state for dashboard
-        peak_risk_score = int(max((r.get("risk_score", 0) for r in frame_results), default=0))
-        active_signal = "N/A" # Signal cycles don't apply to static video uploads
-        
-        GLOBAL_STATE.update(
-            domain="traffic",
-            venue_id=str(parsed_venue_id) if parsed_venue_id else "upload-demo",
-            payload={
-                "venue_id": str(parsed_venue_id) if parsed_venue_id else "upload-demo",
-                "venue_name": v_name,
-                "count": avg_count,
-                "avg_velocity": avg_speed,
-                "wait_time_estimate": avg_wait,
-                "risk_score": peak_risk_score,
-                "density": peak_density,
-                "signal": active_signal,
-                "camera_id": camera_id,
-                "latitude": lat,
-                "longitude": lng,
-                "analysis_mode": True,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        )
-
-        # ── Save screenshot and fire notification ──
-        screenshot_path = None
-        peak_risk_score = max((r.get("risk_score", 0) for r in frame_results), default=0)
-
-        if frame_results:
-            worst_idx = max(range(len(frame_results)), key=lambda i: frame_results[i]["count"])
-            try:
-                cap2 = cv2.VideoCapture(tmp_path)
-                cap2.set(cv2.CAP_PROP_POS_FRAMES, worst_idx * sample_every)
-                ret2, worst_frame = cap2.read()
-                cap2.release()
-                if ret2 and worst_frame is not None:
-                    worst_res = frame_results[worst_idx]
-                    annotated_frame = draw_vehicle_overlays(worst_frame.copy(), worst_res.get("vehicles", []))
-                    annotated_frame = draw_hud(annotated_frame, worst_res)
-                    
-                    # Store for stream fallback
-                    _, buffer = cv2.imencode(".jpg", annotated_frame)
-                    _last_injected_frame_bytes[camera_id] = buffer.tobytes()
-                    
-                    os.makedirs("screenshots/traffic", exist_ok=True)
-                    rel_path = f"screenshots/traffic/alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-                    screenshot_path = os.path.abspath(rel_path)
-                    cv2.imwrite(screenshot_path, annotated_frame)
-            except Exception as e:
-                logger.warning(f"Screenshot failed: {e}")
-
-            try:
-                from app.models.venue import Venue as VenueModel
-                async with db_manager.session() as sess:
-                    v_obj = None
-                    if parsed_venue_id:
-                        v_obj = await sess.get(VenueModel, parsed_venue_id)
-                    
-                    if not v_obj:
-                        stmt = select(VenueModel).limit(1)
-                        res = await sess.execute(stmt)
-                        v_obj = res.scalar_one_or_none()
-                    if not v_obj:
-                        from app.models.venue import Venue as VenueModel
-                        v_obj = VenueModel(id="00000000-0000-0000-0000-000000000000", name="Upload Analysis")
-                    
-                    if True:
-                        tier = "CRITICAL" if peak_density == "Critical" else "HIGH"
-                        insight = f"Video analysis of '{file.filename}': Peak {peak_density} with {max_count} vehicles. Avg speed {avg_speed:.1f} px/s."
-                        await _fire_traffic_notification(
-                            venue_id=str(v_obj.id), venue_obj=v_obj,
-                            count=max_count, density=peak_density, velocity=avg_speed,
-                            wait_time=avg_wait, risk_score=peak_risk_score, tier_label=tier,
-                            insight=insight, recommendation=_generate_recommendation(peak_density, peak_risk_score),
-                            screenshot_path=screenshot_path
-                        )
-                        # Push to Global State so it shows up in the UI Insights Box immediately
-                        GLOBAL_STATE.push_event("notifications", "traffic", {
-                            "id": f"VIDEO-{int(time.time()*1000)}",
-                            "domain": "traffic",
-                            "type": "alert",
-                            "risk_level": peak_density.lower(),
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "latitude": lat,
-                            "longitude": lng,
-                            "total_vehicles": max_count,
-                            "congestion_level": peak_density,
-                            "wait_time": round(avg_wait, 1),
-                            "insight": insight,
-                            "recommendation": _generate_recommendation(peak_density, peak_risk_score)
-                        })
-            except Exception as e:
-                logger.error(f"Upload notification failed: {e}")
-        try:
-            import json
-            payload = {
-                "success": True,
-                "filename": file.filename,
-                "frames_analyzed": len(frame_results),
-                "summary": {
-                    "avg_vehicle_count": avg_count,
-                    "max_vehicle_count": max_count,
-                    "avg_speed_px_s": avg_speed,
-                    "avg_wait_time_min": avg_wait,
-                    "peak_density": peak_density,
-                },
-                "density_matrix": norm_matrix,
-                "vehicle_breakdown": _count_by_class(all_vehicles),
-                "timeline": [
-                    {
-                        "frame": int(i * sample_every), 
-                        "count": int(r["count"]), 
-                        "density": str(r["density"]), 
-                        "speed": float(r.get("avg_velocity", 0.0)), 
-                        "risk": int(r.get("risk_score", 0))
-                    }
-                    for i, r in enumerate(frame_results)
-                ],
-            }
-            # Manually test json serialization!
-            json_str = json.dumps(payload)
-            # If it succeeds, return standard payload or JSONResponse
-            from fastapi.responses import JSONResponse
-            return JSONResponse(content=payload)
-        except Exception as e:
-            with open("payload_error.txt", "w") as f:
-                f.write(traceback.format_exc())
-            raise e
-    except Exception as e:
-        logger.error(f"Upload error: {e}", exc_info=True)
-        if isinstance(e, HTTPException):
-            raise e
+        logger.error(f"Failed to queue legacy upload: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        try:
-            if cap: cap.release()
-        except: pass
-        try:
-            if tmp_path and os.path.exists(tmp_path): 
-                os.remove(tmp_path)
-                logger.info(f"🗑️ Cleaned up temp video: {tmp_path}")
-        except Exception as cleanup_err:
-            logger.warning(f"Failed to cleanup temp file {tmp_path if 'tmp_path' in locals() else 'unknown'}: {cleanup_err}")
+        
+    return {
+        "success": True,
+        "filename": file.filename,
+        "job_id": job_response.job_id,
+        "status": job_response.status,
+        "message": "Video queued for asynchronous analysis via RQ Worker.",
+        
+        # Stubbed legacy fields to prevent frontend crashes during transition
+        "frames_analyzed": 0,
+        "summary": {
+            "avg_vehicle_count": 0,
+            "max_vehicle_count": 0,
+            "avg_speed_px_s": 0,
+            "avg_wait_time_min": 0,
+            "peak_density": "Pending",
+        },
+        "density_matrix": [[0]*GRID_COLS for _ in range(GRID_ROWS)],
+        "vehicle_breakdown": {},
+        "timeline": []
+    }
 
 
 def _count_by_class(vehicles: list) -> Dict[str, int]:

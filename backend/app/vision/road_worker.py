@@ -29,10 +29,12 @@ from app.services.notification_service import notification_service
 
 logger = get_logger(__name__)
 
+from app.vision.vision_core import vision_core
+
 class RoadIntelligenceWorker:
     """
-    Dedicated unified worker for a single road/traffic camera.
-    Handles Traffic, Parking, and Incidents in a single inference loop.
+    Dedicated unified worker for a single road/traffic camera (v2.0 Dual-Path Architecture).
+    Handles Video Streaming separately from AI Processing.
     """
 
     def __init__(self, camera_id: UUID, venue_id: UUID, source: Any):
@@ -40,22 +42,19 @@ class RoadIntelligenceWorker:
         self.venue_id = venue_id
         self.source = source
         
-        # Core detectors
-        self.traffic_det = traffic_detector
-        self.parking_det = ParkingDetector()
-        self.incident_det = incident_detector
+        # Core intelligence engines (No YOLO models loaded in these anymore)
+        self.traffic_intel = traffic_detector
+        self.parking_intel = parking_detector
+        self.incident_intel = incident_detector
         
         self._running = False
         self._task: Optional[asyncio.Task] = None
         self._cached_frame_bytes: Optional[bytes] = None
-        self._last_annotated_frame: Optional[np.ndarray] = None
         
-        # State tracking
+        # State tracking for annotations
         self._last_traffic_result: Optional[dict] = None
         self._last_parking_result: Optional[dict] = None
-        self._last_mesh_status: str = "ok"
         
-        # Frame injection for testing
         self.injected_frame: Optional[np.ndarray] = None
 
     async def start(self):
@@ -75,7 +74,11 @@ class RoadIntelligenceWorker:
         logger.info(f"RoadIntelligenceWorker stopped for camera {self.camera_id}")
 
     async def _run_loop(self):
-        """High-performance frame reading loop (UI and Capture)."""
+        """
+        PATH 1: STREAM
+        High-performance frame reading loop. 
+        Serves MJPEG stream directly, totally unaffected by AI lag.
+        """
         self._detection_task = asyncio.create_task(self._detection_loop())
 
         while self._running:
@@ -95,9 +98,10 @@ class RoadIntelligenceWorker:
                         await asyncio.sleep(0.5)
                         continue
 
+                # Pass a copy to the AI buffer safely
                 self._current_raw_frame = frame.copy()
 
-                # 2. Annotation & Rendering
+                # 2. Annotation & Rendering (Optional for debugging, using LAST KNOWN state)
                 annotated = frame.copy()
                 
                 # Render Parking Zones
@@ -118,9 +122,7 @@ class RoadIntelligenceWorker:
                         cv2.putText(annotated, f"CAR {speed:.0f}px/s", (x1, max(0, y1-5)),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
-                self._last_annotated_frame = annotated
-
-                # 3. Cache for MJPEG stream
+                # 3. Cache for MJPEG stream immediately
                 try:
                     _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 65])
                     self._cached_frame_bytes = jpeg.tobytes()
@@ -144,38 +146,44 @@ class RoadIntelligenceWorker:
                 await asyncio.sleep(1)
 
     async def _detection_loop(self):
-        """Unified AI inference loop. Runs YOLO once, feeds Traffic, Parking, and Alerts."""
-        detection_interval = 0.05  # 20 Hz
+        """
+        PATH 2 & 3: PERCEPTION & INTELLIGENCE
+        Runs asynchronously. Takes frames from the buffer, runs Vision Core,
+        and distributes VisionState to intelligence engines.
+        """
         while self._running:
             try:
                 if hasattr(self, '_current_raw_frame') and self._current_raw_frame is not None:
                     frame = self._current_raw_frame.copy()
 
                     # ==========================================
-                    # STEP 1: SINGLE YOLO INFERENCE (Via Traffic)
+                    # PATH 2: PERCEPTION (Vision Core)
                     # ==========================================
-                    # Traffic detector runs YOLO and centroid tracking
-                    traffic_result = await self.traffic_det.detect_traffic(frame.copy(), str(self.camera_id))
-                    self._last_traffic_result = traffic_result
-                    vehicles = traffic_result.get("vehicles", [])
+                    vision_state = await vision_core.process_frame(frame, str(self.camera_id))
+                    
+                    if not vision_state or not vision_state.tracks:
+                        await asyncio.sleep(0.1)
+                        continue
 
                     # ==========================================
-                    # STEP 2: PARKING INTELLIGENCE
+                    # PATH 3: INTELLIGENCE
                     # ==========================================
-                    # Re-use the YOLO bounding boxes to check zone overlap
-                    slot_states = await self.parking_det.detect_occupancy(frame, vehicles)
+                    
+                    # 3A. Traffic Intelligence
+                    traffic_result = self.traffic_intel.analyze_traffic(vision_state)
+                    self._last_traffic_result = traffic_result
+
+                    # 3B. Parking Intelligence
+                    slot_states = self.parking_intel.detect_occupancy(vision_state)
                     occupancy = sum(1 for s in slot_states.values() if s["occupied"])
                     capacity = len(slot_states)
                     self._last_parking_result = {"slot_states": slot_states, "occupancy": occupancy, "capacity": capacity}
 
-                    # ==========================================
-                    # STEP 3: INCIDENT DETECTION
-                    # ==========================================
-                    loop = asyncio.get_running_loop()
-                    incidents = await loop.run_in_executor(None, self.incident_det.detect_incidents, frame.copy())
+                    # 3C. Incident Intelligence
+                    incidents = self.incident_intel.analyze_incidents(vision_state, frame_hsv=cv2.cvtColor(frame, cv2.COLOR_BGR2HSV))
 
                     # ==========================================
-                    # STEP 4: GLOBAL STATE / EVENTS PUBLISH
+                    # GLOBAL STATE PUBLISHING
                     # ==========================================
                     venue_lat, venue_lng, venue_name = 0.0, 0.0, "Unknown Venue"
                     try:
@@ -215,7 +223,7 @@ class RoadIntelligenceWorker:
                     try:
                         from app.api.v1.endpoints.parking import push_parking_event
                         push_parking_event(
-                            camera_id=str(self.camera_id), vehicles=vehicles, frame_shape=frame.shape,
+                            camera_id=str(self.camera_id), vehicles=vision_state.tracks, frame_shape=frame.shape,
                             venue_id=str(self.venue_id), occupancy_pct=(occupancy/capacity*100) if capacity > 0 else 0,
                             capacity=capacity, occupancy=occupancy
                         )
@@ -227,7 +235,9 @@ class RoadIntelligenceWorker:
                             if inc["priority"] in ["HIGH", "CRITICAL"]:
                                 asyncio.create_task(self._process_incident(inc, venue_name))
 
-                await asyncio.sleep(detection_interval)
+                # Rate limit AI loop independent of stream loop
+                await asyncio.sleep(0.1)
+                
             except Exception as e:
                 logger.error(f"Unified Detection loop error: {e}")
                 await asyncio.sleep(1)
