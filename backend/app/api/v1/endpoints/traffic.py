@@ -980,7 +980,7 @@ async def upload_traffic_image(
 async def capture_traffic_video(camera_id: str = Query(...), duration: int = 15):
     """Records a live clip (up to 15s) with active YOLO detections."""
     from app.vision.orchestrator import ORCHESTRATOR
-    from app.vision.traffic_worker import TrafficWorker
+    from app.vision.road_worker import RoadIntelligenceWorker
 
     try:
         cam_uuid = UUID(camera_id)
@@ -988,7 +988,7 @@ async def capture_traffic_video(camera_id: str = Query(...), duration: int = 15)
         raise HTTPException(400, "Invalid UUID")
 
     worker = ORCHESTRATOR._workers.get(cam_uuid)
-    if not worker or not isinstance(worker, TrafficWorker):
+    if not worker or not isinstance(worker, RoadIntelligenceWorker):
         frames = [np.zeros((480, 640, 3), dtype=np.uint8) for _ in range(10)]
     else:
         frames = []

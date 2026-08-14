@@ -572,13 +572,13 @@ async def upload_parking_source(
 
         # ΓöÇΓöÇ 3. Strategic Worker Injection (for live feed sync) ΓöÇΓöÇ
         from app.vision.orchestrator import ORCHESTRATOR
-        from app.vision.parking_worker import ParkingWorker
+        from app.vision.road_worker import RoadIntelligenceWorker
         worker_to_inject = None
         if camera_id and camera_id != "upload-demo":
             try:
                 cam_uuid = UUID(camera_id)
                 w = ORCHESTRATOR._workers.get(cam_uuid)
-                if w and isinstance(w, ParkingWorker):
+                if w and isinstance(w, RoadIntelligenceWorker):
                     worker_to_inject = w
             except: pass
         
@@ -758,13 +758,13 @@ async def download_parking_snapshot(camera_id: Optional[str] = Query(None)):
     it as a downloadable response.
     """
     from app.vision.orchestrator import ORCHESTRATOR
-    from app.vision.parking_worker import ParkingWorker
+    from app.vision.road_worker import RoadIntelligenceWorker
     import uuid
 
     # Find the target worker
     worker = None
     for cid, w in list(ORCHESTRATOR._workers.items()):
-        if isinstance(w, ParkingWorker):
+        if isinstance(w, RoadIntelligenceWorker):
             if camera_id is None or str(cid) == camera_id:
                 worker = w
                 break

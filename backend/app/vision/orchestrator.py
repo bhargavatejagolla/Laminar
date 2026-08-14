@@ -122,15 +122,9 @@ class VisionOrchestrator:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, source.start)
             
-            if venue_type == VenueDomain.PARKING:
-                from app.vision.parking_worker import ParkingWorker
-                worker = ParkingWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
-            elif venue_type == VenueDomain.TRAFFIC:
-                from app.vision.traffic_worker import TrafficWorker
-                worker = TrafficWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
-            elif venue_type == VenueDomain.INCIDENT:
-                from app.vision.incident_worker import IncidentWorker
-                worker = IncidentWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
+            if venue_type in (VenueDomain.PARKING, VenueDomain.TRAFFIC, VenueDomain.INCIDENT):
+                from app.vision.road_worker import RoadIntelligenceWorker
+                worker = RoadIntelligenceWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
             elif venue_type in (VenueDomain.KINETIC, VenueDomain.LIABILITY):
                 from app.vision.kinetic_worker import KineticWorker
                 worker = KineticWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)

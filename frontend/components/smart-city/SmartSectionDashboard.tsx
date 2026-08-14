@@ -102,7 +102,7 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
     if (sectionType === "liability") return `/api/v1/kinetic/stream/${camera.id}`;
     if (sectionType === "greenwave") return `/api/v1/greenwave/stream/${camera.id}`;
     if (sectionType === "guardian") return `/api/v1/guardian/stream/${camera.id}`;
-    // traffic and incident both use the TrafficWorker stream
+    // hub, traffic and incident all use the unified TrafficWorker stream
     return `/api/v1/traffic/stream/${camera.id}`;
   };
   const baseFeed = isStatic ? camera.static_image_url : streamUrl();
@@ -257,6 +257,51 @@ function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera
                 </div>
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-inner transition-colors ${theme.iconBg}`}>
                   <AlertTriangle className={`w-6 h-6 ${theme.textClass}`} />
+                </div>
+              </div>
+            )}
+
+            {sectionType === "hub" && (
+              <div className="flex items-center gap-6">
+                {/* Traffic Density & Velocity */}
+                <div className="flex items-center gap-4 border-r border-white/5 pr-6">
+                  <div className="text-right">
+                    <div className="text-[9px] text-rose-400 font-bold uppercase tracking-widest mb-0.5">{t('smartCity.density')} / Velocity</div>
+                    <div className="text-xl font-black text-white font-mono leading-none tracking-tighter flex gap-2">
+                      <span>{Math.round((insights.traffic?.metrics?.density || 0) * 100)}<span className="text-[10px] text-slate-500 ml-0.5">%</span></span>
+                      <span className="text-slate-600">·</span>
+                      <span className="text-amber-400">{Math.round(insights.traffic?.signals?.[camera.id]?.avg_velocity || 0)}<span className="text-[10px] text-slate-500 ml-0.5">px/s</span></span>
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner bg-rose-500/10 border border-rose-500/20">
+                    <Activity className="w-5 h-5 text-rose-400" />
+                  </div>
+                </div>
+                
+                {/* Parking Occupancy */}
+                <div className="flex items-center gap-4 border-r border-white/5 pr-6">
+                  <div className="text-right">
+                    <div className="text-[9px] text-cyan-400 font-bold uppercase tracking-widest mb-0.5">{t('smartCity.occupancy')}</div>
+                    <div className="text-xl font-black text-white font-mono leading-none tracking-tighter">
+                      {insights.overall?.occupancy_pct || 0}<span className="text-[10px] text-slate-500 ml-0.5">%</span>
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner bg-cyan-500/10 border border-cyan-500/20">
+                    <Car className="w-5 h-5 text-cyan-400" />
+                  </div>
+                </div>
+
+                {/* Tactical Risk */}
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="text-[9px] text-red-400 font-bold uppercase tracking-widest mb-0.5">{t('smartCity.activeRisk')}</div>
+                    <div className="text-xl font-black text-white font-mono leading-none tracking-tighter">
+                      {insights.incidents?.length > 0 ? "HIGH" : "LOW"}
+                    </div>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-inner bg-red-500/10 border border-red-500/20">
+                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                  </div>
                 </div>
               </div>
             )}
@@ -548,8 +593,10 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
         const rawCameras = Array.isArray(camerasRes.data) ? camerasRes.data : [];
         const allCameras = rawCameras.filter((c: any) => c.is_active !== false);
 
-        // Strict domain match or name heuristic, except for hub
-        const sectionVenues = sectionType === 'hub' ? allVenues : allVenues.filter((v: any) => 
+        // Strict domain match or name heuristic, except for hub which filters to Road Intelligence types
+        const sectionVenues = sectionType === 'hub' 
+          ? allVenues.filter((v: any) => ['parking', 'traffic', 'incident'].includes(v.venue_type?.toLowerCase()))
+          : allVenues.filter((v: any) => 
           (v.venue_type && v.venue_type.toLowerCase() === sectionType.toLowerCase()) || 
           (v.name && v.name.toLowerCase().includes(sectionType.toLowerCase()))
         );
@@ -1022,72 +1069,19 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
 
       <div className="flex gap-8 mt-4 items-start flex-col xl:flex-row">
 
-        <div className={`w-full flex-[2] grid gap-6 ${sectionType === 'hub' ? 'grid-cols-1 lg:grid-cols-2' : cameras.length > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} ${cameras.length >= 4 ? 'xl:grid-cols-2' : ''}`}>
+        <div className={`w-full flex-[2] grid gap-6 ${sectionType === 'hub' ? 'grid-cols-1 lg:grid-cols-3' : cameras.length > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'} ${sectionType !== 'hub' && cameras.length >= 4 ? 'xl:grid-cols-2' : ''}`}>
 
-          {sectionType === 'hub' && (
-            <>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
-                <ServiceCard
-                  title={t("auto.ParkingIntellig_9835") || "Parking Intelligence"}
-                  description="Optimize stall occupancy and predict peak demand with AI neural vision."
-                  icon={Car}
-                  href="/smart-parking"
-                  theme={THEMES.parking}
-                  stats={{
-                    "Occupancy": `${currentInsights?.overall?.occupancy_pct || 0}%`,
-                    "Available": currentInsights?.overall?.total_available || 0
-                  }}
-                />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
-                <ServiceCard
-                  title={t("auto.TrafficFlow_9654") || "Traffic Flow"}
-                  description="Real-time vehicle counting and velocity vector analysis for urban throughput."
-                  icon={Activity}
-                  href="/smart-traffic"
-                  theme={THEMES.traffic}
-                  stats={{
-                    "Density": `${currentInsights?.traffic?.overall?.congested_zones > 0 ? "HIGH" : "OPTIMAL"}`,
-                    "Incidents": currentInsights?.traffic?.overall?.total_vehicles || 0
-                  }}
-                />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}>
-                <ServiceCard
-                  title={t("auto.CrowdDynamics_4664") || "Crowd Dynamics"}
-                  description="Heatmap generation and entry/exit auditing for high-traffic facility zones."
-                  icon={Users}
-                  href="/venues"
-                  theme={THEMES.people}
-                  stats={{
-                    "Flow": `${currentInsights?.flow?.entries || 0}/min`,
-                    "Status": "OPTIMAL"
-                  }}
-                />
-              </motion.div>
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }}>
-                <ServiceCard
-                  title={t("auto.TacticalAlerts_854") || "Tactical Alerts"}
-                  description="Automated risk score calculation and emergency dispatch protocols."
-                  icon={AlertTriangle}
-                  href="/smart-incidents"
-                  theme={THEMES.incident}
-                  stats={{
-                    "Risk": currentInsights?.incidents?.length > 0 ? "HIGH" : "LOW",
-                    "Alerts": `${currentInsights?.incidents?.length || 0} ACTIVE`
-                  }}
-                />
-              </motion.div>
-            </>
-          )}
+          {/* Removed ServiceCards for hub view as per Innovator Plan */}
 
-          {sectionType !== 'hub' && cameras.length === 0 && (
+          {cameras.length === 0 && (
             <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5 border-dashed relative overflow-hidden group">
               <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
               <AlertTriangle className="w-16 h-16 text-slate-700 mb-6 group-hover:text-slate-500 transition-colors" />
-              <h3 className="text-2xl font-black text-slate-400 uppercase tracking-widest">No {title} Nodes Detected</h3>
+              <h3 className="text-2xl font-black text-slate-400 uppercase tracking-widest">
+                {sectionType === 'hub' ? 'No Urban Intelligence Nodes Detected' : `No ${title} Nodes Detected`}
+              </h3>
               <p className="text-slate-600 mt-3 text-sm font-medium tracking-wide uppercase max-w-sm text-center leading-relaxed">
-                Deploy Edge infrastructure into venues tagged as "{sectionType}" to enable local intelligence protocols.
+                Deploy Edge infrastructure into venues to enable live urban intelligence protocols.
               </p>
             </div>
           )}
@@ -1115,7 +1109,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
             </div>
           )}
 
-          {sectionType !== 'hub' && cameras.map(cam => {
+          {cameras.map(cam => {
             const currentKineticCameraId = activeKineticCameraId || cameras[0]?.id;
             if (sectionType === 'kinetic' && cam.id !== currentKineticCameraId) return null;
             return (
@@ -1177,6 +1171,49 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
                   <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 font-mono">{t("auto.EdgeNodes_7901") || "Edge Nodes"}</p>
                   <p className={`text-xl font-black font-mono leading-none ${theme.textSecondary}`}>{cameras.length}</p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Unified Road Intelligence Telemetry */}
+          {sectionType === 'hub' && (
+            <div className="bg-[#12121a]/80 backdrop-blur-xl border border-indigo-500/20 rounded-3xl p-6 relative shadow-[0_0_40px_rgba(99,102,241,0.03)] border-t-indigo-500/40">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-indigo-400 font-bold text-[10px] uppercase tracking-[0.3em] font-mono">Unified Telemetry Hub</p>
+                <span className="text-[9px] font-mono font-black px-2 py-1 rounded-full border text-indigo-400 bg-indigo-500/10 border-indigo-500/30">
+                  ALL SYSTEMS NOMINAL
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Global Density</p>
+                  <p className="text-xl font-black font-mono text-white">{Math.round((currentInsights?.traffic?.metrics?.density || 0) * 100)}%</p>
+                </div>
+                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Available Parking</p>
+                  <p className="text-xl font-black font-mono text-emerald-400">{currentInsights?.overall?.total_available || 0}</p>
+                </div>
+              </div>
+
+              {/* Alert Log */}
+              <div className="space-y-3">
+                <p className="text-[9px] text-slate-500 uppercase font-mono tracking-widest border-b border-white/10 pb-2">Active Anomalies</p>
+                {(!currentInsights?.incidents || currentInsights.incidents.length === 0) ? (
+                  <p className="text-slate-600 text-[10px] font-mono py-2 italic">No critical anomalies detected across infrastructure.</p>
+                ) : (
+                  currentInsights.incidents.slice(0, 3).map((inc: any, i: number) => (
+                    <div key={i} className="flex items-start gap-3 bg-red-500/5 p-3 rounded-xl border border-red-500/10">
+                      <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-red-300 text-[10px] font-bold uppercase font-mono">{inc.type}</p>
+                        <p className="text-slate-400 text-[10px] font-mono mt-1 leading-relaxed">
+                          Zone {inc.camera_id} • Severity: {inc.severity}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
