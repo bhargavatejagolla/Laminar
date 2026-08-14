@@ -121,3 +121,6 @@ router.include_router(emergency_router, prefix="/emergency", tags=["Emergency Be
 
 from app.api.v1.endpoints.upload_jobs import router as upload_jobs_router
 router.include_router(upload_jobs_router, prefix="/jobs", tags=["Async Analysis Jobs"])
+
+from app.api.v1.endpoints.operations import router as operations_router
+router.include_router(operations_router, prefix="/operations", tags=["AI Operations Center"])
