@@ -37,6 +37,7 @@ from app.models.journey import Journey
 from app.models.ticket import Ticket, TicketMessage
 from app.models.sos_report import SOSReport
 from app.models.emergency_profile import EmergencyProfile
+from app.models.analysis_job import AnalysisJob
 
 # ==========================================================
 # Public Exports
@@ -58,6 +59,7 @@ __all__ = [
     "TicketMessage",
     "SOSReport",
     "EmergencyProfile",
+    "AnalysisJob",
 ]
 
 

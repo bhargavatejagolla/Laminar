@@ -118,3 +118,6 @@ router.include_router(liquid_router, prefix="/liquid", tags=["Liquid Threat"])
 
 from app.api.v1.endpoints.emergency import router as emergency_router
 router.include_router(emergency_router, prefix="/emergency", tags=["Emergency Beacon"])
+
+from app.api.v1.endpoints.upload_jobs import router as upload_jobs_router
+router.include_router(upload_jobs_router, prefix="/jobs", tags=["Async Analysis Jobs"])

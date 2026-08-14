@@ -40,3 +40,7 @@ reportlab>=4.2.0        # AI-powered PDF reports
 shapely>=2.0.0          # Geofence zone containment checks
 scikit-learn>=1.4.0     # Isolation Forest anomaly detection
 prophet>=1.1.5        # Predictive surge forecasting
+
+# ── Queue & Background Processing ─────────────────────────────────────────────
+redis>=5.0.0
+rq>=1.16.1

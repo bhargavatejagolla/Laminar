@@ -1109,6 +1109,53 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
             </div>
           )}
 
+          {/* UPLOAD ANALYSIS ZONE */}
+          {sectionType === 'hub' && (
+            <div className="col-span-full mb-4">
+               <label className="cursor-pointer block w-full bg-gradient-to-br from-indigo-950/40 to-[#0c0c14] border border-dashed border-indigo-500/30 hover:border-indigo-500/60 rounded-3xl p-8 transition-all relative overflow-hidden group">
+                 <div className="flex flex-col items-center justify-center gap-4 relative z-10">
+                    <div className="p-4 bg-indigo-500/10 rounded-2xl group-hover:scale-110 transition-transform">
+                      <Upload className="w-8 h-8 text-indigo-400" />
+                    </div>
+                    <div className="text-center">
+                      <h3 className="text-lg font-black text-white uppercase tracking-wider">LAMINAR VISION INPUT</h3>
+                      <p className="text-slate-400 text-xs mt-1 uppercase tracking-widest">Drag & Drop or Click to Upload Media for Asynchronous Forensic Analysis</p>
+                    </div>
+                 </div>
+                 <input type="file" className="hidden" accept="video/*" onChange={async (e) => {
+                   const file = e.target.files?.[0];
+                   if (!file) return;
+                   
+                   const formData = new FormData();
+                   formData.append("file", file);
+                   
+                   const uploadToast = toast.loading("Uploading media to LAMINAR Vision Core...");
+                   try {
+                     const res = await api.post("/jobs/analyze-video", formData, { headers: {"Content-Type": "multipart/form-data"}});
+                     if (res.data?.job_id) {
+                       toast.success(`Job Queued: ${res.data.job_id}`, {id: uploadToast});
+                       // Set up polling (in a real app, WebSocket is preferred)
+                       const pollId = setInterval(async () => {
+                         try {
+                           const statusRes = await api.get(`/jobs/status/${res.data.job_id}`);
+                           if (statusRes.data?.status === 'COMPLETED') {
+                             clearInterval(pollId);
+                             toast.success("Analysis Complete! Refreshing timeline...", { duration: 5000 });
+                           } else if (statusRes.data?.status === 'FAILED') {
+                             clearInterval(pollId);
+                             toast.error(`Analysis Failed: ${statusRes.data.error_message}`);
+                           }
+                         } catch (e) { }
+                       }, 5000);
+                     }
+                   } catch (err) {
+                     toast.error("Failed to upload media.", {id: uploadToast});
+                   }
+                 }} />
+               </label>
+            </div>
+          )}
+
           {cameras.map(cam => {
             const currentKineticCameraId = activeKineticCameraId || cameras[0]?.id;
             if (sectionType === 'kinetic' && cam.id !== currentKineticCameraId) return null;
