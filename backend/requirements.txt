@@ -33,7 +33,7 @@ python-jose[cryptography]==3.3.0
 aiosmtplib==3.0.1
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
-python-multipart==0.0.9
+python-multipart==0.0.32
 
 # ── New Advanced AI Features ──────────────────────────────────────────────────
 reportlab>=4.2.0        # AI-powered PDF reports
