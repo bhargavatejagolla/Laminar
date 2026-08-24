@@ -16,7 +16,7 @@ sqlalchemy==2.0.29
 asyncpg==0.29.0
 
 python-dotenv==1.0.1
-ultralytics>=8.3.0
+ultralytics>=8.4.126
 opencv-python-headless==4.9.0.80
 numpy>=1.26.4
 torch>=2.4.0
