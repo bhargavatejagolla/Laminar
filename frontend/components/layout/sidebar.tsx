@@ -82,10 +82,10 @@ export default function Sidebar() {
       ].filter(i => i.show)
     },
     {
-      labelKey: "nav.smartCity",
-      label: "Smart City OS",
+      labelKey: "nav.roadIntelligence",
+      label: "Road Intelligence",
       items: [
-        { nameKey: "nav.systemsHub", name: "Systems Hub", href: "/smart-systems", icon: Globe, show: true },
+        { nameKey: "nav.roadIntelligence", name: "Road Intelligence", href: "/road-intelligence", icon: Car, show: true },
       ].filter(i => i.show)
     },
     {
