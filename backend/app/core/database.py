@@ -668,24 +668,41 @@ async def get_async_session_factory():
 # This allows: async with async_session_factory() as session:
 
 
+class _SessionContextManager:
+    def __init__(self, db_manager):
+        self.db_manager = db_manager
+        self._cm = None
+
+    def _get_cm(self):
+        if self._cm is None:
+            self._cm = self.db_manager.session()
+        return self._cm
+
+    async def __aenter__(self):
+        return await self._get_cm().__aenter__()
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        return await self._get_cm().__aexit__(exc_type, exc_val, exc_tb)
+
+    def __await__(self):
+        async def _get():
+            return await self.db_manager.get_session()
+        return _get().__await__()
+
+
 class _AsyncSessionFactory:
     def __init__(self, db_manager):
         self.db_manager = db_manager
-        self._factory = None
 
-    async def __call__(self):
-        if not self.db_manager.is_initialized:
-            await self.db_manager.initialize()
-        if self._factory is None:
-            self._factory = self.db_manager.session_factory
-        return self._factory()
+    def __call__(self):
+        return _SessionContextManager(self.db_manager)
 
-    def __aenter__(self):
-        raise RuntimeError(
-            "Use 'async with async_session_factory() as session' not 'async with async_session_factory'")
+    async def __aenter__(self):
+        self._cm = self.db_manager.session()
+        return await self._cm.__aenter__()
 
-    def __aexit__(self, *args):
-        pass
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        return await self._cm.__aexit__(exc_type, exc_val, exc_tb)
 
 
 # Create the singleton instance
