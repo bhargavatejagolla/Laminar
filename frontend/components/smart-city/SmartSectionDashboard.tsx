@@ -89,6 +89,90 @@ function ServiceCard({ title, description, icon: Icon, href, stats, theme }: { t
   );
 }
 
+// Analytics Drill-down Modal
+function AnalyticsModal({ isOpen, onClose, domain, insights, cameras, theme }: any) {
+  if (!isOpen) return null;
+  const { t } = useTranslation();
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-8 backdrop-blur-sm bg-black/60">
+      <div className={`w-full max-w-4xl bg-[#0a0a10] border ${theme.borderClass} rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-full relative`}>
+        <div className={`p-5 border-b ${theme.borderClass} flex items-center justify-between bg-white/5`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${theme.iconBg}`}>
+              {domain === 'parking' ? <Car className={`w-5 h-5 ${theme.textClass}`} /> : <Activity className={`w-5 h-5 ${theme.textClass}`} />}
+            </div>
+            <h2 className="text-xl font-black uppercase tracking-widest text-white">{domain} Analytics</h2>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+          {domain === 'parking' && (
+            <>
+              {/* Parking Specific Analytics */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-slate-500 uppercase font-mono mb-1">{t("auto.Available_2179") || "Available Slots"}</p>
+                  <p className="text-2xl font-black font-mono text-emerald-400">{insights?.overall?.total_available || 0}</p>
+                </div>
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-slate-500 uppercase font-mono mb-1">Occupied Slots</p>
+                  <p className="text-2xl font-black font-mono text-white">{insights?.overall?.occupied || 0}</p>
+                </div>
+              </div>
+              {insights?.zones && (
+                <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                  <p className="text-emerald-400 font-bold text-[10px] uppercase tracking-[0.3em] mb-4 font-mono">Parking Zone Matrix</p>
+                  <div className="space-y-4">
+                    {Object.entries(insights.zones).map(([zoneId, zone]: [string, any]) => (
+                      <div key={zoneId} className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-400 uppercase font-bold tracking-widest">Zone {zoneId.toUpperCase()}</span>
+                          <span className="text-white font-black font-mono">{zone.available}/{zone.capacity} <span className="text-slate-500 text-[10px] font-sans">available</span></span>
+                        </div>
+                        <div className="w-full bg-white/5 h-3 rounded-full overflow-hidden flex gap-0.5">
+                          {[...Array(Math.min(20, zone.capacity > 0 ? 20 : 1))].map((_, i) => {
+                            const isOccupied = i < Math.floor((zone.occupancy_pct / 100) * 20);
+                            return <div key={i} className={`flex-1 h-full rounded-sm ${isOccupied ? 'bg-rose-500/50' : 'bg-emerald-400'}`} />;
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {domain === 'traffic' && (
+             <>
+               {/* Traffic Specific Analytics */}
+               <div className="grid grid-cols-2 gap-4">
+                 <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                   <p className="text-[10px] text-slate-500 uppercase font-mono mb-1">Global Density</p>
+                   <p className="text-2xl font-black font-mono text-rose-400">{Math.round((insights?.metrics?.density || 0) * 100)}%</p>
+                 </div>
+                 <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                   <p className="text-[10px] text-slate-500 uppercase font-mono mb-1">Avg Velocity</p>
+                   <p className="text-2xl font-black font-mono text-amber-400">{Math.round(insights?.signals?.[cameras[0]?.id]?.avg_velocity || 0)} px/s</p>
+                 </div>
+               </div>
+               <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                 <p className="text-rose-400 font-bold text-[10px] uppercase tracking-[0.3em] mb-4 font-mono">Flow Timeline</p>
+                 <div className="h-24 flex items-end gap-1">
+                   {[...Array(30)].map((_, i) => (
+                     <div key={i} className={`flex-1 rounded-t-sm bg-rose-500/40`} style={{ height: `${Math.random() * 80 + 20}%` }} />
+                   ))}
+                 </div>
+               </div>
+             </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Reusable Camera Card Component
 function CameraFeedCard({ camera, sectionType, insights, showHeatmap }: { camera: any; sectionType: string; insights: any; showHeatmap?: boolean }) {
   const { t } = useTranslation();
@@ -519,6 +603,7 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
   const [occupancyHistory, setOccupancyHistory] = useState<number[]>(Array(20).fill(0));
   const [activeKineticCameraId, setActiveKineticCameraId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeModal, setActiveModal] = useState<'traffic' | 'parking' | null>(null);
   const kineticEventsHook = useKineticEvents();
 
   // Hook telemetry depending on section type
@@ -1233,12 +1318,18 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
               </div>
               
               <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Global Density</p>
+                <div 
+                  className="bg-white/5 rounded-2xl p-3 border border-white/5 hover:border-rose-500/30 hover:bg-white/10 cursor-pointer transition-all"
+                  onClick={() => setActiveModal('traffic')}
+                >
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Global Density <span className="float-right text-rose-400">View Analytics ↗</span></p>
                   <p className="text-xl font-black font-mono text-white">{Math.round((currentInsights?.traffic?.metrics?.density || 0) * 100)}%</p>
                 </div>
-                <div className="bg-white/5 rounded-2xl p-3 border border-white/5">
-                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Available Parking</p>
+                <div 
+                  className="bg-white/5 rounded-2xl p-3 border border-white/5 hover:border-emerald-500/30 hover:bg-white/10 cursor-pointer transition-all"
+                  onClick={() => setActiveModal('parking')}
+                >
+                  <p className="text-[9px] text-slate-500 uppercase font-mono mb-1">Available Parking <span className="float-right text-emerald-400">View Analytics ↗</span></p>
                   <p className="text-xl font-black font-mono text-emerald-400">{currentInsights?.overall?.total_available || 0}</p>
                 </div>
               </div>
@@ -1476,6 +1567,15 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
           )}
         </div>
       </div>
+
+      <AnalyticsModal 
+        isOpen={activeModal !== null} 
+        onClose={() => setActiveModal(null)} 
+        domain={activeModal} 
+        insights={activeModal === 'parking' ? currentInsights : currentInsights?.traffic}
+        cameras={cameras}
+        theme={activeModal ? THEMES[activeModal] : THEMES.hub}
+      />
     </div>
   );
 }
