@@ -7,6 +7,7 @@ Filters for cars, trucks, buses, and motorcycles.
 """
 
 import asyncio
+import time
 from typing import Tuple, List, Dict, Any, Optional
 import numpy as np
 import cv2
