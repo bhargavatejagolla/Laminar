@@ -79,5 +79,18 @@ async def get_job_status(job_id: str):
             "status": job.status,
             "progress_percent": job.progress_percent,
             "error_message": job.error_message,
-            "result_data": job.result_data
+            "result_data": job.result_data,
+            "original_filename": job.original_filename
         }
+
+@router.get("/stream/{job_id}")
+async def stream_uploaded_video(job_id: str):
+    """Serve uploaded video file for HTML5 Video Player playback."""
+    from fastapi.responses import FileResponse
+    async with async_session_factory() as session:
+        from sqlalchemy.future import select
+        result = await session.execute(select(AnalysisJob).where(AnalysisJob.job_id == job_id))
+        job = result.scalar_one_or_none()
+        if not job or not job.file_path or not os.path.exists(job.file_path):
+            raise HTTPException(status_code=404, detail="Video file not found")
+        return FileResponse(job.file_path, media_type="video/mp4")
