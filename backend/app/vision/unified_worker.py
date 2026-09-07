@@ -11,6 +11,7 @@ from app.core.global_state import GLOBAL_STATE
 from app.core.database import db_manager
 from app.services.notification_service import notification_service
 from app.vision.video_normalizer import VideoNormalizer
+from app.vision.traffic_worker import draw_vehicle_overlays, draw_hud
 
 logger = get_logger(__name__)
 
@@ -83,8 +84,9 @@ class UnifiedWorker:
                 # Render annotations (using self._last_result)
                 annotated = frame.copy()
                 if self._last_result:
-                    # In future, we will draw based on RoadState
-                    pass
+                    vehicles = self._last_result.get("vehicles", [])
+                    annotated = draw_vehicle_overlays(annotated, vehicles)
+                    annotated = draw_hud(annotated, self._last_result)
                 self._last_annotated_frame = annotated
                 
                 # Cache MJPEG bytes

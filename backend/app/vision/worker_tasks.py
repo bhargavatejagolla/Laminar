@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import asyncio
+from datetime import datetime, timezone
 from sqlalchemy.future import select
 import psutil
 
@@ -9,6 +10,8 @@ from app.core.database import async_session_factory
 from app.models.analysis_job import AnalysisJob, JobStatus
 from app.vision.vision_core import VisionCore
 from app.vision.incident_detector import incident_detector
+from app.vision.traffic_worker import draw_vehicle_overlays, draw_hud
+from app.core.global_state import GLOBAL_STATE
 
 def process_upload_job(job_id: str, file_path: str, job_timeout: int = 3600):
     """
@@ -27,8 +30,9 @@ def process_upload_job(job_id: str, file_path: str, job_timeout: int = 3600):
 
 async def async_process_upload_job(job_id: str, file_path: str):
     """
-    Async logic for analyzing the video using VisionCore.
-    Runs cleanly within the server's main event loop via BackgroundTasks.
+    Async logic for analyzing uploaded video using VisionCore.
+    Generates annotated video with bounding boxes, speeds, and incident highlights,
+    and broadcasts detected accidents to the live Incident Feed.
     """
     # 1. Mark job as PROCESSING
     async with async_session_factory() as session:
@@ -54,6 +58,15 @@ async def async_process_upload_job(job_id: str, file_path: str):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
 
+    # Prepare VideoWriter for Annotated Output Video
+    annotated_path = os.path.join(os.path.dirname(file_path), f"annotated_{job_id}.mp4")
+    writer = None
+    try:
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        writer = cv2.VideoWriter(annotated_path, fourcc, fps, (width, height))
+    except Exception:
+        writer = None
+
     incidents = []
     events_log = []
     vehicle_class_counts = {"Car": 0, "Truck": 0, "Bus": 0, "Motorcycle": 0}
@@ -76,14 +89,11 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 break
 
             frame_idx += 1
+            annotated_frame = frame.copy()
 
-            # Sample every (fps / 3) frames in non-dense mode for responsive processing
+            # Sample rate for heavy processing
             skip_rate = max(1, int(fps / 3))
-            if not in_dense_mode and frame_idx % skip_rate != 0:
-                continue
-
-            # Yield CPU briefly
-            await asyncio.sleep(0.005)
+            is_sample_frame = (frame_idx % skip_rate == 0) or in_dense_mode
 
             # Motion detection
             fg_mask = bg_subtractor.apply(frame)
@@ -98,16 +108,17 @@ async def async_process_upload_job(job_id: str, file_path: str):
                     if dense_mode_frames_left <= 0:
                         in_dense_mode = False
 
+            if is_sample_frame:
                 vision_state = await worker_vision_core.process_frame(frame, f"job_{job_id}")
                 frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
                 frame_incidents = incident_detector.analyze_incidents(vision_state, frame_hsv)
 
                 # Process tracked objects for counts & vehicle classes
-                tracked_objs = vision_state.get("tracked_objects", [])
+                tracked_objs = vision_state.tracks if hasattr(vision_state, "tracks") else []
                 v_count = len(tracked_objs)
                 sampled_counts.append(v_count)
 
-                speeds = [obj.get("velocity", 10.0) for obj in tracked_objs if "velocity" in obj]
+                speeds = [obj.get("speed_px_s", 10.0) for obj in tracked_objs if "speed_px_s" in obj]
                 avg_frame_speed = float(np.mean(speeds)) if speeds else float(12.0 + motion_ratio * 40.0)
                 sampled_speeds.append(avg_frame_speed)
 
@@ -123,17 +134,57 @@ async def async_process_upload_job(job_id: str, file_path: str):
                         vehicle_class_counts["Car"] += 1
 
                     # Update 4x4 spatial density grid
-                    box = obj.get("box", [0, 0, 100, 100])
+                    box = obj.get("bbox", [0, 0, 100, 100])
                     cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
                     r_idx = min(3, max(0, int((cy / height) * 4)))
                     c_idx = min(3, max(0, int((cx / width) * 4)))
                     density_matrix[r_idx][c_idx] += 1
 
-                # Incident recording
+                # Incident recording & Live Event Push
                 if frame_incidents:
                     for inc in frame_incidents:
                         inc["timestamp_seconds"] = round(frame_idx / fps, 2)
                         incidents.append(inc)
+
+                        # Broadcast incident event to Global State for live Incident Feed
+                        inc_event = {
+                            "id": f"upload_job_{job_id}_{frame_idx}",
+                            "type": inc.get("type", "collision"),
+                            "priority": inc.get("priority", "CRITICAL"),
+                            "title": f"Incident Detected on Uploaded Video",
+                            "description": inc.get("description", f"Vehicle accident detected at {inc['timestamp_seconds']}s."),
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "confidence": inc.get("confidence", 0.9),
+                            "camera_id": f"job_{job_id}",
+                            "location": "Road Feed Video Upload"
+                        }
+                        GLOBAL_STATE.push_event("incident", "", inc_event)
+
+                # Draw bounding boxes & vehicle labels
+                annotated_frame = draw_vehicle_overlays(annotated_frame, tracked_objs)
+
+                # Draw incident warnings if present
+                if frame_incidents:
+                    for inc in frame_incidents:
+                        if "bbox" in inc and len(inc["bbox"]) == 4:
+                            bx1, by1, bx2, by2 = [int(p) for p in inc["bbox"]]
+                            cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 0, 255), 3)
+                            cv2.putText(annotated_frame, f"⚠️ COLLISION ({int(inc.get('confidence', 0.9)*100)}%)", 
+                                        (bx1, max(by1 - 8, 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                        
+                        # Banner header
+                        cv2.rectangle(annotated_frame, (0, 0), (width, 42), (0, 0, 180), -1)
+                        cv2.putText(annotated_frame, f"CRITICAL INCIDENT DETECTED: {inc.get('description', 'Collision')}", 
+                                    (15, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+
+                # Draw HUD
+                hud_data = {
+                    "count": v_count,
+                    "density": "High" if v_count > 10 else "Medium" if v_count > 4 else "Low",
+                    "avg_velocity": avg_frame_speed,
+                    "risk_score": min(100, int(v_count * 5 + len(frame_incidents) * 40))
+                }
+                annotated_frame = draw_hud(annotated_frame, hud_data)
 
                 # Add to periodic events log
                 if frame_idx % int(fps * 2) == 0:
@@ -146,6 +197,13 @@ async def async_process_upload_job(job_id: str, file_path: str):
                         "risk": risk_lvl
                     })
 
+            # Write frame to video output
+            if writer is not None:
+                try:
+                    writer.write(annotated_frame)
+                except Exception:
+                    pass
+
             # Update progress periodically
             if frame_idx % 60 == 0 and total_frames > 0:
                 progress = min(99.0, round((frame_idx / total_frames) * 100, 1))
@@ -157,7 +215,12 @@ async def async_process_upload_job(job_id: str, file_path: str):
                         job.frames_analyzed = frame_idx
                         await session.commit()
 
+            # Yield CPU briefly
+            await asyncio.sleep(0.001)
+
         cap.release()
+        if writer is not None:
+            writer.release()
 
         # Compute summary metrics
         avg_v_count = float(np.mean(sampled_counts)) if sampled_counts else 0.0
@@ -190,7 +253,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
             "incidents": incidents
         }
 
-        # Mark COMPLETED (retain file on disk for player streaming!)
+        # Mark COMPLETED
         async with async_session_factory() as session:
             result = await session.execute(select(AnalysisJob).where(AnalysisJob.job_id == job_id))
             job = result.scalar_one_or_none()
@@ -203,6 +266,8 @@ async def async_process_upload_job(job_id: str, file_path: str):
 
     except Exception as exc:
         cap.release()
+        if writer is not None:
+            writer.release()
         await _fail_job(job_id, f"Analysis error: {str(exc)}")
 
 async def _fail_job(job_id: str, message: str):

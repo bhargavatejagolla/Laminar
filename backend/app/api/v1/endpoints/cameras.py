@@ -178,11 +178,12 @@ async def list_cameras(
     if camera_type:
         query = query.where(Camera.camera_type == camera_type)
 
-    if not user.is_super_admin:
+    if not user.is_super_admin and getattr(user, "role", "").lower() != "admin":
         allowed_venue_ids = {v.id for v in user.venues}
-        if venue_id and venue_id not in allowed_venue_ids:
-            return []  # Filter explicitly
-        query = query.where(Camera.venue_id.in_(list(allowed_venue_ids)))
+        if allowed_venue_ids:
+            if venue_id and venue_id not in allowed_venue_ids:
+                return []  # Filter explicitly
+            query = query.where(Camera.venue_id.in_(list(allowed_venue_ids)))
 
     # Add pagination
     query = query.offset(skip).limit(limit).order_by(Camera.created_at.desc())
