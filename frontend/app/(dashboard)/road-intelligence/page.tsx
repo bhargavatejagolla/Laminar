@@ -234,9 +234,8 @@ function AnalyticsModal({ open, onClose, domain, insights }: any) {
 // ── Main Operational Page ─────────────────────────────────────────────────
 export default function RoadIntelligencePage() {
   const { t } = useTranslation();
-  const { setVenue } = useActiveVenue();
+  const { activeVenueId, setVenue } = useActiveVenue();
 
-  const [selectedVenueId, setSelectedVenueId] = useState<string>("");
   const [venues, setVenues] = useState<Venue[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,16 +248,17 @@ export default function RoadIntelligencePage() {
   const [jobProgress, setJobProgress] = useState<number>(0);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
 
-  const { insights: parkingInsights } = (useParkingInsights(selectedVenueId) || {}) as any;
-  const { insights: trafficInsights } = (useTrafficInsights(selectedVenueId) || {}) as any;
-  const incidentResult = useIncidentAlerts(selectedVenueId) as any;
+  // All telemetry is scoped to the venue configured in Venue Settings
+  const { insights: parkingInsights } = (useParkingInsights(activeVenueId ?? "") || {}) as any;
+  const { insights: trafficInsights } = (useTrafficInsights(activeVenueId ?? "") || {}) as any;
+  const incidentResult = useIncidentAlerts(activeVenueId ?? "") as any;
   const rawAlerts: any[] = Array.isArray(incidentResult?.alerts)
     ? incidentResult.alerts
     : Array.isArray(incidentResult)
     ? incidentResult
     : [];
 
-  // Fetch venues & cameras
+  // Fetch venues & cameras — auto-bind first road venue to active venue context
   useEffect(() => {
     async function load() {
       try {
@@ -278,12 +278,13 @@ export default function RoadIntelligencePage() {
           roadCameras = allC.filter((c: any) => c.is_active !== false);
         }
 
-        setVenues(roadVenues.length > 0 ? roadVenues : allV);
+        const displayVenues = roadVenues.length > 0 ? roadVenues : allV;
+        setVenues(displayVenues);
         setCameras(roadCameras);
-        const activeList = roadVenues.length > 0 ? roadVenues : allV;
-        if (activeList[0]) {
-          setVenue(activeList[0].id);
-          setSelectedVenueId(activeList[0].id);
+
+        // Only auto-set venue if none is configured in venue settings yet
+        if (!activeVenueId && displayVenues[0]) {
+          setVenue(displayVenues[0].id);
         }
       } catch (e) {
         console.error("Failed to load road intelligence data", e);
@@ -403,22 +404,36 @@ export default function RoadIntelligencePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Venue Selector Dropdown */}
-          <select
-            value={selectedVenueId}
-            onChange={(e) => {
-              setSelectedVenueId(e.target.value);
-              if (e.target.value) setVenue(e.target.value);
-            }}
-            className="bg-black/60 border border-white/10 text-cyan-400 text-xs font-bold font-mono rounded-xl px-3 py-2 outline-none focus:border-cyan-500/50 cursor-pointer shadow-inner"
-          >
-            <option value="">All Venues (Citywide)</option>
-            {venues.map((v) => (
-              <option key={v.id} value={v.id} className="bg-[#080810] text-white">
-                {v.name} ({(v.venue_type || "Venue").toUpperCase()})
-              </option>
-            ))}
-          </select>
+          {/* Venue Context — driven by Venue Settings configuration */}
+          {(() => {
+            const activeVenue = venues.find(v => v.id === activeVenueId);
+            const vType = activeVenue?.venue_type?.toUpperCase() || "";
+            const typeColor =
+              vType === "TRAFFIC"   ? "text-rose-400 border-rose-500/30 bg-rose-500/10" :
+              vType === "PARKING"   ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" :
+              vType === "INCIDENT"  ? "text-amber-400 border-amber-500/30 bg-amber-500/10" :
+                                      "text-cyan-400 border-cyan-500/30 bg-cyan-500/10";
+            return activeVenue ? (
+              <Link
+                href={`/venues/${activeVenue.id}`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-mono font-black uppercase tracking-widest transition-all hover:scale-[1.02] ${typeColor}`}
+                title="Configured via Venue Settings — click to edit"
+              >
+                <MapPin className="w-3 h-3" />
+                <span className="max-w-[140px] truncate">{activeVenue.name}</span>
+                {vType && <span className="opacity-60">· {vType}</span>}
+              </Link>
+            ) : (
+              <Link
+                href="/venues"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-dashed border-slate-600 text-slate-500 text-[10px] font-mono font-bold uppercase tracking-widest hover:border-cyan-500/40 hover:text-cyan-400 transition-all"
+                title="No road venue configured — go to Venues to set one up"
+              >
+                <Settings2 className="w-3 h-3" />
+                Configure Venue →
+              </Link>
+            );
+          })()}
 
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase ${hasIncidents ? "border-rose-500/30 bg-rose-500/10 text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${hasIncidents ? "bg-rose-400 animate-pulse" : "bg-emerald-400"}`} />
@@ -589,7 +604,7 @@ export default function RoadIntelligencePage() {
 
         {/* ── SECTION 2: LIVE EDGE CAMERAS GRID ── */}
         {(() => {
-          const displayCameras = selectedVenueId ? cameras.filter(c => c.venue_id === selectedVenueId) : cameras;
+          const displayCameras = activeVenueId ? cameras.filter(c => c.venue_id === activeVenueId) : cameras;
           const finalCams = displayCameras.length > 0 ? displayCameras : cameras;
           return (
             <div className="space-y-4">
