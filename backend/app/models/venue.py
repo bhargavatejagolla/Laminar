@@ -227,8 +227,8 @@ class Venue(BaseModel):
         lazy="selectin",
     )
 
-    alerts: Mapped[List["CrowdAlert"]] = relationship(
-        "CrowdAlert",
+    alerts: Mapped[List["SystemAlert"]] = relationship(
+        "SystemAlert",
         back_populates="venue",
         cascade="all, delete-orphan",
         lazy="selectin",

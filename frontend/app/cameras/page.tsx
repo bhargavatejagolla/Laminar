@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useCameras } from "@/hooks/useCameras";
 import { Video, Activity, Search, Filter, Plus, ShieldCheck } from "lucide-react";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 import CameraGrid from "@/components/cameras/camera-grid";
 import CameraStats from "@/components/cameras/camera-stats";
 import AddCameraModal from "@/components/venues/add-camera-modal";
@@ -39,18 +38,6 @@ export default function CamerasPage() {
 
   return (
     <div className="min-h-screen bg-transparent text-white pb-12 relative overflow-hidden">
-      <SplashCursor
-        DENSITY_DISSIPATION={3.5}
-        VELOCITY_DISSIPATION={2}
-        PRESSURE={0.1}
-        CURL={3}
-        SPLAT_RADIUS={0.15}
-        SPLAT_FORCE={6000}
-        COLOR_UPDATE_SPEED={10}
-        SHADING
-        RAINBOW_MODE={false}
-        COLOR="#22d3ee"
-      />
 
       {/* Background Matrix Effect */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.015)_1px,transparent_1px)] bg-[size:48px_48px] pointer-events-none -z-10 [mask-image:radial-gradient(ellipse_50%_50%_at_50%_0%,#000_80%,transparent_100%)]"></div>

@@ -7,7 +7,6 @@ import { Upload, Search, ShieldAlert, Target, Clock, ArrowRight, ScanLine, Activ
 import { api } from "@/services/api";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
 import ElectricBorder from "@/components/react-bits/ElectricBorder";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 import { useTranslation } from "react-i18next";
 
 // Trajectory Interface
@@ -159,21 +158,6 @@ export default function AmberDashboard() {
             <div className="absolute inset-0 bg-gradient-to-br from-red-950/20 via-[#060000] to-[#040000] pointer-events-none" />
             <div className="absolute inset-x-0 top-0 h-[2px] bg-red-500/30 animate-pulse shadow-[0_0_20px_rgba(239,68,68,0.8)]" />
 
-            {amberData && (
-                <SplashCursor
-                    DENSITY_DISSIPATION={3}
-                    VELOCITY_DISSIPATION={2}
-                    PRESSURE={0}
-                    CURL={2}
-                    SPLAT_RADIUS={0.3}
-                    SPLAT_FORCE={4000}
-                    COLOR_UPDATE_SPEED={10}
-                    SHADING={true}
-                    RAINBOW_MODE={false}
-                    COLOR="#EF4444"
-                    TRANSPARENT={true}
-                />
-            )}
 
             {/* HEADER */}
             <header className="flex justify-between items-center shrink-0 z-10 border-b border-red-500/20 pb-6 relative">

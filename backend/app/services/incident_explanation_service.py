@@ -159,6 +159,45 @@ Instruction: Write exactly 2-3 sentences. Focus heavily on actionable, real-worl
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
+    async def explain_traffic_incident(
+        self,
+        incident_type: str,
+        confidence: float,
+        description: str,
+        signals: Dict[str, float]
+    ) -> str:
+        """
+        Randy: The Explainer for Traffic Incidents.
+        Uses LLM to translate structured IncidentEvidence signals into a clear, factual explanation.
+        """
+        try:
+            signals_str = ", ".join([f"{k}: {v:.2f}" for k, v in signals.items()])
+            
+            prompt = f"""You are 'Randy', the Explainer AI for the Laminar Road Intelligence platform.
+Your task is to translate raw incident evidence signals into a short, factual 1-sentence explanation for an operator.
+
+Incident Type: {incident_type}
+Confidence: {confidence * 100:.1f}%
+Raw Description: {description}
+Evidence Signals: {signals_str}
+
+RULES:
+1. ONLY use the provided evidence signals. Do NOT hallucinate vehicle colors, makes, weather, or road names.
+2. Translate the signals into human-readable terms (e.g., if 'decel_1' is high, say 'A vehicle suddenly decelerated').
+3. Keep it to exactly ONE factual sentence.
+4. Do NOT use filler words like "Based on the evidence" or "The data shows". Just state the facts.
+
+Explanation:"""
+            
+            from app.services.ai_provider_service import ai_provider
+            llm_text = await ai_provider.generate_response(prompt, timeout=5.0)
+            if llm_text:
+                return llm_text.strip()
+        except Exception as e:
+            logger.debug(f"LLM traffic incident explanation failed, using fallback: {e}")
+            
+        return description
+
     def generate_insufficient_data_explanation(self) -> Dict[str, Any]:
         """Return a standard explanation when there is insufficient historical data."""
         return {

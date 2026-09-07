@@ -22,7 +22,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.venue import Venue
 from app.core.logging import get_logger
 from app.core.repository import Repository
@@ -38,7 +38,7 @@ class AlertExplainerService:
     _cache_max_size = 100
 
     def __init__(self):
-        self.alert_repo = Repository[CrowdAlert](CrowdAlert)
+        self.alert_repo = Repository[SystemAlert](SystemAlert)
         self.venue_repo = Repository[Venue](Venue)
 
     def _get_cache_key(self, decision: Dict[str, Any]) -> str:
@@ -263,7 +263,7 @@ Alert Explanation:"""
         alert_id: UUID,
         explanation: str,
     ) -> None:
-        """Update the CrowdAlert record with the explanation."""
+        """Update the SystemAlert record with the explanation."""
         try:
             alert = await self.alert_repo.get_by_id(session, alert_id)
             if alert:

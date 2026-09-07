@@ -404,12 +404,12 @@ async def system_health_job():
                 )
 
             # Check for stuck alerts
-            from app.models.crowd_alert import CrowdAlert
+            from app.models.system_alert import SystemAlert
             result = await session.execute(
-                select(CrowdAlert)
+                select(SystemAlert)
                 .where(
-                    CrowdAlert.status.in_(["new", "open", "acknowledged"]),
-                    CrowdAlert.created_at < datetime.now(
+                    SystemAlert.status.in_(["new", "open", "acknowledged"]),
+                    SystemAlert.created_at < datetime.now(
                         timezone.utc) - timedelta(hours=1),
                 )
             )
@@ -499,11 +499,11 @@ async def recurrent_health_notification_job():
     async with db_manager.session() as session:
         try:
             # Query open camera issue alerts that haven't been notified recently
-            from app.models.crowd_alert import CrowdAlert
-            stmt = select(CrowdAlert).where(
-                CrowdAlert.status.in_(["new", "open"]),
-                CrowdAlert.extra_data.contains({"type": "camera_issue"}),
-                (CrowdAlert.last_notified_at == None) | (CrowdAlert.last_notified_at < cutoff)
+            from app.models.system_alert import SystemAlert
+            stmt = select(SystemAlert).where(
+                SystemAlert.status.in_(["new", "open"]),
+                SystemAlert.extra_data.contains({"type": "camera_issue"}),
+                (SystemAlert.last_notified_at == None) | (SystemAlert.last_notified_at < cutoff)
             )
             
             result = await session.execute(stmt)

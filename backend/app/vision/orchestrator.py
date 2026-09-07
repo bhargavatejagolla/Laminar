@@ -109,29 +109,58 @@ class VisionOrchestrator:
             # Determine which detector to use based on venue_type
             venue_type = camera.venue.venue_type
             
-            # Create source
-            source = create_camera_source(
-                source_type=camera.stream_type or "rtsp",
-                source_identifier=camera.stream_url,
-                width=camera.resolution_width or 640,
-                height=camera.resolution_height or 480,
-                target_fps=camera.fps or 5
-            )
-            
-            # Start source
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, source.start)
-            
             if venue_type in (VenueDomain.PARKING, VenueDomain.TRAFFIC, VenueDomain.INCIDENT):
-                from app.vision.road_worker import RoadIntelligenceWorker
-                worker = RoadIntelligenceWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
+                from app.vision.unified_worker import UnifiedWorker
+                # Prefer the camera's explicit configuration; fallback to venue domain
+                profile = camera.camera_type if camera.camera_type in ("traffic", "parking", "generic") else ("traffic" if venue_type in (VenueDomain.TRAFFIC, VenueDomain.INCIDENT) else "parking")
+                if profile == "generic":
+                    profile = "traffic" if venue_type in (VenueDomain.TRAFFIC, VenueDomain.INCIDENT) else "parking"
+                
+                worker = UnifiedWorker(
+                    camera_id=camera.id,
+                    venue_id=camera.venue_id,
+                    stream_url=camera.stream_url,
+                    stream_type=camera.stream_type or "rtsp",
+                    camera_profile=profile
+                )
             elif venue_type in (VenueDomain.KINETIC, VenueDomain.LIABILITY):
+                # Create source for legacy workers
+                source = create_camera_source(
+                    source_type=camera.stream_type or "rtsp",
+                    source_identifier=camera.stream_url,
+                    width=camera.resolution_width or 640,
+                    height=camera.resolution_height or 480,
+                    target_fps=camera.fps or 5
+                )
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, source.start)
+                
                 from app.vision.kinetic_worker import KineticWorker
                 worker = KineticWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
             elif venue_type == VenueDomain.GREENWAVE:
+                source = create_camera_source(
+                    source_type=camera.stream_type or "rtsp",
+                    source_identifier=camera.stream_url,
+                    width=camera.resolution_width or 640,
+                    height=camera.resolution_height or 480,
+                    target_fps=camera.fps or 5
+                )
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, source.start)
+                
                 from app.vision.greenwave_worker import GreenWaveWorker
                 worker = GreenWaveWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
             elif venue_type == VenueDomain.GUARDIAN:
+                source = create_camera_source(
+                    source_type=camera.stream_type or "rtsp",
+                    source_identifier=camera.stream_url,
+                    width=camera.resolution_width or 640,
+                    height=camera.resolution_height or 480,
+                    target_fps=camera.fps or 5
+                )
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, source.start)
+                
                 from app.vision.guardian_worker import GuardianWorker
                 worker = GuardianWorker(camera_id=camera.id, venue_id=camera.venue_id, source=source)
             else:

@@ -11,7 +11,7 @@ Design:
   has YOLO bounding boxes drawn on it)
 - Clip uses the existing EvidenceClipService / recording mechanism
   already inside StreamWorker
-- Both paths are written to CrowdAlert.extra_data JSONB to avoid
+- Both paths are written to SystemAlert.extra_data JSONB to avoid
   any database schema migration
 """
 
@@ -53,7 +53,7 @@ class EvidenceSnapshotService:
     1. Grab the latest annotated frame from the running StreamWorker
     2. Resize + save as JPEG  →  storage/alert_snapshots/<name>.jpg
     3. Start a 10-second clip recording  →  downloads/evidence_clips/<name>.mp4
-    4. Persist both paths in CrowdAlert.extra_data
+    4. Persist both paths in SystemAlert.extra_data
     """
 
     def __init__(self):
@@ -301,16 +301,16 @@ class EvidenceSnapshotService:
         clip_path: Optional[str],
     ) -> None:
         """
-        Update CrowdAlert.extra_data with snapshot_path and clip_path.
+        Update SystemAlert.extra_data with snapshot_path and clip_path.
         Uses a fresh DB session to avoid session conflicts.
         """
         try:
             from sqlalchemy import select
-            from app.models.crowd_alert import CrowdAlert
+            from app.models.system_alert import SystemAlert
 
             async with db_manager.session() as session:
                 result = await session.execute(
-                    select(CrowdAlert).where(CrowdAlert.id == alert_id)
+                    select(SystemAlert).where(SystemAlert.id == alert_id)
                 )
                 alert = result.scalar_one_or_none()
                 if not alert:

@@ -9,7 +9,7 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crowd_metric import CrowdMetric
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.camera import Camera
 from app.models.venue import Venue
 from app.services.prediction_service import PredictionService
@@ -133,9 +133,9 @@ class ReportService:
         )
 
         alert_stmt = (
-            select(func.count(CrowdAlert.id))
-            .where(CrowdAlert.venue_id == venue_id)
-            .where(CrowdAlert.created_at >= today_start)
+            select(func.count(SystemAlert.id))
+            .where(SystemAlert.venue_id == venue_id)
+            .where(SystemAlert.created_at >= today_start)
         )
 
         alert_result = await session.execute(alert_stmt)
@@ -178,9 +178,9 @@ class ReportService:
 
         # Recent Alerts (Last 20)
         recent_alert_stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.venue_id == venue_id)
-            .order_by(desc(CrowdAlert.created_at))
+            select(SystemAlert)
+            .where(SystemAlert.venue_id == venue_id)
+            .order_by(desc(SystemAlert.created_at))
             .limit(20)
         )
         recent_alert_result = await session.execute(recent_alert_stmt)

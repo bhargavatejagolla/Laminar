@@ -36,7 +36,7 @@ from sqlalchemy import select, desc, func
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.models.venue import Venue
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.venue_event import VenueEvent
 from app.models.crowd_metric import CrowdMetric
 from app.models.camera import Camera
@@ -192,9 +192,9 @@ class AIAssistantService:
 
             # Active alerts (open + acknowledged)
             active_result = await session.execute(
-                select(CrowdAlert)
-                .where(CrowdAlert.status.in_(["open", "acknowledged"]))
-                .order_by(desc(CrowdAlert.created_at))
+                select(SystemAlert)
+                .where(SystemAlert.status.in_(["open", "acknowledged"]))
+                .order_by(desc(SystemAlert.created_at))
                 .limit(10)
             )
             active_alerts = active_result.scalars().all()
@@ -276,9 +276,9 @@ class AIAssistantService:
         # 2. Recent alerts (last 30 days)
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         alerts_result = await session.execute(
-            select(CrowdAlert)
-            .where(CrowdAlert.created_at >= thirty_days_ago)
-            .order_by(desc(CrowdAlert.created_at))
+            select(SystemAlert)
+            .where(SystemAlert.created_at >= thirty_days_ago)
+            .order_by(desc(SystemAlert.created_at))
             .limit(1000)
         )
         for a in alerts_result.scalars().all():
@@ -316,7 +316,7 @@ DATABASE MODELS:
 - Camera: id, venue_id, name, code, stream_url, stream_type, is_active, is_online, health_status, zone_name, location_label, floor_level
 - CrowdFrame: id, camera_id, captured_at, detected_count, raw_detections (YOLO output)
 - CrowdMetric: id, venue_id, camera_id, bucket_type (minute/hour/day), bucket_start, avg_count, max_count, min_count, risk_level
-- CrowdAlert: id, venue_id, risk_level, severity, status, escalation_level, created_at, explanation, extra_data
+- SystemAlert: id, venue_id, risk_level, severity, status, escalation_level, created_at, explanation, extra_data
 - VenueEvent: id, venue_id, event_type, start_time, end_time, description
 - Journey: id, global_track_id, camera_id, venue_id, first_seen_at, last_seen_at, embedding (512-dim ResNet-18)
 - PersonWaitRecord: id, venue_id, entered_at, exited_at, wait_duration_seconds
@@ -376,9 +376,9 @@ API ENDPOINTS (Backend port 8000):
         try:
             ninety_days_ago = datetime.now(timezone.utc) - timedelta(days=90)
             alerts_result = await session.execute(
-                select(CrowdAlert)
-                .where(CrowdAlert.created_at >= ninety_days_ago)
-                .order_by(desc(CrowdAlert.created_at))
+                select(SystemAlert)
+                .where(SystemAlert.created_at >= ninety_days_ago)
+                .order_by(desc(SystemAlert.created_at))
                 .limit(2000)
             )
             for a in alerts_result.scalars().all():

@@ -211,7 +211,7 @@ class User(Base):
     # ==========================================================
 
     # Alerts acknowledged by this user
-    # Can be added later when needed: acknowledged_alerts: Mapped[List["CrowdAlert"]] = relationship(...)
+    # Can be added later when needed: acknowledged_alerts: Mapped[List["SystemAlert"]] = relationship(...)
 
     venues: Mapped[List["Venue"]] = relationship(
         "Venue",

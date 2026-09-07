@@ -21,7 +21,7 @@ from app.vision.manager import vision_manager
 from app.models.camera import Camera
 from app.models.crowd_metric import CrowdMetric
 from app.models.venue import Venue
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 
 
 from app.core.logging import get_logger
@@ -181,9 +181,9 @@ async def dashboard_stats():
         active_cameras_count = active_cameras_result.scalar_one() or 0
 
         alerts_result = await session.execute(
-            select(func.count(CrowdAlert.id)).where(
-                CrowdAlert.status.in_(["new", "open", "acknowledged"]),
-                CrowdAlert.resolved_at.is_(None)
+            select(func.count(SystemAlert.id)).where(
+                SystemAlert.status.in_(["new", "open", "acknowledged"]),
+                SystemAlert.resolved_at.is_(None)
             )
         )
         alerts_count = alerts_result.scalar_one() or 0
@@ -210,10 +210,10 @@ async def dashboard_stats():
         most_crowded = hotspot_camera or "No active zones"
 
         critical_alerts_result = await session.execute(
-            select(func.count(CrowdAlert.id)).where(
-                CrowdAlert.severity >= 75,
-                CrowdAlert.status.in_(["new", "open", "acknowledged"]),
-                CrowdAlert.resolved_at.is_(None)
+            select(func.count(SystemAlert.id)).where(
+                SystemAlert.severity >= 75,
+                SystemAlert.status.in_(["new", "open", "acknowledged"]),
+                SystemAlert.resolved_at.is_(None)
             )
         )
         critical_alerts_count = critical_alerts_result.scalar_one() or 0

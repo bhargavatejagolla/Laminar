@@ -1,8 +1,8 @@
 """
-Laminar - Crowd Alert Model
+Laminar - System Alert Model
 ----------------------------
 
-Represents an active or historical alert for a venue.
+Represents an active or historical alert for a venue across domains (crowd, traffic, parking).
 """
 
 from typing import Optional
@@ -22,10 +22,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 from app.models.base import BaseModel
 
 
-class CrowdAlert(BaseModel):
-    """Alert generated from risk engine decisions."""
+class SystemAlert(BaseModel):
+    """Generic alert generated from risk engine decisions across domains."""
 
-    __tablename__ = "crowd_alerts"
+    __tablename__ = "system_alerts"
 
     # ==========================================================
     # Relationships
@@ -52,6 +52,13 @@ class CrowdAlert(BaseModel):
     # ==========================================================
     # Alert details
     # ==========================================================
+    
+    domain: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="crowd",
+        index=True,
+    )
 
     extra_data :Mapped[Optional[dict]]=mapped_column(
         JSONB,
@@ -173,6 +180,6 @@ class CrowdAlert(BaseModel):
 # Indexes
 # ==========================================================
 
-Index("ix_alert_venue_status", CrowdAlert.venue_id, CrowdAlert.status)
-Index("ix_alert_escalation", CrowdAlert.escalation_level, CrowdAlert.status)
-Index("ix_alert_timeline", CrowdAlert.created_at.desc())
+Index("ix_system_alerts_venue_status", SystemAlert.venue_id, SystemAlert.status)
+Index("ix_system_alerts_escalation", SystemAlert.escalation_level, SystemAlert.status)
+Index("ix_system_alerts_timeline", SystemAlert.created_at.desc())

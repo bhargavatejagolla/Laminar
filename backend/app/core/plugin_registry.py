@@ -49,7 +49,7 @@ class PluginBase(ABC):
         pass
 
     async def on_alert(self, alert_data: Dict[str, Any]) -> None:
-        """Called when a new CrowdAlert is created."""
+        """Called when a new SystemAlert is created."""
         pass
 
     async def on_camera_health(self, health_data: Dict[str, Any]) -> None:

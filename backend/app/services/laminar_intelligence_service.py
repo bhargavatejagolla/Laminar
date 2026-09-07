@@ -38,7 +38,7 @@ from sqlalchemy import select, desc, func, and_
 from app.core.logging import get_logger
 from app.models.venue import Venue
 from app.models.camera import Camera
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.crowd_metric import CrowdMetric
 
 logger = get_logger(__name__)
@@ -248,9 +248,9 @@ class LaminarIntelligenceService:
 
         # Active alerts
         alerts_result = await session.execute(
-            select(CrowdAlert)
-            .where(CrowdAlert.venue_id == venue_id, CrowdAlert.status.in_(["open", "acknowledged"]))
-            .order_by(desc(CrowdAlert.created_at))
+            select(SystemAlert)
+            .where(SystemAlert.venue_id == venue_id, SystemAlert.status.in_(["open", "acknowledged"]))
+            .order_by(desc(SystemAlert.created_at))
             .limit(5)
         )
         alerts = alerts_result.scalars().all()
@@ -337,7 +337,7 @@ class LaminarIntelligenceService:
     # ─── Rule-Based Fallback Intelligence ────────────────────────────────────
 
     def _rule_based_intelligence(
-        self, context: Dict[str, Any], cross_camera: str, alert: Optional[CrowdAlert] = None, lang: str = "en"
+        self, context: Dict[str, Any], cross_camera: str, alert: Optional[SystemAlert] = None, lang: str = "en"
     ) -> OperationalIntelligence:
         """
         Generate structured intelligence without LLM.
@@ -507,7 +507,7 @@ class LaminarIntelligenceService:
     # ─── LLM-Powered Intelligence ─────────────────────────────────────────────
 
     async def _llm_intelligence(
-        self, model: str, context: Dict[str, Any], cross_camera: str, alert: Optional[CrowdAlert] = None, prev_intel: Optional[OperationalIntelligence] = None, lang: str = "en"
+        self, model: str, context: Dict[str, Any], cross_camera: str, alert: Optional[SystemAlert] = None, prev_intel: Optional[OperationalIntelligence] = None, lang: str = "en"
     ) -> Optional[OperationalIntelligence]:
         """
         Use Llama 3.2 to generate full structured operational intelligence.
@@ -628,7 +628,7 @@ Respond ONLY with valid JSON. No preamble, no explanation.
     # ─── Main Public API ──────────────────────────────────────────────────────
 
     async def analyze_venue(
-        self, session: AsyncSession, venue_id: UUID, alert: Optional[CrowdAlert] = None, lang: str = "en"
+        self, session: AsyncSession, venue_id: UUID, alert: Optional[SystemAlert] = None, lang: str = "en"
     ) -> OperationalIntelligence:
         """
         Main entry point — generate full operational intelligence for a venue.
@@ -708,7 +708,7 @@ Respond ONLY with valid JSON. No preamble, no explanation.
         return final_intel
 
     async def generate_notification_brief(
-        self, session: AsyncSession, alert: CrowdAlert, venue_name: str, location: str, lang: str = "en"
+        self, session: AsyncSession, alert: SystemAlert, venue_name: str, location: str, lang: str = "en"
     ) -> str:
         """
         Generate a concise AI intelligence brief for notifications/emails.
@@ -762,7 +762,7 @@ Respond ONLY with valid JSON. No preamble, no explanation.
             )
 
     async def analyze_event(
-        self, session: AsyncSession, domain: str, alert: CrowdAlert, lang: str = "en"
+        self, session: AsyncSession, domain: str, alert: SystemAlert, lang: str = "en"
     ) -> OperationalIntelligence:
         """
         AI analysis for tactical events (Traffic, Incident, Parking).
@@ -843,9 +843,9 @@ Respond ONLY with valid JSON. No preamble, no explanation.
 
         # Active alerts summary
         alerts_result = await session.execute(
-            select(CrowdAlert)
-            .where(CrowdAlert.status.in_(["open", "acknowledged"]))
-            .order_by(desc(CrowdAlert.severity))
+            select(SystemAlert)
+            .where(SystemAlert.status.in_(["open", "acknowledged"]))
+            .order_by(desc(SystemAlert.severity))
             .limit(10)
         )
         alerts = alerts_result.scalars().all()

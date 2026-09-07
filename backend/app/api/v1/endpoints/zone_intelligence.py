@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.logging import get_logger
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.crowd_frame import CrowdFrame
 from app.services.intelligence.zone_orchestrator import (
     get_zone_orchestrator,

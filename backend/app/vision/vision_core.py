@@ -42,11 +42,12 @@ class VehicleTracker:
     Lightweight centroid-based multi-object tracker.
     Assigns persistent IDs to vehicles/people across frames and computes speed.
     """
-    def __init__(self, max_lost: int = 10, max_dist: float = 80.0):
+    def __init__(self, max_lost: int = 10, max_dist: float = 80.0, calibration=None):
         self.next_id = 1
-        self.tracks: Dict[int, Dict] = {}  # id -> {cx, cy, last_seen, frames_lost, speed_px_s, class_name, trajectory}
+        self.tracks: Dict[int, Dict] = {}  # id -> {cx, cy, last_seen, frames_lost, speed_px_s, speed_kmh, class_name, trajectory}
         self.max_lost = max_lost
         self.max_dist = max_dist
+        self.calibration = calibration
 
     def update(self, detections: List[Dict], dt: float) -> List[Dict]:
         """
@@ -71,7 +72,13 @@ class VehicleTracker:
             if best_id is not None:
                 # Compute speed from displacement
                 old = self.tracks[best_id]
-                speed_val = float(best_dist / max(dt, 0.05))
+                speed_px_s = float(best_dist / max(dt, 0.05))
+                
+                speed_kmh = 0.0
+                if self.calibration:
+                    speed_kmh = self.calibration.calculate_speed_kmh(
+                        (old["cx"], old["cy"]), (cx, cy), max(dt, 0.05)
+                    )
                 
                 # Update trajectory history
                 traj = old.get("trajectory", [])
@@ -82,28 +89,31 @@ class VehicleTracker:
                 self.tracks[best_id].update({
                     "cx": float(cx), "cy": float(cy),
                     "frames_lost": 0,
-                    "speed_px_s": round(speed_val, 1),
+                    "speed_px_s": round(speed_px_s, 1),
+                    "speed_kmh": round(speed_kmh, 1),
                     "class_name": det["class_name"],
                     "last_seen": time.time(),
                     "trajectory": traj
                 })
                 used_track_ids.add(best_id)
                 det["track_id"] = best_id
-                det["speed_px_s"] = round(speed_val, 1)
+                det["speed_px_s"] = round(speed_px_s, 1)
+                det["speed_kmh"] = round(speed_kmh, 1)
                 det["trajectory"] = traj
-                det["wait_time_s"] = float(round(max(0.0, 30.0 - speed_val * 0.3), 1))
+                det["wait_time_s"] = float(round(max(0.0, 30.0 - speed_px_s * 0.3), 1))
             else:
                 # New track
                 new_id = self.next_id
                 self.next_id += 1
                 self.tracks[new_id] = {
                     "cx": cx, "cy": cy, "frames_lost": 0,
-                    "speed_px_s": 0.0, "class_name": det["class_name"],
+                    "speed_px_s": 0.0, "speed_kmh": 0.0, "class_name": det["class_name"],
                     "last_seen": time.time(),
                     "trajectory": [(cx, cy, time.time())]
                 }
                 det["track_id"] = new_id
                 det["speed_px_s"] = 0.0
+                det["speed_kmh"] = 0.0
                 det["trajectory"] = [(cx, cy, time.time())]
                 det["wait_time_s"] = 30.0
 
@@ -204,7 +214,9 @@ class VisionCore:
             self._last_frame_time[camera_id] = now
             
             if camera_id not in self._trackers:
-                self._trackers[camera_id] = VehicleTracker()
+                # Initialize with a default calibration (can be customized per camera later)
+                from app.vision.calibration import CameraCalibration
+                self._trackers[camera_id] = VehicleTracker(calibration=CameraCalibration())
                 
             tracked_dets = self._trackers[camera_id].update(raw_dets, dt)
 
@@ -217,6 +229,7 @@ class VisionCore:
                     "confidence": float(d["confidence"]),
                     "bbox": [float(round(v, 1)) for v in d["bbox"]],
                     "speed_px_s": float(d["speed_px_s"]),
+                    "speed_kmh": float(d["speed_kmh"]),
                     "wait_time_s": float(d["wait_time_s"]),
                     "cx": float(round(d["cx"], 1)),
                     "cy": float(round(d["cy"], 1)),

@@ -22,7 +22,6 @@ const SECTION_ICONS: Record<string, React.ElementType> = {
 
 import { useParkingInsights, useTrafficInsights, useKineticInsights, useKineticEvents, useIncidentAlerts } from "@/hooks/useTelemetry";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 import ElectricBorder from "@/components/react-bits/ElectricBorder";
 import Loading from "@/app/loading";
 
@@ -735,21 +734,6 @@ export function SmartSectionDashboard({ sectionType, title }: { sectionType: str
 
   return (
     <div className="w-full min-h-screen bg-[#0a0a10] text-white p-8 flex flex-col gap-8 custom-scrollbar overflow-y-auto relative isolate">
-      {sectionType === 'hub' && (
-        <SplashCursor
-          DENSITY_DISSIPATION={3.5}
-          VELOCITY_DISSIPATION={2}
-          PRESSURE={0.1}
-          CURL={3}
-          SPLAT_RADIUS={0.2}
-          SPLAT_FORCE={6000}
-          COLOR_UPDATE_SPEED={10}
-          SHADING={true}
-          RAINBOW_MODE={false}
-          COLOR="#A855F7"
-          TRANSPARENT={true}
-        />
-      )}
 
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between shrink-0">

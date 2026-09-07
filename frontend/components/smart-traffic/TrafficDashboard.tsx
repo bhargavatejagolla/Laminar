@@ -40,7 +40,6 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { api } from "@/services/api";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 import { useTranslation } from "react-i18next";
 
 // ─── Risk / density color maps ───────────────────────────────────────────────
@@ -461,10 +460,6 @@ export function TrafficDashboard() {
 
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12 relative z-10">
-      <div className="fixed inset-0 pointer-events-none z-[-1] opacity-40">
-        <SplashCursor />
-      </div>
-
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

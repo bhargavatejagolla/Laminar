@@ -33,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.camera import Camera
 from app.models.venue import Venue
 from app.models.alert_contact import AlertContact
@@ -71,7 +71,7 @@ class NotificationService:
     async def notify_camera_issue(
         self,
         session: AsyncSession,
-        alert: CrowdAlert,
+        alert: SystemAlert,
     ) -> None:
         """
         Send a specialized notification for camera health issues with
@@ -296,7 +296,7 @@ class NotificationService:
     async def notify_status_change(
         self,
         session: AsyncSession,
-        alert: CrowdAlert,
+        alert: SystemAlert,
         status: str,
     ) -> None:
         """
@@ -422,7 +422,7 @@ class NotificationService:
     async def notify(
         self,
         session: AsyncSession,
-        alert: CrowdAlert,
+        alert: SystemAlert,
     ) -> None:
         """
         Send notification for alert if cooldown allows.
@@ -696,9 +696,9 @@ class NotificationService:
         if metadata and metadata.get("camera_location"):
             location_text = metadata.get("camera_location")
 
-        # Build a temporary CrowdAlert for email builder
+        # Build a temporary SystemAlert for email builder
         # Add domain to extra_data so AI engine and email builder can see it
-        temp_alert = CrowdAlert(
+        temp_alert = SystemAlert(
             venue_id=venue.id,
             risk_level=risk_level,
             explanation=description,
@@ -761,7 +761,7 @@ class NotificationService:
     # Offline SMS Alert Method
     # ==========================================================
 
-    async def _trigger_offline_sms(self, session: AsyncSession, alert: CrowdAlert, venue: Venue, location_text: str, live_metrics: dict = None) -> None:
+    async def _trigger_offline_sms(self, session: AsyncSession, alert: SystemAlert, venue: Venue, location_text: str, live_metrics: dict = None) -> None:
         """Fetch alert contacts from DB and dispatch SMS in background."""
         try:
             from app.models.user import User
@@ -910,7 +910,7 @@ class NotificationService:
             logger.warning(f"Ollama not reachable during model detection: {e}")
         return ""
 
-    def _rule_based_brief(self, alert: CrowdAlert, venue: Venue, location_text: str, lang: str = "en") -> str:
+    def _rule_based_brief(self, alert: SystemAlert, venue: Venue, location_text: str, lang: str = "en") -> str:
         """
         Generate a professional situation brief from alert data.
         Optimized to handle low-data states gracefully.
@@ -972,7 +972,7 @@ class NotificationService:
             note=data_state_note
         )
 
-    async def _generate_ai_brief(self, alert: CrowdAlert, venue: Venue, location_text: str, session: AsyncSession = None, lang: str = "en") -> tuple[str, bool]:
+    async def _generate_ai_brief(self, alert: SystemAlert, venue: Venue, location_text: str, session: AsyncSession = None, lang: str = "en") -> tuple[str, bool]:
         """
         Generate a full AI intelligence brief using the Laminar Intelligence Engine.
         Returns (brief_text, is_ai_generated).
@@ -998,7 +998,7 @@ class NotificationService:
 
     def _build_email(
         self,
-        alert: CrowdAlert,
+        alert: SystemAlert,
         venue: Venue,
         location_text: str,
         color: str,

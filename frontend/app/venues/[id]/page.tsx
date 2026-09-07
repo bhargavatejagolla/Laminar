@@ -16,7 +16,6 @@ import EditVenueModal from "@/components/venues/edit-venue-modal";
 import IntelligencePanel from "@/components/intelligence/IntelligencePanel";
 import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 
 export default function VenueDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { t } = useTranslation();
@@ -50,9 +49,6 @@ export default function VenueDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="min-h-screen bg-transparent text-white pb-12 relative z-10">
-      <div className="fixed inset-0 pointer-events-none z-[-1] opacity-40">
-        <SplashCursor />
-      </div>
       {/* Back navigation & Header */}
       <div className="mb-8">
         <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors mb-6 group">

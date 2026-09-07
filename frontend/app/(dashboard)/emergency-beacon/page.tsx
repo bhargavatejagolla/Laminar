@@ -26,7 +26,8 @@ export default function EmergencyBeaconPage() {
         full_name: "",
         default_address: "",
         emergency_contact_name: "",
-        emergency_contact_phone: ""
+        emergency_contact_phone: "",
+        photo_url: ""
     });
 
     // Emergency Sequence State

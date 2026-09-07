@@ -28,7 +28,7 @@ from app.services.notification_service import NotificationService
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.venue import Venue
 from app.core.repository import Repository
 from app.core.logging import get_logger
@@ -100,7 +100,7 @@ class AlertEngineService:
     POLICE_ESCALATION_LEVELS = {"critical"}
 
     def __init__(self, escalation_policy: Optional[EscalationPolicy] = None):
-        self.alert_repo = Repository[CrowdAlert](CrowdAlert)
+        self.alert_repo = Repository[SystemAlert](SystemAlert)
         self.venue_repo = Repository[Venue](Venue)
         self.escalation_policy = escalation_policy or EscalationPolicy()
         self.notification_service = NotificationService()
@@ -143,7 +143,7 @@ class AlertEngineService:
         *,
         decision: Dict[str, Any],
         tenant_id: Optional[UUID] = None,
-    ) -> Optional[CrowdAlert]:
+    ) -> Optional[SystemAlert]:
         """
         Consume RiskEngine decision and create/manage alert.
 
@@ -166,9 +166,10 @@ class AlertEngineService:
         if tenant_id and venue.tenant_id != tenant_id:
             raise ValueError("Venue not in tenant.")
 
-        # Prevent duplicate active alerts for same venue/camera
+        # Prevent duplicate active alerts for same venue/camera/domain
         camera_id = decision.get("camera_id")
-        existing = await self._get_active_alert(session, venue_id, camera_id=camera_id)
+        domain = decision.get("domain", "crowd")
+        existing = await self._get_active_alert(session, venue_id, camera_id=camera_id, domain=domain)
 
         # Scale RiskEngine's 1-10 score to 10-100 for legacy compatibility
         dynamic_severity = int((decision.get("severity", 5) * 10))
@@ -272,7 +273,7 @@ class AlertEngineService:
                 # ── ⚡ Tactical Mesh Push (Escalation) ────────────────────────
                 try:
                     await self.notification_service.push_notification(
-                        domain="crowd",
+                        domain=existing.domain,
                         type="Escalated Alert",
                         priority=existing.risk_level.upper(),
                         description=f"ESCALATION: {existing.explanation}",
@@ -379,8 +380,8 @@ class AlertEngineService:
             "reason": decision.get("xai_explanation"), # Fallback for detailed view
         }
 
-        # Create new alert with all intelligence signals
-        alert = CrowdAlert(
+        alert = SystemAlert(
+            domain=decision.get("domain", "crowd"),
             venue_id=venue_id,
             tenant_id=venue.tenant_id,
             metric_id=UUID(decision["metric_id"]),
@@ -405,8 +406,8 @@ class AlertEngineService:
         # ── ⚡ Tactical Mesh Push (New Alert) ───────────────────────────
         try:
             await self.notification_service.push_notification(
-                domain="crowd",
-                type=decision.get("alert_type", "Crowd Anomaly"),
+                domain=created.domain,
+                type=decision.get("alert_type", "Anomaly Detection"),
                 priority=created.risk_level.upper(),
                 description=created.explanation,
                 venue_id=str(created.venue_id),
@@ -517,7 +518,7 @@ class AlertEngineService:
         alert_id: UUID,
         user_id: UUID,
         notes: Optional[str] = None,
-    ) -> CrowdAlert:
+    ) -> SystemAlert:
         """
         Mark an alert as acknowledged by a user.
 
@@ -587,7 +588,7 @@ class AlertEngineService:
         alert_id: UUID,
         user_id: Optional[UUID] = None,
         notes: Optional[str] = None,
-    ) -> CrowdAlert:
+    ) -> SystemAlert:
         """
         Resolve an alert (manually or automatically).
 
@@ -682,8 +683,8 @@ class AlertEngineService:
 
         # Get all open/acknowledged alerts
         stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.status.in_(["open", "acknowledged"]))
+            select(SystemAlert)
+            .where(SystemAlert.status.in_(["open", "acknowledged"]))
         )
 
         result = await session.execute(stmt)
@@ -764,10 +765,10 @@ class AlertEngineService:
         for risk_levels, threshold_minutes in resolve_policies:
             cutoff = now - timedelta(minutes=threshold_minutes)
             stmt = (
-                select(CrowdAlert)
-                .where(CrowdAlert.status.in_(["open", "acknowledged"]))
-                .where(CrowdAlert.risk_level.in_(risk_levels))
-                .where(CrowdAlert.created_at <= cutoff)
+                select(SystemAlert)
+                .where(SystemAlert.status.in_(["open", "acknowledged"]))
+                .where(SystemAlert.risk_level.in_(risk_levels))
+                .where(SystemAlert.created_at <= cutoff)
             )
             result = await session.execute(stmt)
             alerts = result.scalars().all()
@@ -802,9 +803,9 @@ class AlertEngineService:
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
 
         stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.status == "open")
-            .where(CrowdAlert.created_at <= cutoff)
+            select(SystemAlert)
+            .where(SystemAlert.status == "open")
+            .where(SystemAlert.created_at <= cutoff)
         )
         result = await session.execute(stmt)
         alerts = result.scalars().all()
@@ -873,13 +874,13 @@ class AlertEngineService:
             Number of alerts resolved.
         """
         stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.venue_id == venue_id)
-            .where(CrowdAlert.status.in_(["open", "acknowledged"]))
+            select(SystemAlert)
+            .where(SystemAlert.venue_id == venue_id)
+            .where(SystemAlert.status.in_(["open", "acknowledged"]))
         )
         if camera_id:
             stmt = stmt.where(
-                CrowdAlert.extra_data["camera_id"].astext == camera_id
+                SystemAlert.extra_data["camera_id"].astext == camera_id
             )
 
         result = await session.execute(stmt)
@@ -918,20 +919,24 @@ class AlertEngineService:
         self,
         session: AsyncSession,
         venue_id: UUID,
-        camera_id: Optional[str] = None
-    ) -> Optional[CrowdAlert]:
-        """Get most recent active alert for a venue/camera."""
+        camera_id: Optional[str] = None,
+        domain: Optional[str] = None
+    ) -> Optional[SystemAlert]:
+        """Get most recent active alert for a venue/camera/domain."""
         stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.venue_id == venue_id)
-            .where(CrowdAlert.status.in_(["open", "acknowledged"]))
+            select(SystemAlert)
+            .where(SystemAlert.venue_id == venue_id)
+            .where(SystemAlert.status.in_(["open", "acknowledged"]))
         )
+
+        if domain:
+            stmt = stmt.where(SystemAlert.domain == domain)
 
         if camera_id:
             # Filter by specific camera in JSON extra_data
-            stmt = stmt.where(CrowdAlert.extra_data["camera_id"].astext == camera_id)
+            stmt = stmt.where(SystemAlert.extra_data["camera_id"].astext == camera_id)
 
-        stmt = stmt.order_by(CrowdAlert.created_at.desc()).limit(1)
+        stmt = stmt.order_by(SystemAlert.created_at.desc()).limit(1)
 
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
@@ -941,18 +946,18 @@ class AlertEngineService:
         session: AsyncSession,
         venue_id: Optional[UUID] = None,
         risk_level: Optional[str] = None,
-    ) -> List[CrowdAlert]:
+    ) -> List[SystemAlert]:
         """List all active alerts with optional filters."""
         stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.status.in_(["open", "acknowledged"]))
-            .order_by(CrowdAlert.severity.desc(), CrowdAlert.created_at.desc())
+            select(SystemAlert)
+            .where(SystemAlert.status.in_(["open", "acknowledged"]))
+            .order_by(SystemAlert.severity.desc(), SystemAlert.created_at.desc())
         )
 
         if venue_id:
-            stmt = stmt.where(CrowdAlert.venue_id == venue_id)
+            stmt = stmt.where(SystemAlert.venue_id == venue_id)
         if risk_level:
-            stmt = stmt.where(CrowdAlert.risk_level == risk_level)
+            stmt = stmt.where(SystemAlert.risk_level == risk_level)
 
         result = await session.execute(stmt)
         return list(result.scalars().all())
@@ -963,9 +968,9 @@ class AlertEngineService:
         venue_id: Optional[UUID] = None,
     ) -> Dict[str, Any]:
         """Get summary of alerts for dashboard."""
-        stmt = select(CrowdAlert)
+        stmt = select(SystemAlert)
         if venue_id:
-            stmt = stmt.where(CrowdAlert.venue_id == venue_id)
+            stmt = stmt.where(SystemAlert.venue_id == venue_id)
 
         result = await session.execute(stmt)
         alerts = result.scalars().all()
@@ -1021,9 +1026,9 @@ class AlertEngineService:
         """
         since = datetime.now(timezone.utc) - timedelta(days=days)
 
-        stmt = select(CrowdAlert).where(CrowdAlert.created_at >= since)
+        stmt = select(SystemAlert).where(SystemAlert.created_at >= since)
         if venue_id:
-            stmt = stmt.where(CrowdAlert.venue_id == venue_id)
+            stmt = stmt.where(SystemAlert.venue_id == venue_id)
 
         result = await session.execute(stmt)
         alerts = result.scalars().all()

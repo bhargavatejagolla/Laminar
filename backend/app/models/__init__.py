@@ -23,7 +23,7 @@ from app.models.camera import Camera
 
 from app.models.detection import Detection
 
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.crowd_frame import CrowdFrame
 from .venue_event import VenueEvent
 from app.models.evidence_clip import EvidenceClip
@@ -49,7 +49,7 @@ __all__ = [
     "ActionRule",
     "Camera",
     "Detection",
-    "CrowdAlert",
+    "SystemAlert",
     "CrowdFrame",
     "EvidenceClip",
     "QueueEstimate",

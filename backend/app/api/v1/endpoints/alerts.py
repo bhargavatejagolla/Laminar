@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.services.notification_service import NotificationService
 
 
@@ -20,13 +20,13 @@ from sqlalchemy import select
 
 from app.core.database import db_manager
 from app.core.dependencies import require_role, get_current_active_user
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.user import UserRole
 from app.schemas.alert import AlertResponse
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
-def verify_alert_access(alert: CrowdAlert, user):
+def verify_alert_access(alert: SystemAlert, user):
     if not user.is_super_admin:
         if str(alert.venue_id) not in [str(v.id) for v in user.venues]:
             raise HTTPException(
@@ -64,18 +64,18 @@ async def list_alerts(
     """
 
     # Default: show all alerts (including resolved for history) unless overridden
-    query = select(CrowdAlert)
+    query = select(SystemAlert)
 
     # If user explicitly requests a status
     if status_filter:
-        query = select(CrowdAlert).where(CrowdAlert.status == status_filter)
+        query = select(SystemAlert).where(SystemAlert.status == status_filter)
 
     if not user.is_super_admin:
         allowed_venue_ids = {str(v.id) for v in user.venues}
-        query = query.where(CrowdAlert.venue_id.in_(list(allowed_venue_ids)))
+        query = query.where(SystemAlert.venue_id.in_(list(allowed_venue_ids)))
 
     # Add pagination and execution
-    query = query.offset(skip).limit(limit).order_by(CrowdAlert.created_at.desc())
+    query = query.offset(skip).limit(limit).order_by(SystemAlert.created_at.desc())
     
     result = await db.execute(query)
     alerts = result.scalars().all()
@@ -98,7 +98,7 @@ async def acknowledge_alert(
     - Admin or higher.
     """
 
-    alert = await db.get(CrowdAlert, alert_id)
+    alert = await db.get(SystemAlert, alert_id)
 
     if not alert :
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -126,7 +126,7 @@ async def resolve_alert(
     - Admin or higher.
     """
 
-    alert = await db.get(CrowdAlert, alert_id)
+    alert = await db.get(SystemAlert, alert_id)
 
     if not alert :
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -154,7 +154,7 @@ async def delete_alert(
     - Super Admin only.
     """
 
-    alert = await db.get(CrowdAlert, alert_id)
+    alert = await db.get(SystemAlert, alert_id)
 
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")

@@ -233,23 +233,23 @@ async def wait_time_analytics(
 
     # Fetch latest intelligence brief from alerts
     latest_insight = None
-    from app.models.crowd_alert import CrowdAlert
+    from app.models.system_alert import SystemAlert
     from app.models.crowd_metric import CrowdMetric
     async with db_manager.session() as session:
         alert_stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.status.in_(["new", "open"]))
-            .order_by(CrowdAlert.created_at.desc())
+            select(SystemAlert)
+            .where(SystemAlert.status.in_(["new", "open"]))
+            .order_by(SystemAlert.created_at.desc())
             .limit(1)
         )
         if camera_id:
             # Join with CrowdMetric to filter by camera_id
             alert_stmt = (
-                select(CrowdAlert)
-                .join(CrowdMetric, CrowdAlert.metric_id == CrowdMetric.id)
-                .where(CrowdAlert.status.in_(["new", "open"]))
+                select(SystemAlert)
+                .join(CrowdMetric, SystemAlert.metric_id == CrowdMetric.id)
+                .where(SystemAlert.status.in_(["new", "open"]))
                 .where(CrowdMetric.camera_id == camera_id)
-                .order_by(CrowdAlert.created_at.desc())
+                .order_by(SystemAlert.created_at.desc())
                 .limit(1)
             )
         

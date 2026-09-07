@@ -29,13 +29,13 @@ class IncidentIntelligence:
 
     def analyze_incidents(self, vision_state: 'VisionState', frame_hsv: Optional[np.ndarray] = None) -> List[Dict[str, Any]]:
         """
-        Scan for accidents using tracking trajectories, and fire using optional HSV frame.
+        Scan for accidents using tracking trajectories and multi-signal evidence scoring.
         """
         incidents = []
         try:
             tracks = vision_state.tracks
             
-            # 1. Heuristic: Collision Detection (Overlap of bounding boxes)
+            # 1. Heuristic: Collision Detection (Multi-Signal Evidence Score)
             if len(tracks) >= 2:
                 for i in range(len(tracks)):
                     for j in range(i + 1, len(tracks)):
@@ -48,6 +48,7 @@ class IncidentIntelligence:
                         # Calculate Areas
                         area1 = (b1[2] - b1[0]) * (b1[3] - b1[1])
                         area2 = (b2[2] - b2[0]) * (b2[3] - b2[1])
+                        min_area = min(area1, area2)
                         
                         # Simple Overlap Check
                         x1 = max(b1[0], b2[0])
@@ -55,49 +56,54 @@ class IncidentIntelligence:
                         x2 = min(b1[2], b2[2])
                         y2 = min(b1[3], b2[3])
                         
-                        if x2 > x1 and y2 > y1:
+                        evidence_score = 0.0
+                        signals = {}
+                        
+                        if x2 > x1 and y2 > y1 and min_area > 0:
                             overlap_area = (x2 - x1) * (y2 - y1)
-                            # Only flag as collision if overlap is > 15% of the smaller vehicle
-                            if overlap_area > 0.15 * min(area1, area2):
-                                # Verify sudden deceleration for at least one of them to prevent false positives in traffic jams
-                                speed_drop_1 = self._check_deceleration(t1)
-                                speed_drop_2 = self._check_deceleration(t2)
+                            overlap_ratio = overlap_area / min_area
+                            
+                            if overlap_ratio > 0.10:
+                                evidence_score += min(overlap_ratio * 0.5, 0.4) # Up to 0.4 from overlap
+                                signals["overlap_ratio"] = overlap_ratio
                                 
-                                if speed_drop_1 or speed_drop_2:
+                                # Verify sudden deceleration for both vehicles
+                                decel_1 = self._check_deceleration(t1)
+                                decel_2 = self._check_deceleration(t2)
+                                
+                                if decel_1 > 0:
+                                    evidence_score += min(decel_1 * 0.3, 0.3)
+                                    signals["decel_1"] = decel_1
+                                if decel_2 > 0:
+                                    evidence_score += min(decel_2 * 0.3, 0.3)
+                                    signals["decel_2"] = decel_2
+                                    
+                                if evidence_score > 0.6: # Threshold for confirmed accident
                                     incidents.append({
-                                        "type": "Accident / Collision",
+                                        "type": "collision",
                                         "priority": "CRITICAL",
-                                        "description": f"Vehicle collision detected with sudden deceleration.",
+                                        "confidence": round(evidence_score, 2),
+                                        "description": f"Collision detected with confidence {evidence_score:.1%}.",
                                         "timestamp": datetime.now(timezone.utc).isoformat(),
-                                        "bbox": [int(x1), int(y1), int(x2), int(y2)]
+                                        "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                                        "track_ids": [t1["id"], t2["id"]],
+                                        "signals": signals
                                     })
-                                    logger.warning(f"HEURISTIC TRIGGER: Collision detected between tracks {t1['id']} and {t2['id']}")
+                                    logger.warning(f"INCIDENT: Collision detected (score {evidence_score:.2f})")
                                     break
                     if incidents: break
 
             # 2. Heuristic: Severe Congestion
             if len(tracks) > 12:
                 incidents.append({
-                    "type": "Severe Congestion",
+                    "type": "lane_obstruction",
                     "priority": "HIGH",
-                    "description": "High vehicle density detected. Urban node saturation imminent.",
-                    "timestamp": datetime.now(timezone.utc).isoformat()
+                    "confidence": 0.85,
+                    "description": "High vehicle density detected. Possible obstruction.",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "track_ids": [t["id"] for t in tracks],
+                    "signals": {"vehicle_count": len(tracks)}
                 })
-
-            # 3. Simulation: Fire Alert (Color Masking)
-            if frame_hsv is not None:
-                lower_red = np.array([0, 120, 70])
-                upper_red = np.array([10, 255, 255])
-                mask = cv2.inRange(frame_hsv, lower_red, upper_red)
-                total_pixels = frame_hsv.shape[0] * frame_hsv.shape[1]
-                if cv2.countNonZero(mask) > (total_pixels * 0.04):
-                    if not any(inc["type"] == "Accident / Collision" for inc in incidents):
-                        incidents.append({
-                            "type": "Fire Alert",
-                            "priority": "CRITICAL",
-                            "description": "High-intensity thermal/color signature detected in sector.",
-                            "timestamp": datetime.now(timezone.utc).isoformat()
-                        })
 
             return incidents
 
@@ -105,14 +111,16 @@ class IncidentIntelligence:
             logger.error(f"Incident analysis error: {e}")
             return []
 
-    def _check_deceleration(self, track: Dict) -> bool:
-        """Check if trajectory shows severe sudden deceleration"""
+    def _check_deceleration(self, track: Dict) -> float:
+        """
+        Check if trajectory shows sudden deceleration.
+        Returns a score from 0.0 to 1.0 based on deceleration severity.
+        """
         traj = track.get("trajectory", [])
         if len(traj) < 10:
-            return False
+            return 0.0
             
         # Get speeds across the trajectory
-        # Trajectory is [(cx, cy, t), ...]
         speeds = []
         for i in range(1, len(traj)):
             dt = max(traj[i][2] - traj[i-1][2], 0.01)
@@ -120,13 +128,21 @@ class IncidentIntelligence:
             speeds.append(dist / dt)
             
         if not speeds:
-            return False
+            return 0.0
             
-        # If max past speed was > 30px/s, and current speed is < 5px/s
         past_max = max(speeds[:-3]) if len(speeds) > 3 else max(speeds)
         current = sum(speeds[-3:]) / 3 if len(speeds) > 3 else speeds[-1]
         
-        return past_max > 30 and current < 5
+        if past_max < 15: # Was never moving fast enough to constitute a "sudden" stop
+            return 0.0
+            
+        speed_drop = past_max - current
+        if speed_drop > 20 and current < 10:
+            # Normalize score
+            score = min((speed_drop - 20) / 30.0, 1.0)
+            return float(round(score, 2))
+            
+        return 0.0
 
 _incident_detector = None
 def get_incident_detector():

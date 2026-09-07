@@ -25,7 +25,6 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } }
 }
 
-import SplashCursor from "@/components/react-bits/SplashCursor"
 
 // ─────────────────────────────────────────────────────────────────
 // Risk badge helper
@@ -285,18 +284,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-transparent text-white pb-12 relative overflow-hidden">
-      <SplashCursor
-        DENSITY_DISSIPATION={3.5}
-        VELOCITY_DISSIPATION={2}
-        PRESSURE={0.1}
-        CURL={3}
-        SPLAT_RADIUS={0.15}
-        SPLAT_FORCE={6000}
-        COLOR_UPDATE_SPEED={10}
-        SHADING
-        RAINBOW_MODE={false}
-        COLOR="#22d3ee"
-      />
 
       <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-cyan-900/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-indigo-900/10 rounded-full blur-[100px] pointer-events-none" />

@@ -23,7 +23,7 @@ from email.message import EmailMessage
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.camera import Camera
 from app.models.venue import Venue
 from app.core.repository import Repository
@@ -48,7 +48,7 @@ class NotificationService:
     async def notify(
         self,
         session: AsyncSession,
-        alert: CrowdAlert,
+        alert: SystemAlert,
     ) -> None:
         """
         Send notification for alert if cooldown allows.
@@ -109,7 +109,7 @@ class NotificationService:
             },
         )
 
-    def _resolve_recipients(self, alert: CrowdAlert) -> List[str]:
+    def _resolve_recipients(self, alert: SystemAlert) -> List[str]:
         recipients = settings.get_management_emails()
 
         if alert.risk_level in ["high", "critical"]:
@@ -122,7 +122,7 @@ class NotificationService:
 
     def _build_email(
         self,
-        alert: CrowdAlert,
+        alert: SystemAlert,
         venue: Venue,
         location_text: str,
         color: str,

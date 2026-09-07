@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.camera import Camera
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +49,7 @@ _frame_issue_buffer: dict[str, list[str]] = {}
 class CameraHealthService:
     """
     Analyses incoming frames for hardware / physical issues and
-    persists health_status + raises CrowdAlerts automatically.
+    persists health_status + raises SystemAlerts automatically.
     """
 
     OFFLINE_MINUTES = OFFLINE_MINUTES
@@ -164,13 +164,13 @@ class CameraHealthService:
         issue_type: str,
     ) -> None:
         """
-        Create a CrowdAlert for the camera issue and send notifications
+        Create a SystemAlert for the camera issue and send notifications
         to the correct coordinators automatically.
         """
         # Don't duplicate open alerts for the same camera + issue
-        existing_stmt = select(CrowdAlert).where(
-            CrowdAlert.venue_id == camera.venue_id,
-            CrowdAlert.status.in_(["open", "acknowledged"]),
+        existing_stmt = select(SystemAlert).where(
+            SystemAlert.venue_id == camera.venue_id,
+            SystemAlert.status.in_(["open", "acknowledged"]),
         )
         existing_result = await session.execute(existing_stmt)
         existing_alerts = existing_result.scalars().all()
@@ -204,7 +204,7 @@ class CameraHealthService:
             "rotated":      "Camera Rotated / Misaligned",
         }
 
-        alert = CrowdAlert(
+        alert = SystemAlert(
             venue_id=camera.venue_id,
             risk_level=risk_level,
             severity=severity,

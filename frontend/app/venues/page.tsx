@@ -11,7 +11,6 @@ import EditVenueModal from "@/components/venues/edit-venue-modal";
 import { MapPin, Search, Filter, Plus, X, Loader2, Map, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 
@@ -60,18 +59,6 @@ export default function VenuesPage() {
 
   return (
     <div className="min-h-screen bg-transparent text-white pb-12 relative overflow-hidden">
-      <SplashCursor
-        DENSITY_DISSIPATION={3.5}
-        VELOCITY_DISSIPATION={2}
-        PRESSURE={0.1}
-        CURL={3}
-        SPLAT_RADIUS={0.15}
-        SPLAT_FORCE={6000}
-        COLOR_UPDATE_SPEED={10}
-        SHADING
-        RAINBOW_MODE={false}
-        COLOR="#22d3ee"
-      />
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}

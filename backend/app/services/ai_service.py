@@ -40,7 +40,7 @@ Laminar is a real-time AI crowd intelligence platform for monitoring and managin
 - **Randy AI Chat**: This chat interface — an AI assistant that can answer questions about the platform, venues, alerts, general knowledge, traffic, parking, and absolutely any other topic.
 
 **Database Models:**
-- Venue, Camera, CrowdFrame, CrowdMetric (minute + hour buckets), CrowdAlert, VenueEvent, Journey, PersonWaitRecord.
+- Venue, Camera, CrowdFrame, CrowdMetric (minute + hour buckets), SystemAlert, VenueEvent, Journey, PersonWaitRecord.
 
 **API:** FastAPI backend on port 8000. Frontend: Next.js on port 3000.
 

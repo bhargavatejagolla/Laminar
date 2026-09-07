@@ -1,19 +1,42 @@
+"""
+Laminar – Queue / Task backend
+-------------------------------
+Tries to connect to Redis for production use.
+Falls back gracefully to a no-op stub so the server starts without Redis on dev machines.
+"""
 import os
-import redis
-from rq import Queue
+import logging
 
-# Fetch Redis URL from environment or fallback to localhost
+logger = logging.getLogger(__name__)
+
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-# Setup connection
-redis_conn = redis.from_url(REDIS_URL)
+class _NullQueue:
+    """No-op queue stub used when Redis is unavailable."""
+    def enqueue(self, *args, **kwargs):
+        logger.warning("Redis not available – job dropped (NullQueue). Start Redis for production use.")
+        return None
 
-# Define Queues
-# 1. upload_analysis: Heavy background processing (videos)
-upload_queue = Queue("upload_analysis", connection=redis_conn, default_timeout=3600)
+def _make_queue(name: str, connection, **kwargs):
+    try:
+        from rq import Queue
+        return Queue(name, connection=connection, **kwargs)
+    except Exception:
+        return _NullQueue()
 
-# 2. evidence_writer: Low priority disk I/O
-evidence_queue = Queue("evidence_writer", connection=redis_conn, default_timeout=600)
+try:
+    import redis
+    redis_conn = redis.from_url(REDIS_URL, socket_connect_timeout=2)
+    redis_conn.ping()  # Test connection immediately
 
-# 3. realtime_vision: If we ever need to push async light vision tasks
-vision_queue = Queue("realtime_vision", connection=redis_conn, default_timeout=300)
+    upload_queue  = _make_queue("upload_analysis", redis_conn, default_timeout=3600)
+    evidence_queue = _make_queue("evidence_writer",  redis_conn, default_timeout=600)
+    vision_queue   = _make_queue("realtime_vision",  redis_conn, default_timeout=300)
+    logger.info("Redis connected – queues initialized.")
+
+except Exception as e:
+    logger.warning(f"Redis unavailable ({e}). Using NullQueue – video jobs will run in-process via BackgroundTasks.")
+    redis_conn     = None
+    upload_queue   = _NullQueue()
+    evidence_queue = _NullQueue()
+    vision_queue   = _NullQueue()

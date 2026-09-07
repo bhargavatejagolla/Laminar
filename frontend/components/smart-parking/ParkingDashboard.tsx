@@ -10,7 +10,6 @@ import {
   TrendingUp, CheckCircle2, ShieldAlert
 } from "lucide-react";
 import { api } from "@/services/api";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 import { useParkingInsights, useParkingEvents } from "@/hooks/useTelemetry";
 import { IntelligenceMap } from "@/components/map/IntelligenceMap";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
@@ -160,7 +159,7 @@ export function ParkingDashboard() {
           const insightData = await insightRes.json();
           // We can merge or override with global insights if we want, but local result is best
           if(insightData && insightData.overall) {
-            setAnalysisData(prev => ({...prev, ...insightData, overall: {...insightData.overall, ...prev?.overall}}));
+            setAnalysisData((prev: any) => ({...prev, ...insightData, overall: {...insightData.overall, ...prev?.overall}}));
           }
         } catch (e) {
           console.error("Failed to fetch updated insights", e);
@@ -200,10 +199,6 @@ export function ParkingDashboard() {
 
   return (
     <div className="w-full h-full bg-[#0a0a10] text-white p-8 overflow-hidden flex flex-col gap-6 relative z-10">
-      <div className="fixed inset-0 pointer-events-none z-[-1] opacity-30">
-        <SplashCursor />
-      </div>
-
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">

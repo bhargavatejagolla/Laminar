@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useIncidentAlerts, useIncidentStream } from "@/hooks/useTelemetry";
 import { useActiveVenue } from "@/hooks/useActiveVenue";
-import SplashCursor from "@/components/react-bits/SplashCursor";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/services/api";
 import {
@@ -456,10 +455,6 @@ export function IncidentDashboard() {
       transition={{ duration: 1.5, repeat: isPulsing ? 1 : 0 }}
       className="space-y-5 pb-20 -m-8 p-8 min-h-screen transition-colors duration-1000 relative z-10"
     >
-      <div className="fixed inset-0 pointer-events-none z-[-1] opacity-40">
-        <SplashCursor />
-      </div>
-
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-4">

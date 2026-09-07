@@ -3,7 +3,6 @@ import uuid
 import shutil
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
-from app.core.queue import upload_queue
 from app.core.database import async_session_factory
 from app.models.analysis_job import AnalysisJob, JobStatus
 from pydantic import BaseModel
@@ -19,7 +18,7 @@ class JobResponse(BaseModel):
     message: str
 
 @router.post("/analyze-video", response_model=JobResponse)
-async def analyze_video(file: UploadFile = File(...)):
+async def analyze_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """
     Upload a video file for async analysis.
     This replaces the blocking /incident/analyze-video endpoint.
@@ -51,14 +50,12 @@ async def analyze_video(file: UploadFile = File(...)):
         session.add(job)
         await session.commit()
 
-    # Enqueue job
-    # The worker will run 'app.vision.worker.process_upload_job'
-    upload_queue.enqueue(
-        "app.vision.worker_tasks.process_upload_job",
-        job_id=job_id,
-        file_path=file_path,
-        job_timeout=3600
-    )
+    # Enqueue job using FastAPI BackgroundTasks to avoid Redis dependency on local envs
+    try:
+        from app.vision.worker_tasks import async_process_upload_job
+        background_tasks.add_task(async_process_upload_job, job_id=job_id, file_path=file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to queue job: {str(e)}")
 
     return JobResponse(
         job_id=job_id,

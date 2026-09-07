@@ -24,8 +24,8 @@ class ParkingIntelligence:
     """
     def __init__(self):
         self.vehicle_classes = {"car", "truck", "bus", "motorcycle"}
-        self._prev_centroids = {}
-        self._last_frame_time = {}
+        self._slot_stability = {} # zone_id -> {"current": bool, "pending": bool, "since": float}
+        self.STABILITY_SECONDS = 3.0
         
         # ── Standard Parking Zones (Polygons for 640x480) ──
         # Defined as [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
@@ -43,13 +43,35 @@ class ParkingIntelligence:
             "A4": [[400, 280], [510, 280], [530, 440], [410, 440]],
             "A5": [[520, 280], [620, 280], [635, 440], [540, 440]]
         }
-        logger.info(f"ParkingIntelligence instance created with {len(self.DEFAULT_ZONES)} default zones.")
+        logger.info(f"ParkingIntelligence initialized with 3s stability buffer.")
+
+    def _apply_stability(self, zone_id: str, raw_occupied: bool, now: float) -> bool:
+        """Applies a 3-second buffer before flipping states to prevent flickering."""
+        if zone_id not in self._slot_stability:
+            self._slot_stability[zone_id] = {"current": raw_occupied, "pending": raw_occupied, "since": now}
+            return raw_occupied
+            
+        state = self._slot_stability[zone_id]
+        
+        # If the raw detection matches what we're already pending towards, keep waiting
+        if raw_occupied == state["pending"]:
+            if raw_occupied != state["current"]:
+                if (now - state["since"]) >= self.STABILITY_SECONDS:
+                    state["current"] = raw_occupied
+        else:
+            # The raw detection changed, reset the pending timer
+            state["pending"] = raw_occupied
+            state["since"] = now
+            
+        return state["current"]
 
     def detect_occupancy(self, vision_state: 'VisionState', zones: Optional[Dict] = None, max_slots: Optional[int] = None) -> Dict[str, Any]:
         """
         Check which zones are occupied by detected vehicles from VisionState.
-        If zones are not predefined, dynamically infer them.
+        Applies State Stability logic.
         """
+        import time
+        now = time.time()
         h, w = vision_state.frame_shape
         vehicles = [t for t in vision_state.tracks if t["class_name"] in self.vehicle_classes]
         slot_states = {}
@@ -62,7 +84,7 @@ class ParkingIntelligence:
                 cv2.fillPoly(mask, [poly], 1)
                 zone_area = np.sum(mask)
                 
-                is_occupied = False
+                raw_occupied = False
                 max_ioa = 0.0
                 
                 for v in vehicles:
@@ -73,16 +95,19 @@ class ParkingIntelligence:
                     if zone_area > 0:
                         ioa = np.sum(intersection) / zone_area
                         if ioa > 0.15:
-                            is_occupied = True
+                            raw_occupied = True
                             max_ioa = max(max_ioa, ioa)
-                    if not is_occupied:
+                    if not raw_occupied:
                         cx, cy = (vx1 + vx2) / 2.0, (vy1 + vy2) / 2.0
                         if cv2.pointPolygonTest(poly, (cx, cy), False) >= 0:
-                            is_occupied = True
+                            raw_occupied = True
                             max_ioa = max(max_ioa, 0.5)
                 
+                # Apply 3-second stability logic
+                stable_occupied = self._apply_stability(zone_id, raw_occupied, now)
+                
                 slot_states[zone_id] = {
-                    "occupied": is_occupied,
+                    "occupied": stable_occupied,
                     "confidence": max_ioa,
                     "polygon": poly.tolist()
                 }

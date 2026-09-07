@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.models.crowd_metric import CrowdMetric
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.models.venue import Venue
 from app.models.camera import Camera
 from app.models.journey import Journey
@@ -440,10 +440,10 @@ class PDFReportService:
         metrics = metric_result.scalars().all()
 
         alert_stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.venue_id == venue_id)
-            .where(CrowdAlert.created_at >= since)
-            .order_by(desc(CrowdAlert.created_at))
+            select(SystemAlert)
+            .where(SystemAlert.venue_id == venue_id)
+            .where(SystemAlert.created_at >= since)
+            .order_by(desc(SystemAlert.created_at))
             .limit(50)
         )
         alert_result = await session.execute(alert_stmt)

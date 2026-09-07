@@ -5,11 +5,11 @@ Tracks Mean Time To Detect (MTTD) and Mean Time To Alert (MTTA)
 per venue, computing SLA compliance percentages from existing DB data.
 
 Definitions:
-  MTTD: Time from a CrowdMetric risk_level change → first CrowdAlert created
-  MTTA: Time from CrowdAlert created → alert acknowledged (status → "acknowledged")
+  MTTD: Time from a CrowdMetric risk_level change → first SystemAlert created
+  MTTA: Time from SystemAlert created → alert acknowledged (status → "acknowledged")
   SLA compliance: % of alerts acknowledged within the configured SLA window (default 5 min)
 
-Uses only existing CrowdMetric + CrowdAlert tables — no new schema needed.
+Uses only existing CrowdMetric + SystemAlert tables — no new schema needed.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
 from app.models.crowd_metric import CrowdMetric
-from app.models.crowd_alert import CrowdAlert
+from app.models.system_alert import SystemAlert
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -53,10 +53,10 @@ class SLAService:
 
         # ── Fetch alerts for the venue ──────────────────────────────────────
         alert_stmt = (
-            select(CrowdAlert)
-            .where(CrowdAlert.venue_id == venue_id)
-            .where(CrowdAlert.created_at >= since)
-            .order_by(CrowdAlert.created_at.asc())
+            select(SystemAlert)
+            .where(SystemAlert.venue_id == venue_id)
+            .where(SystemAlert.created_at >= since)
+            .order_by(SystemAlert.created_at.asc())
         )
         alert_result = await session.execute(alert_stmt)
         alerts = alert_result.scalars().all()

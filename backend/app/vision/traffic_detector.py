@@ -60,6 +60,7 @@ class TrafficIntelligence:
     def analyze_traffic(self, vision_state: 'VisionState') -> Dict[str, Any]:
         """
         Analyze the tracking data to generate traffic flow metrics.
+        Returns a dict compatible with FlowMetrics and legacy structures.
         """
         try:
             h, w = vision_state.frame_shape
@@ -74,9 +75,13 @@ class TrafficIntelligence:
             elif count > 5:
                 density, signal, congestion_level = "Medium", "Green", 0.40
 
-            # Average speed
-            speeds = [t.get("speed_px_s", 0) for t in vision_state.tracks]
-            avg_velocity = round(sum(speeds) / max(1, len(speeds)), 2)
+            # Average speed (now in km/h)
+            speeds = [t.get("speed_kmh", 0) for t in vision_state.tracks if t.get("speed_kmh", 0) > 0]
+            avg_speed_kmh = round(sum(speeds) / max(1, len(speeds)), 2)
+
+            # Average speed (legacy px/s)
+            speeds_px = [t.get("speed_px_s", 0) for t in vision_state.tracks]
+            avg_velocity = round(sum(speeds_px) / max(1, len(speeds_px)), 2)
 
             # Wait time estimate
             velocity_factor = max(0.1, avg_velocity / 100.0)
@@ -91,11 +96,14 @@ class TrafficIntelligence:
 
             analytics = {
                 "count": int(count),
+                "vehicle_count": int(count),
                 "density": str(density),
+                "density_status": str(density),
                 "congestion_level": float(congestion_level),
                 "risk_score": int(risk_score),
                 "signal_suggestion": str(signal),
                 "avg_velocity": float(avg_velocity),
+                "avg_speed_kmh": float(avg_speed_kmh),
                 "wait_time_estimate": float(wait_time),
                 "vehicles": vision_state.tracks,
                 "density_matrix": density_matrix,
@@ -112,8 +120,9 @@ class TrafficIntelligence:
 
     def _empty_result(self) -> Dict[str, Any]:
         return {
-            "count": 0, "density": "Low", "congestion_level": 0.0, "risk_score": 0,
-            "signal_suggestion": "Green", "avg_velocity": 0.0, "wait_time_estimate": 0.0,
+            "count": 0, "vehicle_count": 0, "density": "Low", "density_status": "Low", 
+            "congestion_level": 0.0, "risk_score": 0,
+            "signal_suggestion": "Green", "avg_velocity": 0.0, "avg_speed_kmh": 0.0, "wait_time_estimate": 0.0,
             "vehicles": [], "density_matrix": [[0]*GRID_COLS for _ in range(GRID_ROWS)],
             "frame_shape": [480, 640],
             "timestamp": datetime.now(timezone.utc).isoformat()
