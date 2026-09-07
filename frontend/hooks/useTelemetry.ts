@@ -55,14 +55,18 @@ export function useTelemetry(domain?: string, interval: number = 3000) {
  * Specialized hook for Smart Parking insights.
  * Combines raw domain state with the backend's tactical intelligence layer.
  */
-export function useParkingInsights(interval: number = 2000) {
+export function useParkingInsights(venueIdOrInterval?: string | number, interval: number = 2000) {
+  const venueId = typeof venueIdOrInterval === 'string' ? venueIdOrInterval : undefined;
+  const pollInterval = typeof venueIdOrInterval === 'number' ? venueIdOrInterval : interval;
   const [insights, setInsights] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchInsights = async () => {
       try {
-        const res = await api.get('/parking/insights');
+        const res = await api.get('/parking/insights', {
+          params: venueId ? { venue_id: venueId } : {}
+        });
         setInsights(res.data);
       } catch (err) {
         console.error('Parking Insights Fetch Error:', err);
@@ -72,9 +76,9 @@ export function useParkingInsights(interval: number = 2000) {
     };
 
     fetchInsights();
-    const timer = setInterval(fetchInsights, interval);
+    const timer = setInterval(fetchInsights, pollInterval);
     return () => clearInterval(timer);
-  }, [interval]);
+  }, [venueId, pollInterval]);
 
   return { insights, loading };
 }
@@ -82,14 +86,18 @@ export function useParkingInsights(interval: number = 2000) {
 /**
  * Specialized hook for Smart Traffic flow.
  */
-export function useTrafficInsights(interval: number = 2000) {
+export function useTrafficInsights(venueIdOrInterval?: string | number, interval: number = 2000) {
+  const venueId = typeof venueIdOrInterval === 'string' ? venueIdOrInterval : undefined;
+  const pollInterval = typeof venueIdOrInterval === 'number' ? venueIdOrInterval : interval;
   const [insights, setInsights] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchInsights = async () => {
       try {
-        const res = await api.get('/traffic/insights');
+        const res = await api.get('/traffic/insights', {
+          params: venueId ? { venue_id: venueId } : {}
+        });
         setInsights(res.data);
       } catch (err) {
         console.error('Traffic Insights Fetch Error:', err);
@@ -99,9 +107,9 @@ export function useTrafficInsights(interval: number = 2000) {
     };
 
     fetchInsights();
-    const timer = setInterval(fetchInsights, interval);
+    const timer = setInterval(fetchInsights, pollInterval);
     return () => clearInterval(timer);
-  }, [interval]);
+  }, [venueId, pollInterval]);
 
   return { insights, loading };
 }
@@ -109,14 +117,18 @@ export function useTrafficInsights(interval: number = 2000) {
 /**
  * Specialized hook for Emergency Incident Alerts.
  */
-export function useIncidentAlerts(interval: number = 2000) {
+export function useIncidentAlerts(venueIdOrInterval?: string | number, interval: number = 2000) {
+  const venueId = typeof venueIdOrInterval === 'string' ? venueIdOrInterval : undefined;
+  const pollInterval = typeof venueIdOrInterval === 'number' ? venueIdOrInterval : interval;
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const res = await api.get('/incident/alerts');
+        const res = await api.get('/incident/alerts', {
+          params: venueId ? { venue_id: venueId } : {}
+        });
         setAlerts(res.data);
       } catch (err) {
         console.error('Incident Alerts Fetch Error:', err);
@@ -126,9 +138,9 @@ export function useIncidentAlerts(interval: number = 2000) {
     };
 
     fetchAlerts();
-    const timer = setInterval(fetchAlerts, interval);
+    const timer = setInterval(fetchAlerts, pollInterval);
     return () => clearInterval(timer);
-  }, [interval]);
+  }, [venueId, pollInterval]);
 
   return { alerts, loading };
 }

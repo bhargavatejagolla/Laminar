@@ -236,6 +236,7 @@ export default function RoadIntelligencePage() {
   const { t } = useTranslation();
   const { setVenue } = useActiveVenue();
 
+  const [selectedVenueId, setSelectedVenueId] = useState<string>("");
   const [venues, setVenues] = useState<Venue[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -248,9 +249,9 @@ export default function RoadIntelligencePage() {
   const [jobProgress, setJobProgress] = useState<number>(0);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
 
-  const { insights: parkingInsights } = (useParkingInsights() || {}) as any;
-  const { insights: trafficInsights } = (useTrafficInsights() || {}) as any;
-  const incidentResult = useIncidentAlerts() as any;
+  const { insights: parkingInsights } = (useParkingInsights(selectedVenueId) || {}) as any;
+  const { insights: trafficInsights } = (useTrafficInsights(selectedVenueId) || {}) as any;
+  const incidentResult = useIncidentAlerts(selectedVenueId) as any;
   const rawAlerts: any[] = Array.isArray(incidentResult?.alerts)
     ? incidentResult.alerts
     : Array.isArray(incidentResult)
@@ -280,7 +281,10 @@ export default function RoadIntelligencePage() {
         setVenues(roadVenues.length > 0 ? roadVenues : allV);
         setCameras(roadCameras);
         const activeList = roadVenues.length > 0 ? roadVenues : allV;
-        if (activeList[0]) setVenue(activeList[0].id);
+        if (activeList[0]) {
+          setVenue(activeList[0].id);
+          setSelectedVenueId(activeList[0].id);
+        }
       } catch (e) {
         console.error("Failed to load road intelligence data", e);
       } finally {
@@ -399,6 +403,23 @@ export default function RoadIntelligencePage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Venue Selector Dropdown */}
+          <select
+            value={selectedVenueId}
+            onChange={(e) => {
+              setSelectedVenueId(e.target.value);
+              if (e.target.value) setVenue(e.target.value);
+            }}
+            className="bg-black/60 border border-white/10 text-cyan-400 text-xs font-bold font-mono rounded-xl px-3 py-2 outline-none focus:border-cyan-500/50 cursor-pointer shadow-inner"
+          >
+            <option value="">All Venues (Citywide)</option>
+            {venues.map((v) => (
+              <option key={v.id} value={v.id} className="bg-[#080810] text-white">
+                {v.name} ({(v.venue_type || "Venue").toUpperCase()})
+              </option>
+            ))}
+          </select>
+
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase ${hasIncidents ? "border-rose-500/30 bg-rose-500/10 text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${hasIncidents ? "bg-rose-400 animate-pulse" : "bg-emerald-400"}`} />
             {hasIncidents ? `${activeIncidents.length} Active Hazards` : "All Clear"}
@@ -567,27 +588,31 @@ export default function RoadIntelligencePage() {
         </div>
 
         {/* ── SECTION 2: LIVE EDGE CAMERAS GRID ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Eye className="w-5 h-5 text-cyan-400" />
-              <h2 className="text-base font-black uppercase tracking-wider text-white">Live Operational Edge Nodes</h2>
-            </div>
-            <span className="text-xs font-mono text-slate-500">{cameras.length} Active Feeds</span>
-          </div>
+        {(() => {
+          const displayCameras = selectedVenueId ? cameras.filter(c => c.venue_id === selectedVenueId) : cameras;
+          const finalCams = displayCameras.length > 0 ? displayCameras : cameras;
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-cyan-400" />
+                  <h2 className="text-base font-black uppercase tracking-wider text-white">Live Operational Edge Nodes</h2>
+                </div>
+                <span className="text-xs font-mono text-slate-500">{finalCams.length} Active Feeds</span>
+              </div>
 
-          {cameras.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 border border-dashed border-white/10 rounded-3xl bg-white/[0.01]">
-              <MapPin className="w-10 h-10 text-slate-600 mb-3" />
-              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No Live Edge Nodes Detected</p>
-              <p className="text-xs text-slate-600 mt-1">Go to Venues and add a venue with attached cameras.</p>
-              <Link href="/venues" className="mt-4 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-cyan-500/20 transition-all">
-                Go to Venues →
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {cameras.map((cam, idx) => {
+              {finalCams.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-white/10 rounded-3xl bg-white/[0.01]">
+                  <MapPin className="w-10 h-10 text-slate-600 mb-3" />
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No Live Edge Nodes Detected</p>
+                  <p className="text-xs text-slate-600 mt-1">Go to Venues and add a venue with attached cameras.</p>
+                  <Link href="/venues" className="mt-4 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-cyan-500/20 transition-all">
+                    Go to Venues →
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {finalCams.map((cam, idx) => {
                 const isParking = (cam.camera_type || "").toLowerCase() === "parking";
                 const streamUrl = isParking
                   ? `/api/v1/parking/stream/${cam.id}`
@@ -676,6 +701,8 @@ export default function RoadIntelligencePage() {
             </div>
           )}
         </div>
+      );
+    })()}
 
         {/* ── SECTION 3: INCIDENT & PHYSICS ENGINE ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
