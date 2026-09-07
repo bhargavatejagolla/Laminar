@@ -8,7 +8,7 @@ import {
   RotateCw, X, ChevronRight, Zap, Shield, Eye,
   TrendingUp, Clock, MapPin, Radio, Layers,
   FileText, ArrowUpRight, CheckCircle2, AlertCircle,
-  Play, Pause, Maximize2, RefreshCw, BarChart3, Grid, ShieldAlert, Video
+  Play, Pause, Maximize2, RefreshCw, BarChart3, Grid, ShieldAlert, Video, Settings2
 } from "lucide-react";
 import { api } from "@/services/api";
 import Link from "next/link";
@@ -613,7 +613,10 @@ export default function RoadIntelligencePage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-mono text-slate-500 uppercase">LIVE MJPEG</span>
+                        <Link href={`/cameras`} className="p-1 text-slate-500 hover:text-cyan-400 transition-colors" title="Configure Camera Node Settings">
+                          <Settings2 className="w-3.5 h-3.5" />
+                        </Link>
+                        <span className="text-[9px] font-mono text-slate-500 uppercase">LIVE</span>
                         <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
                       </div>
                     </div>
