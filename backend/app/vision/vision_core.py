@@ -42,7 +42,7 @@ class VehicleTracker:
     Lightweight centroid-based multi-object tracker.
     Assigns persistent IDs to vehicles/people across frames and computes speed.
     """
-    def __init__(self, max_lost: int = 10, max_dist: float = 80.0, calibration=None):
+    def __init__(self, max_lost: int = 10, max_dist: float = 120.0, calibration=None):
         self.next_id = 1
         self.tracks: Dict[int, Dict] = {}  # id -> {cx, cy, last_seen, frames_lost, speed_px_s, speed_kmh, class_name, trajectory}
         self.max_lost = max_lost
@@ -70,9 +70,10 @@ class VehicleTracker:
                     best_id = tid
 
             if best_id is not None:
-                # Compute speed from displacement
+                # Compute speed from displacement with smoothing
                 old = self.tracks[best_id]
-                speed_px_s = float(best_dist / max(dt, 0.05))
+                raw_speed = float(best_dist / max(dt, 0.05))
+                speed_px_s = float(round(0.65 * old.get("speed_px_s", raw_speed) + 0.35 * raw_speed, 1))
                 
                 speed_kmh = 0.0
                 if self.calibration:
@@ -89,7 +90,7 @@ class VehicleTracker:
                 self.tracks[best_id].update({
                     "cx": float(cx), "cy": float(cy),
                     "frames_lost": 0,
-                    "speed_px_s": round(speed_px_s, 1),
+                    "speed_px_s": speed_px_s,
                     "speed_kmh": round(speed_kmh, 1),
                     "class_name": det["class_name"],
                     "last_seen": time.time(),
@@ -97,12 +98,12 @@ class VehicleTracker:
                 })
                 used_track_ids.add(best_id)
                 det["track_id"] = best_id
-                det["speed_px_s"] = round(speed_px_s, 1)
+                det["speed_px_s"] = speed_px_s
                 det["speed_kmh"] = round(speed_kmh, 1)
                 det["trajectory"] = traj
                 det["wait_time_s"] = float(round(max(0.0, 30.0 - speed_px_s * 0.3), 1))
             else:
-                # New track
+                # New track — immediately reserve new_id so subsequent detections in this frame don't collide
                 new_id = self.next_id
                 self.next_id += 1
                 self.tracks[new_id] = {
@@ -111,6 +112,7 @@ class VehicleTracker:
                     "last_seen": time.time(),
                     "trajectory": [(cx, cy, time.time())]
                 }
+                used_track_ids.add(new_id)
                 det["track_id"] = new_id
                 det["speed_px_s"] = 0.0
                 det["speed_kmh"] = 0.0
@@ -143,7 +145,7 @@ class VisionCore:
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self, model_name: str = "yolov8n.pt", conf: float = 0.12):
+    def __init__(self, model_name: str = "yolov8n.pt", conf: float = 0.15):
         if self._initialized: return
         self.model_name = model_name
         self.conf = conf
@@ -191,7 +193,7 @@ class VisionCore:
                 lambda: self.model.predict(
                     source=frame,
                     conf=self.conf,
-                    classes=[0, 2, 3, 5, 7, 67], # COCO: 0=person, 2=car, 3=motorcycle, 5=bus, 7=truck, 67=cell phone (top-down aerial car heuristic)
+                    classes=[0, 2, 3, 5, 7], # Pure COCO vehicle classes (2=car, 3=motorcycle, 5=bus, 7=truck) and 0=person
                     device=self.device,
                     verbose=False
                 )
@@ -207,28 +209,15 @@ class VisionCore:
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
-                    bw, bh = x2 - x1, y2 - y1
-                    area = bw * bh
-                    aspect = max(bw, bh) / max(1.0, min(bw, bh))
 
-                    # 1. Standard COCO vehicle classes (car, motorcycle, bus, truck)
+                    # Genuine COCO vehicle classes: car, motorcycle, bus, truck
                     if cls_id in (2, 3, 5, 7):
                         candidates.append({
                             "bbox": [float(x1), float(y1), float(x2), float(y2)],
                             "class_name": TRACKING_CLASSES.get(cls_id, "car"),
                             "confidence": float(round(conf, 3)),
                         })
-                    # 2. Aerial / Top-Down Vehicle Heuristic:
-                    # Top-down rectangular vehicles in parking lots / roads are classified by COCO
-                    # models as "cell phone" (67) due to shape and roof/sunroof resemblance.
-                    # Physical sanity check: A cell phone is never > 1000px² on outdoor asphalt.
-                    elif cls_id == 67 and area > 1000 and aspect > 1.2:
-                        candidates.append({
-                            "bbox": [float(x1), float(y1), float(x2), float(y2)],
-                            "class_name": "car",
-                            "confidence": float(round(conf, 3)),
-                        })
-                    # 3. Person (0) for incident/safety monitoring (not counted as vehicle)
+                    # Person (0) for safety/crosswalk monitoring (strictly separated from vehicle count)
                     elif cls_id == 0 and conf >= 0.25:
                         candidates.append({
                             "bbox": [float(x1), float(y1), float(x2), float(y2)],
