@@ -119,8 +119,8 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
                 frame_incidents = incident_detector.analyze_incidents(vision_state, frame_hsv)
 
-                # Process tracked objects for counts & vehicle classes
-                tracked_objs = vision_state.tracks if hasattr(vision_state, "tracks") else []
+                # Process tracked objects for counts & vehicle classes (exclude pedestrians)
+                tracked_objs = [t for t in vision_state.tracks if t.get("class_name") != "person"] if hasattr(vision_state, "tracks") else []
                 v_count = len(tracked_objs)
                 sampled_counts.append(v_count)
 

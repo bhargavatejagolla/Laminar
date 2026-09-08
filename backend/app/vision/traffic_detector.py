@@ -20,9 +20,9 @@ logger = get_logger(__name__)
 # COCO class IDs for vehicles
 VEHICLE_CLASSES = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
-# Density matrix grid dimensions
-GRID_ROWS = 6
-GRID_COLS = 8
+# Density matrix grid dimensions (aligned to 4x4 spatial grid on Road Intelligence UI)
+GRID_ROWS = 4
+GRID_COLS = 4
 
 
 from app.vision.vision_core import VisionState
@@ -34,15 +34,16 @@ def build_density_matrix(detections: List[Dict], frame_shape: Tuple[int, int],
     Returns a 2D list [[count, ...], ...].
     """
     h, w = frame_shape[:2]
-    cell_h = h / rows
-    cell_w = w / cols
+    cell_h = max(1.0, h / rows)
+    cell_w = max(1.0, w / cols)
     matrix = [[0] * cols for _ in range(rows)]
 
     for det in detections:
         cx, cy = det.get("cx", 0), det.get("cy", 0)
         r = min(int(cy / cell_h), rows - 1)
         c = min(int(cx / cell_w), cols - 1)
-        matrix[r][c] += 1
+        if 0 <= r < rows and 0 <= c < cols:
+            matrix[r][c] += 1
 
     return matrix
 
@@ -65,7 +66,7 @@ class TrafficIntelligence:
         from app.vision.vision_core import vision_core
         vision_state = await vision_core.process_frame(frame, camera_id)
         result = self.analyze_traffic(vision_state)
-        result["vehicles"] = vision_state.tracks
+        result["vehicles"] = [t for t in vision_state.tracks if t.get("class_name") != "person"]
         return result
 
     def analyze_traffic(self, vision_state: 'VisionState') -> Dict[str, Any]:
@@ -75,7 +76,9 @@ class TrafficIntelligence:
         """
         try:
             h, w = vision_state.frame_shape
-            count = len(vision_state.tracks)
+            # Filter tracks to vehicles only (ignore persons)
+            vehicles = [t for t in vision_state.tracks if t.get("class_name") != "person"]
+            count = len(vehicles)
 
             # Density / congestion logic
             density, signal, congestion_level = "Low", "Green", 0.15
@@ -87,11 +90,11 @@ class TrafficIntelligence:
                 density, signal, congestion_level = "Medium", "Green", 0.40
 
             # Average speed (now in km/h)
-            speeds = [t.get("speed_kmh", 0) for t in vision_state.tracks if t.get("speed_kmh", 0) > 0]
+            speeds = [t.get("speed_kmh", 0) for t in vehicles if t.get("speed_kmh", 0) > 0]
             avg_speed_kmh = round(sum(speeds) / max(1, len(speeds)), 2)
 
             # Average speed (legacy px/s)
-            speeds_px = [t.get("speed_px_s", 0) for t in vision_state.tracks]
+            speeds_px = [t.get("speed_px_s", 0) for t in vehicles]
             avg_velocity = round(sum(speeds_px) / max(1, len(speeds_px)), 2)
 
             # Wait time estimate
@@ -102,8 +105,8 @@ class TrafficIntelligence:
             risk_score = round(congestion_level * 100 + max(0, wait_time - 5) * 0.5)
             risk_score = min(risk_score, 100)
 
-            # Density matrix
-            density_matrix = build_density_matrix(vision_state.tracks, vision_state.frame_shape)
+            # 4x4 Density matrix based on tracked vehicles
+            density_matrix = build_density_matrix(vehicles, vision_state.frame_shape, rows=GRID_ROWS, cols=GRID_COLS)
 
             analytics = {
                 "count": int(count),
@@ -116,7 +119,7 @@ class TrafficIntelligence:
                 "avg_velocity": float(avg_velocity),
                 "avg_speed_kmh": float(avg_speed_kmh),
                 "wait_time_estimate": float(wait_time),
-                "vehicles": vision_state.tracks,
+                "vehicles": vehicles,
                 "density_matrix": density_matrix,
                 "frame_shape": [int(h), int(w)],
                 "timestamp": datetime.now(timezone.utc).isoformat(),

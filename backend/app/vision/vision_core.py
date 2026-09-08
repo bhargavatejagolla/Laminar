@@ -132,7 +132,7 @@ class VehicleTracker:
 class VisionCore:
     """
     Singleton AI Perception Engine.
-    Loads YOLO once. Maintains trackers per camera.
+    Loads YOLOv8 once. Maintains trackers per camera.
     """
     _instance = None
     _load_lock = asyncio.Lock()
@@ -143,7 +143,7 @@ class VisionCore:
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self, model_name: str = "yolo11n.pt", conf: float = 0.25):
+    def __init__(self, model_name: str = "yolov8n.pt", conf: float = 0.12):
         if self._initialized: return
         self.model_name = model_name
         self.conf = conf
@@ -152,23 +152,30 @@ class VisionCore:
         self._trackers: Dict[str, VehicleTracker] = {}
         self._last_frame_time: Dict[str, float] = {}
         self._initialized = True
-        logger.info(f"VisionCore initialized (Model {model_name} will load lazily).")
+        logger.info(f"VisionCore initialized with YOLOv8 ({model_name}).")
 
     async def _ensure_model(self):
         if self.model is not None:
             return
         async with self._load_lock:
             if self.model is None:
-                logger.info(f"LAZY LOAD: Initializing VisionCore YOLO {self.model_name}...")
+                import os
+                logger.info(f"LAZY LOAD: Initializing VisionCore YOLOv8 {self.model_name}...")
                 from ultralytics import YOLO
                 loop = asyncio.get_event_loop()
-                self.model = await loop.run_in_executor(None, YOLO, self.model_name)
+                
+                # Check model location
+                target_weights = self.model_name
+                if not os.path.exists(target_weights) and os.path.exists(os.path.join("backend", target_weights)):
+                    target_weights = os.path.join("backend", target_weights)
+                    
+                self.model = await loop.run_in_executor(None, YOLO, target_weights)
                 self.model.to(self.device)
-                logger.info(f"LAZY LOAD: VisionCore {self.model_name} loaded successfully.")
+                logger.info(f"LAZY LOAD: VisionCore YOLOv8 loaded successfully from {target_weights}.")
 
     async def process_frame(self, frame: np.ndarray, camera_id: str) -> VisionState:
         """
-        Run YOLO and Tracking once.
+        Run YOLOv8 and Tracking once.
         Returns a VisionState object containing tracked entities.
         """
         await self._ensure_model()
@@ -184,7 +191,7 @@ class VisionCore:
                 lambda: self.model.predict(
                     source=frame,
                     conf=self.conf,
-                    classes=list(TRACKING_CLASSES.keys()),
+                    classes=[0, 2, 3, 5, 7, 67], # COCO: 0=person, 2=car, 3=motorcycle, 5=bus, 7=truck, 67=cell phone (top-down aerial car heuristic)
                     device=self.device,
                     verbose=False
                 )
@@ -195,17 +202,64 @@ class VisionCore:
 
             raw_dets = []
             if boxes is not None:
+                candidates = []
                 for box in boxes:
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                    bw, bh = x2 - x1, y2 - y1
+                    area = bw * bh
+                    aspect = max(bw, bh) / max(1.0, min(bw, bh))
+
+                    # 1. Standard COCO vehicle classes (car, motorcycle, bus, truck)
+                    if cls_id in (2, 3, 5, 7):
+                        candidates.append({
+                            "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                            "class_name": TRACKING_CLASSES.get(cls_id, "car"),
+                            "confidence": float(round(conf, 3)),
+                        })
+                    # 2. Aerial / Top-Down Vehicle Heuristic:
+                    # Top-down rectangular vehicles in parking lots / roads are classified by COCO
+                    # models as "cell phone" (67) due to shape and roof/sunroof resemblance.
+                    # Physical sanity check: A cell phone is never > 1000px² on outdoor asphalt.
+                    elif cls_id == 67 and area > 1000 and aspect > 1.2:
+                        candidates.append({
+                            "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                            "class_name": "car",
+                            "confidence": float(round(conf, 3)),
+                        })
+                    # 3. Person (0) for incident/safety monitoring (not counted as vehicle)
+                    elif cls_id == 0 and conf >= 0.25:
+                        candidates.append({
+                            "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                            "class_name": "person",
+                            "confidence": float(round(conf, 3)),
+                        })
+
+                # Deduplicate overlapping vehicle boxes (IoU NMS)
+                def _cand_iou(b1, b2):
+                    xa, ya = max(b1[0], b2[0]), max(b1[1], b2[1])
+                    xb, yb = min(b1[2], b2[2]), min(b1[3], b2[3])
+                    inter = max(0.0, xb - xa) * max(0.0, yb - ya)
+                    a1 = (b1[2] - b1[0]) * (b1[3] - b1[1])
+                    a2 = (b2[2] - b2[0]) * (b2[3] - b2[1])
+                    return inter / max(1.0, a1 + a2 - inter)
+
+                candidates.sort(key=lambda x: x["confidence"], reverse=True)
+                deduped = []
+                for cand in candidates:
+                    if not any(_cand_iou(cand["bbox"], d["bbox"]) > 0.45 for d in deduped if d["class_name"] != "person"):
+                        deduped.append(cand)
+
+                for d in deduped:
+                    x1, y1, x2, y2 = d["bbox"]
                     cx = (x1 + x2) / 2
                     cy = (y1 + y2) / 2
                     raw_dets.append({
                         "cx": float(cx), "cy": float(cy),
-                        "bbox": [float(x1), float(y1), float(x2), float(y2)],
-                        "class_name": TRACKING_CLASSES.get(cls_id, "unknown"),
-                        "confidence": float(round(conf, 3)),
+                        "bbox": d["bbox"],
+                        "class_name": d["class_name"],
+                        "confidence": d["confidence"],
                     })
 
             # Temporal tracking
@@ -214,7 +268,6 @@ class VisionCore:
             self._last_frame_time[camera_id] = now
             
             if camera_id not in self._trackers:
-                # Initialize with a default calibration (can be customized per camera later)
                 from app.vision.calibration import CameraCalibration
                 self._trackers[camera_id] = VehicleTracker(calibration=CameraCalibration())
                 

@@ -713,6 +713,7 @@ async def upload_traffic_image(
     incidents = incident_detector.analyze_incidents(v_state)
 
     screenshot_path = None
+    screenshot_url = None
     try:
         annotated_frame = draw_vehicle_overlays(img.copy(), vehicles)
         annotated_frame = draw_hud(annotated_frame, result)
@@ -721,11 +722,17 @@ async def upload_traffic_image(
         _, buffer = cv2.imencode(".jpg", annotated_frame)
         _last_injected_frame_bytes[camera_id] = buffer.tobytes()
         
+        # Always save annotated image to data/uploads for direct browser preview
+        os.makedirs("data/uploads", exist_ok=True)
+        img_fn = f"annotated_{camera_id}_{int(time.time()*1000)}.jpg"
+        screenshot_path = os.path.abspath(os.path.join("data", "uploads", img_fn))
+        cv2.imwrite(screenshot_path, annotated_frame)
+        screenshot_url = f"/api/v1/uploads/{img_fn}"
+        
         if density in ("High", "Critical"):
             os.makedirs("screenshots/traffic", exist_ok=True)
             rel_path = f"screenshots/traffic/alert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-            screenshot_path = os.path.abspath(rel_path)
-            cv2.imwrite(screenshot_path, annotated_frame)
+            cv2.imwrite(os.path.abspath(rel_path), annotated_frame)
     except Exception as e:
         logger.warning(f"Screenshot/Injection failed for image upload: {e}")
 
@@ -754,14 +761,25 @@ async def upload_traffic_image(
     return {
         "success": True,
         "filename": file.filename,
+        "count": count,
+        "vehicle_count": count,
+        "avg_velocity": velocity,
+        "wait_time_estimate": wait_time,
+        "screenshot_url": screenshot_url,
+        "traffic_flow": {
+            "density": density,
+            "risk_score": risk_score,
+            "signal": result.get("signal_suggestion", "Green")
+        },
         "summary": {
             "vehicle_count": count,
+            "peak_count": count,
             "density": density,
             "avg_speed_px_s": round(velocity, 1),
             "wait_time_min": round(wait_time, 1),
             "risk_score": risk_score,
         },
-        "vehicle_breakdown": _count_by_class(result.get("vehicles", [])),
+        "vehicle_breakdown": _count_by_class(vehicles),
         "density_matrix": result.get("density_matrix", []),
         "incidents": incidents,
     }

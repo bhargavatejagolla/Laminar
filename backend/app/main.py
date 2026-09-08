@@ -90,6 +90,11 @@ app.mount("/api/v1/storage/snapshots",
           StaticFiles(directory="storage/alert_snapshots"),
           name="alert_snapshots")
 
+# Uploaded media & annotated frames mount
+os.makedirs("data/uploads", exist_ok=True)
+app.mount("/api/v1/uploads", StaticFiles(directory="data/uploads"), name="api_uploads")
+app.mount("/data/uploads", StaticFiles(directory="data/uploads"), name="uploads")
+
 # Profile Pictures
 os.makedirs("storage/profile_pictures", exist_ok=True)
 app.mount("/profile_pictures",

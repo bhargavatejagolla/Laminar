@@ -138,7 +138,9 @@ function DensityMatrixGrid({ matrix }: { matrix: number[][] }) {
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /> CLEAR</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> MODERATE</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" /> CRITICAL</span>
-        <span className="text-slate-600">4×4 SPATIAL GRID</span>
+        <span className="text-slate-500 font-bold font-mono">
+          {flatVals.reduce((a, b) => a + b, 0) > 0 ? "4×4 SPATIAL DENSITY" : "NO VEHICLES IN GRID"}
+        </span>
       </div>
     </div>
   );
@@ -399,23 +401,35 @@ function RoadIntelligenceContent() {
         });
         setActiveJobId(null);
         setJobStatus("COMPLETED");
-        const previewUrl = res.data?.screenshot_url ? `/api/v1${res.data.screenshot_url}` : URL.createObjectURL(file);
+
+        const count = res.data?.count ?? res.data?.summary?.vehicle_count ?? 0;
+        const speed = res.data?.avg_velocity ?? res.data?.summary?.avg_speed_px_s ?? 0;
+        const waitTime = res.data?.wait_time_estimate ?? res.data?.summary?.wait_time_min ?? 0;
+        const density = res.data?.traffic_flow?.density ?? res.data?.summary?.density ?? (count > 10 ? "HIGH" : count > 3 ? "MEDIUM" : "LOW");
+        
+        let previewUrl = URL.createObjectURL(file);
+        if (res.data?.screenshot_url) {
+          previewUrl = res.data.screenshot_url.startsWith("/api")
+            ? res.data.screenshot_url
+            : `/api/v1${res.data.screenshot_url.startsWith("/") ? "" : "/"}${res.data.screenshot_url}`;
+        }
         setUploadedImageUrl(previewUrl);
+
         setAnalysisResult({
           summary: {
-            avg_vehicle_count: res.data?.count || 0,
-            peak_count: res.data?.count || 0,
-            avg_speed_px_s: Math.round(res.data?.avg_velocity || 0),
-            avg_wait_min: Math.round((res.data?.wait_time_estimate || 0) * 10) / 10,
-            peak_density: (res.data?.traffic_flow?.density || "LOW").toUpperCase(),
+            avg_vehicle_count: count,
+            peak_count: count,
+            avg_speed_px_s: Math.round(speed),
+            avg_wait_min: Math.round(waitTime * 10) / 10,
+            peak_density: String(density).toUpperCase(),
             duration_seconds: 0
           },
-          vehicle_breakdown: res.data?.vehicle_breakdown || {},
+          vehicle_breakdown: res.data?.vehicle_breakdown || (count > 0 ? { "Car": count } : {}),
           density_matrix: res.data?.density_matrix || [],
           events: [],
           incidents: res.data?.incidents || []
         });
-        toast.success(`Image Analysis Complete — ${res.data?.count || 0} vehicles detected`, { id: toastId });
+        toast.success(`Image Analysis Complete — ${count} vehicles detected`, { id: toastId });
       }
     } catch (err: any) {
       toast.error(`Upload failed: ${err.message || "Error"}`, { id: toastId });
@@ -425,8 +439,8 @@ function RoadIntelligenceContent() {
     }
   }
 
-  // Calculated metrics (links live edge nodes with active video upload analytics)
-  const isAnalyzingUpload = !!activeJobId && jobStatus !== "FAILED";
+  // Calculated metrics (links live edge nodes with active video/image upload analytics)
+  const isAnalyzingUpload = (!!activeJobId || !!uploadedImageUrl) && jobStatus !== "FAILED";
   const uploadAvgCount   = analysisResult?.summary?.avg_vehicle_count;
   const uploadSpeed      = analysisResult?.summary?.avg_speed_px_s;
 
