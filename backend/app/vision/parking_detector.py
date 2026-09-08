@@ -176,86 +176,9 @@ class ParkingIntelligence:
                 }
             return slot_states
 
-        # Dynamic highly-accurate zone generation
-        # 1. Perfectly map occupied slots to vehicles with padding for accuracy
-        occupied_rects = []
-        for i, v in enumerate(vehicles):
-            vx1, vy1, vx2, vy2 = map(int, v["bbox"])
-            # Increase padding to 15% to fully enclose the vehicle and not cut off bumpers
-            pad_x, pad_y = max(2, int((vx2-vx1)*0.15)), max(2, int((vy2-vy1)*0.15))
-            px1, py1, px2, py2 = max(0, vx1-pad_x), max(0, vy1-pad_y), min(w, vx2+pad_x), min(h, vy2+pad_y)
-            poly = [[px1, py1], [px2, py1], [px2, py2], [px1, py2]]
-            slot_states[f"Dyn_Occ_{i}"] = {
-                "occupied": True,
-                "confidence": v.get("confidence", 0.99),
-                "polygon": poly
-            }
-            occupied_rects.append((px1, py1, px2, py2))
-            
-        # 2. Infer available (green) slots to meet capacity (max_slots)
-        target_slots = max_slots if (max_slots and max_slots > len(vehicles)) else (len(vehicles) + 3)
-        needed = target_slots - len(vehicles)
-        
-        if needed > 0 and len(vehicles) > 0:
-            avg_w = int(np.mean([r[2]-r[0] for r in occupied_rects]))
-            avg_h = int(np.mean([r[3]-r[1] for r in occupied_rects]))
-            
-            # Simple heuristic: place empty slots next to existing vehicles in a row
-            # Sort vehicles by x-coordinate to extrapolate
-            occupied_rects.sort(key=lambda r: r[0])
-            added = 0
-            
-            # 1. Check for gaps BETWEEN existing vehicles first
-            for i in range(len(occupied_rects) - 1):
-                if added >= needed: break
-                r1 = occupied_rects[i]
-                r2 = occupied_rects[i+1]
-                gap = r2[0] - r1[2]
-                
-                # If gap is roughly the width of one or more cars, fill it with empty slots
-                if gap > avg_w * 0.7:
-                    # Estimate how many cars can fit in this gap
-                    num_slots_in_gap = int(round(gap / (avg_w + int(avg_w * 0.1))))
-                    cx = r1[2] + int(gap - (num_slots_in_gap * avg_w)) // (num_slots_in_gap + 1)
-                    cy = (r1[1] + r2[1]) // 2 # average y
-                    
-                    for _ in range(num_slots_in_gap):
-                        if added >= needed: break
-                        px1, py1, px2, py2 = cx, cy, cx + avg_w, cy + avg_h
-                        slot_states[f"Dyn_Avail_{added}"] = {
-                            "occupied": False,
-                            "confidence": 0.0,
-                            "polygon": [[px1, py1], [px2, py1], [px2, py2], [px1, py2]]
-                        }
-                        cx += avg_w + int(gap - (num_slots_in_gap * avg_w)) // (num_slots_in_gap + 1)
-                        added += 1
-            
-            # 2. Try appending to the right of the right-most vehicle
-            last_r = occupied_rects[-1]
-            cx, cy = last_r[2] + int(avg_w * 0.2), last_r[1]
-            while added < needed and cx + avg_w < w:
-                px1, py1, px2, py2 = cx, cy, cx + avg_w, cy + avg_h
-                slot_states[f"Dyn_Avail_{added}"] = {
-                    "occupied": False,
-                    "confidence": 0.0,
-                    "polygon": [[px1, py1], [px2, py1], [px2, py2], [px1, py2]]
-                }
-                cx += avg_w + int(avg_w * 0.2)
-                added += 1
-                
-            # 3. If still needed, try appending to the left of the left-most vehicle
-            first_r = occupied_rects[0]
-            cx, cy = first_r[0] - avg_w - int(avg_w * 0.2), first_r[1]
-            while added < needed and cx > 0:
-                px1, py1, px2, py2 = cx, cy, cx + avg_w, cy + avg_h
-                slot_states[f"Dyn_Avail_{added}"] = {
-                    "occupied": False,
-                    "confidence": 0.0,
-                    "polygon": [[px1, py1], [px2, py1], [px2, py2], [px1, py2]]
-                }
-                cx -= (avg_w + int(avg_w * 0.2))
-                added += 1
-
+        # When no specific parking bays or zones are configured:
+        # Do NOT invent synthetic parking slots or dynamic capacity.
+        # Report honest empty slot states so callers know parking is not configured.
         return slot_states
 
     def _empty_result(self) -> Dict[str, Any]:
@@ -317,28 +240,38 @@ class ParkingIntelligence:
                         "status": "CRITICAL" if s.get("occupied") else "AVAILABLE"
                     }
             else:
-                # Fallback for cameras/venues without defined zones (counting-based)
-                occ = data.get("occupied_spots", data.get("occupied", 0))
-                cap = data.get("total_slots", data.get("capacity", 10))
-                total_slots += cap
-                total_occupied += occ
-                
-                zones[source_id] = {
-                    "occupancy_pct": round((occ/cap)*100) if cap > 0 else 0,
-                    "available": max(0, cap - occ),
-                    "capacity": cap,
-                    "status": "HIGH" if (occ/cap) > 0.8 else "STABLE"
-                }
+                # Only use fallback if explicit total_slots capacity was specified
+                cap = data.get("total_slots", data.get("capacity", 0))
+                if cap > 0:
+                    occ = data.get("occupied_spots", data.get("occupied", 0))
+                    total_slots += cap
+                    total_occupied += occ
+                    
+                    zones[source_id] = {
+                        "occupancy_pct": round((occ/cap)*100),
+                        "available": max(0, cap - occ),
+                        "capacity": cap,
+                        "status": "HIGH" if (occ/cap) > 0.8 else "STABLE"
+                    }
 
         if total_slots == 0:
-            total_slots = 0
-            total_occupied = 0
-            total_available = 0
-            occupancy_pct = 0
-            zones = {}
-        else:
-            total_available = max(0, total_slots - total_occupied)
-            occupancy_pct = round((total_occupied / total_slots) * 100) if total_slots > 0 else 0
+            return {
+                "overall": {
+                    "configured": False,
+                    "occupancy_pct": None,
+                    "occupied": None,
+                    "capacity": None,
+                    "total_slots": None,
+                    "total_available": None,
+                },
+                "suggestion": "PARKING NOT CONFIGURED",
+                "prediction": "No parking zones or cameras mapped in sector.",
+                "zones": {},
+                "alerts": []
+            }
+
+        total_available = max(0, total_slots - total_occupied)
+        occupancy_pct = round((total_occupied / total_slots) * 100) if total_slots > 0 else 0
 
         # Dynamic Decision
         suggestion = f"PARKING STATUS: {total_occupied} spots occupied, {total_available} available."
@@ -353,6 +286,7 @@ class ParkingIntelligence:
 
         return {
             "overall": {
+                "configured": True,
                 "occupancy_pct": occupancy_pct,
                 "occupied": total_occupied,
                 "capacity": total_slots,

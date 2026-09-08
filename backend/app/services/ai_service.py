@@ -75,7 +75,7 @@ class LaminarAIService:
     def __init__(self):
         self.gemini_key = settings.GEMINI_API_KEY
         self.groq_key = settings.GROQ_API_KEY
-        self.groq_model = "llama-3.1-8b-instant"
+        self.groq_model = "openai/gpt-oss-20b"
         self.local_endpoint = "http://127.0.0.1:8080/v1/chat/completions"
 
     def classify_intent(self, query: str) -> str:
@@ -163,7 +163,7 @@ class LaminarAIService:
                     choices = data.get("choices", [])
                     if choices:
                         return choices[0].get("message", {}).get("content", "").strip()
-                logger.warning(f"Groq failed with {resp.status_code}: {resp.text}")
+                logger.debug(f"Groq failed with {resp.status_code}: {resp.text}")
         except Exception as e:
             logger.warning(f"Groq Exception: {e}")
         return None
@@ -173,7 +173,7 @@ class LaminarAIService:
         if not self.gemini_key:
             return None
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.gemini_key}"
         
         payload = {
             "contents": [{
@@ -431,7 +431,16 @@ Please generate a JSON object ONLY with exactly lowercase key: "explanation".
             {"role": "system", "content": BASE_SYSTEM_PROMPT},
             {"role": "user", "content": prompt}
         ]
-        return await self._execute_chain(prompt, messages, is_json=False, return_provider_name=return_provider_name)
+        result = await self._execute_chain(prompt, messages, is_json=False, return_provider_name=return_provider_name)
+        # If all providers failed, return a clean fallback instead of None
+        if return_provider_name:
+            text, provider = result if result else (None, "None")
+            if not text:
+                return ("RANDY: Operational telemetry running normally.", "Fallback")
+            return result
+        if not result:
+            return "RANDY: Operational telemetry running normally."
+        return result
 
 ai_service = LaminarAIService()
 

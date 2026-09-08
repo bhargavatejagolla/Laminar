@@ -32,7 +32,7 @@ class AIFallbackProvider:
         self.ollama_base = settings.OLLAMA_BASE_URL
 
         # Models to try on Groq
-        self.groq_model = "llama-3.1-8b-instant"
+        self.groq_model = "openai/gpt-oss-20b"
 
         # Models to try on Ollama
         self.preferred_ollama_models = ["llama3.2", "llama3", "deepseek-coder:6.7b", "mistral", "phi3"]
@@ -44,7 +44,7 @@ class AIFallbackProvider:
         if not self.gemini_key:
             return None
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.gemini_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.gemini_key}"
         
         payload = {
             "contents": [{
