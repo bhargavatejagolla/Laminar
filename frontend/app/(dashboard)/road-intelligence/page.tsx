@@ -567,6 +567,28 @@ function RoadIntelligenceContent() {
           />
         </div>
 
+        {/* Active Source Banner for Uploaded Media Context (Phase 7) */}
+        {activeJobId && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-cyan-500/10 border border-cyan-500/30 rounded-2xl text-xs font-mono shadow-[0_0_20px_rgba(34,211,238,0.1)]">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+              </span>
+              <span className="font-bold text-white uppercase tracking-wider">Active Pipeline Source:</span>
+              <span className="text-cyan-300 font-bold uppercase">Uploaded Road Analysis</span>
+              <span className="text-slate-600">|</span>
+              <span className="text-slate-400">Job ID: <strong className="text-white font-mono">{activeJobId.slice(0, 8)}</strong></span>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+              <span>Sector Context:</span>
+              <span className="text-cyan-300 font-bold">
+                {currentVenue ? `${currentVenue.name} · ${(currentVenue.venue_type || "Road").toUpperCase()}` : "Standalone Corridor Media"}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* ── SECTION 1: FORENSIC VIDEO ANALYZER & MEDIA SUITE ── */}
         <div className="bg-white/[0.01] border border-white/[0.08] rounded-3xl p-6 space-y-6 shadow-2xl">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -635,19 +657,35 @@ function RoadIntelligenceContent() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Vehicles</p>
-                      <p className="text-xl font-black font-mono text-white">{analysisResult?.summary?.avg_vehicle_count ?? 0}</p>
+                      <p className="text-xl font-black font-mono text-white">
+                        {analysisResult?.summary?.avg_vehicle_count !== undefined
+                          ? analysisResult.summary.avg_vehicle_count
+                          : jobStatus === "PROCESSING" ? "Analyzing…" : "0"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Peak Count</p>
-                      <p className="text-xl font-black font-mono text-cyan-400">{analysisResult?.summary?.peak_count ?? 0}</p>
+                      <p className="text-xl font-black font-mono text-cyan-400">
+                        {analysisResult?.summary?.peak_count !== undefined
+                          ? analysisResult.summary.peak_count
+                          : jobStatus === "PROCESSING" ? "Analyzing…" : "0"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Velocity</p>
-                      <p className="text-xl font-black font-mono text-amber-400">{analysisResult?.summary?.avg_speed_px_s ?? 0} px/s</p>
+                      <p className="text-xl font-black font-mono text-amber-400">
+                        {analysisResult?.summary?.avg_speed_px_s !== undefined
+                          ? `${analysisResult.summary.avg_speed_px_s} px/s`
+                          : jobStatus === "PROCESSING" ? "Calculating…" : "0 px/s"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Delay</p>
-                      <p className="text-xl font-black font-mono text-emerald-400">{analysisResult?.summary?.avg_wait_min ?? 0}m</p>
+                      <p className="text-xl font-black font-mono text-emerald-400">
+                        {analysisResult?.summary?.avg_wait_min !== undefined
+                          ? `${analysisResult.summary.avg_wait_min}m`
+                          : jobStatus === "PROCESSING" ? "Calculating…" : "0m"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -656,12 +694,17 @@ function RoadIntelligenceContent() {
                 <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
                   <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-[0.2em]">Detected Vehicle Types</p>
                   <div className="flex flex-wrap gap-2">
-                    {Object.entries(analysisResult?.vehicle_breakdown || {}).map(([cls, cnt]) => (
-                      <span key={cls} className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/10 text-xs font-mono font-bold text-slate-200">
-                        {cls} <strong className="text-cyan-400">×{cnt}</strong>
+                    {analysisResult?.vehicle_breakdown && Object.keys(analysisResult.vehicle_breakdown).length > 0 ? (
+                      Object.entries(analysisResult.vehicle_breakdown).map(([cls, cnt]) => (
+                        <span key={cls} className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/10 text-xs font-mono font-bold text-slate-200">
+                          {cls} <strong className="text-cyan-400">×{cnt}</strong>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-500 font-mono">
+                        {jobStatus === "PROCESSING" ? "Detecting vehicle classes…" : "Awaiting media input"}
                       </span>
-                    ))}
-                    {!analysisResult?.vehicle_breakdown && <span className="text-xs text-slate-500">Processing...</span>}
+                    )}
                   </div>
                 </div>
 
