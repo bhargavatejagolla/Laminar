@@ -75,7 +75,7 @@ class LaminarAIService:
     def __init__(self):
         self.gemini_key = settings.GEMINI_API_KEY
         self.groq_key = settings.GROQ_API_KEY
-        self.groq_model = "openai/gpt-oss-20b"
+        self.groq_model = "qwen/qwen3.8-27b"
         self.local_endpoint = "http://127.0.0.1:8080/v1/chat/completions"
 
     def classify_intent(self, query: str) -> str:

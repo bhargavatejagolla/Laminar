@@ -32,7 +32,7 @@ class AIFallbackProvider:
         self.ollama_base = settings.OLLAMA_BASE_URL
 
         # Models to try on Groq
-        self.groq_model = "openai/gpt-oss-20b"
+        self.groq_model = "qwen/qwen3.8-27b"
 
         # Models to try on Ollama
         self.preferred_ollama_models = ["llama3.2", "llama3", "deepseek-coder:6.7b", "mistral", "phi3"]
