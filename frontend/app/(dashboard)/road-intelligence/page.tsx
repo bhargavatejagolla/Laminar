@@ -348,8 +348,11 @@ function RoadIntelligenceContent() {
         setJobStatus(status);
         setJobProgress(res.data?.progress_percent || 0);
 
+        if (res.data?.result_data) {
+          setAnalysisResult(res.data.result_data);
+        }
+
         if (status === "COMPLETED") {
-          setAnalysisResult(res.data?.result_data || null);
           toast.success("Forensic video analysis complete!");
           clearInterval(interval);
         } else if (status === "FAILED") {
@@ -400,13 +403,26 @@ function RoadIntelligenceContent() {
     }
   }
 
-  // Calculated metrics
-  const trafficDensity   = Math.round((trafficInsights?.metrics?.density || 0) * 100);
+  // Calculated metrics (links live edge nodes with active video upload analytics)
+  const isAnalyzingUpload = !!activeJobId && jobStatus !== "FAILED";
+  const uploadAvgCount   = analysisResult?.summary?.avg_vehicle_count;
+  const uploadSpeed      = analysisResult?.summary?.avg_speed_px_s;
+
+  const trafficDensity   = (isAnalyzingUpload && uploadAvgCount !== undefined)
+    ? Math.min(100, Math.round(uploadAvgCount * 6))
+    : Math.round((trafficInsights?.metrics?.density || 0) * 100);
+
+  const currentSpeed     = (isAnalyzingUpload && uploadSpeed !== undefined)
+    ? Math.round(uploadSpeed)
+    : Math.round(trafficInsights?.metrics?.avg_speed || 0);
+
   const parkingAvail     = parkingInsights?.overall?.total_available ?? 0;
   const parkingOccupied  = parkingInsights?.overall?.occupied ?? 0;
   const parkingCap       = parkingInsights?.overall?.capacity ?? 100;
   const hasIncidents     = activeIncidents.length > 0;
-  const flowState        = (trafficInsights as any)?.flow_state || "free_flow";
+  const flowState        = isAnalyzingUpload && uploadAvgCount !== undefined
+    ? (uploadAvgCount > 10 ? "congested" : uploadAvgCount > 4 ? "moderate_flow" : "free_flow")
+    : ((trafficInsights as any)?.flow_state || "free_flow");
   const flowLabel        = flowState.replace(/_/g, " ").toUpperCase();
 
   // Active venue metadata

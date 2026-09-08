@@ -140,23 +140,27 @@ async def async_process_upload_job(job_id: str, file_path: str):
                     c_idx = min(3, max(0, int((cx / width) * 4)))
                     density_matrix[r_idx][c_idx] += 1
 
-                # Incident recording & Live Event Push
+                # Incident recording & Live Event Push (with persistent lifecycle ID)
                 if frame_incidents:
                     for inc in frame_incidents:
                         inc["timestamp_seconds"] = round(frame_idx / fps, 2)
-                        incidents.append(inc)
+                        existing_idx = next((i for i, x in enumerate(incidents) if x.get("id") == inc.get("id")), -1)
+                        if existing_idx >= 0:
+                            incidents[existing_idx] = inc
+                        else:
+                            incidents.append(inc)
 
-                        # Broadcast incident event to Global State for live Incident Feed
+                        inc_id = inc.get("id") or f"LMNR-INC-{job_id[:8]}"
                         inc_event = {
-                            "id": f"upload_job_{job_id}_{frame_idx}",
+                            "id": inc_id,
                             "type": inc.get("type", "collision"),
                             "priority": inc.get("priority", "CRITICAL"),
-                            "title": f"Incident Detected on Uploaded Video",
-                            "description": inc.get("description", f"Vehicle accident detected at {inc['timestamp_seconds']}s."),
+                            "title": "Incident Confirmed on Video Stream",
+                            "description": inc.get("description", "Accident detected on monitored corridor."),
                             "timestamp": datetime.now(timezone.utc).isoformat(),
                             "confidence": inc.get("confidence", 0.9),
                             "camera_id": f"job_{job_id}",
-                            "location": "Road Feed Video Upload"
+                            "location": "Road Media Stream"
                         }
                         GLOBAL_STATE.push_event("incident", "", inc_event)
 
@@ -204,15 +208,56 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 except Exception:
                     pass
 
-            # Update progress periodically
-            if frame_idx % 60 == 0 and total_frames > 0:
+            # Update progress & progressive result_data periodically so UI reflects live stats while video plays
+            if (frame_idx % 25 == 0 or frame_idx == 10) and total_frames > 0:
                 progress = min(99.0, round((frame_idx / total_frames) * 100, 1))
+                curr_avg_v = float(np.mean(sampled_counts)) if sampled_counts else float(v_count)
+                curr_peak_v = int(np.max(sampled_counts)) if sampled_counts else v_count
+                curr_avg_spd = float(np.mean(sampled_speeds)) if sampled_speeds else float(avg_frame_speed)
+                
+                curr_breakdown = {k: v for k, v in vehicle_class_counts.items() if v > 0}
+                if not curr_breakdown and v_count > 0:
+                    curr_breakdown = {"Car": v_count}
+
+                intermediate_result = {
+                    "summary": {
+                        "avg_vehicle_count": round(curr_avg_v, 1),
+                        "peak_count": curr_peak_v,
+                        "avg_speed_px_s": round(curr_avg_spd, 1),
+                        "avg_wait_min": max(0.5, round(curr_avg_v * 0.8, 1)),
+                        "peak_density": "HIGH" if curr_peak_v > 12 else "MEDIUM" if curr_peak_v > 6 else "LOW",
+                        "duration_seconds": round(frame_idx / fps, 1)
+                    },
+                    "vehicle_breakdown": curr_breakdown,
+                    "density_matrix": density_matrix,
+                    "events": events_log[-8:],
+                    "incidents": incidents
+                }
+
+                # Push to global state so Road Intelligence top cards immediately reflect the uploaded video analysis
+                GLOBAL_STATE.update(
+                    domain="traffic",
+                    venue_id=job_id,
+                    payload={
+                        "venue_id": job_id,
+                        "camera_id": f"job_{job_id}",
+                        "count": v_count,
+                        "density": "High" if v_count > 10 else "Medium" if v_count > 4 else "Low",
+                        "avg_velocity": curr_avg_spd,
+                        "wait_time_estimate": round(curr_avg_v * 0.8, 1),
+                        "risk_score": min(100, int(v_count * 5 + len(incidents) * 35)),
+                        "source_type": "upload",
+                        "last_updated": time.time(),
+                    }
+                )
+
                 async with async_session_factory() as session:
                     result = await session.execute(select(AnalysisJob).where(AnalysisJob.job_id == job_id))
                     job = result.scalar_one_or_none()
                     if job:
                         job.progress_percent = progress
                         job.frames_analyzed = frame_idx
+                        job.result_data = intermediate_result
                         await session.commit()
 
             # Yield CPU briefly
