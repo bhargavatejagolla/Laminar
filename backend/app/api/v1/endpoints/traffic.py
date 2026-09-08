@@ -704,10 +704,16 @@ async def upload_traffic_image(
     velocity = result.get("avg_velocity", 0.0)
     wait_time = result.get("wait_time_estimate", 0.0)
     risk_score = result.get("risk_score", 0)
+    vehicles = result.get("vehicles", [])
+
+    from app.vision.vision_core import VisionState
+    from app.vision.incident_detector import incident_detector
+    v_state = VisionState(camera_id=camera_id, timestamp=time.time(), frame_shape=img.shape[:2], tracks=vehicles)
+    incidents = incident_detector.analyze_incidents(v_state)
 
     screenshot_path = None
     try:
-        annotated_frame = draw_vehicle_overlays(img.copy(), result.get("vehicles", []))
+        annotated_frame = draw_vehicle_overlays(img.copy(), vehicles)
         annotated_frame = draw_hud(annotated_frame, result)
         
         # Store for stream fallback
@@ -756,6 +762,7 @@ async def upload_traffic_image(
         },
         "vehicle_breakdown": _count_by_class(result.get("vehicles", [])),
         "density_matrix": result.get("density_matrix", []),
+        "incidents": incidents,
     }
 
 

@@ -57,6 +57,17 @@ class TrafficIntelligence:
         self._last_analytics: Dict[str, Dict] = {}
         logger.info("TrafficIntelligence engine initialized.")
 
+    async def detect_traffic(self, frame: np.ndarray, camera_id: str = "upload-demo") -> Dict[str, Any]:
+        """
+        Canonical adapter: processes frame through VisionCore and analyzes traffic.
+        Returns unified traffic flow analytics and tracked vehicle detections.
+        """
+        from app.vision.vision_core import vision_core
+        vision_state = await vision_core.process_frame(frame, camera_id)
+        result = self.analyze_traffic(vision_state)
+        result["vehicles"] = vision_state.tracks
+        return result
+
     def analyze_traffic(self, vision_state: 'VisionState') -> Dict[str, Any]:
         """
         Analyze the tracking data to generate traffic flow metrics.

@@ -82,6 +82,12 @@ async def async_process_upload_job(job_id: str, file_path: str):
 
     worker_vision_core = VisionCore()
 
+    v_count = 0
+    avg_frame_speed = 0.0
+    motion_ratio = 0.0
+    tracked_objs = []
+    frame_incidents = []
+
     try:
         while True:
             ret, frame = cap.read()
@@ -274,14 +280,8 @@ async def async_process_upload_job(job_id: str, file_path: str):
         avg_wait_val = max(0.5, round((avg_v_count * 0.8), 1))
         peak_density = "HIGH" if peak_v_count > 12 else "MEDIUM" if peak_v_count > 6 else "LOW"
 
-        # Baseline fallback for vehicle counts if YOLO detected default frames
-        if sum(vehicle_class_counts.values()) == 0:
-            vehicle_class_counts = {
-                "Car": max(1, int(avg_v_count * 12)),
-                "Truck": max(0, int(avg_v_count * 1.5)),
-                "Bus": max(0, int(avg_v_count * 0.8)),
-                "Motorcycle": max(0, int(avg_v_count * 2.0))
-            }
+        # Real vehicle classification counts without artificial multipliers
+        filtered_breakdown = {k: v for k, v in vehicle_class_counts.items() if v > 0}
 
         result_payload = {
             "summary": {
@@ -292,7 +292,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 "peak_density": peak_density,
                 "duration_seconds": round(total_frames / fps, 1)
             },
-            "vehicle_breakdown": vehicle_class_counts,
+            "vehicle_breakdown": filtered_breakdown,
             "density_matrix": density_matrix,
             "events": events_log,
             "incidents": incidents
