@@ -155,15 +155,11 @@ class TrafficIntelligence:
         avg_risk = round(sum(v.get("risk_score", 0) for v in status.values()) / max(1, len(status))) if status else 0
 
         if total_vehicles == 0:
-            import math
-            now_sec = time.time()
-            total_vehicles = 16 + int(math.sin(now_sec / 10.0) * 6)
-            avg_risk = min(100, max(15, int(total_vehicles * 3.8)))
-            congested_zones = 1 if total_vehicles > 18 else 0
-            avg_speed = round(24.5 + math.cos(now_sec / 8.0) * 4.2, 1)
-            density_status = "High" if total_vehicles > 18 else "Medium"
-            flow_state = "moderate_flow" if total_vehicles > 14 else "free_flow"
-            suggestion = f"Traffic flowing dynamically across active corridors ({total_vehicles} vehicles tracked)."
+            avg_speed = 0.0
+            density_status = "Low"
+            flow_state = "free_flow"
+            avg_risk = 0
+            suggestion = "Corridor is clear. No active vehicle congestion detected."
         else:
             avg_speed = round(sum(v.get("avg_velocity", 20.0) for v in status.values()) / max(1, len(status)), 1)
             density_status = "High" if congested_zones > 0 else "Medium"

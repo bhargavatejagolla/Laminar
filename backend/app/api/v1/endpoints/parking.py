@@ -974,10 +974,17 @@ async def stream_parking_camera(camera_id: str):
     except Exception:
         cam_uuid = None
 
-    blank = np.zeros((360, 640, 3), dtype=np.uint8)
-    cv2.putText(blank, "PARKING FEED INITIALIZING", (120, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 200), 2)
-    _, blank_jpg = cv2.imencode(".jpg", blank)
-    blank_bytes = blank_jpg.tobytes()
+    def _create_parking_standby_frame():
+        frame = np.zeros((360, 640, 3), dtype=np.uint8)
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        cv2.putText(frame, f"PARKING NODE // {camera_id[:8]}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 230, 255), 2)
+        cv2.putText(frame, "LAMINAR SPATIAL PARKING MATRIX - ACTIVE", (20, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 150), 1)
+        scan_y = int((time.time() * 90) % 360)
+        cv2.line(frame, (0, scan_y), (640, scan_y), (0, 210, 255), 1)
+        cv2.putText(frame, now_str, (20, 335), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (140, 160, 180), 1)
+        cv2.circle(frame, (615, 35), 6, (0, 255, 150), -1)
+        _, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        return jpg.tobytes()
 
     async def frame_generator():
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
@@ -990,12 +997,10 @@ async def stream_parking_camera(camera_id: str):
             if injected:
                 frame_bytes = injected
             elif worker:
-                from app.vision.parking_worker import ParkingWorker
-                if isinstance(worker, ParkingWorker):
-                    frame_bytes = getattr(worker, "_cached_frame_bytes", None)
+                frame_bytes = getattr(worker, "_cached_frame_bytes", None)
                 
-            yield boundary + (frame_bytes if frame_bytes else blank_bytes) + b"\r\n"
-            await asyncio.sleep(0.08)
+            yield boundary + (frame_bytes if frame_bytes else _create_parking_standby_frame()) + b"\r\n"
+            await asyncio.sleep(0.05)
 
     return StreamingResponse(
         frame_generator(),

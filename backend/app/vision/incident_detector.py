@@ -27,6 +27,12 @@ class IncidentIntelligence:
     def __init__(self):
         logger.info("IncidentIntelligence engine initialized.")
 
+    def detect_incidents(self, frame_or_state: Any) -> List[Dict[str, Any]]:
+        """Compatibility method for callers passing frame or VisionState."""
+        if hasattr(frame_or_state, "tracks"):
+            return self.analyze_incidents(frame_or_state)
+        return []
+
     def analyze_incidents(self, vision_state: 'VisionState', frame_hsv: Optional[np.ndarray] = None) -> List[Dict[str, Any]]:
         """
         Scan for accidents using tracking trajectories and multi-signal evidence scoring.

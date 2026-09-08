@@ -156,7 +156,8 @@ class UnifiedWorker:
         flow_data = await loop.run_in_executor(None, traffic_detector.analyze_traffic, vision_state)
         
         # 3. Incident Detection (Phase 6 hook)
-        incidents_raw = await loop.run_in_executor(None, incident_detector.detect_incidents, frame.copy())
+        frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        incidents_raw = await loop.run_in_executor(None, incident_detector.analyze_incidents, vision_state, frame_hsv)
         
         # Format into standardized primitives
         vehicles = []

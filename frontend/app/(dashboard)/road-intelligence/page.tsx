@@ -217,10 +217,21 @@ function AnalyticsModal({ open, onClose, domain, insights }: any) {
                 <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5">
                   <p className="text-[10px] text-rose-400 font-mono font-bold uppercase tracking-[0.3em] mb-3">Flow Timeline</p>
                   <div className="h-20 flex items-end gap-1">
-                    {[...Array(30)].map((_, i) => (
-                      <div key={i} className="flex-1 rounded-t-sm bg-rose-500/30 hover:bg-rose-500/60 transition-colors"
-                        style={{ height: `${Math.max(15, Math.sin(i) * 40 + 50)}%` }} />
-                    ))}
+                    {insights?.timeline && insights.timeline.length > 0 ? (
+                      insights.timeline.slice(-30).map((pt: any, i: number) => {
+                        const h = Math.min(100, Math.max(8, Number(pt.density || pt.value || pt.count || 10)));
+                        return (
+                          <div key={i} className="flex-1 rounded-t-sm bg-rose-500/40 hover:bg-rose-500/70 transition-colors"
+                            style={{ height: `${h}%` }}
+                            title={`Time: ${pt.time || pt.t || i} - Val: ${h}`}
+                          />
+                        );
+                      })
+                    ) : (
+                      <div className="w-full flex items-center justify-center text-[10px] font-mono text-slate-500 py-6">
+                        Real-time telemetry timeline will plot here as vehicles traverse corridor.
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
@@ -297,11 +308,14 @@ function RoadIntelligenceContent() {
         } else if (roadVenueId && allV.some(v => v.id === roadVenueId)) {
           setSelectedVenueId(roadVenueId);
         } else {
-          // If there are road-specific venues, suggest the first one, or leave as Citywide
+          // If there are road-specific venues, suggest the first one
           const roadTyped = allV.filter(v => ["traffic", "parking", "incident"].includes((v.venue_type || "").toLowerCase()));
           if (roadTyped.length > 0) {
             setSelectedVenueId(roadTyped[0].id);
             setRoadVenue(roadTyped[0].id);
+          } else if (allV.length > 0) {
+            setSelectedVenueId(allV[0].id);
+            setRoadVenue(allV[0].id);
           } else {
             setSelectedVenueId("");
           }
@@ -605,19 +619,19 @@ function RoadIntelligenceContent() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Vehicles</p>
-                      <p className="text-xl font-black font-mono text-white">{analysisResult?.summary?.avg_vehicle_count ?? 12.4}</p>
+                      <p className="text-xl font-black font-mono text-white">{analysisResult?.summary?.avg_vehicle_count ?? 0}</p>
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Peak Count</p>
-                      <p className="text-xl font-black font-mono text-cyan-400">{analysisResult?.summary?.peak_count ?? 19}</p>
+                      <p className="text-xl font-black font-mono text-cyan-400">{analysisResult?.summary?.peak_count ?? 0}</p>
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Velocity</p>
-                      <p className="text-xl font-black font-mono text-amber-400">{analysisResult?.summary?.avg_speed_px_s ?? 14.8} px/s</p>
+                      <p className="text-xl font-black font-mono text-amber-400">{analysisResult?.summary?.avg_speed_px_s ?? 0} px/s</p>
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Delay</p>
-                      <p className="text-xl font-black font-mono text-emerald-400">{analysisResult?.summary?.avg_wait_min ?? 11.2}m</p>
+                      <p className="text-xl font-black font-mono text-emerald-400">{analysisResult?.summary?.avg_wait_min ?? 0}m</p>
                     </div>
                   </div>
                 </div>
@@ -626,18 +640,19 @@ function RoadIntelligenceContent() {
                 <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
                   <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-[0.2em]">Detected Vehicle Types</p>
                   <div className="flex flex-wrap gap-2">
-                    {Object.entries(analysisResult?.vehicle_breakdown || { Car: 184, Truck: 3, Bus: 2, Motorcycle: 5 }).map(([cls, cnt]) => (
+                    {Object.entries(analysisResult?.vehicle_breakdown || {}).map(([cls, cnt]) => (
                       <span key={cls} className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/10 text-xs font-mono font-bold text-slate-200">
                         {cls} <strong className="text-cyan-400">×{cnt}</strong>
                       </span>
                     ))}
+                    {!analysisResult?.vehicle_breakdown && <span className="text-xs text-slate-500">Processing...</span>}
                   </div>
                 </div>
 
                 {/* Spatial Density Grid */}
                 <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
                   <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-[0.2em]">Video Density Matrix</p>
-                  <DensityMatrixGrid matrix={analysisResult?.density_matrix || [[2, 1, 0, 1], [3, 4, 8, 2], [1, 2, 3, 1], [0, 1, 0, 0]]} />
+                  <DensityMatrixGrid matrix={analysisResult?.density_matrix || []} />
                 </div>
               </div>
             </div>
@@ -782,7 +797,7 @@ function RoadIntelligenceContent() {
                       <div>
                         <p className="text-[9px] text-slate-500 uppercase font-mono">{isParking ? "Free Slots" : "Avg Speed"}</p>
                         <p className="text-sm font-black font-mono text-emerald-400">
-                          {isParking ? `${parkingAvail} spots` : `${Math.round(trafficInsights?.metrics?.avg_speed || 38)} km/h`}
+                          {isParking ? `${parkingAvail} spots` : `${Math.round(trafficInsights?.metrics?.avg_speed || 0)} km/h`}
                         </p>
                       </div>
                     </div>

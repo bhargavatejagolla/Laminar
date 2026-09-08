@@ -95,7 +95,7 @@ async def stream_uploaded_video(job_id: str):
             raise HTTPException(status_code=404, detail="Video file record not found")
 
         annotated_path = os.path.join(os.path.dirname(job.file_path), f"annotated_{job_id}.mp4")
-        if os.path.exists(annotated_path) and os.path.getsize(annotated_path) > 0:
+        if job.status == JobStatus.COMPLETED and os.path.exists(annotated_path) and os.path.getsize(annotated_path) > 1000:
             return FileResponse(annotated_path, media_type="video/mp4")
 
         if not os.path.exists(job.file_path):

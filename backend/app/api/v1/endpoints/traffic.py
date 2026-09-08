@@ -1270,9 +1270,17 @@ async def stream_traffic_camera(camera_id: str):
         from fastapi import HTTPException
         raise HTTPException(404, f"Invalid camera_id UUID: {camera_id}")
 
-    blank = np.zeros((360, 640, 3), dtype=np.uint8)
-    _, blank_jpg = cv2.imencode(".jpg", blank)
-    blank_bytes = blank_jpg.tobytes()
+    def _create_standby_frame():
+        frame = np.zeros((360, 640, 3), dtype=np.uint8)
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        cv2.putText(frame, f"EDGE NODE // {camera_id[:8]}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 230, 255), 2)
+        cv2.putText(frame, "LAMINAR TRAFFIC INTELLIGENCE - SENSOR ACTIVE", (20, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 150), 1)
+        scan_y = int((time.time() * 90) % 360)
+        cv2.line(frame, (0, scan_y), (640, scan_y), (0, 210, 255), 1)
+        cv2.putText(frame, now_str, (20, 335), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (140, 160, 180), 1)
+        cv2.circle(frame, (615, 35), 6, (0, 255, 150), -1)
+        _, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        return jpg.tobytes()
 
     async def frame_generator():
         boundary = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n"
@@ -1298,9 +1306,9 @@ async def stream_traffic_camera(camera_id: str):
                 yield boundary + frame_bytes + b"\r\n"
                 last_yielded = frame_bytes
             elif not frame_bytes:
-                yield boundary + blank_bytes + b"\r\n"
+                yield boundary + _create_standby_frame() + b"\r\n"
                 
-            await asyncio.sleep(0.033)
+            await asyncio.sleep(0.04)
 
     return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
