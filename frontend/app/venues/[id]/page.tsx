@@ -7,14 +7,13 @@ import { useQueueEstimate } from "@/hooks/useQueueEstimate";
 import { useCrowdTrends } from "@/hooks/useCrowdTrends";
 import { useResourcePlanning } from "@/hooks/useResourcePlanning";
 import PredictionGraph from "@/components/venues/prediction-graph";
-import { Activity, MapPin, Users, AlertTriangle, ShieldCheck, ChevronLeft, Plus, Clock, TrendingUp, LineChart, UserCheck, ShieldAlert } from "lucide-react";
+import { Activity, MapPin, Users, AlertTriangle, ShieldCheck, ChevronLeft, Plus, Clock, TrendingUp, LineChart, UserCheck, ShieldAlert, Radio, Settings } from "lucide-react";
 import Link from "next/link";
 import VenueCapacityBar from "@/components/venues/venue-capacity-bar";
 import VenueCameraList from "@/components/venues/venue-camera-list";
 import AddCameraModal from "@/components/venues/add-camera-modal";
 import EditVenueModal from "@/components/venues/edit-venue-modal";
 import IntelligencePanel from "@/components/intelligence/IntelligencePanel";
-import { Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export default function VenueDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -102,18 +101,11 @@ export default function VenueDetailPage({ params }: { params: Promise<{ id: stri
           {/* Action Buttons */}
           <div className="flex items-center gap-3 self-end md:self-auto">
             <Link
-              href={`/smart-traffic?venue_id=${venueId}`}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg text-xs font-bold text-amber-500 transition-all group"
+              href={`/road-intelligence?venue_id=${venueId}`}
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-lg text-xs font-bold text-cyan-400 transition-all group shadow-[0_0_15px_rgba(34,211,238,0.1)]"
             >
-              <Activity className="w-4 h-4" />
-              {t("auto.InboundTraffic_9793") || "Inbound Traffic"}
-            </Link>
-            <Link
-              href={`/smart-incidents?venue_id=${venueId}`}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-lg text-xs font-bold text-rose-500 transition-all group"
-            >
-              <ShieldAlert className="w-4 h-4" />
-              {t("auto.ActiveIncidentH_8645") || "Active Incident Hub"}
+              <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
+              Road Intelligence Hub
             </Link>
             <button
               onClick={() => setIsEditVenueOpen(true)}

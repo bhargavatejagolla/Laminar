@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -13,8 +14,8 @@ import {
 import { api } from "@/services/api";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
-import { useParkingInsights, useTrafficInsights, useIncidentAlerts } from "@/hooks/useTelemetry";
-import { useActiveVenue } from "@/hooks/useActiveVenue";
+import { useParkingInsights, useTrafficInsights, useIncidentAlerts, useIncidentStream } from "@/hooks/useTelemetry";
+import { useRoadVenue } from "@/hooks/useRoadVenue";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Camera { id: string; name: string; stream_url?: string; camera_type?: string; venue_id?: string; }
@@ -232,14 +233,17 @@ function AnalyticsModal({ open, onClose, domain, insights }: any) {
 }
 
 // ── Main Operational Page ─────────────────────────────────────────────────
-export default function RoadIntelligencePage() {
+function RoadIntelligenceContent() {
   const { t } = useTranslation();
-  const { activeVenueId, setVenue } = useActiveVenue();
+  const searchParams = useSearchParams();
+  const urlVenueId = searchParams.get("venue_id");
+  const { roadVenueId, setRoadVenue } = useRoadVenue();
 
   const [venues, setVenues] = useState<Venue[]>([]);
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<"traffic" | "parking" | null>(null);
+  const [selectedVenueId, setSelectedVenueId] = useState<string>("");
 
   // Forensic Upload Video State
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -248,43 +252,59 @@ export default function RoadIntelligencePage() {
   const [jobProgress, setJobProgress] = useState<number>(0);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
 
-  // All telemetry is scoped to the venue configured in Venue Settings
-  const { insights: parkingInsights } = (useParkingInsights(activeVenueId ?? "") || {}) as any;
-  const { insights: trafficInsights } = (useTrafficInsights(activeVenueId ?? "") || {}) as any;
-  const incidentResult = useIncidentAlerts(activeVenueId ?? "") as any;
+  // Dynamic Telemetry Polling (scoped by selectedVenueId)
+  const { insights: parkingInsights } = (useParkingInsights(selectedVenueId) || {}) as any;
+  const { insights: trafficInsights } = (useTrafficInsights(selectedVenueId) || {}) as any;
+  const incidentResult = useIncidentAlerts(selectedVenueId) as any;
   const rawAlerts: any[] = Array.isArray(incidentResult?.alerts)
     ? incidentResult.alerts
     : Array.isArray(incidentResult)
     ? incidentResult
     : [];
 
-  // Fetch venues & cameras — auto-bind first road venue to active venue context
+  // Live SSE Stream for Real-time Road Incidents
+  const { lastEvent: liveIncident } = useIncidentStream();
+  const [streamAlerts, setStreamAlerts] = useState<any[]>([]);
+
   useEffect(() => {
-    async function load() {
+    if (liveIncident) {
+      setStreamAlerts(prev => [liveIncident, ...prev.filter(e => e.id !== liveIncident.id)].slice(0, 20));
+    }
+  }, [liveIncident]);
+
+  const activeIncidents = [...streamAlerts, ...rawAlerts].filter(
+    (item, idx, arr) => arr.findIndex(x => (x.id && x.id === item.id) || (x.timestamp === item.timestamp && x.type === item.type)) === idx
+  ).slice(0, 10);
+
+  // Load Venues & Cameras
+  useEffect(() => {
+    async function loadData() {
       try {
         const [vRes, cRes] = await Promise.all([api.get("/venues"), api.get("/cameras")]);
         const allV: Venue[] = Array.isArray(vRes.data) ? vRes.data : [];
         const allC: Camera[] = Array.isArray(cRes.data) ? cRes.data : [];
-        const roadVenues = allV.filter(v =>
-          ["parking", "traffic", "incident"].includes((v.venue_type || "").toLowerCase())
-        );
-        const roadVenueIds = new Set(roadVenues.map(v => v.id));
-        let roadCameras = allC.filter((c: any) =>
-          (roadVenueIds.has(c.venue_id) || ["traffic", "parking", "incident"].includes((c.camera_type || "").toLowerCase())) &&
-          c.is_active !== false
-        );
 
-        if (roadCameras.length === 0 && allC.length > 0) {
-          roadCameras = allC.filter((c: any) => c.is_active !== false);
-        }
+        setVenues(allV);
+        setCameras(allC);
 
-        const displayVenues = roadVenues.length > 0 ? roadVenues : allV;
-        setVenues(displayVenues);
-        setCameras(roadCameras);
-
-        // Only auto-set venue if none is configured in venue settings yet
-        if (!activeVenueId && displayVenues[0]) {
-          setVenue(displayVenues[0].id);
+        // Determine initial active venue:
+        // 1. Prioritize ?venue_id= URL parameter from Venue Management
+        // 2. Otherwise stored roadVenueId
+        // 3. Otherwise default to "" (Citywide Multi-Venue Matrix)
+        if (urlVenueId && allV.some(v => v.id === urlVenueId)) {
+          setSelectedVenueId(urlVenueId);
+          setRoadVenue(urlVenueId);
+        } else if (roadVenueId && allV.some(v => v.id === roadVenueId)) {
+          setSelectedVenueId(roadVenueId);
+        } else {
+          // If there are road-specific venues, suggest the first one, or leave as Citywide
+          const roadTyped = allV.filter(v => ["traffic", "parking", "incident"].includes((v.venue_type || "").toLowerCase()));
+          if (roadTyped.length > 0) {
+            setSelectedVenueId(roadTyped[0].id);
+            setRoadVenue(roadTyped[0].id);
+          } else {
+            setSelectedVenueId("");
+          }
         }
       } catch (e) {
         console.error("Failed to load road intelligence data", e);
@@ -292,8 +312,16 @@ export default function RoadIntelligencePage() {
         setLoading(false);
       }
     }
-    load();
-  }, []);
+    loadData();
+  }, [urlVenueId]);
+
+  // Handle venue switcher selection
+  const handleVenueChange = (newVenueId: string) => {
+    setSelectedVenueId(newVenueId);
+    if (newVenueId) {
+      setRoadVenue(newVenueId);
+    }
+  };
 
   // Poll video upload status when job queued
   useEffect(() => {
@@ -358,15 +386,22 @@ export default function RoadIntelligencePage() {
     }
   }
 
+  // Calculated metrics
   const trafficDensity   = Math.round((trafficInsights?.metrics?.density || 0) * 100);
   const parkingAvail     = parkingInsights?.overall?.total_available ?? 0;
   const parkingOccupied  = parkingInsights?.overall?.occupied ?? 0;
   const parkingCap       = parkingInsights?.overall?.capacity ?? 100;
-  const parkingPct       = parkingCap > 0 ? Math.round((parkingOccupied / parkingCap) * 100) : 0;
-  const activeIncidents  = rawAlerts.slice(0, 8);
   const hasIncidents     = activeIncidents.length > 0;
   const flowState        = (trafficInsights as any)?.flow_state || "free_flow";
   const flowLabel        = flowState.replace(/_/g, " ").toUpperCase();
+
+  // Active venue metadata
+  const currentVenue = venues.find(v => v.id === selectedVenueId);
+
+  // Cameras matching selected venue or all road cameras
+  const displayCameras = selectedVenueId
+    ? cameras.filter(c => c.venue_id === selectedVenueId)
+    : cameras;
 
   if (loading) {
     return (
@@ -382,74 +417,83 @@ export default function RoadIntelligencePage() {
   return (
     <div className="min-h-screen bg-[#080810] text-white flex flex-col font-sans">
 
-      {/* ── TOP NAV BAR ── */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] bg-[#080810]/90 backdrop-blur-xl sticky top-0 z-50">
+      {/* ── TOP NAV BAR WITH UNIFIED VENUE SELECTOR ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6 py-4 border-b border-white/[0.06] bg-[#080810]/90 backdrop-blur-xl sticky top-0 z-50">
         <div className="flex items-center gap-4">
-          <Link href="/venues" className="p-2.5 rounded-xl hover:bg-white/5 border border-white/5 text-slate-400 hover:text-white transition-all">
+          <Link href="/venues" className="p-2.5 rounded-xl hover:bg-white/5 border border-white/5 text-slate-400 hover:text-white transition-all" title="Back to Venue Management">
             <ChevronRight className="w-4 h-4 rotate-180" />
           </Link>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
-              <Radio className="w-4 h-4 text-cyan-400" />
+            <div className="p-2 bg-cyan-500/10 rounded-xl border border-cyan-500/20 shadow-[0_0_15px_rgba(34,211,238,0.15)]">
+              <Radio className="w-5 h-5 text-cyan-400 animate-pulse" />
             </div>
             <div>
-              <h1 className="text-sm font-black uppercase tracking-[0.15em] text-white leading-none">
-                LAMINAR <span className="text-cyan-400">ROAD INTELLIGENCE SUITE</span>
-              </h1>
-              <p className="text-[10px] text-slate-500 font-mono mt-0.5 uppercase tracking-widest">
-                {venues.length} Venues · {cameras.length} Nodes Monitored · Neural Vision Active
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-black uppercase tracking-[0.15em] text-white leading-none">
+                  LAMINAR <span className="text-cyan-400">ROAD INTELLIGENCE SUITE</span>
+                </h1>
+                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 uppercase">
+                  v2.5 Connected
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-widest">
+                {venues.length} Sectors Registered · {displayCameras.length} Edge Feeds Online · Real-time AI Vision
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Venue Context — driven by Venue Settings configuration */}
-          {(() => {
-            const activeVenue = venues.find(v => v.id === activeVenueId);
-            const vType = activeVenue?.venue_type?.toUpperCase() || "";
-            const typeColor =
-              vType === "TRAFFIC"   ? "text-rose-400 border-rose-500/30 bg-rose-500/10" :
-              vType === "PARKING"   ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" :
-              vType === "INCIDENT"  ? "text-amber-400 border-amber-500/30 bg-amber-500/10" :
-                                      "text-cyan-400 border-cyan-500/30 bg-cyan-500/10";
-            return activeVenue ? (
+        {/* Dynamic Sector Selector & Actions */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Interactive Sector / Venue Selector Dropdown */}
+          <div className="flex items-center gap-2 bg-[#0c1322] border border-cyan-500/30 rounded-xl px-2 py-1 shadow-[0_0_15px_rgba(34,211,238,0.08)]">
+            <MapPin className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-1" />
+            <select
+              value={selectedVenueId}
+              onChange={(e) => handleVenueChange(e.target.value)}
+              className="bg-transparent text-cyan-400 text-xs font-black font-mono outline-none cursor-pointer py-1 pr-2 max-w-[220px]"
+            >
+              <option value="" className="bg-[#080810] text-white font-mono">
+                🌐 All Sectors (Citywide Matrix)
+              </option>
+              {venues.map((v) => {
+                const camCount = cameras.filter(c => c.venue_id === v.id).length;
+                const vType = (v.venue_type || "Sector").toUpperCase();
+                return (
+                  <option key={v.id} value={v.id} className="bg-[#080810] text-white font-mono">
+                    {v.name} · {vType} ({camCount} {camCount === 1 ? "node" : "nodes"})
+                  </option>
+                );
+              })}
+            </select>
+            {selectedVenueId && (
               <Link
-                href={`/venues/${activeVenue.id}`}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-mono font-black uppercase tracking-widest transition-all hover:scale-[1.02] ${typeColor}`}
-                title="Configured via Venue Settings — click to edit"
+                href={`/venues/${selectedVenueId}`}
+                className="p-1 text-slate-400 hover:text-cyan-300 hover:bg-white/5 rounded transition-all"
+                title="Open Sector Configuration in Venue Management"
               >
-                <MapPin className="w-3 h-3" />
-                <span className="max-w-[140px] truncate">{activeVenue.name}</span>
-                {vType && <span className="opacity-60">· {vType}</span>}
+                <Settings2 className="w-3.5 h-3.5" />
               </Link>
-            ) : (
-              <Link
-                href="/venues"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-dashed border-slate-600 text-slate-500 text-[10px] font-mono font-bold uppercase tracking-widest hover:border-cyan-500/40 hover:text-cyan-400 transition-all"
-                title="No road venue configured — go to Venues to set one up"
-              >
-                <Settings2 className="w-3 h-3" />
-                Configure Venue →
-              </Link>
-            );
-          })()}
-
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase ${hasIncidents ? "border-rose-500/30 bg-rose-500/10 text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${hasIncidents ? "bg-rose-400 animate-pulse" : "bg-emerald-400"}`} />
-            {hasIncidents ? `${activeIncidents.length} Active Hazards` : "All Clear"}
+            )}
           </div>
 
+          {/* Hazard Status Badge */}
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase ${hasIncidents ? "border-rose-500/40 bg-rose-500/10 text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"}`}>
+            <span className={`w-2 h-2 rounded-full ${hasIncidents ? "bg-rose-400 animate-ping" : "bg-emerald-400"}`} />
+            {hasIncidents ? `${activeIncidents.length} Hazards Active` : "Corridor Clear"}
+          </div>
+
+          {/* Sync / Reset Button */}
           <button
             onClick={async () => {
-              const tId = toast.loading("Re-syncing streams…");
+              const tId = toast.loading("Re-synchronizing edge feeds…");
               try {
                 await Promise.allSettled([api.post("/parking/reset-frame"), api.post("/traffic/reset")]);
-                toast.success("Nodes synchronized", { id: tId });
+                toast.success("Feeds synchronized with Global State", { id: tId });
               } catch { toast.error("Reset failed", { id: tId }); }
             }}
             className="p-2.5 rounded-xl hover:bg-white/5 border border-white/5 text-slate-400 hover:text-white transition-all"
-            title="Reset Feeds"
+            title="Re-sync Feeds"
           >
             <RotateCw className="w-4 h-4" />
           </button>
@@ -462,32 +506,32 @@ export default function RoadIntelligencePage() {
         {/* ── EXECUTIVE STAT CARDS ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="Traffic Density"
+            label="Traffic Flow Density"
             value={`${trafficDensity}%`}
-            sub={`Flow: ${flowLabel}`}
+            sub={`Status: ${flowLabel}`}
             color="rose"
             icon={Activity}
             onClick={() => setActiveModal("traffic")}
           />
           <StatCard
-            label="Parking Available"
+            label="Parking Capacity"
             value={parkingAvail}
-            sub={`${parkingOccupied} occupied / ${parkingCap} capacity`}
+            sub={`${parkingOccupied} occupied / ${parkingCap} total spots`}
             color="emerald"
             icon={Car}
             onClick={() => setActiveModal("parking")}
           />
           <StatCard
-            label="Active Hazards"
+            label="Live Hazards & Incidents"
             value={activeIncidents.length}
-            sub={hasIncidents ? "Immediate response required" : "Nominal road state"}
+            sub={hasIncidents ? "Immediate dispatch required" : "Nominal road vectors"}
             color={hasIncidents ? "rose" : "cyan"}
             icon={AlertTriangle}
           />
           <StatCard
             label="Active Edge Nodes"
-            value={cameras.length}
-            sub={`${venues.length} venues mapped`}
+            value={displayCameras.length}
+            sub={currentVenue ? `Scoped to ${currentVenue.name}` : `Aggregating ${venues.length} sectors`}
             color="violet"
             icon={Eye}
           />
@@ -495,37 +539,42 @@ export default function RoadIntelligencePage() {
 
         {/* ── SECTION 1: FORENSIC VIDEO ANALYZER & MEDIA SUITE ── */}
         <div className="bg-white/[0.01] border border-white/[0.08] rounded-3xl p-6 space-y-6 shadow-2xl">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
+              <div className="p-2.5 bg-cyan-500/10 rounded-xl border border-cyan-500/20">
                 <Video className="w-5 h-5 text-cyan-400" />
               </div>
               <div>
-                <h2 className="text-base font-black uppercase tracking-wider text-white">
+                <h2 className="text-base font-black uppercase tracking-wider text-white flex items-center gap-2">
                   Forensic Video & Media Analysis Suite
+                  <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-white/5 border border-white/10 text-cyan-400 uppercase">
+                    YOLO Neural Pipeline
+                  </span>
                 </h2>
-                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">
-                  Upload traffic video or photo to run YOLO object tracking, velocity estimation, and density mapping
+                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-0.5">
+                  Inject traffic footage or snapshot for bounding boxes, velocity estimation, and density mapping
                 </p>
               </div>
             </div>
 
-            <label className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
-              <Upload className="w-4 h-4" />
-              {uploading ? "Analyzing…" : "Inject Media Video/Photo"}
-              <input type="file" accept="video/*,image/*" className="hidden" onChange={handleMediaUpload} disabled={uploading} />
-            </label>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className={`cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(34,211,238,0.15)] ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+                <Upload className="w-4 h-4" />
+                {uploading ? "Uploading & Analyzing…" : "Inject Media Video/Photo"}
+                <input type="file" accept="video/*,image/*" className="hidden" onChange={handleMediaUpload} disabled={uploading} />
+              </label>
+            </div>
           </div>
 
           {/* Active Job Progress Bar */}
           {activeJobId && jobStatus !== "COMPLETED" && jobStatus !== "FAILED" && (
-            <div className="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-2xl space-y-2">
+            <div className="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-2xl space-y-2 animate-pulse">
               <div className="flex justify-between text-xs font-mono">
-                <span className="text-cyan-400 font-bold uppercase">Processing Video Job: {activeJobId.slice(0, 8)}</span>
+                <span className="text-cyan-400 font-bold uppercase">Processing Neural Pipeline — Job: {activeJobId.slice(0, 8)}</span>
                 <span className="text-white font-black">{Math.round(jobProgress)}%</span>
               </div>
               <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <motion.div className="h-full bg-cyan-400 rounded-full" animate={{ width: `${jobProgress}%` }} />
+                <motion.div className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full" animate={{ width: `${jobProgress}%` }} />
               </div>
             </div>
           )}
@@ -543,9 +592,10 @@ export default function RoadIntelligencePage() {
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <p className="text-[10px] text-slate-500 font-mono text-center uppercase tracking-widest">
-                  Active Forensic Stream · Job ID: {activeJobId}
-                </p>
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 px-1">
+                  <span>Stream ID: {activeJobId}</span>
+                  <span className="text-emerald-400 font-bold">● Neural Annotated Stream Active</span>
+                </div>
               </div>
 
               {/* Analysis Summary Cards */}
@@ -555,19 +605,19 @@ export default function RoadIntelligencePage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Vehicles</p>
-                      <p className="text-xl font-black font-mono text-white">{analysisResult?.summary?.avg_vehicle_count ?? 10.6}</p>
+                      <p className="text-xl font-black font-mono text-white">{analysisResult?.summary?.avg_vehicle_count ?? 12.4}</p>
                     </div>
                     <div>
                       <p className="text-[9px] text-slate-500 uppercase font-mono">Peak Count</p>
-                      <p className="text-xl font-black font-mono text-cyan-400">{analysisResult?.summary?.peak_count ?? 18}</p>
+                      <p className="text-xl font-black font-mono text-cyan-400">{analysisResult?.summary?.peak_count ?? 19}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Speed</p>
-                      <p className="text-xl font-black font-mono text-amber-400">{analysisResult?.summary?.avg_speed_px_s ?? 13.5} px/s</p>
+                      <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Velocity</p>
+                      <p className="text-xl font-black font-mono text-amber-400">{analysisResult?.summary?.avg_speed_px_s ?? 14.8} px/s</p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Wait</p>
-                      <p className="text-xl font-black font-mono text-emerald-400">{analysisResult?.summary?.avg_wait_min ?? 13.4}m</p>
+                      <p className="text-[9px] text-slate-500 uppercase font-mono">Avg Delay</p>
+                      <p className="text-xl font-black font-mono text-emerald-400">{analysisResult?.summary?.avg_wait_min ?? 11.2}m</p>
                     </div>
                   </div>
                 </div>
@@ -576,7 +626,7 @@ export default function RoadIntelligencePage() {
                 <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
                   <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-[0.2em]">Detected Vehicle Types</p>
                   <div className="flex flex-wrap gap-2">
-                    {Object.entries(analysisResult?.vehicle_breakdown || { Car: 178, Truck: 1, Bus: 2, Motorcycle: 4 }).map(([cls, cnt]) => (
+                    {Object.entries(analysisResult?.vehicle_breakdown || { Car: 184, Truck: 3, Bus: 2, Motorcycle: 5 }).map(([cls, cnt]) => (
                       <span key={cls} className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/10 text-xs font-mono font-bold text-slate-200">
                         {cls} <strong className="text-cyan-400">×{cnt}</strong>
                       </span>
@@ -602,36 +652,57 @@ export default function RoadIntelligencePage() {
           )}
         </div>
 
-        {/* ── SECTION 2: LIVE EDGE CAMERAS GRID ── */}
-        {(() => {
-          const displayCameras = activeVenueId ? cameras.filter(c => c.venue_id === activeVenueId) : cameras;
-          const finalCams = displayCameras.length > 0 ? displayCameras : cameras;
-          return (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-cyan-400" />
-                  <h2 className="text-base font-black uppercase tracking-wider text-white">Live Operational Edge Nodes</h2>
-                </div>
-                <span className="text-xs font-mono text-slate-500">{finalCams.length} Active Feeds</span>
-              </div>
+        {/* ── SECTION 2: LIVE OPERATIONAL EDGE NODES GRID ── */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-base font-black uppercase tracking-wider text-white">Live Operational Edge Nodes</h2>
+              {currentVenue && (
+                <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-lg">
+                  Sector: {currentVenue.name}
+                </span>
+              )}
+            </div>
+            <span className="text-xs font-mono text-slate-500">{displayCameras.length} Node Feeds Displayed</span>
+          </div>
 
-              {finalCams.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 border border-dashed border-white/10 rounded-3xl bg-white/[0.01]">
-                  <MapPin className="w-10 h-10 text-slate-600 mb-3" />
-                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No Live Edge Nodes Detected</p>
-                  <p className="text-xs text-slate-600 mt-1">Go to Venues and add a venue with attached cameras.</p>
-                  <Link href="/venues" className="mt-4 px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-cyan-500/20 transition-all">
-                    Go to Venues →
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {finalCams.map((cam, idx) => {
+          {displayCameras.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 border border-dashed border-white/10 rounded-3xl bg-white/[0.01] text-center p-6">
+              <MapPin className="w-10 h-10 text-slate-600 mb-3" />
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+                {currentVenue ? `No Edge Nodes Attached to "${currentVenue.name}"` : "No Edge Nodes Found"}
+              </p>
+              <p className="text-xs text-slate-600 mt-1 max-w-md">
+                {currentVenue
+                  ? "This sector doesn't have camera nodes assigned yet. Attach cameras in Venue Settings, or switch to view citywide nodes."
+                  : "Go to Venues and configure your road or traffic cameras to stream into this command center."}
+              </p>
+              <div className="flex items-center gap-3 mt-4">
+                {selectedVenueId && (
+                  <button
+                    onClick={() => setSelectedVenueId("")}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+                  >
+                    🌐 View All Citywide Nodes ({cameras.length})
+                  </button>
+                )}
+                <Link
+                  href={currentVenue ? `/venues/${currentVenue.id}` : "/venues"}
+                  className="px-4 py-2 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-cyan-500/20 transition-all"
+                >
+                  Configure Nodes in Venue →
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {displayCameras.map((cam, idx) => {
                 const isParking = (cam.camera_type || "").toLowerCase() === "parking";
                 const streamUrl = isParking
                   ? `/api/v1/parking/stream/${cam.id}`
                   : `/api/v1/traffic/stream/${cam.id}`;
+                const camVenue = venues.find(v => v.id === cam.venue_id);
 
                 return (
                   <motion.div
@@ -651,12 +722,17 @@ export default function RoadIntelligencePage() {
                         <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border uppercase ${isParking ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" : "text-rose-400 border-rose-500/30 bg-rose-500/10"}`}>
                           {isParking ? "Parking Node" : "Traffic Node"}
                         </span>
+                        {camVenue && (
+                          <span className="text-[9px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
+                            {camVenue.name}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Link href={`/cameras`} className="p-1 text-slate-500 hover:text-cyan-400 transition-colors" title="Configure Camera Node Settings">
                           <Settings2 className="w-3.5 h-3.5" />
                         </Link>
-                        <span className="text-[9px] font-mono text-slate-500 uppercase">LIVE</span>
+                        <span className="text-[9px] font-mono text-slate-500 uppercase">ONLINE</span>
                         <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
                       </div>
                     </div>
@@ -716,8 +792,6 @@ export default function RoadIntelligencePage() {
             </div>
           )}
         </div>
-      );
-    })()}
 
         {/* ── SECTION 3: INCIDENT & PHYSICS ENGINE ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -736,7 +810,7 @@ export default function RoadIntelligencePage() {
               {activeIncidents.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-600 font-mono text-xs uppercase tracking-widest">
                   <Shield className="w-8 h-8 mb-2 opacity-40" />
-                  No Active Hazards Recorded
+                  No Active Hazards Recorded in Monitored Sector
                 </div>
               ) : (
                 activeIncidents.map((inc, i) => <IncidentRow key={inc.id || i} inc={inc} idx={i} />)
@@ -755,7 +829,7 @@ export default function RoadIntelligencePage() {
                 <p className="text-xs font-mono text-violet-200/90 leading-relaxed">
                   {(trafficInsights as any)?.randy_summary ||
                     (hasIncidents
-                      ? `${activeIncidents.length} active road hazard(s) detected. Collision vector score elevated. Initiate tactical response.`
+                      ? `${activeIncidents.length} active road hazard(s) detected across monitored sectors. Collision vector score elevated. Initiate tactical response.`
                       : "All road systems nominal. Traffic flow and spatial parking parameters operating within safe limits."
                     )}
                 </p>
@@ -764,7 +838,7 @@ export default function RoadIntelligencePage() {
 
             <button
               onClick={async () => {
-                const tId = toast.loading("Generating PDF Report…");
+                const tId = toast.loading("Generating Tactical PDF Report…");
                 try {
                   const res = await fetch("/api/v1/traffic/report/pdf");
                   if (!res.ok) throw new Error();
@@ -774,7 +848,7 @@ export default function RoadIntelligencePage() {
                   toast.success("PDF Downloaded!", { id: tId });
                 } catch { toast.error("Export failed", { id: tId }); }
               }}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono font-bold uppercase tracking-widest text-white transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono font-bold uppercase tracking-widest text-white transition-all shadow-lg"
             >
               <FileText className="w-4 h-4" />
               Export PDF Tactical Report
@@ -792,5 +866,17 @@ export default function RoadIntelligencePage() {
         insights={activeModal === "parking" ? parkingInsights : trafficInsights}
       />
     </div>
+  );
+}
+
+export default function RoadIntelligencePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#080810] flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
+      </div>
+    }>
+      <RoadIntelligenceContent />
+    </Suspense>
   );
 }

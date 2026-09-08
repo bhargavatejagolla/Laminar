@@ -4,7 +4,7 @@ import { Venue } from "@/types/venue";
 import { useVenueStats } from "@/hooks/useVenueStats";
 import VenueStatusBadge from "./venue-status-badge";
 import VenueCapacityBar from "./venue-capacity-bar";
-import { Users, Video, Activity, Globe, Trash2, ArrowRight, Loader2, Settings, Car, Flame, ShieldAlert, Zap } from "lucide-react";
+import { Users, Video, Activity, Globe, Trash2, ArrowRight, Loader2, Settings, Car, Flame, ShieldAlert, Zap, Radio } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/services/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -153,27 +153,30 @@ export default function VenueCard({ venue, onEdit }: Props) {
 
       {/* Domain Specific Actions */}
       <div className="flex gap-2 mb-4 pt-1">
-        {(venue.venue_type === 'traffic' || venue.venue_type === 'incident') ? (
+        {(venue.venue_type === 'traffic' || venue.venue_type === 'incident' || venue.venue_type === 'parking') ? (
           <Link
-            href={`/smart-traffic?venue_id=${venue.id}`}
-            className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg border border-cyan-500/10 bg-cyan-500/5 text-[10px] font-black text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all uppercase tracking-widest"
+            href={`/road-intelligence?venue_id=${venue.id}`}
+            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-[10px] font-black text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-500/50 transition-all uppercase tracking-widest shadow-[0_0_15px_rgba(34,211,238,0.1)] group"
           >
-            <Activity className="w-3 h-3" /> {t("domains.traffic") || "Traffic Intelligence"}
-          </Link>
-        ) : venue.venue_type === 'parking' ? (
-          <Link
-            href={`/smart-parking?venue_id=${venue.id}`}
-            className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg border border-emerald-500/10 bg-emerald-500/5 text-[10px] font-black text-emerald-500 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all uppercase tracking-widest"
-          >
-            <Car className="w-3 h-3" /> {t("domains.parking") || "Smart Parking"}
+            <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse group-hover:scale-110 transition-transform" />
+            Road Intelligence
           </Link>
         ) : (
-          <Link
-            href={`/venues/${venue.id}`}
-            className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg border border-blue-500/10 bg-blue-500/5 text-[10px] font-black text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/30 transition-all uppercase tracking-widest"
-          >
-            <Users className="w-3 h-3" /> {t("domains.systemConsole") || "System Console"}
-          </Link>
+          <div className="flex-1 flex gap-1.5">
+            <Link
+              href={`/venues/${venue.id}`}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-blue-500/20 bg-blue-500/5 text-[10px] font-black text-blue-400 hover:bg-blue-500/15 hover:border-blue-500/40 transition-all uppercase tracking-widest"
+            >
+              <Users className="w-3 h-3" /> System Console
+            </Link>
+            <Link
+              href={`/road-intelligence?venue_id=${venue.id}`}
+              className="flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-slate-700/50 bg-slate-800/40 text-[10px] font-mono font-bold text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/10 transition-all"
+              title="Inspect sector in Road Intelligence Suite"
+            >
+              <Radio className="w-3 h-3" />
+            </Link>
+          </div>
         )}
       </div>
 

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { toast } from "sonner";
-import { Settings, X, Building, Users, AlertTriangle, Save, CloudLightning, Car, Activity, Flame, BrainCircuit, Zap, ShieldCheck, Shield } from "lucide-react";
+import { Settings, X, Building, Users, AlertTriangle, Save, CloudLightning, Car, Activity, Flame, BrainCircuit, Zap, ShieldCheck, Shield, Radio } from "lucide-react";
 import { Venue } from "@/types/venue";
 import { MapPicker } from "@/components/map/MapPicker";
 import { useTranslation } from "react-i18next";
@@ -83,6 +83,12 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
     },
     onSuccess: () => {
       toast.success("Venue configuration updated.");
+      if (["traffic", "parking", "incident"].includes(formData.venue_type)) {
+        try {
+          localStorage.setItem("laminar_road_venue_id", venue.id);
+          window.dispatchEvent(new Event("laminar_road_venue_sync"));
+        } catch {}
+      }
       queryClient.invalidateQueries({ queryKey: ["venues"] });
       queryClient.invalidateQueries({ queryKey: ["venue-stats", venue.id] });
       onClose();
@@ -218,27 +224,57 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
             </div>
 
             <div className="space-y-4">
-              <label className="text-xs uppercase tracking-widest text-cyan-400 font-bold mb-2 block">Laminar AI Domain (Processing Engine)</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs uppercase tracking-widest text-cyan-400 font-bold block">Laminar AI Domain (Processing Engine)</label>
+                {["traffic", "parking", "incident"].includes(formData.venue_type) && (
+                  <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                    <Radio className="w-3 h-3 animate-pulse" /> Road Intelligence Active
+                  </span>
+                )}
+              </div>
+
+              {/* Road Intelligence Connected Banner */}
+              {["traffic", "parking", "incident"].includes(formData.venue_type) && (
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-500/10 via-indigo-500/10 to-transparent border border-cyan-500/30 flex items-start gap-3 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+                  <div className="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/40 shrink-0 mt-0.5">
+                    <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black text-white uppercase tracking-wider block">
+                      Connected to Road Intelligence Suite
+                    </span>
+                    <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                      Camera feeds attached to this venue stream directly into the unified <strong className="text-cyan-400">Road Intelligence Command Center</strong> with real-time YOLO vehicle detection, speed estimation, parking slot matrices, and collision alerts.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: "people", label: "People Intelligence", icon: Users, color: "text-blue-400", desc: "Crowd, Security & Flow" },
-                  { id: "parking", label: "Smart Parking", icon: Car, color: "text-emerald-400", desc: "Vehicles & Occupancy" },
-                  { id: "traffic", label: "Smart Traffic", icon: Activity, color: "text-amber-400", desc: "Congestion & Signals" },
-                  { id: "incident", label: "Incident Detection", icon: Flame, color: "text-rose-400", desc: "Accident & Fire Alert" },
-                  { id: "kinetic", label: "Kinetic SOS", icon: BrainCircuit, color: "text-indigo-400", desc: "Behavioral Intel" },
-                  { id: "guardian", label: "Guardian Route", icon: Shield, color: "text-blue-400", desc: "AI Escort Tracker" },
-                  { id: "greenwave", label: "AI Green Wave", icon: Zap, color: "text-emerald-400", desc: "Traffic Signal Preemption" },
-                  { id: "liability", label: "Liability Defense", icon: ShieldCheck, color: "text-rose-400", desc: "Predictive Triage" },
+                  { id: "people", label: "People Intelligence", icon: Users, color: "text-blue-400", desc: "Crowd, Security & Flow", road: false },
+                  { id: "traffic", label: "Smart Traffic", icon: Activity, color: "text-amber-400", desc: "Road Flow & Congestion", road: true },
+                  { id: "parking", label: "Smart Parking", icon: Car, color: "text-emerald-400", desc: "Vehicle Grid & Free Slots", road: true },
+                  { id: "incident", label: "Incident Detection", icon: Flame, color: "text-rose-400", desc: "Accidents & Road Hazards", road: true },
+                  { id: "kinetic", label: "Kinetic SOS", icon: BrainCircuit, color: "text-indigo-400", desc: "Behavioral Intel", road: false },
+                  { id: "guardian", label: "Guardian Route", icon: Shield, color: "text-blue-400", desc: "AI Escort Tracker", road: false },
+                  { id: "greenwave", label: "AI Green Wave", icon: Zap, color: "text-emerald-400", desc: "Traffic Signal Preemption", road: false },
+                  { id: "liability", label: "Liability Defense", icon: ShieldCheck, color: "text-rose-400", desc: "Predictive Triage", road: false },
                 ].map((domain) => (
                   <button
                     key={domain.id}
                     type="button"
                     onClick={() => setFormData({ ...formData, venue_type: domain.id })}
-                    className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left group ${formData.venue_type === domain.id
+                    className={`flex flex-col items-start p-3 rounded-xl border transition-all duration-200 text-left group relative ${formData.venue_type === domain.id
                       ? "bg-cyan-500/10 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]"
                       : "bg-[#020617] border-slate-700 hover:border-slate-500"
                       }`}
                   >
+                    {domain.road && (
+                      <span className="absolute top-2 right-2 text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase">
+                        Road
+                      </span>
+                    )}
                     <div className="flex items-center gap-2 mb-1">
                       <domain.icon className={`w-4 h-4 ${formData.venue_type === domain.id ? "text-cyan-400" : domain.color}`} />
                       <span className={`text-xs font-bold ${formData.venue_type === domain.id ? "text-white" : "text-slate-400"}`}>{domain.label}</span>
