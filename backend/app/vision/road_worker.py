@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from app.core.logging import get_logger
 from app.vision.traffic_detector import traffic_detector
-from app.vision.parking_detector import ParkingDetector
+from app.vision.parking_detector import ParkingDetector, parking_detector
 from app.vision.incident_detector import incident_detector
 from app.core.global_state import GLOBAL_STATE
 from app.core.database import db_manager

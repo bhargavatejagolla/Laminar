@@ -18,6 +18,17 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+class AwaitableDict(dict):
+    """
+    A dictionary subclass that can be awaited if called in an async context,
+    or used synchronously as a standard dict.
+    """
+    def __await__(self):
+        async def _resolve():
+            return self
+        return _resolve().__await__()
+
+
 class ParkingIntelligence:
     """
     Vehicle-optimized intelligence for Smart Parking (v2.0)
@@ -46,6 +57,33 @@ class ParkingIntelligence:
         }
         logger.info(f"ParkingIntelligence initialized with 3s stability buffer.")
 
+    async def detect_vehicles(self, frame: np.ndarray, camera_id: str = "parking-cam") -> Dict[str, Any]:
+        """
+        Runs vehicle detection and tracking on a single frame using vision_core.
+        Returns a dict containing vehicles list, all_detections, count, avg_velocity, and vision_state.
+        """
+        if frame is None or getattr(frame, "size", 0) == 0:
+            return {"count": 0, "vehicles": [], "all_detections": [], "avg_velocity": 0.0}
+
+        try:
+            from app.vision.vision_core import vision_core
+            vision_state = await vision_core.process_frame(frame, camera_id)
+            vehicles = [
+                t for t in vision_state.tracks
+                if t.get("class_name") in self.vehicle_classes
+            ]
+            avg_velocity = float(np.mean([v.get("speed_px_s", 0.0) for v in vehicles])) if vehicles else 0.0
+            return {
+                "count": len(vehicles),
+                "vehicles": vehicles,
+                "all_detections": vehicles,
+                "avg_velocity": avg_velocity,
+                "vision_state": vision_state
+            }
+        except Exception as e:
+            logger.error(f"Parking detect_vehicles error: {e}", exc_info=True)
+            return {"count": 0, "vehicles": [], "all_detections": [], "avg_velocity": 0.0}
+
     def _apply_stability(self, zone_id: str, raw_occupied: bool, now: float) -> bool:
         """Applies a 3-second buffer before flipping states to prevent flickering."""
         if zone_id not in self._slot_stability:
@@ -66,16 +104,40 @@ class ParkingIntelligence:
             
         return state["current"]
 
-    def detect_occupancy(self, vision_state: 'VisionState', zones: Optional[Dict] = None, max_slots: Optional[int] = None) -> Dict[str, Any]:
+    def detect_occupancy(
+        self,
+        input_arg: Any,
+        second_arg: Any = None,
+        max_slots: Optional[int] = None,
+        zones: Optional[Dict] = None
+    ) -> AwaitableDict:
         """
-        Check which zones are occupied by detected vehicles from VisionState.
-        Applies State Stability logic.
+        Check which zones are occupied by detected vehicles.
+        Supports both:
+          - (vision_state, zones=None, max_slots=None)
+          - (frame, vehicles, max_slots=None)
+        Applies State Stability logic and returns an AwaitableDict so it can be used synchronously or awaited.
         """
-        import time
         now = time.time()
-        h, w = vision_state.frame_shape
-        vehicles = [t for t in vision_state.tracks if t["class_name"] in self.vehicle_classes]
-        slot_states = {}
+        
+        # Handle input variations
+        if isinstance(input_arg, np.ndarray):
+            h, w = input_arg.shape[:2]
+            vehicles = second_arg if isinstance(second_arg, list) else []
+            if isinstance(second_arg, dict) and zones is None:
+                zones = second_arg
+        elif hasattr(input_arg, 'frame_shape') and hasattr(input_arg, 'tracks'):
+            h, w = input_arg.frame_shape
+            vehicles = [t for t in input_arg.tracks if t.get("class_name") in self.vehicle_classes]
+            if isinstance(second_arg, dict) and zones is None:
+                zones = second_arg
+            elif isinstance(second_arg, int) and max_slots is None:
+                max_slots = second_arg
+        else:
+            h, w = (480, 640)
+            vehicles = second_arg if isinstance(second_arg, list) else []
+
+        slot_states = AwaitableDict()
         
         # If zones are strictly predefined, use them
         if zones is not None and len(zones) > 0:
@@ -316,4 +378,5 @@ class LazyParkingDetector:
         return getattr(get_parking_detector(), name)
 
 parking_detector = LazyParkingDetector()
+ParkingDetector = ParkingIntelligence
 

@@ -37,6 +37,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 _last_injected_frame_bytes = {} # Global cache for injected photos
+_notified_traffic_tiers: Dict[str, str] = {}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Rich Rule-Based AI Insight Engine (no external API — deterministic)
