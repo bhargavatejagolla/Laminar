@@ -10,7 +10,7 @@ import psutil
 from app.core.database import async_session_factory
 from app.models.analysis_job import AnalysisJob, JobStatus
 from app.vision.vision_core import VisionCore
-from app.vision.incident_detector import incident_detector
+from app.vision.incident_detector import incident_detector, IncidentIntelligence
 from app.vision.traffic_worker import draw_vehicle_overlays, draw_hud
 from app.core.global_state import GLOBAL_STATE
 from app.core.logging import get_logger
@@ -102,6 +102,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
     sampled_waits = []
 
     worker_vision_core = VisionCore()
+    worker_incident_detector = IncidentIntelligence()
 
     v_count = 0
     avg_frame_speed = 0.0
@@ -131,7 +132,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
                     frame, f"job_{job_id}", dt=dt_step
                 )
                 frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-                frame_incidents = incident_detector.analyze_incidents(vision_state, frame_hsv)
+                frame_incidents = worker_incident_detector.analyze_incidents(vision_state, frame_hsv)
 
                 # Process tracked objects for counts & vehicle classes (exclude pedestrians from vehicle count)
                 tracked_objs = [t for t in vision_state.tracks if t.get("class_name") != "person"] if hasattr(vision_state, "tracks") else []
