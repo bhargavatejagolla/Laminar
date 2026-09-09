@@ -715,8 +715,8 @@ async def upload_traffic_image(
     screenshot_path = None
     screenshot_url = None
     try:
-        annotated_frame = draw_vehicle_overlays(img.copy(), vehicles)
-        annotated_frame = draw_hud(annotated_frame, result)
+        annotated_frame = draw_vehicle_overlays(img.copy(), vehicles, is_static=True)
+        annotated_frame = draw_hud(annotated_frame, result, is_static=True)
         
         # Store for stream fallback
         _, buffer = cv2.imencode(".jpg", annotated_frame)

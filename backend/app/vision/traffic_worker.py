@@ -34,9 +34,10 @@ CLASS_COLORS: Dict[str, tuple] = {
 }
 
 
-def draw_vehicle_overlays(frame: np.ndarray, vehicles: list) -> np.ndarray:
+def draw_vehicle_overlays(frame: np.ndarray, vehicles: list, is_static: bool = False) -> np.ndarray:
     """
     Draws bounding boxes, class labels, speed badges, and track IDs on the frame.
+    In is_static mode, suppresses speed badges since still photos have no temporal motion.
     """
     overlay = frame.copy()
 
@@ -69,8 +70,13 @@ def draw_vehicle_overlays(frame: np.ndarray, vehicles: list) -> np.ndarray:
         cv2.line(frame, (x2, y2), (x2 - length, y2), color, t)
         cv2.line(frame, (x2, y2), (x2, y2 - length), color, t)
 
-        # Label background
-        label = f"#{track_id} {cls.upper()} {speed:.0f}px/s"
+        # Label background: in static image mode, display class & confidence; in stream, display track ID & speed
+        if is_static:
+            conf_str = f" {int(conf*100)}%" if conf > 0 else ""
+            label = f"{cls.upper()}{conf_str}"
+        else:
+            label = f"#{track_id} {cls.upper()} {speed:.0f}px/s"
+
         (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.38, 1)
         ly = max(y1 - 6, th + 4)
         cv2.rectangle(frame, (x1, ly - th - 4), (x1 + tw + 4, ly + 2), color, -1)
@@ -83,7 +89,7 @@ def draw_vehicle_overlays(frame: np.ndarray, vehicles: list) -> np.ndarray:
     return frame
 
 
-def draw_hud(frame: np.ndarray, result: dict) -> np.ndarray:
+def draw_hud(frame: np.ndarray, result: dict, is_static: bool = False) -> np.ndarray:
     """Adds analytics HUD overlay to top-left corner."""
     count = result.get("count", 0)
     density = result.get("density", "Low")
@@ -102,14 +108,17 @@ def draw_hud(frame: np.ndarray, result: dict) -> np.ndarray:
     cv2.rectangle(frame, (8, 8), (300, 90), (10, 12, 18), -1)
     cv2.rectangle(frame, (8, 8), (300, 90), density_color, 1)
 
-    cv2.putText(frame, f"LAMINAR TRAFFIC NODE", (14, 26),
+    node_title = "LAMINAR PHOTO ANALYSIS" if is_static else "LAMINAR TRAFFIC NODE"
+    cv2.putText(frame, node_title, (14, 26),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
     cv2.putText(frame, f"VEHICLES: {count}   DENSITY: {density}", (14, 46),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.40, density_color, 1, cv2.LINE_AA)
-    cv2.putText(frame, f"AVG SPEED: {velocity:.1f} px/s   RISK: {risk}%", (14, 64),
+    speed_text = "MOTION: N/A (STILL)" if is_static else f"AVG SPEED: {velocity:.1f} px/s   RISK: {risk}%"
+    cv2.putText(frame, speed_text, (14, 64),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 220, 255), 1, cv2.LINE_AA)
     ts = datetime.now().strftime("%H:%M:%S")
-    cv2.putText(frame, f"LIVE  {ts}", (14, 82),
+    time_text = f"SNAPSHOT  {ts}" if is_static else f"LIVE  {ts}"
+    cv2.putText(frame, time_text, (14, 82),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.34, (120, 120, 120), 1, cv2.LINE_AA)
 
     return frame
