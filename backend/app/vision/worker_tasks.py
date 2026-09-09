@@ -70,7 +70,8 @@ async def async_process_upload_job(job_id: str, file_path: str):
 
     incidents = []
     events_log = []
-    vehicle_class_counts = {"Car": 0, "Truck": 0, "Bus": 0, "Motorcycle": 0}
+    vehicle_observation_counts = {"Car": 0, "Truck": 0, "Bus": 0, "Motorcycle": 0}
+    unique_vehicles_by_id = {} # track_id -> normalized class
     density_matrix = [[0, 0, 0, 0] for _ in range(4)]
 
     frame_idx = 0
@@ -131,14 +132,23 @@ async def async_process_upload_job(job_id: str, file_path: str):
 
                 for obj in tracked_objs:
                     cls_name = (obj.get("class_name") or "car").lower()
+                    norm_class = "Car"
                     if "truck" in cls_name:
-                        vehicle_class_counts["Truck"] += 1
+                        vehicle_observation_counts["Truck"] += 1
+                        norm_class = "Truck"
                     elif "bus" in cls_name:
-                        vehicle_class_counts["Bus"] += 1
+                        vehicle_observation_counts["Bus"] += 1
+                        norm_class = "Bus"
                     elif "motor" in cls_name or "bike" in cls_name:
-                        vehicle_class_counts["Motorcycle"] += 1
+                        vehicle_observation_counts["Motorcycle"] += 1
+                        norm_class = "Motorcycle"
                     else:
-                        vehicle_class_counts["Car"] += 1
+                        vehicle_observation_counts["Car"] += 1
+
+                    # Record unique vehicle track ID
+                    tid = obj.get("id") or obj.get("track_id")
+                    if tid is not None:
+                        unique_vehicles_by_id[str(tid)] = norm_class
 
                     # Update 4x4 spatial density grid
                     box = obj.get("bbox", [0, 0, 100, 100])
@@ -222,20 +232,28 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 curr_peak_v = int(np.max(sampled_counts)) if sampled_counts else v_count
                 curr_avg_spd = float(np.mean(sampled_speeds)) if sampled_speeds else float(avg_frame_speed)
                 
-                curr_breakdown = {k: v for k, v in vehicle_class_counts.items() if v > 0}
-                if not curr_breakdown and v_count > 0:
-                    curr_breakdown = {"Car": v_count}
+                # Unique vehicle counts by class
+                unique_class_counts = {}
+                for cls in unique_vehicles_by_id.values():
+                    unique_class_counts[cls] = unique_class_counts.get(cls, 0) + 1
+
+                curr_unique_breakdown = {k: v for k, v in unique_class_counts.items() if v > 0}
+                curr_obs_breakdown = {k: v for k, v in vehicle_observation_counts.items() if v > 0}
+                if not curr_unique_breakdown and v_count > 0:
+                    curr_unique_breakdown = {"Car": v_count}
 
                 intermediate_result = {
                     "summary": {
                         "avg_vehicle_count": round(curr_avg_v, 1),
                         "peak_count": curr_peak_v,
+                        "unique_vehicle_count": len(unique_vehicles_by_id) if unique_vehicles_by_id else curr_peak_v,
                         "avg_speed_px_s": round(curr_avg_spd, 1),
                         "avg_wait_min": max(0.5, round(curr_avg_v * 0.8, 1)),
                         "peak_density": "HIGH" if curr_peak_v > 12 else "MEDIUM" if curr_peak_v > 6 else "LOW",
                         "duration_seconds": round(frame_idx / fps, 1)
                     },
-                    "vehicle_breakdown": curr_breakdown,
+                    "vehicle_breakdown": curr_unique_breakdown,
+                    "vehicle_observations": curr_obs_breakdown,
                     "density_matrix": density_matrix,
                     "events": events_log[-8:],
                     "incidents": incidents
@@ -281,19 +299,26 @@ async def async_process_upload_job(job_id: str, file_path: str):
         avg_wait_val = max(0.5, round((avg_v_count * 0.8), 1))
         peak_density = "HIGH" if peak_v_count > 12 else "MEDIUM" if peak_v_count > 6 else "LOW"
 
-        # Real vehicle classification counts without artificial multipliers
-        filtered_breakdown = {k: v for k, v in vehicle_class_counts.items() if v > 0}
+        # Unique vehicle counts by class
+        unique_class_counts = {}
+        for cls in unique_vehicles_by_id.values():
+            unique_class_counts[cls] = unique_class_counts.get(cls, 0) + 1
+
+        final_unique_breakdown = {k: v for k, v in unique_class_counts.items() if v > 0}
+        final_obs_breakdown = {k: v for k, v in vehicle_observation_counts.items() if v > 0}
 
         result_payload = {
             "summary": {
                 "avg_vehicle_count": round(avg_v_count, 1),
                 "peak_count": peak_v_count,
+                "unique_vehicle_count": len(unique_vehicles_by_id) if unique_vehicles_by_id else peak_v_count,
                 "avg_speed_px_s": round(avg_speed_val, 1),
                 "avg_wait_min": avg_wait_val,
                 "peak_density": peak_density,
                 "duration_seconds": round(total_frames / fps, 1)
             },
-            "vehicle_breakdown": filtered_breakdown,
+            "vehicle_breakdown": final_unique_breakdown if final_unique_breakdown else {"Car": peak_v_count},
+            "vehicle_observations": final_obs_breakdown,
             "density_matrix": density_matrix,
             "events": events_log,
             "incidents": incidents

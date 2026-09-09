@@ -24,6 +24,7 @@ interface Venue  { id: string; name: string; venue_type: string; }
 interface AnalysisSummary {
   avg_vehicle_count?: number;
   peak_count?: number;
+  unique_vehicle_count?: number;
   avg_speed_px_s?: number;
   avg_wait_min?: number;
   peak_density?: string;
@@ -33,6 +34,7 @@ interface AnalysisSummary {
 interface AnalysisResultData {
   summary?: AnalysisSummary;
   vehicle_breakdown?: Record<string, number>;
+  vehicle_observations?: Record<string, number>;
   density_matrix?: number[][];
   events?: Array<{ time: string; vehicles: number; speed: string; risk: string }>;
   incidents?: any[];
@@ -907,25 +909,53 @@ function RoadIntelligenceContent() {
                     </div>
 
                     {/* Vehicle Classification Breakdown */}
-                    <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
-                      <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-[0.2em]">Detected Vehicle Types</p>
-                      <div className="flex flex-wrap gap-2">
-                        {analysisResult?.vehicle_breakdown && Object.keys(analysisResult.vehicle_breakdown).length > 0 ? (
-                          Object.entries(analysisResult.vehicle_breakdown).map(([cls, cnt]) => (
-                            <span key={cls} className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/10 text-xs font-mono font-bold text-slate-200">
-                              {cls} <strong className="text-cyan-400">×{cnt}</strong>
+                    <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-[0.2em]">Unique Tracked Vehicles</p>
+                          {analysisResult?.summary?.unique_vehicle_count !== undefined && (
+                            <span className="text-[10px] font-mono text-cyan-400 font-bold">
+                              {analysisResult.summary.unique_vehicle_count} Total Tracks
                             </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-500 font-mono">
-                            {jobStatus === "FAILED"
-                              ? (jobErrorMessage ? `Error: ${jobErrorMessage}` : "Pipeline failed during video decode/inference")
-                              : jobStatus === "PROCESSING"
-                              ? "Detecting vehicle classes…"
-                              : (activeJobId || uploadedImageUrl ? "No vehicles detected in frame" : "Awaiting media input")}
-                          </span>
-                        )}
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {analysisResult?.vehicle_breakdown && Object.keys(analysisResult.vehicle_breakdown).length > 0 ? (
+                            Object.entries(analysisResult.vehicle_breakdown).map(([cls, cnt]) => (
+                              <span key={cls} className="px-2.5 py-1 bg-white/5 rounded-lg border border-white/10 text-xs font-mono font-bold text-slate-200">
+                                {cls} <strong className="text-cyan-400">×{cnt}</strong>
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-500 font-mono">
+                              {jobStatus === "FAILED"
+                                ? (jobErrorMessage ? `Error: ${jobErrorMessage}` : "Pipeline failed during video decode/inference")
+                                : jobStatus === "PROCESSING"
+                                ? "Tracking unique vehicle IDs…"
+                                : (activeJobId || uploadedImageUrl ? "No vehicles detected in frame" : "Awaiting media input")}
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Observations accumulator (clearly distinguished from unique vehicle count) */}
+                      {analysisResult?.vehicle_observations && Object.keys(analysisResult.vehicle_observations).length > 0 && (
+                        <div className="pt-2 border-t border-white/5">
+                          <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 uppercase">
+                            <span>Per-Frame Neural Observations</span>
+                            <span>
+                              {Object.values(analysisResult.vehicle_observations).reduce((a, b) => a + b, 0).toLocaleString()} Detections
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {Object.entries(analysisResult.vehicle_observations).map(([cls, cnt]) => (
+                              <span key={cls} className="px-2 py-0.5 bg-black/40 rounded border border-white/5 text-[10px] font-mono text-slate-400">
+                                {cls}: {cnt.toLocaleString()}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Spatial Density Grid */}
