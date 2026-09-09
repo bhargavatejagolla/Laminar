@@ -130,7 +130,9 @@ function DensityMatrixGrid({ matrix }: { matrix: number[][] }) {
                 className={`aspect-square rounded-lg flex flex-col items-center justify-center p-1 border border-white/5 ${bgClass} transition-all hover:scale-105`}
                 title={`Zone [${r + 1},${c + 1}]: ${val} vehicles`}
               >
-                <span className="text-[9px] font-mono font-bold text-white/90">{val}</span>
+                <span className="text-[9px] font-mono font-bold text-white/90">
+                  {typeof val === "number" ? (Number.isInteger(val) ? val : val.toFixed(1)) : val}
+                </span>
               </motion.div>
             );
           })
@@ -849,7 +851,8 @@ function RoadIntelligenceContent() {
                     <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-white/10 relative shadow-2xl flex items-center justify-center">
                       {activeJobId ? (
                         <video
-                          src={`/api/v1/jobs/stream/${activeJobId}`}
+                          key={`${activeJobId}_${jobStatus}`}
+                          src={`/api/v1/jobs/stream/${activeJobId}?t=${jobStatus || "initial"}`}
                           controls
                           autoPlay
                           className="w-full h-full object-contain"

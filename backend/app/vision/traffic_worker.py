@@ -24,12 +24,15 @@ from app.vision.incident_detector import incident_detector
 
 logger = get_logger(__name__)
 
-# Color map for vehicle classes
+# Color map for vehicle and transit classes
 CLASS_COLORS: Dict[str, tuple] = {
     "car":        (0, 220, 140),   # teal-green
     "truck":      (255, 140, 0),   # orange
     "bus":        (80, 120, 255),  # blue-violet
     "motorcycle": (255, 60, 120),  # magenta
+    "bicycle":    (0, 220, 255),   # cyan-yellow
+    "train":      (220, 50, 255),  # violet-purple
+    "person":     (255, 200, 0),   # yellow-gold
     "vehicle":    (200, 200, 200), # grey fallback
 }
 
@@ -43,9 +46,10 @@ def draw_vehicle_overlays(frame: np.ndarray, vehicles: list, is_static: bool = F
 
     for v in vehicles:
         x1, y1, x2, y2 = [int(p) for p in v["bbox"]]
-        cls = v.get("class_name", "vehicle")
+        cls = v.get("class_name", "vehicle").lower()
         speed = v.get("speed_px_s", 0.0)
-        track_id = v.get("id", 0)
+        speed_kmh = v.get("speed_kmh", 0.0)
+        track_id = v.get("id", v.get("track_id", 0))
         conf = v.get("confidence", 0)
         color = CLASS_COLORS.get(cls, CLASS_COLORS["vehicle"])
 
@@ -55,8 +59,8 @@ def draw_vehicle_overlays(frame: np.ndarray, vehicles: list, is_static: bool = F
         # Border with cyber/AI corners
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 1)
         # Draw corner brackets
-        length = max(10, int((x2 - x1) * 0.2))
-        t = 3 # thickness
+        length = max(8, int((x2 - x1) * 0.2))
+        t = 2 # thickness
         # Top-left
         cv2.line(frame, (x1, y1), (x1 + length, y1), color, t)
         cv2.line(frame, (x1, y1), (x1, y1 + length), color, t)
@@ -75,7 +79,10 @@ def draw_vehicle_overlays(frame: np.ndarray, vehicles: list, is_static: bool = F
             conf_str = f" {int(conf*100)}%" if conf > 0 else ""
             label = f"{cls.upper()}{conf_str}"
         else:
-            label = f"#{track_id} {cls.upper()} {speed:.0f}px/s"
+            if speed_kmh and speed_kmh > 0:
+                label = f"#{track_id} {cls.upper()} {speed_kmh:.0f}km/h"
+            else:
+                label = f"#{track_id} {cls.upper()} {speed:.0f}px/s"
 
         (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.38, 1)
         ly = max(y1 - 6, th + 4)
