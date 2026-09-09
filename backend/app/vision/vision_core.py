@@ -157,14 +157,13 @@ class VehicleTracker:
         speed_px_s = float(round(0.70 * old.get("speed_px_s", raw_speed) + 0.30 * raw_speed, 1))
 
         # Calibrated real-world speed
+        is_calibrated = False
         speed_kmh = 0.0
-        if self.calibration:
-            speed_kmh = self.calibration.calculate_speed_kmh(
+        if self.calibration and getattr(self.calibration, "homography_matrix", None) is not None:
+            speed_kmh = float(self.calibration.calculate_speed_kmh(
                 (old["cx"], old["cy"]), (cx, cy), dt
-            )
-        else:
-            # Standard perspective estimation fallback
-            speed_kmh = round(min(160.0, speed_px_s * 0.55), 1)
+            ))
+            is_calibrated = True
 
         # Stopped state accumulation
         stopped = old.get("stopped_frames", 0)
@@ -184,6 +183,7 @@ class VehicleTracker:
             "frames_lost": 0,
             "speed_px_s": speed_px_s,
             "speed_kmh": round(speed_kmh, 1),
+            "is_calibrated": is_calibrated,
             "class_name": det["class_name"],
             "last_seen": time.time(),
             "trajectory": traj,
@@ -195,6 +195,7 @@ class VehicleTracker:
         det["id"] = tid
         det["speed_px_s"] = speed_px_s
         det["speed_kmh"] = round(speed_kmh, 1)
+        det["is_calibrated"] = is_calibrated
         det["trajectory"] = traj
         det["wait_time_s"] = round(stopped * dt, 1)
         det["stopped_frames"] = stopped

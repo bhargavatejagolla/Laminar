@@ -99,6 +99,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
     frame_idx = 0
     sampled_counts = []
     sampled_speeds = []
+    sampled_waits = []
 
     worker_vision_core = VisionCore()
 
@@ -111,6 +112,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
     # Fast sampling: run YOLO at ~6 FPS, interpolate in between for 30 FPS smooth rendering
     skip_rate = max(1, int(fps / 6))
     dt_step = skip_rate / fps
+    proc_start_time = time.time()
 
     try:
         while True:
@@ -140,6 +142,10 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 speeds = [float(obj.get("speed_px_s", 0.0)) for obj in tracked_objs if obj.get("speed_px_s", 0) > 0]
                 avg_frame_speed = float(np.mean(speeds)) if speeds else 0.0
                 sampled_speeds.append(avg_frame_speed)
+
+                stopped_delays = [t.get("wait_time_s", 0.0) for t in tracked_objs if t.get("stopped_frames", 0) > 3]
+                curr_wait_min = round(float(np.mean(stopped_delays)) / 60.0, 1) if stopped_delays else 0.0
+                sampled_waits.append(curr_wait_min)
 
                 # Reset current spatial grid for this sample frame
                 current_density_grid = [[0, 0, 0, 0] for _ in range(4)]
@@ -248,23 +254,23 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 risk_lvl = "CRITICAL" if v_count > 15 else "HIGH" if v_count > 10 else "MEDIUM" if v_count > 5 else "LOW"
                 events_log.append({
                     "time": ts_str,
-                    "vehicles": v_count,
-                    "speed": f"{avg_frame_speed:.1f}px/s",
-                    "risk": risk_lvl
+                    "event": f"Active volume: {v_count} vehicles, {len(frame_incidents)} hazards",
+                    "severity": risk_lvl
                 })
 
-            # Write frame to video output
+            # Write annotated frame to video output
             if writer is not None:
                 try:
                     if use_imageio:
+                        # imageio requires RGB format
                         writer.append_data(cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB))
                     else:
                         writer.write(annotated_frame)
-                except Exception:
-                    pass
+                except Exception as w_err:
+                    logger.warning(f"Frame write error at frame {frame_idx}: {w_err}")
 
-            # Update progress & progressive result_data periodically so UI reflects live stats while video plays
-            if (frame_idx % 20 == 0 or frame_idx == 10) and total_frames > 0:
+            # Emit live progress every ~1.5s
+            if frame_idx % int(fps * 1.5) == 0:
                 progress = min(99.0, round((frame_idx / total_frames) * 100, 1))
                 curr_avg_v = float(np.mean(sampled_counts)) if sampled_counts else float(v_count)
                 curr_peak_v = int(np.max(sampled_counts)) if sampled_counts else v_count
@@ -292,7 +298,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
                         "peak_count": curr_peak_v,
                         "unique_vehicle_count": len(unique_vehicles_by_id) if unique_vehicles_by_id else curr_peak_v,
                         "avg_speed_px_s": round(curr_avg_spd, 1),
-                        "avg_wait_min": max(0.5, round(curr_avg_v * 0.8, 1)),
+                        "avg_wait_min": curr_wait_min,
                         "peak_density": "HIGH" if curr_peak_v > 12 else "MEDIUM" if curr_peak_v > 6 else "LOW",
                         "duration_seconds": round(frame_idx / fps, 1)
                     },
@@ -313,7 +319,7 @@ async def async_process_upload_job(job_id: str, file_path: str):
                         "count": v_count,
                         "density": "High" if v_count > 10 else "Medium" if v_count > 4 else "Low",
                         "avg_velocity": curr_avg_spd,
-                        "wait_time_estimate": round(curr_avg_v * 0.8, 1),
+                        "wait_time_estimate": curr_wait_min,
                         "risk_score": min(100, int(v_count * 4 + len(incidents) * 35)),
                         "source_type": "upload",
                         "last_updated": time.time(),
@@ -343,10 +349,12 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 pass
 
         # Compute final summary metrics
+        total_proc_time = max(0.1, time.time() - proc_start_time)
+        real_proc_fps = round(frame_idx / total_proc_time, 1)
         avg_v_count = float(np.mean(sampled_counts)) if sampled_counts else 0.0
         peak_v_count = int(np.max(sampled_counts)) if sampled_counts else 0
         avg_speed_val = float(np.mean(sampled_speeds)) if sampled_speeds else 0.0
-        avg_wait_val = max(0.5, round((avg_v_count * 0.8), 1))
+        avg_wait_val = round(float(np.mean(sampled_waits)), 1) if sampled_waits else 0.0
         peak_density = "HIGH" if peak_v_count > 12 else "MEDIUM" if peak_v_count > 6 else "LOW"
 
         # Unique vehicle counts by class
@@ -371,7 +379,9 @@ async def async_process_upload_job(job_id: str, file_path: str):
                 "avg_speed_px_s": round(avg_speed_val, 1),
                 "avg_wait_min": avg_wait_val,
                 "peak_density": peak_density,
-                "duration_seconds": round(total_frames / fps, 1)
+                "duration_seconds": round(total_frames / fps, 1),
+                "processing_fps": real_proc_fps,
+                "processing_time_s": round(total_proc_time, 1)
             },
             "vehicle_breakdown": final_unique_breakdown if final_unique_breakdown else {"Car": peak_v_count},
             "vehicle_observations": final_obs_breakdown,

@@ -67,7 +67,7 @@ class IncidentIntelligence:
                         b1 = t1.get("bbox", [0, 0, 0, 0])
                         b2 = t2.get("bbox", [0, 0, 0, 0])
                         
-                        # Calculate Areas
+                        # Calculate Dimensions & Areas
                         w1, h1 = max(0, b1[2] - b1[0]), max(0, b1[3] - b1[1])
                         w2, h2 = max(0, b2[2] - b2[0]), max(0, b2[3] - b2[1])
                         area1 = w1 * h1
@@ -75,12 +75,17 @@ class IncidentIntelligence:
                         if area1 <= 0 or area2 <= 0:
                             continue
                         
-                        # Calculate Centroid Distance & Proximity
-                        c1x, c1y = (b1[0] + b1[2]) / 2, (b1[1] + b1[3]) / 2
-                        c2x, c2y = (b2[0] + b2[2]) / 2, (b2[1] + b2[3]) / 2
+                        # Ignore distant horizon vehicles (perspective compression causes spurious overlaps)
+                        c1y = (b1[1] + b1[3]) / 2
+                        c2y = (b2[1] + b2[3]) / 2
+                        if c1y < 140 or c2y < 140 or min(h1, h2) < 25:
+                            continue
+
+                        # Calculate Centroid Distance
+                        c1x = (b1[0] + b1[2]) / 2
+                        c2x = (b2[0] + b2[2]) / 2
                         center_dist = math.sqrt((c1x - c2x)**2 + (c1y - c2y)**2)
                         min_dim = min(max(w1, h1), max(w2, h2))
-                        proximity_threshold = min_dim * 0.85
 
                         # Contact Geometry (IoU)
                         x1 = max(b1[0], b2[0])
@@ -94,8 +99,9 @@ class IncidentIntelligence:
                             union_area = area1 + area2 - intersection_area
                             iou = intersection_area / max(1.0, union_area)
                         
-                        # Collision candidates require either visible overlap (IoU >= 0.04) or extreme proximity
-                        if iou < 0.04 and center_dist > proximity_threshold:
+                        # Genuine collision candidate requires actual physical overlap (IoU >= 0.10)
+                        # or severe centroid penetration (distance < 40% of vehicle dimension)
+                        if iou < 0.10 and center_dist > (min_dim * 0.40):
                             continue
 
                         s1_curr = float(t1.get("speed_px_s", 0.0))
@@ -105,13 +111,13 @@ class IncidentIntelligence:
                         traj1 = t1.get("trajectory", [])
                         traj2 = t2.get("trajectory", [])
                         s1_prior = s1_curr
-                        if len(traj1) >= 3:
+                        if len(traj1) >= 4:
                             dx = traj1[-1][0] - traj1[0][0]
                             dy = traj1[-1][1] - traj1[0][1]
                             dt_span = max(0.05, traj1[-1][2] - traj1[0][2])
                             s1_prior = math.sqrt(dx*dx + dy*dy) / dt_span
                         s2_prior = s2_curr
-                        if len(traj2) >= 3:
+                        if len(traj2) >= 4:
                             dx = traj2[-1][0] - traj2[0][0]
                             dy = traj2[-1][1] - traj2[0][1]
                             dt_span = max(0.05, traj2[-1][2] - traj2[0][2])
@@ -120,10 +126,11 @@ class IncidentIntelligence:
                         drop1 = max(0.0, s1_prior - s1_curr)
                         drop2 = max(0.0, s2_prior - s2_curr)
                         max_drop = max(drop1, drop2)
-                        decel_score = min(1.0, max(0.0, max_drop / 20.0)) if (s1_curr < 8.0 or s2_curr < 8.0) else 0.0
+                        decel_score = min(1.0, max(0.0, max_drop / 25.0)) if (s1_curr < 6.0 or s2_curr < 6.0) else 0.0
 
-                        # Signal 2: Trajectory Anomaly & Approach Heading Angle
-                        anomaly_score = 0.0
+                        # Signal 2: Trajectory Convergence & Approach Heading Angle
+                        # Parallel traffic in adjacent lanes has dot product near 1.0 (angle < 15 deg) -> score 0.0
+                        convergence_score = 0.0
                         if len(traj1) >= 2 and len(traj2) >= 2:
                             v1x = traj1[-1][0] - traj1[-2][0]
                             v1y = traj1[-1][1] - traj1[-2][1]
@@ -131,29 +138,30 @@ class IncidentIntelligence:
                             v2y = traj2[-1][1] - traj2[-2][1]
                             mag1 = math.sqrt(v1x*v1x + v1y*v1y)
                             mag2 = math.sqrt(v2x*v2x + v2y*v2y)
-                            if mag1 > 0.5 and mag2 > 0.5:
+                            if mag1 > 1.0 and mag2 > 1.0:
                                 dot = (v1x*v2x + v1y*v2y) / (mag1 * mag2)
                                 dot = max(-1.0, min(1.0, dot))
                                 angle_deg = math.degrees(math.acos(dot))
-                                if angle_deg > 25.0:
-                                    anomaly_score = min(1.0, (angle_deg - 25.0) / 45.0)
+                                # Only angle divergence > 35 degrees indicates collision trajectory (T-bone, swerve, head-on)
+                                if angle_deg > 35.0:
+                                    convergence_score = min(1.0, (angle_deg - 35.0) / 45.0)
 
-                        # Signal 3: Contact Geometry (IoU or Close Proximity)
-                        geom_score = min(1.0, max(0.2, iou * 3.5)) if iou >= 0.04 else max(0.0, 1.0 - (center_dist / proximity_threshold))
+                        # Signal 3: Contact Geometry (Substantial IoU)
+                        geom_score = min(1.0, iou * 3.0) if iou >= 0.10 else 0.0
 
-                        # Signal 4: Post-event stationary stall
-                        stall_score = 1.0 if (s1_curr < 5.0 and s2_curr < 5.0) else 0.0
+                        # Signal 4: Post-event stationary stall (both vehicles stopped after impact)
+                        stall_score = 1.0 if (s1_curr < 4.0 and s2_curr < 4.0) else (0.5 if (s1_curr < 4.0 or s2_curr < 4.0) else 0.0)
 
-                        # Weighted Evidence Score
+                        # Weighted Evidence Score: Requires multiple converging signals
                         evidence_score = (
                             0.35 * decel_score +
-                            0.30 * anomaly_score +
+                            0.30 * convergence_score +
                             0.20 * geom_score +
                             0.15 * stall_score
                         )
 
-                        # Parallel smooth flowing traffic has evidence_score < 0.35 -> Ignored
-                        if evidence_score < 0.40:
+                        # Parallel smooth flowing traffic has evidence_score < 0.20 -> Strictly ignored
+                        if evidence_score < 0.60:
                             continue
 
                         t1_id, t2_id = min(t1["id"], t2["id"]), max(t1["id"], t2["id"])
@@ -173,18 +181,17 @@ class IncidentIntelligence:
                             rec["confidence"] = max(rec["confidence"], round(evidence_score, 2))
                             rec["bbox"] = [enc_x1, enc_y1, enc_x2, enc_y2]
                             
-                            # Promote based on consecutive observation
-                            if rec["consecutive_frames"] >= 2:
+                            # Promote based on 4+ consecutive frames of observed collision evidence
+                            if rec["consecutive_frames"] >= 4:
                                 rec["status"] = "CONFIRMED"
                                 active_confirmed_incidents.append(rec)
                         else:
-                            # New candidate
-                            status = "CONFIRMED" if evidence_score >= 0.70 else "CANDIDATE"
+                            # New candidate - must persist before confirmation
                             rec = {
                                 "id": f"LMNR-INC-{t1_id}-{t2_id}",
                                 "type": "collision",
-                                "status": status,
-                                "priority": "CRITICAL" if evidence_score >= 0.65 else "HIGH",
+                                "status": "CANDIDATE",
+                                "priority": "CRITICAL",
                                 "confidence": round(evidence_score, 2),
                                 "description": f"Collision anomaly detected between units #{t1_id} and #{t2_id}.",
                                 "timestamp": now.isoformat(),
@@ -197,7 +204,7 @@ class IncidentIntelligence:
                                     "score": round(evidence_score, 2),
                                     "signals": {
                                         "sudden_deceleration": round(decel_score, 2),
-                                        "trajectory_anomaly": round(anomaly_score, 2),
+                                        "convergence": round(convergence_score, 2),
                                         "contact_geometry": round(geom_score, 2),
                                         "post_event_stall": round(stall_score, 2),
                                         "iou": round(iou, 2)
@@ -205,11 +212,10 @@ class IncidentIntelligence:
                                 }
                             }
                             self._tracked_incidents[inc_key] = rec
-                            if status == "CONFIRMED":
-                                active_confirmed_incidents.append(rec)
 
             # 2. Road Hazard: Stalled Vehicle in Active Corridor
-            # When average roadway traffic is moving (>15 px/s) and a single vehicle remains stopped (>3 frames)
+            # Genuinely stalled vehicle: must be in foreground/active corridor, stopped for >= 10 frames,
+            # and traffic around it is flowing (> 15 px/s).
             if len(tracks) >= 3:
                 speeds = [float(t.get("speed_px_s", 0)) for t in tracks if t.get("class_name") != "person"]
                 avg_speed = sum(speeds) / max(1, len(speeds))
@@ -220,10 +226,27 @@ class IncidentIntelligence:
                         tid = t.get("id", 0)
                         s = float(t.get("speed_px_s", 0))
                         stopped_cnt = int(t.get("stopped_frames", 0))
-                        if s < 3.5 and stopped_cnt >= 4:
+                        b = t.get("bbox", [0, 0, 50, 50])
+                        cy = (b[1] + b[3]) / 2.0
+                        bh = b[3] - b[1]
+
+                        # Ignore horizon / distant perspective vehicles (cy < 160 or small bounding box)
+                        if cy < 160 or bh < 30:
+                            continue
+
+                        # Must be stationary for >= 10 sampled frames (>= 1.6s) with prior motion history
+                        traj = t.get("trajectory", [])
+                        had_prior_motion = False
+                        if len(traj) >= 5:
+                            dx = traj[-1][0] - traj[0][0]
+                            dy = traj[-1][1] - traj[0][1]
+                            if math.sqrt(dx*dx + dy*dy) > 30.0:
+                                had_prior_motion = True
+
+                        if s < 3.0 and stopped_cnt >= 10 and had_prior_motion:
                             hazard_key = f"stall_{tid}"
                             observed_keys_in_frame.add(hazard_key)
-                            b = [int(p) for p in t.get("bbox", [0, 0, 50, 50])]
+                            b_int = [int(p) for p in b]
                             rec = {
                                 "id": f"LMNR-HAZ-{tid}",
                                 "type": "stalled_vehicle",
@@ -235,7 +258,7 @@ class IncidentIntelligence:
                                 "first_seen_ts": now_ts,
                                 "last_seen_ts": now_ts,
                                 "consecutive_frames": stopped_cnt,
-                                "bbox": b,
+                                "bbox": b_int,
                                 "track_ids": [tid]
                             }
                             self._tracked_incidents[hazard_key] = rec

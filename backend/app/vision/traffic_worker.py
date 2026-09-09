@@ -79,7 +79,8 @@ def draw_vehicle_overlays(frame: np.ndarray, vehicles: list, is_static: bool = F
             conf_str = f" {int(conf*100)}%" if conf > 0 else ""
             label = f"{cls.upper()}{conf_str}"
         else:
-            if speed_kmh and speed_kmh > 0:
+            is_calib = v.get("is_calibrated", False)
+            if is_calib and speed_kmh and speed_kmh > 0:
                 label = f"#{track_id} {cls.upper()} {speed_kmh:.0f}km/h"
             else:
                 label = f"#{track_id} {cls.upper()} {speed:.0f}px/s"
@@ -112,17 +113,17 @@ def draw_hud(frame: np.ndarray, result: dict, is_static: bool = False) -> np.nda
 
     # HUD panel background
     h, w = frame.shape[:2]
-    cv2.rectangle(frame, (8, 8), (300, 90), (10, 12, 18), -1)
-    cv2.rectangle(frame, (8, 8), (300, 90), density_color, 1)
+    cv2.rectangle(frame, (8, 8), (350, 90), (10, 12, 18), -1)
+    cv2.rectangle(frame, (8, 8), (350, 90), density_color, 1)
 
     node_title = "LAMINAR PHOTO ANALYSIS" if is_static else "LAMINAR TRAFFIC NODE"
     cv2.putText(frame, node_title, (14, 26),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
     cv2.putText(frame, f"VEHICLES: {count}   DENSITY: {density}", (14, 46),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.40, density_color, 1, cv2.LINE_AA)
-    speed_text = "MOTION: N/A (STILL)" if is_static else f"AVG SPEED: {velocity:.1f} px/s   RISK: {risk}%"
+    speed_text = "MOTION: N/A (STILL)" if is_static else f"AVG SPEED: {velocity:.1f} px/s (UNCALIBRATED)   RISK: {risk}%"
     cv2.putText(frame, speed_text, (14, 64),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 220, 255), 1, cv2.LINE_AA)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.36, (180, 220, 255), 1, cv2.LINE_AA)
     ts = datetime.now().strftime("%H:%M:%S")
     time_text = f"SNAPSHOT  {ts}" if is_static else f"LIVE  {ts}"
     cv2.putText(frame, time_text, (14, 82),
