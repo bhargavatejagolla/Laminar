@@ -109,14 +109,16 @@ class ParkingIntelligence:
         input_arg: Any,
         second_arg: Any = None,
         max_slots: Optional[int] = None,
-        zones: Optional[Dict] = None
+        zones: Optional[Dict] = None,
+        is_video: bool = True
     ) -> AwaitableDict:
         """
         Check which zones are occupied by detected vehicles.
         Supports both:
           - (vision_state, zones=None, max_slots=None)
           - (frame, vehicles, max_slots=None)
-        Applies State Stability logic and returns an AwaitableDict so it can be used synchronously or awaited.
+        Applies State Stability logic on videos, or direct evaluation on static images.
+        Returns an AwaitableDict so it can be used synchronously or awaited.
         """
         now = time.time()
         
@@ -166,8 +168,11 @@ class ParkingIntelligence:
                             raw_occupied = True
                             max_ioa = max(max_ioa, 0.5)
                 
-                # Apply 3-second stability logic
-                stable_occupied = self._apply_stability(zone_id, raw_occupied, now)
+                # Apply 3-second stability logic for continuous video; static images evaluate immediately
+                if is_video:
+                    stable_occupied = self._apply_stability(zone_id, raw_occupied, now)
+                else:
+                    stable_occupied = raw_occupied
                 
                 slot_states[zone_id] = {
                     "occupied": stable_occupied,

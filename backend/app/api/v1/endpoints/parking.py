@@ -615,14 +615,14 @@ async def upload_parking_source(
                             v_lng = v_obj.longitude
                 except: pass
 
-        # ΓöÇΓöÇ 4. Zone Occupancy ΓöÇΓöÇ
-        slot_states = await parking_detector.detect_occupancy(img, all_detections, max_slots=venue_capacity)
+        # ── 4. Zone Occupancy ──
+        slot_states = await parking_detector.detect_occupancy(img, all_detections, max_slots=venue_capacity, is_video=is_video)
         occupancy = sum(1 for s in slot_states.values() if s["occupied"])
         capacity = len(slot_states)
         occ_pct = round((occupancy / capacity) * 100) if capacity > 0 else 0
         avg_conf = sum(v.get("confidence", 0) for v in best_vehicles) / len(best_vehicles) if best_vehicles else 0
 
-        # ΓöÇΓöÇ 6. Worker Injection Commit ΓöÇΓöÇ
+        # ── 6. Worker Injection Commit ──
         # Inject the annotated frame and metrics back into the active worker
         # so the standard feed endpoint sees this frame.
         
@@ -631,7 +631,7 @@ async def upload_parking_source(
             # now accurately draws dynamic padded red polygons, eliminating the "double box" issue.
             
             # Draw parking slots
-            slot_states = await parking_detector.detect_occupancy(img, best_vehicles, max_slots=venue_capacity)
+            slot_states = await parking_detector.detect_occupancy(img, best_vehicles, max_slots=venue_capacity, is_video=is_video)
             for zid, state_info in slot_states.items():
                 poly = np.array(state_info["polygon"], dtype=np.int32)
                 color = (0, 0, 255) if state_info["occupied"] else (0, 255, 0)
