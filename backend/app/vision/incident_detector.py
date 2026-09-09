@@ -111,13 +111,13 @@ class IncidentIntelligence:
                         traj1 = t1.get("trajectory", [])
                         traj2 = t2.get("trajectory", [])
                         s1_prior = s1_curr
-                        if len(traj1) >= 4:
+                        if len(traj1) >= 3:
                             dx = traj1[-1][0] - traj1[0][0]
                             dy = traj1[-1][1] - traj1[0][1]
                             dt_span = max(0.05, traj1[-1][2] - traj1[0][2])
                             s1_prior = math.sqrt(dx*dx + dy*dy) / dt_span
                         s2_prior = s2_curr
-                        if len(traj2) >= 4:
+                        if len(traj2) >= 3:
                             dx = traj2[-1][0] - traj2[0][0]
                             dy = traj2[-1][1] - traj2[0][1]
                             dt_span = max(0.05, traj2[-1][2] - traj2[0][2])
@@ -128,9 +128,11 @@ class IncidentIntelligence:
                         max_drop = max(drop1, drop2)
                         decel_score = min(1.0, max(0.0, max_drop / 25.0)) if (s1_curr < 6.0 or s2_curr < 6.0) else 0.0
 
-                        # Signal 2: Trajectory Convergence & Approach Heading Angle
-                        # Parallel traffic in adjacent lanes has dot product near 1.0 (angle < 15 deg) -> score 0.0
+                        # Signal 2: Trajectory Kinematics & Collision Archetype Classification
+                        # Distinguishes: A) Crossing / Angle Collision, B) Rear-End In-line Collision, C) Stationary Hazard Impact
                         convergence_score = 0.0
+                        col_type = "collision"
+
                         if len(traj1) >= 2 and len(traj2) >= 2:
                             v1x = traj1[-1][0] - traj1[-2][0]
                             v1y = traj1[-1][1] - traj1[-2][1]
@@ -138,18 +140,44 @@ class IncidentIntelligence:
                             v2y = traj2[-1][1] - traj2[-2][1]
                             mag1 = math.sqrt(v1x*v1x + v1y*v1y)
                             mag2 = math.sqrt(v2x*v2x + v2y*v2y)
-                            if mag1 > 1.0 and mag2 > 1.0:
+
+                            if mag1 > 0.8 and mag2 > 0.8:
                                 dot = (v1x*v2x + v1y*v2y) / (mag1 * mag2)
                                 dot = max(-1.0, min(1.0, dot))
                                 angle_deg = math.degrees(math.acos(dot))
-                                # Only angle divergence > 35 degrees indicates collision trajectory (T-bone, swerve, head-on)
-                                if angle_deg > 35.0:
-                                    convergence_score = min(1.0, (angle_deg - 35.0) / 45.0)
 
-                        # Signal 3: Contact Geometry (Substantial IoU)
+                                if angle_deg > 30.0:
+                                    # Archetype A: Crossing or head-on trajectory convergence
+                                    convergence_score = min(1.0, (angle_deg - 30.0) / 45.0)
+                                    col_type = "crossing_collision"
+                                elif dot >= 0.70 and center_dist > 1.0:
+                                    # Archetype B: Rear-end same-direction impact (longitudinal closing speed)
+                                    # Vector from vehicle 1 to vehicle 2
+                                    dx = c2x - c1x
+                                    dy = c2y - c1y
+                                    rel_vx = v1x - v2x
+                                    rel_vy = v1y - v2y
+                                    closing_speed = (rel_vx * dx + rel_vy * dy) / center_dist
+                                    if abs(closing_speed) > 6.0:
+                                        convergence_score = min(1.0, abs(closing_speed) / 20.0)
+                                        col_type = "rear_end_collision"
+                            elif (mag1 > 1.5 and mag2 < 0.5) or (mag2 > 1.5 and mag1 < 0.5):
+                                # Archetype C: Moving vehicle impacting a stationary stopped vehicle
+                                moving_t = 1 if mag1 > mag2 else 2
+                                dx = (c2x - c1x) if moving_t == 1 else (c1x - c2x)
+                                dy = (c2y - c1y) if moving_t == 1 else (c1y - c2y)
+                                mvx = v1x if moving_t == 1 else v2x
+                                mvy = v1y if moving_t == 1 else v2y
+                                if center_dist > 1.0:
+                                    approach_proj = (mvx * dx + mvy * dy) / center_dist
+                                    if approach_proj > 6.0:
+                                        convergence_score = min(1.0, approach_proj / 20.0)
+                                        col_type = "stationary_impact"
+
+                        # Signal 3: Contact Geometry (Substantial IoU or tight penetration)
                         geom_score = min(1.0, iou * 3.0) if iou >= 0.10 else 0.0
 
-                        # Signal 4: Post-event stationary stall (both vehicles stopped after impact)
+                        # Signal 4: Post-event stationary stall (vehicles stopped or severe slow-down)
                         stall_score = 1.0 if (s1_curr < 4.0 and s2_curr < 4.0) else (0.5 if (s1_curr < 4.0 or s2_curr < 4.0) else 0.0)
 
                         # Weighted Evidence Score: Requires multiple converging signals
@@ -187,13 +215,20 @@ class IncidentIntelligence:
                                 active_confirmed_incidents.append(rec)
                         else:
                             # New candidate - must persist before confirmation
+                            if col_type == "rear_end_collision":
+                                desc = f"Rear-end impact detected between units #{t1_id} and #{t2_id}."
+                            elif col_type == "stationary_impact":
+                                desc = f"Stationary impact hazard detected between units #{t1_id} and #{t2_id}."
+                            else:
+                                desc = f"Crossing collision anomaly detected between units #{t1_id} and #{t2_id}."
+
                             rec = {
                                 "id": f"LMNR-INC-{t1_id}-{t2_id}",
-                                "type": "collision",
+                                "type": col_type,
                                 "status": "CANDIDATE",
                                 "priority": "CRITICAL",
                                 "confidence": round(evidence_score, 2),
-                                "description": f"Collision anomaly detected between units #{t1_id} and #{t2_id}.",
+                                "description": desc,
                                 "timestamp": now.isoformat(),
                                 "first_seen_ts": now_ts,
                                 "last_seen_ts": now_ts,
@@ -202,6 +237,7 @@ class IncidentIntelligence:
                                 "track_ids": [t1_id, t2_id],
                                 "evidence": {
                                     "score": round(evidence_score, 2),
+                                    "archetype": col_type,
                                     "signals": {
                                         "sudden_deceleration": round(decel_score, 2),
                                         "convergence": round(convergence_score, 2),
