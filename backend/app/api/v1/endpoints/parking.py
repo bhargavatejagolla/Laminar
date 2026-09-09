@@ -977,12 +977,11 @@ async def stream_parking_camera(camera_id: str):
     def _create_parking_standby_frame():
         frame = np.zeros((360, 640, 3), dtype=np.uint8)
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        cv2.putText(frame, f"PARKING NODE // {camera_id[:8]}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 230, 255), 2)
-        cv2.putText(frame, "LAMINAR SPATIAL PARKING MATRIX - ACTIVE", (20, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 150), 1)
-        scan_y = int((time.time() * 90) % 360)
-        cv2.line(frame, (0, scan_y), (640, scan_y), (0, 210, 255), 1)
-        cv2.putText(frame, now_str, (20, 335), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (140, 160, 180), 1)
-        cv2.circle(frame, (615, 35), 6, (0, 255, 150), -1)
+        cv2.putText(frame, f"PARKING NODE // {camera_id[:8]}", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (100, 100, 255), 2)
+        cv2.putText(frame, "CAMERA OFFLINE - SOURCE UNAVAILABLE", (20, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (80, 80, 220), 1)
+        cv2.putText(frame, "No live parking feed received from sensor source.", (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (120, 120, 140), 1)
+        cv2.putText(frame, now_str, (20, 335), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 100, 120), 1)
+        cv2.circle(frame, (615, 35), 6, (0, 0, 220), -1) # Red offline dot
         _, jpg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
         return jpg.tobytes()
 

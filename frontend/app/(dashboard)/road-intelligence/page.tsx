@@ -266,6 +266,7 @@ function RoadIntelligenceContent() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResultData | null>(null);
   const [jobProgress, setJobProgress] = useState<number>(0);
   const [jobStatus, setJobStatus] = useState<string | null>(null);
+  const [jobErrorMessage, setJobErrorMessage] = useState<string | null>(null);
 
   // Dynamic Telemetry Polling (scoped by selectedVenueId)
   const { insights: parkingInsights } = (useParkingInsights(selectedVenueId) || {}) as any;
@@ -360,7 +361,9 @@ function RoadIntelligenceContent() {
           toast.success("Forensic video analysis complete!");
           clearInterval(interval);
         } else if (status === "FAILED") {
-          toast.error(`Analysis failed: ${res.data?.error_message || "Error"}`);
+          const errText = res.data?.error_message || "Analysis error";
+          setJobErrorMessage(errText);
+          toast.error(`Analysis failed: ${errText}`);
           clearInterval(interval);
         }
       } catch (err) {
@@ -377,6 +380,8 @@ function RoadIntelligenceContent() {
     if (!file) return;
     setUploading(true);
     setAnalysisResult(null);
+    setJobErrorMessage(null);
+    setJobStatus(null);
     setSourceMode("upload"); // Automatically navigate to forensic upload suite
     const toastId = toast.loading("Uploading media to LAMINAR Neural Core…");
 
@@ -581,10 +586,32 @@ function RoadIntelligenceContent() {
           </div>
 
           {/* Hazard Status Badge */}
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase ${hasIncidents ? "border-rose-500/40 bg-rose-500/10 text-rose-400" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"}`}>
-            <span className={`w-2 h-2 rounded-full ${hasIncidents ? "bg-rose-400 animate-ping" : "bg-emerald-400"}`} />
-            {hasIncidents ? `${activeIncidents.length} Hazards Active` : "Corridor Clear"}
-          </div>
+          {sourceMode === "upload" && jobStatus === "FAILED" ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase border-amber-500/40 bg-amber-500/10 text-amber-400">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              Analysis Failed
+            </div>
+          ) : sourceMode === "upload" && jobStatus === "PROCESSING" ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase border-cyan-500/40 bg-cyan-500/10 text-cyan-400">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              Analyzing Video ({jobProgress}%)
+            </div>
+          ) : (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono font-black uppercase ${
+              (sourceMode === "upload" ? (analysisResult?.incidents?.length || 0) > 0 : hasIncidents)
+                ? "border-rose-500/40 bg-rose-500/10 text-rose-400"
+                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                (sourceMode === "upload" ? (analysisResult?.incidents?.length || 0) > 0 : hasIncidents)
+                  ? "bg-rose-400 animate-ping"
+                  : "bg-emerald-400"
+              }`} />
+              {(sourceMode === "upload" ? (analysisResult?.incidents?.length || 0) > 0 : hasIncidents)
+                ? `${sourceMode === "upload" ? analysisResult!.incidents!.length : activeIncidents.length} Hazards Active`
+                : (sourceMode === "upload" && !analysisResult ? "Standby" : "Corridor Clear")}
+            </div>
+          )}
 
           {/* Sync / Reset Button */}
           <button
@@ -656,10 +683,16 @@ function RoadIntelligenceContent() {
                     ? uploadAvgCount
                     : jobStatus === "PROCESSING"
                     ? "Analyzing…"
+                    : jobStatus === "FAILED"
+                    ? "DATA UNAVAILABLE"
                     : "0"
                 }
-                sub={`Peak count: ${analysisResult?.summary?.peak_count ?? 0} vehicles`}
-                color="cyan"
+                sub={
+                  jobStatus === "FAILED"
+                    ? "Pipeline execution failed"
+                    : `Peak count: ${analysisResult?.summary?.peak_count ?? 0} vehicles`
+                }
+                color={jobStatus === "FAILED" ? "amber" : "cyan"}
                 icon={Activity}
               />
               <StatCard
@@ -669,34 +702,66 @@ function RoadIntelligenceContent() {
                     ? `${Math.round(uploadSpeed)} px/s`
                     : jobStatus === "PROCESSING"
                     ? "Calculating…"
+                    : jobStatus === "FAILED"
+                    ? "NOT AVAILABLE"
+                    : uploadedImageUrl
+                    ? "NOT AVAILABLE"
                     : "0 px/s"
                 }
-                sub={`Est. corridor delay: ${analysisResult?.summary?.avg_wait_min ?? 0}m`}
-                color="amber"
+                sub={
+                  jobStatus === "FAILED"
+                    ? "Pipeline execution failed"
+                    : uploadedImageUrl
+                    ? "Still photo — speed not applicable"
+                    : `Est. corridor delay: ${analysisResult?.summary?.avg_wait_min ?? 0}m`
+                }
+                color={jobStatus === "FAILED" ? "amber" : "amber"}
                 icon={TrendingUp}
               />
               <StatCard
                 label="Footage Incidents"
-                value={analysisResult?.incidents?.length || 0}
-                sub={
-                  (analysisResult?.incidents?.length || 0) > 0
-                    ? "Collision / hazard detected"
-                    : "Corridor clear — zero hazards"
+                value={
+                  jobStatus === "FAILED"
+                    ? "FAILED"
+                    : analysisResult?.incidents?.length !== undefined
+                    ? analysisResult.incidents.length
+                    : jobStatus === "PROCESSING"
+                    ? "Scanning…"
+                    : 0
                 }
-                color={(analysisResult?.incidents?.length || 0) > 0 ? "rose" : "emerald"}
+                sub={
+                  jobStatus === "FAILED"
+                    ? "Pipeline execution failed"
+                    : (analysisResult?.incidents?.length || 0) > 0
+                    ? "Collision / hazard detected"
+                    : jobStatus === "PROCESSING"
+                    ? "Analyzing frame kinematics…"
+                    : analysisResult
+                    ? "Corridor clear — zero hazards"
+                    : "Awaiting media input"
+                }
+                color={
+                  jobStatus === "FAILED"
+                    ? "amber"
+                    : (analysisResult?.incidents?.length || 0) > 0
+                    ? "rose"
+                    : "emerald"
+                }
                 icon={AlertTriangle}
               />
               <StatCard
                 label="Pipeline Status"
                 value={jobStatus || (uploadedImageUrl ? "COMPLETED" : "STANDBY")}
                 sub={
-                  activeJobId
+                  jobStatus === "FAILED"
+                    ? (jobErrorMessage ? `${jobErrorMessage.slice(0, 32)}…` : "Fatal analysis error")
+                    : activeJobId
                     ? `Job: ${activeJobId.slice(0, 8)}`
                     : uploadedImageUrl
                     ? "Snapshot Analyzed"
                     : "Awaiting Media Injection"
                 }
-                color="violet"
+                color={jobStatus === "FAILED" ? "rose" : "violet"}
                 icon={BrainCircuit}
               />
             </>
@@ -811,7 +876,7 @@ function RoadIntelligenceContent() {
                           <p className="text-xl font-black font-mono text-white">
                             {analysisResult?.summary?.avg_vehicle_count !== undefined
                               ? analysisResult.summary.avg_vehicle_count
-                              : jobStatus === "PROCESSING" ? "Analyzing…" : "0"}
+                              : jobStatus === "PROCESSING" ? "Analyzing…" : jobStatus === "FAILED" ? "FAILED" : "0"}
                           </p>
                         </div>
                         <div>
@@ -819,7 +884,7 @@ function RoadIntelligenceContent() {
                           <p className="text-xl font-black font-mono text-cyan-400">
                             {analysisResult?.summary?.peak_count !== undefined
                               ? analysisResult.summary.peak_count
-                              : jobStatus === "PROCESSING" ? "Analyzing…" : "0"}
+                              : jobStatus === "PROCESSING" ? "Analyzing…" : jobStatus === "FAILED" ? "FAILED" : "0"}
                           </p>
                         </div>
                         <div>
@@ -827,7 +892,7 @@ function RoadIntelligenceContent() {
                           <p className="text-xl font-black font-mono text-amber-400">
                             {analysisResult?.summary?.avg_speed_px_s !== undefined
                               ? `${analysisResult.summary.avg_speed_px_s} px/s`
-                              : jobStatus === "PROCESSING" ? "Calculating…" : "0 px/s"}
+                              : jobStatus === "PROCESSING" ? "Calculating…" : jobStatus === "FAILED" ? "FAILED" : uploadedImageUrl ? "N/A" : "0 px/s"}
                           </p>
                         </div>
                         <div>
@@ -835,7 +900,7 @@ function RoadIntelligenceContent() {
                           <p className="text-xl font-black font-mono text-emerald-400">
                             {analysisResult?.summary?.avg_wait_min !== undefined
                               ? `${analysisResult.summary.avg_wait_min}m`
-                              : jobStatus === "PROCESSING" ? "Calculating…" : "0m"}
+                              : jobStatus === "PROCESSING" ? "Calculating…" : jobStatus === "FAILED" ? "FAILED" : "0m"}
                           </p>
                         </div>
                       </div>
@@ -853,7 +918,11 @@ function RoadIntelligenceContent() {
                           ))
                         ) : (
                           <span className="text-xs text-slate-500 font-mono">
-                            {jobStatus === "PROCESSING" ? "Detecting vehicle classes…" : (activeJobId || uploadedImageUrl ? "No vehicles detected in frame" : "Awaiting media input")}
+                            {jobStatus === "FAILED"
+                              ? (jobErrorMessage ? `Error: ${jobErrorMessage}` : "Pipeline failed during video decode/inference")
+                              : jobStatus === "PROCESSING"
+                              ? "Detecting vehicle classes…"
+                              : (activeJobId || uploadedImageUrl ? "No vehicles detected in frame" : "Awaiting media input")}
                           </span>
                         )}
                       </div>
@@ -884,16 +953,30 @@ function RoadIntelligenceContent() {
                   <AlertTriangle className="w-5 h-5 text-rose-400" />
                   <h2 className="text-base font-black uppercase tracking-wider text-white">Footage Incident Analysis</h2>
                 </div>
-                <span className="text-[10px] font-mono text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/30">
-                  {analysisResult?.incidents?.length || 0} Hazards Detected
+                <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full border ${
+                  jobStatus === "FAILED"
+                    ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
+                    : (analysisResult?.incidents?.length || 0) > 0
+                    ? "text-rose-400 bg-rose-500/10 border-rose-500/30"
+                    : "text-emerald-400 bg-emerald-500/10 border-emerald-500/30"
+                }`}>
+                  {jobStatus === "FAILED"
+                    ? "Analysis Failed"
+                    : `${analysisResult?.incidents?.length || 0} Hazards Detected`}
                 </span>
               </div>
 
               <div className="space-y-2 max-h-[350px] overflow-y-auto">
-                {(analysisResult?.incidents?.length || 0) === 0 ? (
+                {jobStatus === "FAILED" ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-amber-400 font-mono text-xs uppercase tracking-widest text-center px-4">
+                    <AlertTriangle className="w-8 h-8 mb-2 opacity-60 text-amber-400" />
+                    Analysis Failed — Telemetry Unavailable
+                    <span className="text-[10px] text-slate-500 normal-case mt-1 font-mono">{jobErrorMessage || "Check server logs"}</span>
+                  </div>
+                ) : (analysisResult?.incidents?.length || 0) === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-slate-600 font-mono text-xs uppercase tracking-widest">
                     <Shield className="w-8 h-8 mb-2 opacity-40 text-emerald-400" />
-                    Corridor Clear — No collision hazards detected in uploaded media
+                    {analysisResult ? "Corridor Clear — No collision hazards detected in uploaded media" : "Awaiting media analysis"}
                   </div>
                 ) : (
                   analysisResult!.incidents!.map((inc: any, i: number) => (
