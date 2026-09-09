@@ -124,9 +124,11 @@ async def health_check():
     vision_health_status = "unknown"
     try:
         from app.vision.manager import vision_manager
-        vision_data = vision_manager.get_status()
-        vision_health_status = "running" if vision_data.get(
-            "running") else "stopped"
+        if hasattr(vision_manager, "_running"):
+            vision_health_status = "running" if vision_manager._running else "stopped"
+        else:
+            vision_data = await vision_manager.get_status()
+            vision_health_status = "running" if vision_data.get("running") else "stopped"
     except Exception as e:
         logger.warning(f"Could not get vision health: {e}")
         vision_health_status = "error"

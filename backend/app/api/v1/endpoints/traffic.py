@@ -186,9 +186,9 @@ async def _fire_traffic_notification(
         # AI insight fields rendered by NotificationBell expandable card
         "insight": insight,
         "recommendation": recommendation,
-        "camera_id": str(camera_id) if 'camera_id' in locals() else None,
-        "coordinates": f"{lat}, {lng}" if 'lat' in locals() and 'lng' in locals() else None,
-        "camera_location": f"Camera ID: {camera_id}" if 'camera_id' in locals() else None,
+        "camera_id": str(camera_id) if camera_id else None,
+        "coordinates": f"{lat}, {lng}" if lat is not None and lng is not None else None,
+        "camera_location": f"Camera ID: {camera_id}" if camera_id else None,
     }
     try:
         async with db_manager.session() as sess:
@@ -1313,19 +1313,14 @@ async def stream_traffic_camera(camera_id: str):
         while True:
             frame_bytes = None
             
-            # 1. Prioritize injected frame
-            if camera_id and camera_id in _last_injected_frame_bytes:
+            # 1. Exact active worker matching camera UUID
+            worker = ORCHESTRATOR._workers.get(cam_uuid)
+            if worker:
+                frame_bytes = getattr(worker, "_cached_frame_bytes", None)
+                
+            # 2. Injected frame strictly for this specific camera_id if explicitly targeted
+            if not frame_bytes and camera_id and camera_id in _last_injected_frame_bytes:
                 frame_bytes = _last_injected_frame_bytes[camera_id]
-                
-            # 2. Check active workers
-            if not frame_bytes:
-                worker = ORCHESTRATOR._workers.get(cam_uuid)
-                frame_bytes = getattr(worker, "_cached_frame_bytes", None) if worker else None
-                
-            # 3. Fallback to upload-demo or first injected frame
-            if not frame_bytes and _last_injected_frame_bytes:
-                fallback_key = "upload-demo" if "upload-demo" in _last_injected_frame_bytes else list(_last_injected_frame_bytes.keys())[0]
-                frame_bytes = _last_injected_frame_bytes[fallback_key]
             
             if frame_bytes and frame_bytes != last_yielded:
                 yield boundary + frame_bytes + b"\r\n"

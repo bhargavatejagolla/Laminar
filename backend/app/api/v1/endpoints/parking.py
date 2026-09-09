@@ -1028,28 +1028,26 @@ async def parking_video_feed(camera_id: Optional[str] = Query(None)):
         while True:
             frame_bytes = None
             
-            # 1. Prioritize injected frame if explicitly requested via camera_id
-            if camera_id and camera_id in _last_injected_frame_bytes:
-                frame_bytes = _last_injected_frame_bytes[camera_id]
-                
-            # 2. Check active workers
-            if not frame_bytes:
-                for w in ORCHESTRATOR._workers.values():
-                    if isinstance(w, ParkingWorker):
+            # 1. Exact active worker matching camera UUID if provided
+            if camera_id:
+                try:
+                    target_uuid = UUID(camera_id)
+                    w = ORCHESTRATOR._workers.get(target_uuid)
+                    if w:
                         frame_bytes = getattr(w, "_cached_frame_bytes", None)
-                        break
-            
-            # 3. Fallback to general upload-demo or the first available injected cache item
-            if not frame_bytes and _last_injected_frame_bytes:
-                fallback_key = "upload-demo" if "upload-demo" in _last_injected_frame_bytes else list(_last_injected_frame_bytes.keys())[0]
-                frame_bytes = _last_injected_frame_bytes[fallback_key]
+                except Exception:
+                    pass
+                
+            # 2. Injected frame strictly for this specific camera_id
+            if not frame_bytes and camera_id and camera_id in _last_injected_frame_bytes:
+                frame_bytes = _last_injected_frame_bytes[camera_id]
             
             if frame_bytes and frame_bytes != last_yielded:
                 yield boundary + frame_bytes + b"\r\n"
                 last_yielded = frame_bytes
             elif not frame_bytes:
-                blank = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(blank, "WAITING FOR CAMERA", (100, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,200,200), 2)
+                blank = np.zeros((360, 640, 3), dtype=np.uint8)
+                cv2.putText(blank, "PARKING CAMERA OFFLINE", (140, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (80, 80, 220), 2)
                 _, buf = cv2.imencode(".jpg", blank)
                 yield boundary + buf.tobytes() + b"\r\n"
                 

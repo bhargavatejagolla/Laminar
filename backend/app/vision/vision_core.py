@@ -192,8 +192,8 @@ class VisionCore:
                 None,
                 lambda: self.model.predict(
                     source=frame,
-                    conf=self.conf,
-                    classes=[0, 2, 3, 5, 7], # Pure COCO vehicle classes (2=car, 3=motorcycle, 5=bus, 7=truck) and 0=person
+                    conf=min(self.conf, 0.08),
+                    classes=[0, 2, 3, 5, 7, 28, 67], # COCO vehicle classes + aerial candidate classes
                     device=self.device,
                     verbose=False
                 )
@@ -209,6 +209,10 @@ class VisionCore:
                     cls_id = int(box.cls[0])
                     conf = float(box.conf[0])
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                    bw = x2 - x1
+                    bh = y2 - y1
+                    area = bw * bh
+                    aspect = max(bw, bh) / max(min(bw, bh), 1.0)
 
                     # Genuine COCO vehicle classes: car, motorcycle, bus, truck
                     if cls_id in (2, 3, 5, 7):
@@ -216,6 +220,15 @@ class VisionCore:
                             "bbox": [float(x1), float(y1), float(x2), float(y2)],
                             "class_name": TRACKING_CLASSES.get(cls_id, "car"),
                             "confidence": float(round(conf, 3)),
+                        })
+                    # Aerial top-down parking geometry support:
+                    # In 90-degree bird's-eye views, standard COCO models often misclassify rectangular car rooftops
+                    # as cell phone (67) or suitcase (28). If area > 10,000 px² and aspect ratio is 1.3 - 3.5, map to car.
+                    elif cls_id in (67, 28) and area > 10000 and 1.3 <= aspect <= 3.5:
+                        candidates.append({
+                            "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                            "class_name": "car",
+                            "confidence": float(round(min(0.85, conf + 0.15), 3)),
                         })
                     # Person (0) for safety/crosswalk monitoring (strictly separated from vehicle count)
                     elif cls_id == 0 and conf >= 0.25:
