@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Search, Loader2, Wifi, WifiOff, Scan, Activity,
   Crosshair, Cpu, Server, AlertTriangle, Eye, RefreshCw, Target, ArrowLeft,
   Upload, Play, Pause, Volume2, VolumeX, Maximize, Film, Layers, CheckCircle2,
-  XCircle, Sliders, Clock, Compass, ShieldCheck, Zap
+  XCircle, Sliders, Clock, Compass, ShieldCheck, Zap, Sparkles, MessageSquare, Send, CornerDownLeft
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -24,6 +24,7 @@ interface ForensicMatch {
   class_name: string;
   dominant_color: string;
   bbox_norm: [number, number, number, number];
+  quadrant: string;
   region: string;
   rationale: string;
   thumbnail_url: string;
@@ -33,6 +34,7 @@ interface ForensicQueryResult {
   status: "VERIFIED" | "NOT_VERIFIED";
   verdict_title: string;
   summary: string;
+  forensic_brief?: string;
   matches: ForensicMatch[];
   relevance_gate: {
     active: boolean;
@@ -71,6 +73,11 @@ interface IndexStatus {
   semantic_snapshots?: number;
 }
 
+interface ChatMessage {
+  role: "user" | "copilot";
+  text: string;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────
@@ -81,18 +88,20 @@ const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/
 
 const FORENSIC_PRESETS = [
   "White car",
-  "Car",
+  "Car in Top-Right",
   "Person in dark clothing",
   "Person wearing blue",
   "Truck or lorry",
   "Backpack or luggage",
 ];
 
+const QUADRANTS = ["All", "Top-Left", "Top-Right", "Center", "Bottom-Left", "Bottom-Right"];
+
 export default function AISearchPage() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  // Mode Selection: Forensic Video Retrieval (P0) vs Camera Mesh
+  // Mode Selection: Forensic Video Retrieval (P0/P1/P2) vs Camera Mesh
   const [activeTab, setActiveTab] = useState<"video" | "mesh">("video");
 
   // ── Video State ─────────────────────────────────────────────
@@ -115,11 +124,19 @@ export default function AISearchPage() {
   // ── Search State ────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [threshold, setThreshold] = useState(0.40);
+  const [selectedQuadrant, setSelectedQuadrant] = useState("All");
   const [forensicLoading, setForensicLoading] = useState(false);
   const [forensicResult, setForensicResult] = useState<ForensicQueryResult | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Forensic Copilot Chat State ─────────────────────────────
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
 
   // ── Camera Mesh State (Tab 2) ───────────────────────────────
   const [meshResults, setMeshResults] = useState<CameraSearchResult[]>([]);
@@ -199,6 +216,13 @@ export default function AISearchPage() {
     videoRef.current.play().catch(() => {});
     setIsPlaying(true);
     setActiveHit(match);
+  };
+
+  const handleSeekToSeconds = (seconds: number) => {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = seconds;
+    videoRef.current.play().catch(() => {});
+    setIsPlaying(true);
   };
 
   const handleTimelineScrub = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -288,6 +312,7 @@ export default function AISearchPage() {
     setError(null);
     setHasSearched(true);
     setActiveHit(null);
+    setChatMessages([]);
 
     try {
       const res = await fetch(`${API_BASE}/search/forensic-query`, {
@@ -309,6 +334,12 @@ export default function AISearchPage() {
       const data: ForensicQueryResult = await res.json();
       setForensicResult(data);
 
+      if (data.forensic_brief) {
+        setChatMessages([
+          { role: "copilot", text: data.forensic_brief }
+        ]);
+      }
+
       // Auto-jump to first hit if verified
       if (data.status === "VERIFIED" && data.matches.length > 0) {
         handleSeekTo(data.matches[0]);
@@ -317,6 +348,38 @@ export default function AISearchPage() {
       setError(err.message || "Forensic search failed");
     } finally {
       setForensicLoading(false);
+    }
+  };
+
+  // ── Forensic Copilot Q&A Handler ────────────────────────────
+  const handleSendChatMessage = async (presetText?: string) => {
+    const qText = (presetText || chatInput).trim();
+    if (!qText || !selectedVideo || !forensicResult || chatLoading) return;
+
+    const userMsg: ChatMessage = { role: "user", text: qText };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput("");
+    setChatLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/search/forensic-chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_id: selectedVideo.video_id,
+          question: qText,
+          matches: forensicResult.matches,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Copilot response failed");
+      const data = await res.json();
+      setChatMessages(prev => [...prev, { role: "copilot", text: data.answer }]);
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { role: "copilot", text: "Forensic query temporarily unavailable." }]);
+    } finally {
+      setChatLoading(false);
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }
   };
 
@@ -341,6 +404,13 @@ export default function AISearchPage() {
     }
   };
 
+  // ── Filtered Matches by Quadrant ────────────────────────────
+  const displayedMatches = useMemo(() => {
+    if (!forensicResult?.matches) return [];
+    if (selectedQuadrant === "All") return forensicResult.matches;
+    return forensicResult.matches.filter(m => m.quadrant === selectedQuadrant);
+  }, [forensicResult, selectedQuadrant]);
+
   function roundNumber(num: number, decimals: number) {
     return Math.round(num * Math.pow(10, decimals)) / Math.pow(10, decimals);
   }
@@ -349,6 +419,38 @@ export default function AISearchPage() {
     if (!url) return "";
     if (url.startsWith("http")) return url;
     return `${BACKEND_BASE}${url}`;
+  }
+
+  function parseTimestampToSeconds(ts: string): number {
+    const parts = ts.split(":");
+    if (parts.length === 2) {
+      return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+    }
+    return 0;
+  }
+
+  // Renders text with clickable [MM:SS] citation buttons
+  function renderClickableBrief(text: string) {
+    if (!text) return null;
+    const parts = text.split(/(\[\d{2}:\d{2}(?:\.\d+)?\])/g);
+    return parts.map((part, idx) => {
+      const match = part.match(/^\[(\d{2}:\d{2}(?:\.\d+)?)\]$/);
+      if (match) {
+        const tsFormatted = match[1];
+        const sec = parseTimestampToSeconds(tsFormatted);
+        return (
+          <button
+            key={idx}
+            onClick={() => handleSeekToSeconds(sec)}
+            className="inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded bg-sky-500/20 hover:bg-sky-500/40 text-sky-300 hover:text-white border border-sky-400/40 font-mono font-bold text-[11px] transition-all cursor-pointer shadow-[0_0_8px_rgba(56,189,248,0.3)]"
+          >
+            <Play className="w-2.5 h-2.5" />
+            {tsFormatted}
+          </button>
+        );
+      }
+      return <span key={idx}>{part}</span>;
+    });
   }
 
   return (
@@ -402,7 +504,7 @@ export default function AISearchPage() {
               <p className="text-xs font-bold text-sky-400 uppercase tracking-widest mt-0.5 flex items-center gap-2">
                 <span>Evidence-Grounded Retrieval Engine</span>
                 <span className="inline-block w-1 h-1 rounded-full bg-sky-400" />
-                <span className="text-slate-400 font-normal">VideoRAG Native Workstation</span>
+                <span className="text-slate-400 font-normal">Spatial Pyramid + VLM Grounding</span>
               </p>
             </div>
           </div>
@@ -473,6 +575,7 @@ export default function AISearchPage() {
                       setForensicResult(null);
                       setActiveHit(null);
                       setHasSearched(false);
+                      setChatMessages([]);
                     }
                   }}
                   className="bg-black/60 border border-white/15 text-xs text-white rounded-xl px-3 py-2 outline-none focus:border-sky-500 max-w-xs md:max-w-md truncate"
@@ -585,7 +688,7 @@ export default function AISearchPage() {
                     </div>
                     {activeHit && (
                       <div className="bg-sky-500/20 border border-sky-400/40 text-sky-300 text-[10px] font-mono font-bold px-3 py-1 rounded-full backdrop-blur-md">
-                        LOC: {activeHit.region}
+                        ZONE: {activeHit.quadrant}
                       </div>
                     )}
                   </div>
@@ -604,7 +707,7 @@ export default function AISearchPage() {
                     />
 
                     {/* Timeline Hit Pins */}
-                    {forensicResult?.matches?.map((hit, idx) => {
+                    {displayedMatches.map((hit, idx) => {
                       const pinLeft = duration ? (hit.timestamp_sec / duration) * 100 : 0;
                       const isActive = activeHit?.timestamp_sec === hit.timestamp_sec;
                       return (
@@ -618,7 +721,7 @@ export default function AISearchPage() {
                             isActive ? "scale-125" : ""
                           }`}
                           style={{ left: `${pinLeft}%` }}
-                          title={`Verified Hit: ${hit.class_name} at ${hit.timestamp_formatted}`}
+                          title={`Verified Hit: ${hit.class_name} at ${hit.timestamp_formatted} (${hit.quadrant})`}
                         >
                           <span className="absolute inset-0 rounded-full bg-sky-400 animate-ping opacity-75" />
                           <span className={`relative block w-3.5 h-3.5 rounded-full border-2 border-white shadow-[0_0_10px_#38bdf8] ${
@@ -770,73 +873,197 @@ export default function AISearchPage() {
                       </p>
                     </div>
 
-                    {/* Evidence Match Cards */}
-                    {forensicResult.matches.length > 0 && (
-                      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                        <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                          <Activity className="w-3.5 h-3.5 text-sky-400" />
-                          Verified Occurrence Strip ({forensicResult.matches.length}):
-                        </span>
+                    {/* AI Forensic Brief (Grounded Multimodal Reasoning) */}
+                    {forensicResult.status === "VERIFIED" && forensicResult.forensic_brief && (
+                      <div className="p-4 rounded-2xl bg-sky-500/10 border border-sky-500/30 backdrop-blur-xl shadow-lg relative overflow-hidden">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Sparkles className="w-4 h-4 text-sky-400 animate-pulse" />
+                          <span className="text-xs font-black uppercase tracking-wider text-sky-300">
+                            AI Forensic Synthesis
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400 ml-auto">
+                            Grounded Citations
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-200 leading-relaxed">
+                          {renderClickableBrief(forensicResult.forensic_brief)}
+                        </div>
+                      </div>
+                    )}
 
-                        {forensicResult.matches.map((match, idx) => {
-                          const isFocused = activeHit?.timestamp_sec === match.timestamp_sec;
-                          return (
-                            <div
-                              key={idx}
-                              onClick={() => handleSeekTo(match)}
-                              className={`p-3 rounded-xl border transition-all cursor-pointer flex gap-3.5 ${
-                                isFocused
-                                  ? "bg-sky-500/15 border-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.2)]"
-                                  : "bg-white/[0.03] border-white/10 hover:border-sky-500/40 hover:bg-white/[0.05]"
+                    {/* Spatial Quadrant Filter Buttons */}
+                    {forensicResult.matches.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                            <Compass className="w-3.5 h-3.5 text-sky-400" />
+                            Spatial Zone Filter:
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            Showing {displayedMatches.length} of {forensicResult.matches.length}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {QUADRANTS.map((quad) => (
+                            <button
+                              key={quad}
+                              onClick={() => setSelectedQuadrant(quad)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                                selectedQuadrant === quad
+                                  ? "bg-sky-500 text-white shadow-[0_0_10px_rgba(56,189,248,0.4)]"
+                                  : "bg-white/5 text-slate-400 hover:text-white"
                               }`}
                             >
-                              {/* Evidence Thumbnail */}
-                              <div className="relative w-24 h-16 rounded-lg bg-black overflow-hidden shrink-0 border border-white/10">
-                                <img
-                                  src={resolveThumb(match.thumbnail_url)}
-                                  alt="Evidence"
-                                  className="w-full h-full object-cover"
-                                />
-                                <div className="absolute bottom-1 right-1 px-1.5 py-0.2 bg-black/80 rounded text-[9px] font-mono text-sky-400 font-bold">
-                                  {match.timestamp_formatted}
-                                </div>
-                              </div>
+                              {quad}
+                            </button>
+                          ))}
+                        </div>
 
-                              {/* Evidence Meta & Click-to-Seek Action */}
-                              <div className="flex-1 flex flex-col justify-between">
-                                <div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-white">
-                                      {match.class_name} ({match.dominant_color})
-                                    </span>
-                                    <span className="text-[10px] font-bold font-mono text-emerald-400">
-                                      {match.confidence}% CONF
-                                    </span>
+                        {/* Evidence Match Cards */}
+                        <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                          {displayedMatches.map((match, idx) => {
+                            const isFocused = activeHit?.timestamp_sec === match.timestamp_sec;
+                            return (
+                              <div
+                                key={idx}
+                                onClick={() => handleSeekTo(match)}
+                                className={`p-3 rounded-xl border transition-all cursor-pointer flex gap-3.5 ${
+                                  isFocused
+                                    ? "bg-sky-500/15 border-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.2)]"
+                                    : "bg-white/[0.03] border-white/10 hover:border-sky-500/40 hover:bg-white/[0.05]"
+                                }`}
+                              >
+                                {/* Evidence Thumbnail */}
+                                <div className="relative w-24 h-16 rounded-lg bg-black overflow-hidden shrink-0 border border-white/10">
+                                  <img
+                                    src={resolveThumb(match.thumbnail_url)}
+                                    alt="Evidence"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <div className="absolute bottom-1 right-1 px-1.5 py-0.2 bg-black/80 rounded text-[9px] font-mono text-sky-400 font-bold">
+                                    {match.timestamp_formatted}
                                   </div>
-                                  <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
-                                    {match.rationale}
-                                  </p>
                                 </div>
 
-                                <div className="flex items-center justify-between pt-2 mt-1 border-t border-white/5">
-                                  <span className="text-[10px] text-slate-500 font-mono">
-                                    Region: {match.region}
-                                  </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSeekTo(match);
-                                    }}
-                                    className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300 uppercase tracking-wider"
-                                  >
-                                    <Play className="w-2.5 h-2.5" />
-                                    SEEK TO {match.timestamp_formatted}
-                                  </button>
+                                {/* Evidence Meta & Click-to-Seek Action */}
+                                <div className="flex-1 flex flex-col justify-between">
+                                  <div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold uppercase tracking-wider text-white">
+                                        {match.class_name} ({match.dominant_color})
+                                      </span>
+                                      <span className="text-[10px] font-bold font-mono text-emerald-400">
+                                        {match.confidence}% CONF
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                                      {match.rationale}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-2 mt-1 border-t border-white/5">
+                                    <span className="text-[10px] text-slate-400 font-mono bg-white/5 px-1.5 py-0.5 rounded">
+                                      {match.quadrant}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSeekTo(match);
+                                      }}
+                                      className="flex items-center gap-1 text-[10px] font-bold text-sky-400 hover:text-sky-300 uppercase tracking-wider"
+                                    >
+                                      <Play className="w-2.5 h-2.5" />
+                                      SEEK TO {match.timestamp_formatted}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Forensic Copilot Follow-Up Q&A Drawer */}
+                    {forensicResult.status === "VERIFIED" && (
+                      <div className="p-4 rounded-2xl bg-[#0b0d14]/90 border border-white/10 space-y-3">
+                        <button
+                          onClick={() => setChatOpen(!chatOpen)}
+                          className="flex items-center justify-between w-full text-xs font-bold text-slate-300 hover:text-white transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <MessageSquare className="w-3.5 h-3.5 text-sky-400" />
+                            Investigator Q&A Copilot
+                          </span>
+                          <span className="text-[10px] text-sky-400 underline">
+                            {chatOpen ? "Collapse Q&A" : "Ask Follow-Up Question"}
+                          </span>
+                        </button>
+
+                        {chatOpen && (
+                          <div className="space-y-3 pt-2">
+                            {/* Chat Thread */}
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
+                              {chatMessages.map((msg, i) => (
+                                <div
+                                  key={i}
+                                  className={`p-2.5 rounded-xl ${
+                                    msg.role === "user"
+                                      ? "bg-sky-500/20 text-white ml-6 border border-sky-500/30"
+                                      : "bg-white/5 text-slate-300 mr-6 border border-white/10"
+                                  }`}
+                                >
+                                  {renderClickableBrief(msg.text)}
+                                </div>
+                              ))}
+                              {chatLoading && (
+                                <div className="flex items-center gap-2 text-xs text-sky-400">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span>Grounded Copilot Reasoning...</span>
+                                </div>
+                              )}
+                              <div ref={chatBottomRef} />
                             </div>
-                          );
-                        })}
+
+                            {/* Preset Question Buttons */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {[
+                                "When was the target first detected?",
+                                "Summarize the movement trajectory",
+                                "In which quadrant was confidence highest?"
+                              ].map((qPrompt) => (
+                                <button
+                                  key={qPrompt}
+                                  onClick={() => handleSendChatMessage(qPrompt)}
+                                  disabled={chatLoading}
+                                  className="text-[10px] px-2 py-1 rounded bg-white/5 border border-white/10 text-slate-400 hover:text-sky-300 hover:border-sky-400 transition-colors"
+                                >
+                                  {qPrompt}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Chat Input */}
+                            <div className="flex gap-2 p-1 rounded-xl bg-white/[0.04] border border-white/10">
+                              <input
+                                type="text"
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleSendChatMessage()}
+                                placeholder="Ask about timeline, trajectory, quadrants..."
+                                className="flex-1 bg-transparent px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none"
+                                disabled={chatLoading}
+                              />
+                              <button
+                                onClick={() => handleSendChatMessage()}
+                                disabled={chatLoading || !chatInput.trim()}
+                                className="p-2 rounded-lg bg-sky-500 text-white hover:bg-sky-400 transition-colors disabled:opacity-40"
+                              >
+                                <Send className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </motion.div>

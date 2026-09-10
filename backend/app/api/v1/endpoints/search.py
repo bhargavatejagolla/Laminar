@@ -119,6 +119,11 @@ class IndexVideoRequest(BaseModel):
     video_id: str
     force_reindex: Optional[bool] = False
 
+class ForensicChatRequest(BaseModel):
+    video_id: str
+    question: str
+    matches: Optional[List[Dict[str, Any]]] = None
+
 # ──────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────
@@ -477,26 +482,45 @@ async def trigger_video_index(req: IndexVideoRequest):
 async def forensic_video_query(req: ForensicQueryRequest):
     """
     Executes Evidence-Grounded forensic query against an indexed video.
-    Strictly gates irrelevant queries (VERIFIED vs NOT VERIFIED).
+    Strictly gates irrelevant queries (VERIFIED vs NOT VERIFIED) and synthesizes AI Forensic Brief.
     """
     query_str = req.query.strip()
     if not query_str:
         raise HTTPException(status_code=400, detail="Query string cannot be empty.")
 
     try:
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(
-            None,
-            forensic_search_service.query_video,
+        result = await forensic_search_service.query_video(
             req.video_id,
             query_str,
             req.threshold or 0.40,
-            req.top_k or 8
+            req.top_k or 8,
+            generate_brief=True
         )
         return result
     except Exception as exc:
         logger.exception(f"Forensic query error for {req.video_id}: {exc}")
         raise HTTPException(status_code=500, detail=f"Search execution failed: {exc}")
+
+
+@router.post("/forensic-chat")
+async def forensic_video_chat(req: ForensicChatRequest):
+    """
+    Answers investigator questions strictly grounded in the verified evidence dossier.
+    """
+    question = req.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    try:
+        answer = await forensic_search_service.forensic_chat(
+            req.video_id,
+            question,
+            req.matches or []
+        )
+        return {"answer": answer}
+    except Exception as exc:
+        logger.exception(f"Forensic chat error for {req.video_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Forensic chat failed: {exc}")
 
 
 @router.get("/video-stream/{video_id}")

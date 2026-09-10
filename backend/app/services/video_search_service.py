@@ -1,13 +1,15 @@
 """
-Laminar - Forensic Video Retrieval Service (VideoRAG Synthesis)
-==============================================================
+Laminar - Forensic Video Retrieval Service (VideoRAG Synthesis - Phase 1 & 2)
+=============================================================================
 Provides evidence-grounded video search over CCTV footage:
 - Adaptive Temporal Sampling (scales FPS based on video duration)
 - 64-bit Perceptual dHash Edge-Gate Filter (prunes static frames)
+- Spatial Pyramid & Quadrant Categorization (Top-Left, Top-Right, Bottom-Left, Bottom-Right, Center)
 - YOLOv11 Multi-Class & Color Extraction
 - Measured Telemetry (real pruning %, real latencies)
 - Configurable Evidence-Grounded Relevance Gate (VERIFIED vs NOT VERIFIED)
-- Timestamped Evidence Dossier for Click-to-Seek Playback
+- Grounded AI Forensic Brief Synthesis (citing strictly verified timestamps [MM:SS])
+- Conversational Forensic Q&A over Verified Evidence Dossier
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ import json
 import glob
 import re
 import math
-import base64
+import asyncio
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 
@@ -90,6 +92,14 @@ COCO_NAMES: Dict[int, str] = {
 
 GENERIC_SEARCH_WORDS = {"target", "object", "anything", "presence", "entity", "movement"}
 
+SPATIAL_KEYWORDS = {
+    "top_left": ["top left", "upper left", "top-left", "upper-left"],
+    "top_right": ["top right", "upper right", "top-right", "upper-right"],
+    "bottom_left": ["bottom left", "lower left", "bottom-left", "lower-left"],
+    "bottom_right": ["bottom right", "lower right", "bottom-right", "lower-right"],
+    "center": ["center", "middle", "centre"],
+}
+
 
 # ─────────────────────────────────────────────────────────────
 # Perceptual 64-bit dHash & Distance
@@ -123,6 +133,23 @@ def format_timestamp(seconds: float) -> str:
     mins = int(seconds // 60)
     secs = seconds % 60
     return f"{mins:02d}:{secs:04.1f}"
+
+
+def compute_quadrant(bbox_norm: List[float]) -> str:
+    """Computes spatial pyramid quadrant from normalized bbox [x1, y1, x2, y2]."""
+    cx = (bbox_norm[0] + bbox_norm[2]) / 2.0
+    cy = (bbox_norm[1] + bbox_norm[3]) / 2.0
+    
+    if 25.0 <= cx <= 75.0 and 25.0 <= cy <= 75.0:
+        return "Center"
+    elif cx < 50.0 and cy < 50.0:
+        return "Top-Left"
+    elif cx >= 50.0 and cy < 50.0:
+        return "Top-Right"
+    elif cx < 50.0 and cy >= 50.0:
+        return "Bottom-Left"
+    else:
+        return "Bottom-Right"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -291,12 +318,16 @@ class ForensicVideoSearchService:
                                                 best_c_score = sc
                                                 dominant_color = c_name
 
+                                bbox_norm = [nx1, ny1, nx2, ny2]
+                                quadrant = compute_quadrant(bbox_norm)
+
                                 detected_objects.append({
                                     "id": b_i,
                                     "class_id": cls_id,
                                     "class_name": cls_name,
                                     "confidence": round(float(b_c), 3),
-                                    "bbox_norm": [nx1, ny1, nx2, ny2],
+                                    "bbox_norm": bbox_norm,
+                                    "quadrant": quadrant,
                                     "dominant_color": dominant_color,
                                     "color_profile": color_profile
                                 })
@@ -359,19 +390,21 @@ class ForensicVideoSearchService:
 
         return index_data
 
-    def query_video(
+    async def query_video(
         self,
         video_id: str,
         query: str,
         threshold: float = DEFAULT_RELEVANCE_THRESHOLD,
-        top_k: int = 6
+        top_k: int = 6,
+        generate_brief: bool = True
     ) -> Dict[str, Any]:
         t0 = time.perf_counter()
         index_data = self.load_index(video_id)
         if not index_data:
             v_matches = glob.glob(os.path.join(_UPLOADS_DIR, f"{video_id}.*"))
             if v_matches:
-                index_data = self.index_video(video_id, v_matches[0])
+                loop = asyncio.get_running_loop()
+                index_data = await loop.run_in_executor(None, self.index_video, video_id, v_matches[0])
             else:
                 return {
                     "status": "NOT_VERIFIED",
@@ -385,31 +418,35 @@ class ForensicVideoSearchService:
         q = query.lower().strip()
         target_color = extract_primary_color(q)
 
+        # ── Spatial Intent Parsing ────────────────────────────────────
+        requested_quadrant = None
+        for quad_key, synonyms in SPATIAL_KEYWORDS.items():
+            if any(syn in q for syn in synonyms):
+                requested_quadrant = quad_key
+                break
+
         # ── Forensic Class Parsing ────────────────────────────────────
         tokens = re.findall(r"[a-z0-9]+", q)
         target_class_ids = set()
-        matched_class_names = set()
 
         for token in tokens:
             if token in COCO_CLASSES:
                 cid = COCO_CLASSES[token]
                 target_class_ids.add(cid)
-                matched_class_names.add(COCO_NAMES.get(cid, token))
 
-        # Check for multi-word classes like "traffic light", "fire hydrant", "cell phone"
         for phrase, cid in COCO_CLASSES.items():
             if " " in phrase and phrase in q:
                 target_class_ids.add(cid)
-                matched_class_names.add(COCO_NAMES.get(cid, phrase))
 
         is_generic_search = any(w in tokens for w in GENERIC_SEARCH_WORDS)
 
-        # If user queried a specific noun that is NOT a known COCO class,
-        # do NOT default to person! Return NOT_VERIFIED honestly!
-        query_nouns = [w for w in tokens if w not in {"in", "a", "an", "the", "with", "wearing", "of", "and", "near", "at", "on", "is", "moving", "standing", "sitting", "running", "walking", "fast", "slow", "front", "back", "left", "right"} and w != target_color]
+        query_nouns = [
+            w for w in tokens 
+            if w not in {"in", "a", "an", "the", "with", "wearing", "of", "and", "near", "at", "on", "is", "moving", "standing", "sitting", "running", "walking", "fast", "slow", "front", "back", "left", "right", "top", "bottom", "side", "area", "quadrant", "zone", "corner"} 
+            and w != target_color
+        ]
         
         if not target_class_ids and not is_generic_search:
-            # If query has nouns but none match COCO (e.g. "giraffe", "dinosaur", "helicopter", "spaceship")
             if query_nouns:
                 unmatched_target = query_nouns[0].upper()
                 query_ms = round((time.perf_counter() - t0) * 1000, 1)
@@ -420,6 +457,7 @@ class ForensicVideoSearchService:
                         f"Target '{unmatched_target}' is not present in indexed surveillance evidence. "
                         f"Zero indexed evidence exceeded the forensic gate ({threshold:.2f})."
                     ),
+                    "forensic_brief": f"Forensic scan completed for '{query}'. No visual evidence matched the target entity.",
                     "relevance_gate": {
                         "active": True,
                         "threshold": threshold,
@@ -433,7 +471,6 @@ class ForensicVideoSearchService:
                     }
                 }
             else:
-                # Default to person only if completely abstract (e.g. "in red")
                 target_class_ids.add(0)
 
         frames = index_data.get("frames", [])
@@ -451,47 +488,45 @@ class ForensicVideoSearchService:
                 yolo_conf = obj["confidence"]
                 dom_color = obj.get("dominant_color", "unknown")
                 color_scores = obj.get("color_profile", {})
+                quadrant = obj.get("quadrant") or compute_quadrant(obj["bbox_norm"])
 
                 # 1. Class Relevance Score
                 if is_generic_search or cid in target_class_ids:
                     class_score = 1.0
                 else:
-                    class_score = 0.0  # Zero score for class mismatch!
+                    class_score = 0.0
 
-                # If class doesn't match at all, drop object candidate
                 if class_score == 0.0:
                     continue
 
                 # 2. Color Relevance Score & Color Gating
                 if target_color:
-                    # Forensic color resolution:
                     if dom_color == target_color:
                         c_conf = max(color_scores.get(target_color, 0.85), 0.85)
                     elif cname == "person" and target_color in color_scores and color_scores[target_color] >= 0.50:
-                        # People can wear different top/bottom colors
                         c_conf = color_scores[target_color] * 0.85
                     else:
-                        # Vehicles, bags, etc. must match dominant color
                         c_conf = 0.0
 
-                    # Strict color gate
                     if c_conf < 0.30:
                         continue
 
-                    final_score = (class_score * 0.30) + (c_conf * 0.55) + (yolo_conf * 0.15)
+                    base_score = (class_score * 0.30) + (c_conf * 0.55) + (yolo_conf * 0.15)
                 else:
-                    final_score = (class_score * 0.60) + (yolo_conf * 0.40)
+                    base_score = (class_score * 0.60) + (yolo_conf * 0.40)
 
-                final_score = round(final_score, 3)
+                # 3. Spatial Pyramid Weighting
+                spatial_multiplier = 1.0
+                if requested_quadrant:
+                    q_clean = quadrant.lower().replace("-", "_")
+                    if requested_quadrant == q_clean:
+                        spatial_multiplier = 1.15
+                    else:
+                        spatial_multiplier = 0.65
+
+                final_score = round(base_score * spatial_multiplier, 3)
 
                 if final_score >= threshold:
-                    bbox = obj["bbox_norm"]
-                    cx = (bbox[0] + bbox[2]) / 2
-                    cy = (bbox[1] + bbox[3]) / 2
-                    x_region = "Left" if cx < 35 else "Right" if cx > 65 else "Center"
-                    y_region = "Top" if cy < 35 else "Bottom" if cy > 65 else "Mid"
-                    region_tag = f"{y_region}-{x_region}" if (x_region != "Center" or y_region != "Mid") else "Center"
-
                     rationale = f"{cname.capitalize()} detected with {int(final_score * 100)}% visual confidence"
                     if target_color:
                         rationale += f" ({target_color.upper()} attire/surface match)"
@@ -503,8 +538,9 @@ class ForensicVideoSearchService:
                         "score": final_score,
                         "class_name": cname,
                         "dominant_color": dom_color,
-                        "bbox_norm": bbox,
-                        "region": region_tag,
+                        "bbox_norm": obj["bbox_norm"],
+                        "quadrant": quadrant,
+                        "region": quadrant,
                         "rationale": rationale,
                         "thumbnail_url": f"/api/v1/search/thumbnail/{thumb_file}"
                     })
@@ -533,6 +569,7 @@ class ForensicVideoSearchService:
                     f"No indexed evidence exceeded the forensic verification threshold ({threshold:.2f}) "
                     f"for '{query}'. Inspected {len(frames)} indexed frames with 0 ungrounded assumptions."
                 ),
+                "forensic_brief": f"Zero occurrences of '{query}' exceeded the active evidence verification threshold.",
                 "relevance_gate": {
                     "active": True,
                     "threshold": threshold,
@@ -546,6 +583,11 @@ class ForensicVideoSearchService:
                 }
             }
 
+        # ── Grounded AI Forensic Brief Synthesis ───────────────────────
+        brief = ""
+        if generate_brief:
+            brief = await self._synthesize_forensic_brief(query, deduped_hits, index_data.get("telemetry", {}))
+
         return {
             "status": "VERIFIED",
             "verdict_title": "TARGET VERIFIED",
@@ -553,6 +595,7 @@ class ForensicVideoSearchService:
                 f"Identified {len(deduped_hits)} verified occurrence(s) matching '{query}' "
                 f"exceeding the evidence verification threshold ({threshold:.2f})."
             ),
+            "forensic_brief": brief,
             "relevance_gate": {
                 "active": True,
                 "threshold": threshold,
@@ -565,5 +608,85 @@ class ForensicVideoSearchService:
                 "video_duration_sec": index_data.get("telemetry", {}).get("duration_sec", 0)
             }
         }
+
+    async def _synthesize_forensic_brief(self, query: str, matches: List[Dict[str, Any]], telemetry: dict) -> str:
+        """Synthesizes a 2-sentence executive forensic brief citing ONLY verified timestamps [MM:SS]."""
+        if not matches:
+            return ""
+
+        top_hit = matches[0]
+        last_hit = matches[-1]
+
+        # Fast heuristic fallback if LLM is unreachable
+        fallback_brief = (
+            f"Target matching '{query}' was verified across {len(matches)} frames, "
+            f"first isolated at [{top_hit['timestamp_formatted']}] in the {top_hit['quadrant']} quadrant "
+            f"({top_hit['confidence']}% visual certainty) and tracked through [{last_hit['timestamp_formatted']}]."
+        )
+
+        evidence_snippets = []
+        for m in matches[:5]:
+            evidence_snippets.append(
+                f"- Timestamp [{m['timestamp_formatted']}]: {m['class_name']} ({m['dominant_color']}) in {m['quadrant']} ({m['confidence']}% confidence)"
+            )
+        evidence_str = chr(10).join(evidence_snippets)
+
+        prompt = f"""You are an elite forensic video investigator.
+Target Query: "{query}"
+Verified Video Evidence:
+{evidence_str}
+
+Instructions:
+1. Write a professional, concise 2-sentence forensic intelligence brief summarizing where and when the target was detected.
+2. You MUST cite the exact timestamps using brackets [MM:SS] (e.g. [{top_hit['timestamp_formatted']}]) for events you describe.
+3. NEVER mention or hallucinate any timestamp not present in the verified evidence above.
+4. Keep it direct, evidentiary, and objective."""
+
+        try:
+            from app.services.ai_service import get_ai_service
+            loop = asyncio.get_running_loop()
+            ai_text = await asyncio.wait_for(get_ai_service().generate_raw(prompt, timeout=12.0), timeout=14.0)
+            if ai_text and len(ai_text.strip()) > 15:
+                # Ensure the AI response actually cited at least one verified timestamp
+                if any(f"[{m['timestamp_formatted']}]" in ai_text for m in matches):
+                    return ai_text.strip()
+        except Exception as exc:
+            logger.debug(f"AI Brief synthesis fallback triggered: {exc}")
+
+        return fallback_brief
+
+    async def forensic_chat(self, video_id: str, question: str, matches: List[Dict[str, Any]]) -> str:
+        """Answers investigator questions strictly grounded in the verified evidence dossier."""
+        if not matches:
+            return "No verified occurrences are available for this video to analyze."
+
+        evidence_snippets = []
+        for m in matches:
+            evidence_snippets.append(
+                f"- Timestamp [{m['timestamp_formatted']}]: {m['class_name']} ({m['dominant_color']}) in quadrant {m['quadrant']}, confidence {m['confidence']}%"
+            )
+        evidence_str = chr(10).join(evidence_snippets)
+
+        prompt = f"""You are Randy AI, forensic investigator on the Laminar Platform.
+Investigator Question: "{question}"
+
+VERIFIED FORENSIC EVIDENCE:
+{evidence_str}
+
+STRICT FORENSIC RULES:
+1. Ground your answer ONLY in the verified evidence listed above.
+2. Whenever referring to an event or location, ALWAYS cite the timestamp in brackets [MM:SS] (e.g. [{matches[0]['timestamp_formatted']}]).
+3. If the evidence does not contain the answer, say "Based on verified surveillance timestamps, this information is not visible."
+4. Be crisp, professional, and directly useful."""
+
+        try:
+            from app.services.ai_service import get_ai_service
+            ans = await get_ai_service().generate_raw(prompt, timeout=15.0)
+            if ans and len(ans.strip()) > 10:
+                return ans.strip()
+        except Exception as e:
+            logger.warning(f"Forensic chat failure: {e}")
+
+        return f"Based on verified surveillance timestamps [{matches[0]['timestamp_formatted']}] through [{matches[-1]['timestamp_formatted']}], {len(matches)} occurrence(s) were isolated in the footage."
 
 forensic_search_service = ForensicVideoSearchService()
