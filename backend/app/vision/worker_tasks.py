@@ -14,6 +14,7 @@ from app.vision.incident_detector import incident_detector, IncidentIntelligence
 from app.vision.traffic_worker import draw_vehicle_overlays, draw_hud
 from app.core.global_state import GLOBAL_STATE
 from app.core.logging import get_logger
+from app.services.notification_service import notification_service
 
 logger = get_logger(__name__)
 
@@ -88,6 +89,8 @@ async def async_process_upload_job(job_id: str, file_path: str):
 
     incidents = []
     events_log = []
+    notified_incident_ids = set()
+    density_alert_sent = False
     vehicle_observation_counts = {
         "Car": 0, "Truck": 0, "Bus": 0, "Motorcycle": 0, "Bicycle": 0, "Train": 0
     }
@@ -204,6 +207,45 @@ async def async_process_upload_job(job_id: str, file_path: str):
                             "location": "Road Media Stream"
                         }
                         GLOBAL_STATE.push_event("incident", "", inc_event)
+
+                        # Debounced Notification Dispatch via LAMINAR existing notification system
+                        if inc_id not in notified_incident_ids and inc.get("status") == "CONFIRMED":
+                            notified_incident_ids.add(inc_id)
+                            try:
+                                await notification_service.push_notification(
+                                    type=inc.get("type", "collision").upper(),
+                                    priority=inc.get("priority", "CRITICAL"),
+                                    description=inc.get("description", "Roadway hazard detected on video."),
+                                    venue_id=job_id,
+                                    venue_name="Road Media Stream",
+                                    camera_id=f"job_{job_id}",
+                                    domain="incident",
+                                    metadata={
+                                        "incident_id": inc_id,
+                                        "confidence": inc.get("confidence", 0.9),
+                                        "track_ids": inc.get("track_ids", []),
+                                        "timestamp_seconds": inc.get("timestamp_seconds", 0)
+                                    }
+                                )
+                            except Exception as notif_err:
+                                logger.warning(f"Could not dispatch notification for {inc_id}: {notif_err}")
+
+                # Debounced high density notification for critical volume
+                if v_count >= 16 and not density_alert_sent:
+                    density_alert_sent = True
+                    try:
+                        await notification_service.push_notification(
+                            type="HIGH_DENSITY",
+                            priority="HIGH",
+                            description=f"Corridor congestion critical: {v_count} concurrent vehicles detected.",
+                            venue_id=job_id,
+                            venue_name="Road Media Stream",
+                            camera_id=f"job_{job_id}",
+                            domain="traffic",
+                            metadata={"vehicle_count": v_count, "timestamp_seconds": round(frame_idx / fps, 2)}
+                        )
+                    except Exception as notif_err:
+                        logger.warning(f"Could not dispatch density notification: {notif_err}")
 
                 active_draw_objs = tracked_objs
             else:
