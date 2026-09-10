@@ -42,6 +42,7 @@ class VenueDomain(str, Enum):
     PEOPLE = "people"
     PARKING = "parking"
     TRAFFIC = "traffic"
+    ROAD_CORRIDOR = "road_corridor"
     INCIDENT = "incident"
     KINETIC = "kinetic"
     GREENWAVE = "greenwave"

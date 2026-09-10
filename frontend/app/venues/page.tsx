@@ -8,7 +8,7 @@ import { Venue } from "@/types/venue";
 import VenueCard from "@/components/venues/venue-card";
 import AddVenueModal from "@/components/venues/add-venue-modal";
 import EditVenueModal from "@/components/venues/edit-venue-modal";
-import { MapPin, Search, Filter, Plus, X, Loader2, Map, Trash2, ChevronDown } from "lucide-react";
+import { MapPin, Search, Filter, Plus, X, Loader2, Map, Trash2, ChevronDown, Activity, Car, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,6 +18,7 @@ export default function VenuesPage() {
   const [isAddMode, setIsAddMode] = useState(false);
   const [search, setSearch] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("all");
+  const [domainFilter, setDomainFilter] = useState<string>("all");
   const [showFilter, setShowFilter] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
@@ -35,13 +36,18 @@ export default function VenuesPage() {
         v.name?.toLowerCase().includes(search.toLowerCase()) ||
         v.city?.toLowerCase().includes(search.toLowerCase()) ||
         v.country?.toLowerCase().includes(search.toLowerCase());
-      const matchesFilter =
+      const matchesStatus =
         filterActive === "all" ||
         (filterActive === "active" && v.is_active) ||
         (filterActive === "inactive" && !v.is_active);
-      return matchesSearch && matchesFilter;
+      const matchesDomain =
+        domainFilter === "all" ||
+        (domainFilter === "traffic" && (v.venue_type === "traffic" || v.venue_type === "incident" || v.venue_type === "road_corridor")) ||
+        (domainFilter === "parking" && v.venue_type === "parking") ||
+        (domainFilter === "people" && (v.venue_type === "people" || !v.venue_type));
+      return matchesSearch && matchesStatus && matchesDomain;
     });
-  }, [venues, search, filterActive]);
+  }, [venues, search, filterActive, domainFilter]);
 
   const handleDelete = async (venue: Venue) => {
     if (!confirm(`Delete "${venue.name}"? This will also remove all associated cameras.`)) return;
@@ -159,6 +165,31 @@ export default function VenuesPage() {
           )}
         </div>
       </motion.div>
+
+      {/* Domain Quick Tabs */}
+      <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1 scrollbar-none">
+        {[
+          { id: "all", label: "All Sectors" },
+          { id: "traffic", label: "Urban Road Corridor", icon: Activity, color: "text-cyan-400" },
+          { id: "parking", label: "Smart Parking Facility", icon: Car, color: "text-emerald-400" },
+          { id: "people", label: "People Intelligence", icon: Users, color: "text-blue-400" },
+        ].map((tab) => {
+          const isActive = domainFilter === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setDomainFilter(tab.id)}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${isActive
+                ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+                : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              {tab.icon && <tab.icon className={`w-3.5 h-3.5 ${isActive ? "text-cyan-400" : tab.color}`} />}
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Grid */}
       <div className="mt-2">

@@ -108,31 +108,59 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
     switch (type) {
       case "parking":
         return {
-          capacity: "Total Available Slots",
+          logisticsTitle: "Parking Facility Logistics",
+          capacity: "Total Demarcated Bays",
+          capacityHelp: "Total physical parking bays / slots demarcated across this facility.",
           threshold: "Slots",
-          unit: "Vehicles",
-          density: "Occupancy Rate"
+          unit: "Slots",
+          warnLabel: "Occupancy Warning Threshold",
+          critLabel: "Facility Full Critical Threshold",
+          density: "Parking Turnover Rate",
+          staffingTitle: "Parking Operations & Enforcement (Personnel Count)",
+          staffingHelp: "Configure on-duty parking attendants & enforcement staff by occupancy level.",
+          metric1Label: "Turnover / Influx Rate",
+          metric1Help: "Vehicle bay changes/min triggering occupancy re-allocation alert. Default: 5.0",
+          metric2Label: "Unauthorized Dwell / Obstruction Limit",
+          metric2Help: "Seconds a vehicle remains stationary in a no-parking or drive aisle before alert. Default: 60s",
+          metric2Unit: "sec",
         };
       case "traffic":
+      case "incident":
+      case "road_corridor":
         return {
-          capacity: "Sector Road Capacity",
+          logisticsTitle: "Corridor Vehicle Logistics",
+          capacity: "Corridor Vehicle Capacity",
+          capacityHelp: "Maximum simultaneous vehicle volume this road corridor can sustain before gridlock.",
           threshold: "Vehicles",
           unit: "Vehicles",
-          density: "Traffic Flow Rate"
-        };
-      case "incident":
-        return {
-          capacity: "Zone Monitor Capacity",
-          threshold: "Hazards",
-          unit: "Hazards",
-          density: "Event Intensity"
+          warnLabel: "Congestion Warning Threshold",
+          critLabel: "Gridlock Critical Threshold",
+          density: "Vehicle Flow Rate",
+          staffingTitle: "Traffic Enforcement & Emergency Response (Personnel Count)",
+          staffingHelp: "Configure on-duty traffic marshals & rapid response units by congestion level.",
+          metric1Label: "Traffic Surge / Influx Rate",
+          metric1Help: "Vehicle volume surge/min triggering congestion alert. Default: 5.0",
+          metric2Label: "Kinematic Collision Deceleration Limit",
+          metric2Help: "Sudden deceleration (px/s²) triggering collision & hazard triage. Default: 15.0",
+          metric2Unit: "px/s²",
         };
       default:
         return {
+          logisticsTitle: "Fire & Crowd Logistics",
           capacity: "Maximum Fire Capacity",
+          capacityHelp: "Total allowed physical attendees deployed in sector under fire safety regulations.",
           threshold: "Persons",
           unit: "People",
-          density: "Crowd Surge Rate"
+          warnLabel: "Warning Threshold",
+          critLabel: "Critical Threshold",
+          density: "Crowd Surge Rate",
+          staffingTitle: "Manual Staffing Requirements (Personnel Count)",
+          staffingHelp: "Configure expected staffing based on live threat levels.",
+          metric1Label: "Crowd Surge Rate",
+          metric1Help: "Growth above this rate/min triggers a surge alert. Default: 5.0",
+          metric2Label: "Panic / Hazard Velocity Limit",
+          metric2Help: "Movement speed above this triggers an immediate threat detection.",
+          metric2Unit: "px/sec",
         };
     }
   };
@@ -252,13 +280,12 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: "people", label: "People Intelligence", icon: Users, color: "text-blue-400", desc: "Crowd, Security & Flow", road: false },
-                  { id: "traffic", label: "Smart Traffic", icon: Activity, color: "text-amber-400", desc: "Road Flow & Congestion", road: true },
-                  { id: "parking", label: "Smart Parking", icon: Car, color: "text-emerald-400", desc: "Vehicle Grid & Free Slots", road: true },
-                  { id: "incident", label: "Incident Detection", icon: Flame, color: "text-rose-400", desc: "Accidents & Road Hazards", road: true },
-                  { id: "kinetic", label: "Kinetic SOS", icon: BrainCircuit, color: "text-indigo-400", desc: "Behavioral Intel", road: false },
-                  { id: "guardian", label: "Guardian Route", icon: Shield, color: "text-blue-400", desc: "AI Escort Tracker", road: false },
+                  { id: "people", label: "People Intelligence", icon: Users, color: "text-blue-400", desc: "Crowd Safety, Density & Movement", road: false },
+                  { id: "traffic", label: "Urban Road Corridor", icon: Activity, color: "text-cyan-400", desc: "Traffic Flow, Collisions & Road Hazards", road: true },
+                  { id: "parking", label: "Smart Parking Facility", icon: Car, color: "text-emerald-400", desc: "Bay Grid, Occupancy & Obstructions", road: true },
                   { id: "greenwave", label: "AI Green Wave", icon: Zap, color: "text-emerald-400", desc: "Traffic Signal Preemption", road: false },
+                  { id: "guardian", label: "Guardian Route", icon: Shield, color: "text-blue-400", desc: "AI Escort Tracker", road: false },
+                  { id: "kinetic", label: "Kinetic SOS", icon: BrainCircuit, color: "text-indigo-400", desc: "Behavioral Intel", road: false },
                   { id: "liability", label: "Liability Defense", icon: ShieldCheck, color: "text-rose-400", desc: "Predictive Triage", road: false },
                 ].map((domain) => (
                   <button
@@ -287,7 +314,13 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
 
             <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
               <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
-                <Users className="w-4 h-4" /> {labels.capacity} Logistics
+                {formData.venue_type === 'parking' ? (
+                  <Car className="w-4 h-4" />
+                ) : (formData.venue_type === 'traffic' || formData.venue_type === 'incident' || formData.venue_type === 'road_corridor') ? (
+                  <Activity className="w-4 h-4" />
+                ) : (
+                  <Users className="w-4 h-4" />
+                )} {labels.logisticsTitle}
               </h3>
 
               <div className="space-y-2">
@@ -299,12 +332,12 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                   value={formData.capacity}
                   onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
                 />
-                <p className="text-[10px] text-slate-500 font-mono mt-1">Total allowed {labels.unit.toLowerCase()} deployed in sector.</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-1">{labels.capacityHelp}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Warning Threshold ({labels.threshold})</label>
+                  <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {labels.warnLabel} ({labels.threshold})</label>
                   <input
                     type="number"
                     min="1"
@@ -317,7 +350,7 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Critical Threshold ({labels.threshold})</label>
+                  <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {labels.critLabel} ({labels.threshold})</label>
                   <input
                     type="number"
                     min="1"
@@ -332,65 +365,63 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
               </div>
             </div>
 
-            {formData.venue_type !== 'parking' && (
-              <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
-                <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
-                  <Users className="w-4 h-4" /> Manual Staffing Requirements (Personnel Count)
-                </h3>
-                <p className="text-[10px] text-slate-500 font-mono mb-2">{t("auto.Configureexpect_963") || "Configure expected staffing based on live threat levels."}</p>
+            <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
+              <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
+                <Users className="w-4 h-4" /> {labels.staffingTitle}
+              </h3>
+              <p className="text-[10px] text-slate-500 font-mono mb-2">{labels.staffingHelp}</p>
 
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{t("auto.Low_8115") || "Low"}</label>
-                    <input
-                      type="number" min="0"
-                      className="w-full bg-[#020617] border border-slate-700 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-cyan-500 transition-colors text-sm"
-                      value={formData.staffing_config.low}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        staffing_config: { ...formData.staffing_config, low: parseInt(e.target.value) || 0 }
-                      })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{t("auto.Medium_6687") || "Medium"}</label>
-                    <input
-                      type="number" min="0"
-                      className="w-full bg-[#020617] border border-slate-700 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-cyan-500 transition-colors text-sm"
-                      value={formData.staffing_config.medium}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        staffing_config: { ...formData.staffing_config, medium: parseInt(e.target.value) || 0 }
-                      })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">{t("auto.High_288") || "High"}</label>
-                    <input
-                      type="number" min="0"
-                      className="w-full bg-[#020617] border border-amber-900/40 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-amber-500 transition-colors text-sm"
-                      value={formData.staffing_config.high}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        staffing_config: { ...formData.staffing_config, high: parseInt(e.target.value) || 0 }
-                      })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold">{t("auto.Critical_6118") || "Critical"}</label>
-                    <input
-                      type="number" min="0"
-                      className="w-full bg-[#020617] border border-rose-900/40 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-rose-500 transition-colors text-sm"
-                      value={formData.staffing_config.critical}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        staffing_config: { ...formData.staffing_config, critical: parseInt(e.target.value) || 0 }
-                      })}
-                    />
-                  </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{t("auto.Low_8115") || "Low"}</label>
+                  <input
+                    type="number" min="0"
+                    className="w-full bg-[#020617] border border-slate-700 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-cyan-500 transition-colors text-sm"
+                    value={formData.staffing_config.low}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      staffing_config: { ...formData.staffing_config, low: parseInt(e.target.value) || 0 }
+                    })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">{t("auto.Medium_6687") || "Medium"}</label>
+                  <input
+                    type="number" min="0"
+                    className="w-full bg-[#020617] border border-slate-700 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-cyan-500 transition-colors text-sm"
+                    value={formData.staffing_config.medium}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      staffing_config: { ...formData.staffing_config, medium: parseInt(e.target.value) || 0 }
+                    })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">{t("auto.High_288") || "High"}</label>
+                  <input
+                    type="number" min="0"
+                    className="w-full bg-[#020617] border border-amber-900/40 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-amber-500 transition-colors text-sm"
+                    value={formData.staffing_config.high}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      staffing_config: { ...formData.staffing_config, high: parseInt(e.target.value) || 0 }
+                    })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold">{t("auto.Critical_6118") || "Critical"}</label>
+                  <input
+                    type="number" min="0"
+                    className="w-full bg-[#020617] border border-rose-900/40 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-rose-500 transition-colors text-sm"
+                    value={formData.staffing_config.critical}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      staffing_config: { ...formData.staffing_config, critical: parseInt(e.target.value) || 0 }
+                    })}
+                  />
                 </div>
               </div>
-            )}
+            </div>
 
             <div className="mt-6 pt-4 border-t border-slate-800 space-y-4">
               <h3 className="text-sm font-semibold text-cyan-500 flex items-center gap-2">
@@ -399,22 +430,22 @@ export default function EditVenueModal({ venue, isOpen, onClose }: Props) {
               <p className="text-[10px] text-slate-500 font-mono mb-2">{t("auto.OverrideAItrigg_6913") || "Override AI trigger thresholds specific to this venue layout."}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">{labels.density} ({labels.unit}/min)</label>
+                  <label className="text-[10px] uppercase tracking-widest text-amber-500 font-semibold">{labels.metric1Label} ({labels.unit}/min)</label>
                   <input type="number" step="0.5" min="0"
                     className="w-full bg-[#020617] border border-amber-900/40 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 transition-colors text-sm"
                     value={formData.model_metadata?.surge_rate ?? 5.0}
                     onChange={(e) => setFormData({ ...formData, model_metadata: { ...formData.model_metadata, surge_rate: parseFloat(e.target.value) || 5.0 } })}
                   />
-                  <p className="text-[10px] text-slate-500 font-mono">Growth above this rate/min triggers a surge alert. Default: 5.0</p>
+                  <p className="text-[10px] text-slate-500 font-mono">{labels.metric1Help}</p>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold">Panic/Hazard Velocity Limit (px/sec)</label>
+                  <label className="text-[10px] uppercase tracking-widest text-rose-500 font-semibold">{labels.metric2Label} ({labels.metric2Unit})</label>
                   <input type="number" step="1" min="0"
                     className="w-full bg-[#020617] border border-rose-900/40 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors text-sm"
                     value={formData.model_metadata?.velocity_threshold ?? 15.0}
                     onChange={(e) => setFormData({ ...formData, model_metadata: { ...formData.model_metadata, velocity_threshold: parseFloat(e.target.value) || 15.0 } })}
                   />
-                  <p className="text-[10px] text-slate-500 font-mono">{t("auto.Movementspeedab_9333") || "Movement speed above this triggers an immediate threat detection."}</p>
+                  <p className="text-[10px] text-slate-500 font-mono">{labels.metric2Help}</p>
                 </div>
               </div>
             </div>

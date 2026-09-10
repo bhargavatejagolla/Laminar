@@ -40,10 +40,13 @@ export default function VenueCard({ venue, onEdit }: Props) {
   const riskLevel = computedRiskLevel;
 
   const domainMap: Record<string, { icon: any, label: string, color: string }> = {
-    people: { icon: Users, label: t("domains.people") || "People Intelligence", color: "text-blue-400" },
-    parking: { icon: Car, label: t("domains.parking") || "Smart Parking", color: "text-emerald-400" },
-    traffic: { icon: Activity, label: t("domains.traffic") || "Traffic Intelligence", color: "text-cyan-400" },
-    incident: { icon: Flame, label: t("domains.incident") || "Incident Intel", color: "text-rose-400" },
+    people: { icon: Users, label: "People Intelligence", color: "text-blue-400" },
+    parking: { icon: Car, label: "Smart Parking Facility", color: "text-emerald-400" },
+    traffic: { icon: Activity, label: "Urban Road Corridor", color: "text-cyan-400" },
+    road_corridor: { icon: Activity, label: "Urban Road Corridor", color: "text-cyan-400" },
+    incident: { icon: Activity, label: "Urban Road Corridor", color: "text-cyan-400" },
+    greenwave: { icon: Zap, label: "AI Green Wave", color: "text-emerald-400" },
+    guardian: { icon: ShieldAlert, label: "Guardian Route", color: "text-blue-400" },
   };
 
   const domain = domainMap[venue.venue_type || "people"] || domainMap.people;
@@ -131,11 +134,17 @@ export default function VenueCard({ venue, onEdit }: Props) {
       {/* Capacity Bar */}
       <div className="my-3">
         <div className="flex justify-between items-end mb-1.5 text-[11px] text-slate-500 font-medium">
-          <span>{venue.venue_type === 'parking' ? (t("venues.slotAvailability") || 'Slot Availability') : venue.venue_type === 'traffic' ? (t("venues.vehicleDensity") || 'Vehicle Density') : (t("venues.capacity") || "Capacity")}</span>
+          <span>
+            {venue.venue_type === 'parking' 
+              ? (t("venues.slotAvailability") || 'Bay Occupancy') 
+              : (venue.venue_type === 'traffic' || venue.venue_type === 'incident' || venue.venue_type === 'road_corridor') 
+                ? (t("venues.vehicleDensity") || 'Corridor Vehicle Capacity') 
+                : (t("venues.capacity") || "Capacity")}
+          </span>
           <span className="font-mono text-slate-400">
             {isLoading
               ? "…"
-              : `${Math.round(currentOccupancy).toLocaleString()} / ${cap.toLocaleString()}`}
+              : `${Math.round(currentOccupancy).toLocaleString()} / ${cap.toLocaleString()} ${venue.venue_type === 'parking' ? 'Slots' : (venue.venue_type === 'traffic' || venue.venue_type === 'incident' || venue.venue_type === 'road_corridor') ? 'Vehicles' : 'Persons'}`}
           </span>
         </div>
         <div className="flex justify-between items-center mb-1 text-[9px] uppercase tracking-tighter text-slate-600 font-bold">

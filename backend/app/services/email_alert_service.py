@@ -341,8 +341,7 @@ class EmailAlertService:
                 coords = str(metadata["coordinates"])
 
             venue_name = (metadata.get("venue_name") or "Municipal Traffic Corridor") if metadata else "Municipal Traffic Corridor"
-            camera_name = (metadata.get("camera_name") or metadata.get("camera_id") or "Edge Vision Node") if metadata else "Edge Vision Node"
-            action = (metadata.get("recommended_action") or "Immediate emergency dispatch & corridor clearance recommended.") if metadata else "Immediate emergency dispatch & corridor clearance recommended."
+            action = (metadata.get("recommended_action") or "Notify emergency response personnel and deploy on-duty traffic marshals for corridor clearance.") if metadata else "Notify emergency response personnel and deploy on-duty traffic marshals for corridor clearance."
             
             # Neural Insight / Explanation
             insight = "Anomalous kinetic or spatial event verified by neural tracking engine."
@@ -497,7 +496,7 @@ class EmailAlertService:
                   
                   <!-- TACTICAL SOP / RECOMMENDED ACTION -->
                   <div style="background:rgba(225, 29, 72, 0.12); border: 1px solid rgba(225, 29, 72, 0.4); padding:20px; border-radius:12px; margin-bottom:24px;">
-                    <div style="font-size:10px; color:#fb7185; text-transform:uppercase; letter-spacing:1.5px; font-weight:800; margin-bottom:6px;">⚠️ TACTICAL ACTION PROTOCOL</div>
+                    <div style="font-size:10px; color:#fb7185; text-transform:uppercase; letter-spacing:1.5px; font-weight:800; margin-bottom:6px;">⚠️ RECOMMENDED RESPONSE PROTOCOL</div>
                     <p style="margin:0; color:#ffe4e6; font-size:15px; font-weight:700; line-height:1.5;">{action}</p>
                   </div>
 
