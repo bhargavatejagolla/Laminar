@@ -47,6 +47,7 @@ backend/storage/*.faiss
 backend/media/
 backend/screenshots/
 backend/data/uploads/
+backend/data/*.pdf
 
 # Media and large archives
 *.zip

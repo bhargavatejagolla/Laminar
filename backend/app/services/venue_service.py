@@ -815,3 +815,71 @@ class VenueService:
                 "percentage": percentage,
                 "message": f"Normal crowd level: {current_count} persons ({percentage:.1f}%)"
             }
+
+    async def resolve_cameras_for_domain(
+        self,
+        session: AsyncSession,
+        venue_id: Any,
+        domain: str,
+    ) -> List[Camera]:
+        """
+        Canonical camera-domain resolver.
+        Returns ONLY cameras that:
+        1. Belong to venue_id
+        2. Are active (is_active == True)
+        3. Match the requested intelligence domain:
+           - domain in camera.hardware_metadata["domains"]
+           - OR camera.camera_type matches domain
+        No fallback to upload-demo, random camera, or unrelated domains.
+        If none found, returns empty list (NO_CAMERA_CONFIGURED).
+        """
+        from uuid import UUID
+        from sqlalchemy import select
+
+        parsed_id = UUID(str(venue_id)) if not isinstance(venue_id, UUID) else venue_id
+        domain_clean = domain.lower().strip()
+
+        stmt = select(Camera).where(
+            Camera.venue_id == parsed_id,
+            Camera.is_active == True,
+            Camera.is_deleted == False
+        )
+        result = await session.execute(stmt)
+        cameras = list(result.scalars().all())
+
+        matched = []
+        for cam in cameras:
+            # 1. Check explicit domain tag in hardware_metadata
+            hw = cam.hardware_metadata or {}
+            cam_domains = [str(d).lower().strip() for d in hw.get("domains", [])]
+            if domain_clean in cam_domains:
+                matched.append(cam)
+                continue
+
+            # 2. Check camera_type match
+            cam_type = (cam.camera_type or "").lower().strip()
+            if cam_type == domain_clean:
+                matched.append(cam)
+                continue
+
+            # 3. Domain mappings (e.g. traffic cameras also handle incidents by default)
+            if domain_clean in ("traffic", "incident") and cam_type in ("traffic", "road", "corridor"):
+                matched.append(cam)
+                continue
+            if domain_clean == "parking" and cam_type in ("parking", "garage", "lot"):
+                matched.append(cam)
+                continue
+            if domain_clean == "road_condition" and (cam_type in ("road", "traffic", "road_condition") or "road_condition" in cam_domains):
+                matched.append(cam)
+                continue
+
+        if not matched:
+            logger.info(f"📍 [DOMAIN ROUTER] NO_CAMERA_CONFIGURED for venue={venue_id}, domain={domain}")
+        else:
+            logger.info(f"📍 [DOMAIN ROUTER] Resolved {len(matched)} camera(s) for venue={venue_id}, domain={domain}")
+
+        return matched
+
+
+venue_service = VenueService()
+

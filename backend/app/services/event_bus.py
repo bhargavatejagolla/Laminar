@@ -59,8 +59,72 @@ class EventBus:
         self._last_event_ts[dedup_key] = now_ts
         self._domain_states[dedup_key] = event.severity
 
-        # Append to event ring buffer
+        # Append to event ring buffer (SSE / Live in-memory)
         self._events.appendleft(event)
+
+        # Tactical Mesh / Notification Integration
+        if event.severity in ("high", "critical"):
+            try:
+                delivery_res = await notification_service.push_notification(
+                    type=event.event_type.upper(),
+                    priority=event.severity.upper(),
+                    description=f"[{event.title}] {event.description}",
+                    venue_id=event.venue_id,
+                    venue_name=event.venue_name,
+                    camera_id=event.camera_id,
+                    domain=event.domain,
+                    metadata={
+                        "event_id": event.event_id,
+                        "confidence": event.confidence,
+                        "location": event.location.model_dump(),
+                        "evidence": event.evidence,
+                        "explanation": event.explanation
+                    }
+                )
+                if isinstance(delivery_res, dict):
+                    event.delivery_status = delivery_res
+            except Exception as notif_err:
+                logger.warning(f"Could not push event {event.event_id} to notification_service: {notif_err}")
+                event.delivery_status = {"in_app": "DELIVERED", "email": "FAILED", "sms": "FAILED"}
+
+        # Dual-Store: Persist to DB for historical truth
+        try:
+            from app.core.database import async_session_factory
+            from app.models.intelligence_event import IntelligenceEventRecord
+            from sqlalchemy import select
+            async with async_session_factory() as session:
+                existing = await session.execute(
+                    select(IntelligenceEventRecord).where(IntelligenceEventRecord.event_id == event.event_id)
+                )
+                if not existing.scalar_one_or_none():
+                    rec = IntelligenceEventRecord(
+                        event_id=event.event_id,
+                        event_type=event.event_type,
+                        domain=event.domain,
+                        venue_id=event.venue_id,
+                        venue_name=event.venue_name,
+                        camera_id=event.camera_id,
+                        camera_name=event.camera_name,
+                        source_type=event.source_type,
+                        timestamp_iso=event.timestamp,
+                        latitude=event.location.latitude,
+                        longitude=event.location.longitude,
+                        location_source=event.location.location_source,
+                        severity=event.severity,
+                        confidence=event.confidence,
+                        state=event.state,
+                        title=event.title,
+                        description=event.description,
+                        evidence=event.evidence,
+                        explanation=event.explanation,
+                        model_name=event.model_name,
+                        model_version=event.model_version,
+                        delivery_status=event.delivery_status
+                    )
+                    session.add(rec)
+                    await session.commit()
+        except Exception as db_err:
+            logger.debug(f"Event DB persistence note: {db_err}")
 
         # Update GLOBAL_STATE for immediate dashboard synchronization
         GLOBAL_STATE.update(
@@ -80,28 +144,6 @@ class EventBus:
             except Exception:
                 if q in self._sse_subscribers:
                     self._sse_subscribers.remove(q)
-
-        # Tactical Mesh / Notification Integration
-        if event.severity in ("high", "critical"):
-            try:
-                await notification_service.push_notification(
-                    type=event.event_type.upper(),
-                    priority=event.severity.upper(),
-                    description=f"[{event.title}] {event.description}",
-                    venue_id=event.venue_id,
-                    venue_name=event.venue_name,
-                    camera_id=event.camera_id,
-                    domain=event.domain,
-                    metadata={
-                        "event_id": event.event_id,
-                        "confidence": event.confidence,
-                        "location": event.location.model_dump(),
-                        "evidence": event.evidence,
-                        "explanation": event.explanation
-                    }
-                )
-            except Exception as notif_err:
-                logger.warning(f"Could not push event {event.event_id} to notification_service: {notif_err}")
 
         logger.info(f"⚡ [EVENT BUS] Emitted {event.event_type} (severity={event.severity}, venue={event.venue_name})")
         return True
@@ -178,9 +220,21 @@ class EventBus:
             overall_severity = "ELEVATED"
             status_text = f"ELEVATED: {active_warnings} road sector warning(s) active across monitored network."
 
+        # Zero-mock domain readiness report
+        from app.core.model_registry import model_registry, ModelLifecycleState
+        road_desc = model_registry.get_descriptor("road_condition")
+        road_configured = (road_desc is not None and road_desc.state in (ModelLifecycleState.MODEL_VALIDATED, ModelLifecycleState.MODEL_ENABLED, ModelLifecycleState.FROZEN))
+
         return {
             "overall_status": overall_severity,
             "headline": status_text,
+            "domain_readiness": {
+                "traffic": "READY",
+                "incident": "READY",
+                "parking": "GEOMETRY_DEPENDENT",
+                "road_condition": "NOT_CONFIGURED" if not road_configured else "READY",
+                "traffic_signals": "SIGNAL DATA NOT CONNECTED"
+            },
             "metrics": {
                 "active_critical": active_critical,
                 "active_warnings": active_warnings,

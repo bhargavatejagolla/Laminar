@@ -13,6 +13,8 @@ from app.models.analysis_job import AnalysisJob, JobStatus
 from app.vision.vision_core import VisionCore
 from app.vision.incident_detector import incident_detector, IncidentIntelligence
 from app.vision.traffic_worker import draw_vehicle_overlays, draw_hud
+from app.vision.road_condition_detector import road_condition_detector
+from app.vision.intersection_analyzer import intersection_analyzer
 from app.core.global_state import GLOBAL_STATE
 from app.core.logging import get_logger
 from app.services.notification_service import notification_service
@@ -109,6 +111,21 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
 
     worker_vision_core = VisionCore()
     worker_incident_detector = IncidentIntelligence()
+
+    road_defects = []
+    latest_road_condition = road_condition_detector.get_status()
+    latest_intersection_summary = {
+        "status": "NOT_CONFIGURED",
+        "signal_state": "SIGNAL DATA NOT CONNECTED",
+        "metrics": {
+            "approach_vehicles": 0,
+            "queue_length_vehicles": 0,
+            "stopped_vehicles": 0,
+            "conflict_zone_occupancy": 0,
+            "blockage_detected": False
+        },
+        "notes": "No intersection geometry or signal integration configured for this video stream."
+    }
 
     v_count = 0
     avg_frame_speed = 0.0
@@ -293,6 +310,28 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                     except Exception as notif_err:
                         logger.warning(f"Could not emit density event: {notif_err}")
 
+                # Road Condition Defect Analysis (Zero-mock: reports NOT_CONFIGURED when weights missing)
+                rc_res = road_condition_detector.detect_defects(
+                    frame,
+                    camera_id=f"job_{job_id}",
+                    venue_id=venue_id or job_id,
+                    venue_name=v_name if 'v_name' in locals() else "Road Media Stream",
+                    timestamp_s=round(frame_idx / fps, 2),
+                    dt=dt_step
+                )
+                latest_road_condition = rc_res
+                if rc_res.get("confirmed_defects"):
+                    for cd in rc_res["confirmed_defects"]:
+                        road_defects.append(cd)
+
+                # Intersection & Cross-Road Kinematics (Zero-mock: reports NOT_CONFIGURED when geometry missing)
+                inter_res = intersection_analyzer.analyze_intersection(
+                    tracked_objs,
+                    intersection_config=None,
+                    camera_id=f"job_{job_id}"
+                )
+                latest_intersection_summary = inter_res
+
                 active_draw_objs = tracked_objs
             else:
                 # Interpolate positions for smooth 30 FPS bounding boxes
@@ -313,6 +352,16 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
 
             # Draw bounding boxes & vehicle labels on EVERY frame
             annotated_frame = draw_vehicle_overlays(annotated_frame, active_draw_objs)
+
+            # Draw road defect overlays if detected
+            if latest_road_condition.get("raw_detections"):
+                for rd in latest_road_condition["raw_detections"]:
+                    bx1, by1, bx2, by2 = [int(p) for p in rd.get("bbox", [0, 0, 0, 0])]
+                    cname = rd.get("class", "defect").upper()
+                    conf = int(rd.get("confidence", 0.8) * 100)
+                    cv2.rectangle(annotated_frame, (bx1, by1), (bx2, by2), (0, 165, 255), 2)
+                    cv2.putText(annotated_frame, f"ROAD DEFECT: {cname} ({conf}%)", 
+                                (bx1, max(by1 - 6, 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 165, 255), 2)
 
             # Draw incident warnings if present
             if frame_incidents:
@@ -395,7 +444,14 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                     "vehicle_observations": curr_obs_breakdown,
                     "density_matrix": active_matrix,
                     "events": events_log[-8:],
-                    "incidents": incidents
+                    "incidents": incidents,
+                    "road_condition": {
+                        "status": latest_road_condition.get("status", "NOT_CONFIGURED"),
+                        "notes": latest_road_condition.get("notes", "No validated road defect weights located on system."),
+                        "total_defects_found": len(road_defects),
+                        "defects": road_defects
+                    },
+                    "intersection": latest_intersection_summary
                 }
 
                 # Push to global state so Road Intelligence top cards immediately reflect the uploaded video analysis
@@ -410,6 +466,20 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                         "avg_velocity": curr_avg_spd,
                         "wait_time_estimate": curr_wait_min,
                         "risk_score": min(100, int(v_count * 4 + len(incidents) * 35)),
+                        "source_type": "upload",
+                        "last_updated": time.time(),
+                    }
+                )
+
+                GLOBAL_STATE.update(
+                    domain="road_condition",
+                    venue_id=job_id,
+                    payload={
+                        "venue_id": job_id,
+                        "camera_id": f"job_{job_id}",
+                        "status": latest_road_condition.get("status", "NOT_CONFIGURED"),
+                        "defect_count": len(road_defects),
+                        "notes": latest_road_condition.get("notes", ""),
                         "source_type": "upload",
                         "last_updated": time.time(),
                     }
@@ -476,7 +546,14 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
             "vehicle_observations": final_obs_breakdown,
             "density_matrix": final_avg_matrix,
             "events": events_log,
-            "incidents": incidents
+            "incidents": incidents,
+            "road_condition": {
+                "status": latest_road_condition.get("status", "NOT_CONFIGURED"),
+                "notes": latest_road_condition.get("notes", "No validated road defect weights located on system."),
+                "total_defects_found": len(road_defects),
+                "defects": road_defects
+            },
+            "intersection": latest_intersection_summary
         }
 
         # Mark COMPLETED

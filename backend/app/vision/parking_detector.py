@@ -268,8 +268,9 @@ class ParkingIntelligence:
                     "capacity": None,
                     "total_slots": None,
                     "total_available": None,
+                    "geometry_status": "PARKING GEOMETRY NOT CONFIGURED",
                 },
-                "suggestion": "PARKING NOT CONFIGURED",
+                "suggestion": "PARKING GEOMETRY NOT CONFIGURED",
                 "prediction": "No parking zones or cameras mapped in sector.",
                 "zones": {},
                 "alerts": []

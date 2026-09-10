@@ -48,6 +48,37 @@ async def get_urban_pulse(
         "pulse": pulse
     }
 
+@router.get("/report/pdf")
+async def export_road_intelligence_pdf(
+    venue_id: Optional[str] = Query(None, description="Optional venue ID scoping")
+):
+    """
+    Export certified operational PDF audit report for road intelligence,
+    incidents, and model governance.
+    """
+    from fastapi.responses import Response
+    from app.core.database import async_session_factory
+    from app.services.pdf_report_service import pdf_report_service
+    from app.core.logging import get_logger
+    _logger = get_logger(__name__)
+
+    try:
+        async with async_session_factory() as session:
+            pdf_bytes = await pdf_report_service.generate_road_intelligence_pdf(
+                session=session,
+                venue_id=venue_id
+            )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="LAMINAR_ROAD_AUDIT_{venue_id or "GLOBAL"}.pdf"'
+            }
+        )
+    except Exception as e:
+        _logger.error(f"Error generating road intelligence PDF: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed generating PDF report: {str(e)}")
+
 @router.post("/{event_id}/acknowledge")
 async def acknowledge_event(
     event_id: str,

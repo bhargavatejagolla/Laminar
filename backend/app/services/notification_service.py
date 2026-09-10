@@ -1668,35 +1668,60 @@ class NotificationService:
                 if q in _sse_subscribers:
                     _sse_subscribers.remove(q)
                     
+        delivery_status = {
+            "in_app": "DELIVERED",
+            "email": "NOT_CONFIGURED",
+            "sms": "NOT_CONFIGURED"
+        }
+
+        # Check SMS provider status
+        if getattr(self.sms_service, "enabled", False):
+            delivery_status["sms"] = "ATTEMPTED"
+        else:
+            delivery_status["sms"] = "NOT_CONFIGURED (Simulation Mode)"
+
+        # Check Email provider status
+        from app.services.email_alert_service import email_alert_service
+        from app.core.config import settings
+        if email_alert_service.configured:
+            delivery_status["email"] = "ATTEMPTED"
+        else:
+            delivery_status["email"] = "NOT_CONFIGURED"
+
         # Trigger SMS and Email for CRITICAL alerts
-        if priority and priority.upper() == "CRITICAL":
+        if priority and priority.upper() in ("CRITICAL", "HIGH"):
             sms_msg = f"[LAMINAR ALERT - {type}] {description}"
             if metadata:
                 if "coordinates" in metadata:
                     sms_msg += f"\n📍 Location: {metadata['coordinates']}"
                 if "screenshot_url" in metadata and metadata["screenshot_url"]:
-                    # In production this would be the public domain
                     sms_msg += f"\n📸 Snapshot: http://127.0.0.1:8000{metadata['screenshot_url']}"
                 if "recommended_action" in metadata:
                     sms_msg += f"\n⚠️ Action: {metadata['recommended_action']}"
             
-            # Send to a default emergency number (or load from env)
             phone = os.environ.get("EMERGENCY_PHONE_NUMBER", "+15550199")
-            asyncio.create_task(self.sms_service.send_sms(phone, sms_msg))
-            
-            # Dispatch Email
-            from app.services.email_alert_service import email_alert_service
-            from app.core.config import settings
-            emails = settings.get_supervisor_emails()
-            if not emails:
-                emails = ["admin@laminar.ai"]
-            if emails:
-                asyncio.create_task(email_alert_service.send_alert_email(
-                    subject=f"CRITICAL SOS: {type}",
-                    body=description,
-                    recipients=emails,
-                    metadata=metadata
-                ))
+            if getattr(self.sms_service, "enabled", False):
+                try:
+                    asyncio.create_task(self.sms_service.send_sms(phone, sms_msg))
+                    delivery_status["sms"] = "DELIVERED"
+                except Exception:
+                    delivery_status["sms"] = "FAILED"
+
+            if email_alert_service.configured:
+                try:
+                    emails = settings.get_supervisor_emails() or ["admin@laminar.ai"]
+                    asyncio.create_task(email_alert_service.send_alert_email(
+                        subject=f"CRITICAL ALERT: {type}",
+                        body=description,
+                        recipients=emails,
+                        metadata=metadata
+                    ))
+                    delivery_status["email"] = "DELIVERED"
+                except Exception:
+                    delivery_status["email"] = "FAILED"
+
+        notif["delivery_status"] = delivery_status
+        return delivery_status
 
     def get_recent(self, limit: int = 50):
         buffer_list = list(_notification_buffer)

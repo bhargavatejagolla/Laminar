@@ -38,6 +38,7 @@ from app.models.ticket import Ticket, TicketMessage
 from app.models.sos_report import SOSReport
 from app.models.emergency_profile import EmergencyProfile
 from app.models.analysis_job import AnalysisJob
+from app.models.intelligence_event import IntelligenceEventRecord
 
 # ==========================================================
 # Public Exports

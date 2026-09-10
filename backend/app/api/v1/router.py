@@ -57,6 +57,7 @@ from app.api.v1.endpoints.search import router as search_router
 from app.api.v1.endpoints.actions import router as actions_router
 from app.api.v1.endpoints.journeys import router as journeys_router
 from app.api.v1.endpoints.edge_sync import router as edge_sync_router
+from app.api.v1.endpoints.models import router as models_router
 
 # Create main v1 router with prefix
 router = APIRouter(prefix=settings.API_V1_PREFIX)
@@ -77,6 +78,7 @@ router.include_router(
     tags=["Prediction Monitoring"]
 )
 router.include_router(events_router, prefix="/events", tags=["Intelligence Events"])
+router.include_router(models_router, prefix="/models", tags=["Model Governance"])
 router.include_router(prediction_router)
 router.include_router(prediction_graph_router)
 router.include_router(camera_intelligence_router)
