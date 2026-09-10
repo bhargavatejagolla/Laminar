@@ -335,6 +335,24 @@ class TrafficWorker:
                                     current_status = "warning"
 
                                 if current_status != self._last_mesh_status:
+                                    # Capture annotated congestion snapshot
+                                    trf_snap_path = None
+                                    trf_snap_url = None
+                                    if frame_to_encode is not None:
+                                        try:
+                                            os.makedirs("data/uploads", exist_ok=True)
+                                            os.makedirs("screenshots/traffic", exist_ok=True)
+                                            fn = f"alert_traffic_{int(time.time()*1000)}.jpg"
+                                            trf_snap_path = os.path.abspath(os.path.join("data", "uploads", fn))
+                                            cv2.imwrite(trf_snap_path, frame_to_encode)
+                                            trf_snap_url = f"/api/v1/uploads/{fn}"
+                                            cv2.imwrite(os.path.abspath(os.path.join("screenshots", "traffic", fn)), frame_to_encode)
+                                        except Exception as img_err:
+                                            logger.warning(f"Could not save traffic worker snapshot: {img_err}")
+
+                                    metric_meta["screenshot_path"] = trf_snap_path
+                                    metric_meta["screenshot_url"] = trf_snap_url
+
                                     if current_status == "critical":
                                         desc = (
                                             f"{occ} vehicles · {density_val} congestion · "
@@ -343,7 +361,8 @@ class TrafficWorker:
                                         asyncio.create_task(notification_service.push_notification(
                                             domain="traffic", type="Critical Gridlock", priority="CRITICAL",
                                             description=desc, venue_id=str(self.venue_id),
-                                            venue_name=venue_obj.name, metadata=metric_meta
+                                            venue_name=venue_obj.name, camera_id=str(self.camera_id),
+                                            metadata=metric_meta
                                         ))
                                     elif current_status == "warning":
                                         desc = (
@@ -353,7 +372,8 @@ class TrafficWorker:
                                         asyncio.create_task(notification_service.push_notification(
                                             domain="traffic", type="Congestion Spike", priority="HIGH",
                                             description=desc, venue_id=str(self.venue_id),
-                                            venue_name=venue_obj.name, metadata=metric_meta
+                                            venue_name=venue_obj.name, camera_id=str(self.camera_id),
+                                            metadata=metric_meta
                                         ))
                                     self._last_mesh_status = current_status
 

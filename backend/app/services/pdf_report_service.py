@@ -920,12 +920,22 @@ class PDFReportService:
                 ]
 
                 # Check if local image frame exists
-                frame_path = inc.get("evidence", {}).get("raw_frame_path") or inc.get("evidence", {}).get("frame_url")
+                frame_path = inc.get("evidence", {}).get("screenshot_path") or inc.get("evidence", {}).get("raw_frame_path")
+                if not frame_path or not os.path.exists(frame_path):
+                    f_url = inc.get("frame_url") or inc.get("evidence", {}).get("screenshot_url")
+                    if f_url and f_url.startswith("/api/v1/uploads/"):
+                        fname = f_url.replace("/api/v1/uploads/", "")
+                        for cand_dir in ["data/uploads", "backend/data/uploads", "../backend/data/uploads", "screenshots/incidents", "screenshots/traffic"]:
+                            cand = os.path.abspath(os.path.join(cand_dir, fname))
+                            if os.path.exists(cand):
+                                frame_path = cand
+                                break
+
                 if frame_path and os.path.exists(frame_path):
                     try:
                         inc_box_data.append([
                             Paragraph("<b>ACTUAL EVIDENCE FRAME CAPTURE:</b>", cell_bold),
-                            RLImage(frame_path, width=7*cm, height=4*cm)
+                            RLImage(frame_path, width=8.5*cm, height=4.8*cm)
                         ])
                     except Exception as img_err:
                         logger.warning(f"Could not load image {frame_path}: {img_err}")

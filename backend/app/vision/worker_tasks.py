@@ -239,14 +239,44 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                                 try:
                                     from app.models.venue import Venue as VenueModel
                                     from uuid import UUID
-                                    async with async_session_factory() as session:
-                                        v_obj = await session.get(VenueModel, UUID(venue_id))
+                                    v_uuid = None
+                                    try:
+                                        v_uuid = UUID(str(venue_id))
+                                    except Exception:
+                                        pass
+                                    if v_uuid:
+                                        async with async_session_factory() as session:
+                                            v_obj = await session.get(VenueModel, v_uuid)
                                         if v_obj:
                                             v_name = v_obj.name
                                             v_lat = float(v_obj.latitude) if v_obj.latitude else None
                                             v_lon = float(v_obj.longitude) if v_obj.longitude else None
                                 except Exception as v_err:
                                     logger.warning(f"Could not resolve venue {venue_id}: {v_err}")
+
+                            # Capture annotated collision snapshot
+                            inc_snap_path = None
+                            inc_snap_url = None
+                            try:
+                                snap_frame = draw_vehicle_overlays(frame.copy(), tracked_objs)
+                                if "bbox" in inc and len(inc["bbox"]) == 4:
+                                    bx1, by1, bx2, by2 = [int(p) for p in inc["bbox"]]
+                                    cv2.rectangle(snap_frame, (bx1, by1), (bx2, by2), (0, 0, 255), 3)
+                                    cv2.putText(snap_frame, f"CRITICAL COLLISION ({int(inc.get('confidence', 0.85)*100)}%)",
+                                                (bx1, max(by1 - 8, 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
+                                cv2.rectangle(snap_frame, (0, 0), (width, 36), (0, 0, 180), -1)
+                                cv2.putText(snap_frame, f"LAMINAR COLLISION VERIFIED: {v_name} @ {round(frame_idx/fps, 2)}s",
+                                            (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
+                                
+                                os.makedirs("data/uploads", exist_ok=True)
+                                os.makedirs("screenshots/incidents", exist_ok=True)
+                                fname = f"incident_{inc_id}_{int(time.time()*1000)}.jpg"
+                                inc_snap_path = os.path.abspath(os.path.join("data", "uploads", fname))
+                                cv2.imwrite(inc_snap_path, snap_frame)
+                                inc_snap_url = f"/api/v1/uploads/{fname}"
+                                cv2.imwrite(os.path.abspath(os.path.join("screenshots", "incidents", fname)), snap_frame)
+                            except Exception as snap_err:
+                                logger.warning(f"Could not save collision snapshot: {snap_err}")
 
                             ev = LaminarIntelligenceEvent(
                                 event_id=inc_id,
@@ -272,8 +302,11 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                                     "timestamp_seconds": inc.get("timestamp_seconds", 0),
                                     "bbox": inc.get("bbox", []),
                                     "signals": inc.get("evidence", {}).get("signals", {}),
-                                    "post_impact": inc.get("evidence", {}).get("post_impact", {})
+                                    "post_impact": inc.get("evidence", {}).get("post_impact", {}),
+                                    "screenshot_path": inc_snap_path,
+                                    "screenshot_url": inc_snap_url
                                 },
+                                frame_url=inc_snap_url,
                                 explanation={
                                     "reason": "Severe physical impact signature verified with post-impact evidence continuity.",
                                     "confidence": inc.get("confidence", 0.85)
@@ -284,31 +317,109 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                             except Exception as notif_err:
                                 logger.warning(f"Could not emit event for {inc_id}: {notif_err}")
 
-                # Debounced high density event for critical volume
-                if v_count >= 16 and not density_alert_sent:
+                            # Push to GLOBAL_STATE notifications feed so both PDF reports and live feeds include it
+                            GLOBAL_STATE.push_event("notifications", "incident", {
+                                "id": f"NOTIF-{inc_id}",
+                                "domain": "incident",
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "risk_level": "critical",
+                                "latitude": float(v_lat or 0.0),
+                                "longitude": float(v_lon or 0.0),
+                                "total_vehicles": v_count,
+                                "congestion_level": "High" if v_count > 6 else "Medium",
+                                "velocity": float(round(float(avg_frame_speed), 2)),
+                                "wait_time": float(curr_wait_min),
+                                "risk_score": 95,
+                                "insight": f"Collision verified between tracks #{', #'.join(str(t) for t in inc.get('track_ids', []))}",
+                                "recommendation": "Dispatch Level-1 EMS and Traffic Marshals immediately.",
+                                "screenshot_path": inc_snap_path,
+                                "screenshot_url": inc_snap_url
+                            })
+
+                # Venue-aware threshold evaluation for traffic congestion
+                warn_thresh = 6
+                crit_thresh = 10
+                if venue_id:
+                    try:
+                        v_state = GLOBAL_STATE.get_venue_state("traffic", venue_id)
+                        if v_state and v_state.get("warning_threshold"):
+                            warn_thresh = int(v_state["warning_threshold"])
+                        if v_state and v_state.get("critical_threshold"):
+                            crit_thresh = int(v_state["critical_threshold"])
+                    except Exception:
+                        pass
+
+                is_dense = (v_count >= crit_thresh) or (v_count >= warn_thresh and avg_frame_speed < 30.0) or (v_count >= 10)
+                if is_dense and not density_alert_sent and frame_idx >= int(fps * 2):
                     density_alert_sent = True
+                    
+                    dens_snap_path = None
+                    dens_snap_url = None
+                    try:
+                        d_frame = draw_vehicle_overlays(frame.copy(), tracked_objs)
+                        d_frame = draw_hud(d_frame, {"count": v_count, "density": "High", "avg_velocity": avg_frame_speed, "risk_score": 85})
+                        os.makedirs("data/uploads", exist_ok=True)
+                        os.makedirs("screenshots/traffic", exist_ok=True)
+                        d_fn = f"congestion_{job_id[:8]}_{frame_idx}_{int(time.time()*1000)}.jpg"
+                        dens_snap_path = os.path.abspath(os.path.join("data", "uploads", d_fn))
+                        cv2.imwrite(dens_snap_path, d_frame)
+                        dens_snap_url = f"/api/v1/uploads/{d_fn}"
+                        cv2.imwrite(os.path.abspath(os.path.join("screenshots", "traffic", d_fn)), d_frame)
+                    except Exception as d_err:
+                        logger.warning(f"Could not save congestion snapshot: {d_err}")
+
                     dens_ev = LaminarIntelligenceEvent(
                         event_id=f"DENS-{job_id[:8]}-{frame_idx}",
                         event_type="traffic_density_critical",
                         domain="traffic",
-                        venue_id=job_id,
-                        venue_name="Road Media Stream",
+                        venue_id=venue_id or job_id,
+                        venue_name=v_name if 'v_name' in locals() else "Road Media Stream",
                         camera_id=f"job_{job_id}",
                         camera_name=f"Video Analysis Job {job_id[:8]}",
                         source_type="upload",
-                        location=LocationPayload(location_source="VIDEO_METADATA"),
-                        severity="high",
+                        location=LocationPayload(
+                            latitude=v_lat if 'v_lat' in locals() else None,
+                            longitude=v_lon if 'v_lon' in locals() else None,
+                            location_source="VENUE_CONFIG" if ('v_lat' in locals() and v_lat) else "VIDEO_METADATA"
+                        ),
+                        severity="critical" if v_count >= crit_thresh else "high",
                         confidence=0.95,
                         state="active",
                         title="Corridor Density Critical",
-                        description=f"Corridor congestion critical: {v_count} concurrent vehicles detected.",
-                        evidence={"vehicle_count": v_count, "timestamp_seconds": round(frame_idx / fps, 2)},
-                        explanation={"observed_count": v_count, "threshold": 16, "rule": f"Observed {v_count} vehicles >= 16 threshold"}
+                        description=f"Corridor congestion critical: {v_count} concurrent vehicles detected at {avg_frame_speed:.1f} px/s.",
+                        evidence={
+                            "vehicle_count": v_count,
+                            "timestamp_seconds": round(frame_idx / fps, 2),
+                            "avg_velocity": avg_frame_speed,
+                            "threshold": crit_thresh,
+                            "screenshot_path": dens_snap_path,
+                            "screenshot_url": dens_snap_url
+                        },
+                        frame_url=dens_snap_url,
+                        explanation={"observed_count": v_count, "threshold": crit_thresh, "rule": f"Observed {v_count} vehicles >= {crit_thresh} threshold"}
                     )
                     try:
                         await event_bus.emit_event(dens_ev, cooldown_seconds=60.0)
                     except Exception as notif_err:
                         logger.warning(f"Could not emit density event: {notif_err}")
+
+                    GLOBAL_STATE.push_event("notifications", "traffic", {
+                        "id": f"NOTIF-DENS-{job_id[:8]}-{frame_idx}",
+                        "domain": "traffic",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "risk_level": "critical" if v_count >= crit_thresh else "high",
+                        "latitude": float(v_lat or 0.0) if 'v_lat' in locals() else 0.0,
+                        "longitude": float(v_lon or 0.0) if 'v_lon' in locals() else 0.0,
+                        "total_vehicles": v_count,
+                        "congestion_level": "Critical" if v_count >= crit_thresh else "High",
+                        "velocity": float(round(float(avg_frame_speed), 2)),
+                        "wait_time": float(curr_wait_min),
+                        "risk_score": 85 if v_count >= crit_thresh else 70,
+                        "insight": f"High volume spike: {v_count} concurrent vehicles detected.",
+                        "recommendation": "Adjust traffic signal timings or deploy marshals.",
+                        "screenshot_path": dens_snap_path,
+                        "screenshot_url": dens_snap_url
+                    })
 
                 # Road Condition Defect Analysis (Zero-mock: reports NOT_CONFIGURED when weights missing)
                 rc_res = road_condition_detector.detect_defects(
@@ -407,8 +518,8 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                 except Exception as w_err:
                     logger.warning(f"Frame write error at frame {frame_idx}: {w_err}")
 
-            # Emit live progress every ~1.5s
-            if frame_idx % int(fps * 1.5) == 0:
+            # Emit live progress frequently (every ~0.5s of video)
+            if frame_idx % max(8, int(fps * 0.5)) == 0 or frame_idx == total_frames - 1:
                 progress = min(99.0, round((frame_idx / total_frames) * 100, 1))
                 curr_avg_v = float(np.mean(sampled_counts)) if sampled_counts else float(v_count)
                 curr_peak_v = int(np.max(sampled_counts)) if sampled_counts else v_count

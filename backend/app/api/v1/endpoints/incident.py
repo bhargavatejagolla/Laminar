@@ -543,21 +543,41 @@ async def download_incident_report():
                 pdf.cell(0, 5, f"  Dispatch Status: {disp}", ln=True)
 
                 b64_frame = inc.get("annotated_frame")
+                snap_img_path = None
                 if b64_frame:
                     try:
-                        import tempfile, base64, os
                         fd, tmp_img_path = tempfile.mkstemp(suffix=".jpg")
                         with os.fdopen(fd, "wb") as f:
                             f.write(base64.b64decode(b64_frame))
-                        
-                        # Check if we need to add a page (prevent image cutoff)
-                        if pdf.get_y() > 200:
+                        snap_img_path = tmp_img_path
+                    except Exception as img_e:
+                        logger.error(f"Could not decode b64 incident screenshot: {img_e}")
+                else:
+                    sp = inc.get("screenshot_path") or (inc.get("evidence", {}).get("screenshot_path") if isinstance(inc.get("evidence"), dict) else None)
+                    if sp and os.path.exists(sp):
+                        snap_img_path = sp
+                    elif inc.get("frame_url"):
+                        f_url = inc.get("frame_url")
+                        if f_url.startswith("/api/v1/uploads/"):
+                            fname = f_url.replace("/api/v1/uploads/", "")
+                            for cd in ["data/uploads", "backend/data/uploads", "../backend/data/uploads", "screenshots/incidents", "screenshots/traffic"]:
+                                c_cand = os.path.abspath(os.path.join(cd, fname))
+                                if os.path.exists(c_cand):
+                                    snap_img_path = c_cand
+                                    break
+
+                if snap_img_path and os.path.exists(snap_img_path):
+                    try:
+                        if pdf.get_y() > 190:
                             pdf.add_page()
-                            
                         pdf.ln(2)
-                        pdf.image(tmp_img_path, x=15, w=100)
+                        pdf.image(snap_img_path, x=15, w=120)
                         pdf.ln(5)
-                        os.remove(tmp_img_path)
+                        if b64_frame and os.path.exists(snap_img_path):
+                            try:
+                                os.remove(snap_img_path)
+                            except Exception:
+                                pass
                     except Exception as img_e:
                         logger.error(f"Could not embed incident screenshot: {img_e}")
 

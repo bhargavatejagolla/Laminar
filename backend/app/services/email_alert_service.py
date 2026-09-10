@@ -12,10 +12,12 @@ Configuration (set in .env):
     ALERT_EMAIL_TO = police@dept.gov,admin@laminar.ai  (comma-separated)
 """
 
+import os
 import smtplib
 import traceback
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 from datetime import datetime
 from typing import Any, Dict, Optional, List
 
@@ -55,6 +57,7 @@ class EmailAlertService:
         vehicle_types: Optional[Dict[str, int]] = None,
         recording_name: Optional[str] = None,
         extra_details: Optional[Dict[str, Any]] = None,
+        screenshot_path: Optional[str] = None,
     ) -> bool:
         """
         Send a detailed police alert email for a detected accident.
@@ -68,6 +71,13 @@ class EmailAlertService:
             return False
 
         try:
+            if screenshot_path and not os.path.exists(screenshot_path):
+                for cand_dir in ["data/uploads", "backend/data/uploads", "../backend/data/uploads", "screenshots/incidents", "screenshots/traffic"]:
+                    cand = os.path.abspath(os.path.join(cand_dir, os.path.basename(screenshot_path)))
+                    if os.path.exists(cand):
+                        screenshot_path = cand
+                        break
+
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             incident_id = incident.get("id", "N/A")
             incident_type = incident.get("type", "Unknown Incident")
@@ -170,6 +180,14 @@ class EmailAlertService:
     <!-- Recording -->
     {f'<div class="section"><div class="label">📹 Recording Reference</div><div class="value" style="font-family:monospace;font-size:13px">{recording_name}</div></div>' if recording_name else ''}
 
+    <!-- Visual Snapshot -->
+    {f'''
+    <div class="section" style="padding:12px;background:#000;border:1px solid #334155;border-radius:8px;">
+      <div class="label" style="margin-bottom:8px;">📸 Collision Visual Evidence Snapshot</div>
+      <img src="cid:accident_snapshot" alt="Accident Snapshot" style="width:100%;display:block;border-radius:6px;" />
+    </div>
+    ''' if (screenshot_path and os.path.exists(screenshot_path)) else ''}
+
     <!-- Action Required -->
     <div style="background:#1a0a0a;border:1px solid {priority_color}40;border-radius:8px;padding:16px;margin-top:16px;text-align:center">
       <p style="color:{priority_color};font-weight:800;font-size:14px;margin:0 0 8px">⚠ IMMEDIATE RESPONSE REQUESTED</p>
@@ -177,6 +195,11 @@ class EmailAlertService:
         Laminar AI has detected a {priority.lower()} priority incident at {venue_name}.<br>
         Please dispatch appropriate emergency response units to the coordinates above.
       </p>
+      <div style="margin-top:12px;">
+        <a href="http://localhost:3000/road-intelligence/command" style="display:inline-block;background:#06b6d4;color:#000;padding:10px 20px;border-radius:6px;font-weight:bold;text-decoration:none;font-size:11px;letter-spacing:1px;text-transform:uppercase;">
+          ⚡ Open Command Center & GIS
+        </a>
+      </div>
     </div>
   </div>
 
@@ -188,7 +211,7 @@ class EmailAlertService:
 </body>
 </html>"""
 
-            msg = MIMEMultipart("alternative")
+            msg = MIMEMultipart("related")
             msg["Subject"] = f"🚨 [{priority}] ACCIDENT ALERT — {venue_name} | Laminar AI"
             msg["From"] = f"Laminar Emergency AI <{self.user}>"
             msg["To"] = ", ".join(self.recipients)
@@ -210,6 +233,16 @@ class EmailAlertService:
 
             msg.attach(MIMEText(plain, "plain"))
             msg.attach(MIMEText(html_body, "html"))
+
+            if screenshot_path and os.path.exists(screenshot_path):
+                try:
+                    with open(screenshot_path, "rb") as f:
+                        img_part = MIMEImage(f.read())
+                        img_part.add_header("Content-ID", "<accident_snapshot>")
+                        img_part.add_header("Content-Disposition", "inline")
+                        msg.attach(img_part)
+                except Exception as img_err:
+                    logger.warning(f"Could not attach snapshot to accident email: {img_err}")
 
             with smtplib.SMTP(self.host, self.port, timeout=10) as server:
                 server.ehlo()
@@ -295,85 +328,196 @@ class EmailAlertService:
             msg["To"] = ", ".join(target_recipients)
             
             # Extract rich data
-            coords = metadata.get("coordinates", "Unknown Location") if metadata else "Unknown Location"
-            action = metadata.get("recommended_action", "Standby for further instructions.") if metadata else "Standby for further instructions."
-            insight = metadata.get("insight", "Anomalous event detected in sector.") if metadata else "Anomalous event detected in sector."
+            coords = "Unknown Location"
+            google_maps_link = None
+            loc_data = metadata.get("location") if metadata else None
+            if isinstance(loc_data, dict):
+                lat = loc_data.get("latitude")
+                lng = loc_data.get("longitude")
+                if lat and lng:
+                    coords = f"{lat:.6f}, {lng:.6f}"
+                    google_maps_link = f"https://maps.google.com/?q={lat},{lng}"
+            elif metadata and "coordinates" in metadata:
+                coords = str(metadata["coordinates"])
+
+            venue_name = (metadata.get("venue_name") or "Municipal Traffic Corridor") if metadata else "Municipal Traffic Corridor"
+            camera_name = (metadata.get("camera_name") or metadata.get("camera_id") or "Edge Vision Node") if metadata else "Edge Vision Node"
+            action = (metadata.get("recommended_action") or "Immediate emergency dispatch & corridor clearance recommended.") if metadata else "Immediate emergency dispatch & corridor clearance recommended."
             
-            # Fetch Image for Email Attachment
-            img_url = metadata.get("screenshot_url") if metadata else None
+            # Neural Insight / Explanation
+            insight = "Anomalous kinetic or spatial event verified by neural tracking engine."
+            if metadata:
+                if isinstance(metadata.get("explanation"), dict):
+                    insight = metadata["explanation"].get("reason", insight)
+                elif metadata.get("insight"):
+                    insight = str(metadata["insight"])
+
+            # Evidence telemetry breakdown
+            evidence = metadata.get("evidence", {}) if metadata else {}
+            veh_count = evidence.get("vehicle_count") or metadata.get("vehicle_count")
+            track_ids = evidence.get("track_ids", [])
+            signals = evidence.get("signals", {})
+            rel_speed = signals.get("rel_speed_px_s") or signals.get("impact_rel_speed")
+            decel = signals.get("observed_decel")
+
+            # Fetch Image for Email Attachment (Direct disk priority -> HTTP fallback)
             img_data = None
             img_cid = None
-            if img_url and (img_url.startswith("/api") or img_url.startswith("/storage")):
+            img_path = metadata.get("screenshot_path") if metadata else None
+            img_url = metadata.get("screenshot_url") if metadata else None
+
+            # 1. Direct path check with directory fallbacks
+            if img_path:
+                if not os.path.exists(img_path):
+                    for cand_dir in ["data/uploads", "backend/data/uploads", "../backend/data/uploads", "screenshots/incidents", "screenshots/traffic"]:
+                        cand = os.path.abspath(os.path.join(cand_dir, os.path.basename(img_path)))
+                        if os.path.exists(cand):
+                            img_path = cand
+                            break
+                if os.path.exists(img_path):
+                    try:
+                        with open(img_path, "rb") as f:
+                            img_data = f.read()
+                            img_cid = "incident_snapshot"
+                    except Exception as disk_err:
+                        logger.warning(f"Could not read screenshot from disk {img_path}: {disk_err}")
+
+            # 2. Disk resolution from URL
+            if not img_data and img_url:
+                candidate_paths = []
+                if img_url.startswith("/api/v1/uploads/"):
+                    fname = img_url.replace("/api/v1/uploads/", "")
+                    for cand_dir in ["data/uploads", "backend/data/uploads", "../backend/data/uploads", "screenshots/incidents", "screenshots/traffic"]:
+                        candidate_paths.append(os.path.abspath(os.path.join(cand_dir, fname)))
+                elif "/storage/" in img_url:
+                    candidate_paths.append(os.path.abspath(img_url.lstrip("/")))
+
+                for cp in candidate_paths:
+                    if os.path.exists(cp):
+                        try:
+                            with open(cp, "rb") as f:
+                                img_data = f.read()
+                                img_cid = "incident_snapshot"
+                                break
+                        except Exception:
+                            pass
+
+            # 3. HTTP loopback fallback
+            if not img_data and img_url and (img_url.startswith("/api") or img_url.startswith("/storage")):
                 import httpx
                 try:
-                    async with httpx.AsyncClient() as client:
+                    async with httpx.AsyncClient(timeout=3.0) as client:
                         resp = await client.get(f"http://127.0.0.1:8000{img_url}")
                         if resp.status_code == 200:
                             img_data = resp.content
                             img_cid = "incident_snapshot"
-                except Exception as e:
-                    logger.error(f"Failed to fetch internal snapshot for email: {e}")
-                
+                except Exception:
+                    pass
+
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Build Premium HTML
+
+            # Build Telemetry Rows HTML
+            telemetry_rows = []
+            if veh_count is not None:
+                telemetry_rows.append(f"<tr><td style='padding:6px 12px;color:#94a3b8;font-size:12px;border-bottom:1px solid #1e293b'>Vehicle Volume</td><td style='padding:6px 12px;color:#38bdf8;font-weight:bold;font-size:12px;border-bottom:1px solid #1e293b'>{veh_count} vehicles</td></tr>")
+            if track_ids:
+                telemetry_rows.append(f"<tr><td style='padding:6px 12px;color:#94a3b8;font-size:12px;border-bottom:1px solid #1e293b'>Involved Track IDs</td><td style='padding:6px 12px;color:#f43f5e;font-family:monospace;font-size:12px;border-bottom:1px solid #1e293b'>#{', #'.join(str(t) for t in track_ids)}</td></tr>")
+            if rel_speed:
+                telemetry_rows.append(f"<tr><td style='padding:6px 12px;color:#94a3b8;font-size:12px;border-bottom:1px solid #1e293b'>Impact Relative Velocity</td><td style='padding:6px 12px;color:#fbbf24;font-weight:bold;font-size:12px;border-bottom:1px solid #1e293b'>{rel_speed:.1f} px/s</td></tr>")
+            if decel:
+                telemetry_rows.append(f"<tr><td style='padding:6px 12px;color:#94a3b8;font-size:12px;border-bottom:1px solid #1e293b'>Post-Impact Kinematics</td><td style='padding:6px 12px;color:#ef4444;font-size:12px;border-bottom:1px solid #1e293b'>Sudden Kinetic Deceleration Verified</td></tr>")
+
+            telemetry_table = f"""
+            <table style='width:100%;border-collapse:collapse;margin-top:8px;background:#09090f;border:1px solid #1e293b;border-radius:8px;overflow:hidden;'>
+              {''.join(telemetry_rows)}
+            </table>
+            """ if telemetry_rows else ""
+
+            # Build Premium Tactical HTML
             html_body = f"""
             <!DOCTYPE html>
             <html>
             <head><meta charset="UTF-8"></head>
-            <body style="font-family: 'Inter', -apple-system, sans-serif; background:#000000; color:#f8fafc; padding:40px 20px; margin:0;">
-              <div style="max-width:600px; margin:0 auto; background:#0f0f13; border:1px solid #e11d4850; border-radius:16px; overflow:hidden; box-shadow: 0 20px 40px rgba(225, 29, 72, 0.15);">
+            <body style="font-family: 'Inter', -apple-system, sans-serif; background:#050508; color:#f8fafc; padding:30px 15px; margin:0;">
+              <div style="max-width:640px; margin:0 auto; background:#0c0c14; border:1px solid #e11d4860; border-radius:16px; overflow:hidden; box-shadow: 0 25px 50px -12px rgba(225, 29, 72, 0.25);">
                 
                 <!-- HEADER -->
-                <div style="background:linear-gradient(135deg, #be123c, #881337); padding:30px 24px; text-align:center; border-bottom: 2px solid #f43f5e;">
-                  <div style="display:inline-block; background:#fff; color:#be123c; font-size:10px; font-weight:900; letter-spacing:2px; padding:4px 12px; border-radius:20px; margin-bottom:12px;">CRITICAL INCIDENT</div>
-                  <h1 style="margin:0; color:#ffffff; font-size:24px; font-weight:800; letter-spacing:-0.5px;">AUTONOMOUS SOS ACTIVATED</h1>
-                  <p style="margin:8px 0 0; color:#fecdd3; font-size:13px; font-weight:500;">{now} (LOCAL TIME)</p>
+                <div style="background:linear-gradient(135deg, #180509 0%, #3f0713 50%, #180509 100%); padding:28px 24px; text-align:center; border-bottom: 2px solid #f43f5e;">
+                  <div style="display:inline-block; background:#be123c; color:#ffffff; font-size:11px; font-weight:900; letter-spacing:2px; padding:4px 14px; border-radius:999px; margin-bottom:12px; box-shadow: 0 0 12px rgba(244,63,94,0.6);">
+                    🚨 MISSION-CRITICAL INCIDENT ALERT
+                  </div>
+                  <h1 style="margin:0; color:#ffffff; font-size:22px; font-weight:800; letter-spacing:-0.5px;">{subject}</h1>
+                  <p style="margin:8px 0 0; color:#fda4af; font-size:12px; font-weight:500;">
+                    {now} · LAMINAR AUTONOMOUS DISPATCH
+                  </p>
                 </div>
                 
                 <!-- BODY -->
-                <div style="padding:32px 24px;">
+                <div style="padding:28px 24px;">
                   
-                  <!-- DESCRIPTION -->
-                  <div style="background:#18181b; border: 1px solid #27272a; padding:20px; border-radius:12px; margin-bottom:24px;">
-                    <p style="margin:0; color:#e4e4e7; font-size:15px; line-height:1.6;">
+                  <!-- OVERVIEW DESCRIPTION -->
+                  <div style="background:#13131f; border: 1px solid #27273a; padding:18px; border-radius:12px; margin-bottom:20px;">
+                    <div style="font-size:10px; color:#64748b; text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:6px;">INCIDENT SUMMARY</div>
+                    <p style="margin:0; color:#e2e8f0; font-size:14px; line-height:1.6;">
                       {body}
                     </p>
                   </div>
                   
-                  <!-- AI INSIGHTS -->
-                  <div style="background:rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3); padding:20px; border-radius:12px; margin-bottom:24px;">
-                    <p style="margin:0 0 8px; font-size:11px; color:#38bdf8; text-transform:uppercase; font-weight:700; letter-spacing:1px;">🧠 System Telemetry & Insights</p>
-                    <p style="margin:0; color:#e0f2fe; font-size:14px; line-height:1.6; font-style: italic;">"{insight}"</p>
+                  <!-- SECTOR & LOCATION -->
+                  <div style="background:#09090f; border-left: 4px solid #0ea5e9; border: 1px solid #1e293b; padding:18px; border-radius:8px; margin-bottom:20px;">
+                    <div style="font-size:10px; color:#38bdf8; text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:6px;">📍 SECTOR & GEODETIC COORDINATES</div>
+                    <div style="font-size:15px; font-weight:bold; color:#ffffff;">{venue_name} <span style="color:#64748b; font-weight:normal; font-size:12px;">({camera_name})</span></div>
+                    <div style="margin-top:6px; font-size:13px; font-family:monospace; color:#38bdf8;">{coords}</div>
+                    {f'<div style="margin-top:12px;"><a href="{google_maps_link}" style="display:inline-block;background:#0ea5e9;color:#000;padding:8px 16px;border-radius:6px;font-size:11px;font-weight:800;text-decoration:none;letter-spacing:0.5px;">📌 OPEN IN GOOGLE MAPS</a></div>' if google_maps_link else ''}
                   </div>
-                  
-                  <!-- COORDINATES -->
-                  <div style="margin-bottom:24px;">
-                    <p style="margin:0 0 8px; font-size:11px; color:#a1a1aa; text-transform:uppercase; font-weight:700; letter-spacing:1px;">📍 Incident Location</p>
-                    <div style="background:#09090b; border-left: 4px solid #0ea5e9; padding:16px; border-radius:4px;">
-                      <p style="margin:0; color:#38bdf8; font-size:16px; font-family:monospace; font-weight:bold;">{coords}</p>
-                    </div>
-                  </div>
-                  
-                  <!-- SNAPSHOT -->
+
+                  <!-- TELEMETRY & KINEMATICS -->
                   {f'''
-                  <div style="margin-bottom:24px;">
-                    <p style="margin:0 0 8px; font-size:11px; color:#a1a1aa; text-transform:uppercase; font-weight:700; letter-spacing:1px;">📸 Live Camera Snapshot</p>
-                    <img src="cid:{img_cid}" alt="Incident Snapshot" style="width:100%; border-radius:12px; border: 2px solid #27272a;" />
+                  <div style="margin-bottom:20px;">
+                    <div style="font-size:10px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:6px;">📊 KINEMATIC EVIDENCE & TELEMETRY</div>
+                    {telemetry_table}
+                  </div>
+                  ''' if telemetry_rows else ''}
+
+                  <!-- NEURAL INSIGHT -->
+                  <div style="background:rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3); padding:18px; border-radius:12px; margin-bottom:20px;">
+                    <div style="font-size:10px; color:#38bdf8; text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:6px;">🧠 NEURAL AUDIT & EXPLAINABILITY</div>
+                    <p style="margin:0; color:#e0f2fe; font-size:13px; line-height:1.6; font-style:italic;">"{insight}"</p>
+                  </div>
+                  
+                  <!-- SNAPSHOT EVIDENCE -->
+                  {f'''
+                  <div style="margin-bottom:20px;">
+                    <div style="font-size:10px; color:#a1a1aa; text-transform:uppercase; letter-spacing:1.5px; font-weight:700; margin-bottom:8px;">📸 FORENSIC VISUAL EVIDENCE</div>
+                    <div style="border: 2px solid #334155; border-radius:12px; overflow:hidden; background:#000;">
+                      <img src="cid:{img_cid}" alt="Incident Forensic Snapshot" style="width:100%; display:block;" />
+                    </div>
                   </div>
                   ''' if img_cid else ''}
                   
-                  <!-- ACTION REQUIRED -->
-                  <div style="background:rgba(225, 29, 72, 0.1); border: 1px solid rgba(225, 29, 72, 0.3); padding:20px; border-radius:12px;">
-                    <p style="margin:0 0 8px; font-size:11px; color:#fb7185; text-transform:uppercase; font-weight:700; letter-spacing:1px;">⚠️ Recommended Action</p>
-                    <p style="margin:0; color:#ffe4e6; font-size:16px; font-weight:600;">{action}</p>
+                  <!-- TACTICAL SOP / RECOMMENDED ACTION -->
+                  <div style="background:rgba(225, 29, 72, 0.12); border: 1px solid rgba(225, 29, 72, 0.4); padding:20px; border-radius:12px; margin-bottom:24px;">
+                    <div style="font-size:10px; color:#fb7185; text-transform:uppercase; letter-spacing:1.5px; font-weight:800; margin-bottom:6px;">⚠️ TACTICAL ACTION PROTOCOL</div>
+                    <p style="margin:0; color:#ffe4e6; font-size:15px; font-weight:700; line-height:1.5;">{action}</p>
+                  </div>
+
+                  <!-- ACTION CTA BUTTON -->
+                  <div style="text-align:center; padding:10px 0;">
+                    <a href="http://localhost:3000/road-intelligence/command" style="display:inline-block; background:#06b6d4; color:#000000; padding:14px 28px; border-radius:10px; font-size:12px; font-weight:900; letter-spacing:1px; text-transform:uppercase; text-decoration:none; box-shadow: 0 4px 15px rgba(6,182,212,0.4);">
+                      ⚡ OPEN LAMINAR COMMAND CENTER & GIS MAP
+                    </a>
                   </div>
                   
                 </div>
                 
                 <!-- FOOTER -->
-                <div style="background:#09090b; padding:20px; text-align:center; border-top: 1px solid #27272a;">
-                  <p style="margin:0; font-size:11px; color:#52525b; letter-spacing:1px;">LAMINAR AI • TACTICAL OVERSIGHT ENGINE</p>
+                <div style="background:#08080e; padding:18px 24px; text-align:center; border-top: 1px solid #1e293b;">
+                  <p style="margin:0; font-size:11px; color:#64748b; letter-spacing:1px;">
+                    LAMINAR AI • AUTONOMOUS URBAN ROAD INTELLIGENCE PLATFORM
+                  </p>
+                  <p style="margin:4px 0 0; font-size:10px; color:#475569;">
+                    Automated security dispatch. Do not reply to this email.
+                  </p>
                 </div>
                 
               </div>

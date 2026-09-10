@@ -199,24 +199,43 @@ class IncidentWorker:
                 except Exception as sms_err:
                     logger.error(f"Sms dispatch error: {sms_err}")
                 
-                # 2. Email Alert
+                # 2. Capture Evidence Screenshot
+                snap_path = None
+                snap_url = None
+                if self._last_annotated_frame is not None:
+                    try:
+                        os.makedirs("data/uploads", exist_ok=True)
+                        os.makedirs("screenshots/incidents", exist_ok=True)
+                        fn = f"incident_{incident.get('id', int(time.time()*1000))}.jpg"
+                        snap_path = os.path.abspath(os.path.join("data", "uploads", fn))
+                        cv2.imwrite(snap_path, self._last_annotated_frame)
+                        snap_url = f"/api/v1/uploads/{fn}"
+                        cv2.imwrite(os.path.abspath(os.path.join("screenshots", "incidents", fn)), self._last_annotated_frame)
+                    except Exception as img_err:
+                        logger.warning(f"Could not save incident worker snapshot: {img_err}")
+
+                # 3. Email Alert
                 try:
                     total_veh = sum(vehicle_counts.values()) if vehicle_counts else 0
                     email_alert_service.send_accident_alert(
                         incident=incident, venue_name=v_name, latitude=lat, longitude=lon,
-                        vehicle_count=total_veh, vehicle_types=vehicle_counts
+                        vehicle_count=total_veh, vehicle_types=vehicle_counts,
+                        screenshot_path=snap_path
                     )
                 except Exception as email_err:
                     logger.error(f"Email dispatch error: {email_err}")
                     
-                # 3. Global Mesh Notification
+                # 4. Global Mesh Notification
                 asyncio.create_task(notification_service.push_notification(
                     domain="incident", type=incident.get('type', 'Emergency'), priority="CRITICAL",
                     description=f"CRITICAL INCIDENT at {v_name}: {incident.get('description')}",
                     venue_id=str(self.venue_id),
+                    venue_name=v_name,
+                    camera_id=str(self.camera_id),
                     metadata={
                         "incident_type": incident.get('type'), "latitude": lat, "longitude": lon,
-                        "explanation": incident.get('description'), "vehicle_counts": vehicle_counts
+                        "explanation": incident.get('description'), "vehicle_counts": vehicle_counts,
+                        "screenshot_path": snap_path, "screenshot_url": snap_url
                     }
                 ))
         except Exception as e:

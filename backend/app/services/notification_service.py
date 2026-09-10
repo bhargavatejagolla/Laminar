@@ -1709,12 +1709,20 @@ class NotificationService:
 
             if email_alert_service.configured:
                 try:
-                    emails = settings.get_supervisor_emails() or ["admin@laminar.ai"]
+                    emails = email_alert_service.recipients or settings.get_supervisor_emails() or [settings.SMTP_USER]
+                    meta_with_context = dict(metadata or {})
+                    if venue_name and "venue_name" not in meta_with_context:
+                        meta_with_context["venue_name"] = venue_name
+                    if camera_id and "camera_id" not in meta_with_context:
+                        meta_with_context["camera_id"] = camera_id
+                    if domain and "domain" not in meta_with_context:
+                        meta_with_context["domain"] = domain
+
                     asyncio.create_task(email_alert_service.send_alert_email(
-                        subject=f"CRITICAL ALERT: {type}",
+                        subject=f"[{priority.upper()}] {type} — {venue_name or 'Road Corridor'}",
                         body=description,
                         recipients=emails,
-                        metadata=metadata
+                        metadata=meta_with_context
                     ))
                     delivery_status["email"] = "DELIVERED"
                 except Exception:

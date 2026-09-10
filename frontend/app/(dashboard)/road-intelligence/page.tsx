@@ -1272,12 +1272,13 @@ function RoadIntelligenceContent() {
                   onClick={async () => {
                     const tId = toast.loading("Generating Tactical PDF Report…");
                     try {
-                      const res = await fetch("/api/v1/traffic/report/pdf");
+                      const vParam = selectedVenueId ? `?venue_id=${encodeURIComponent(selectedVenueId)}` : "";
+                      const res = await fetch(`/api/v1/traffic/report/pdf${vParam}`);
                       if (!res.ok) throw new Error();
                       const blob = await res.blob();
                       const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a"); a.href = url; a.download = "road_intelligence_report.pdf"; a.click();
-                      toast.success("PDF Downloaded!", { id: tId });
+                      const a = document.createElement("a"); a.href = url; a.download = `LAMINAR_TRAFFIC_REPORT_${currentVenue?.name?.replace(/\s+/g, "_") || "SECTOR"}_${Date.now()}.pdf`; a.click();
+                      toast.success("Tactical AI PDF Downloaded!", { id: tId });
                     } catch { toast.error("Export failed", { id: tId }); }
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono font-bold uppercase tracking-widest text-white transition-all shadow-lg"

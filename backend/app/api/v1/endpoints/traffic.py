@@ -250,26 +250,27 @@ def push_traffic_event(
     screenshot_path: Optional[str] = None,
 ):
     """Called by TrafficWorker to broadcast live analytics via SSE."""
-    # ── 1. Coordinate & Threshold Lookup (Priority: GLOBAL_STATE) ──
+    # ── 1. Coordinate & Threshold Lookup (Priority: GLOBAL_STATE -> Fallback) ──
     lat = 0.0
     lng = 0.0
-    capacity = 100
-    warn_t = 70
-    crit_t = 90
+    capacity = 10
+    warn_t = 5
+    crit_t = 8
     risk_level = "low"
+    v_name = "Corridor Node"
 
     if venue_id:
         try:
             from app.core.global_state import GLOBAL_STATE
-            v_state = GLOBAL_STATE.get_venue_state("traffic", venue_id)
+            v_state = GLOBAL_STATE.get_venue_state("traffic", venue_id) or GLOBAL_STATE.get_venue_state("people", venue_id) or GLOBAL_STATE.get_venue_state("incident", venue_id)
             if v_state:
-                capacity = v_state.get("capacity", 100)
-                warn_t = v_state.get("warning_threshold", 70)
-                crit_t = v_state.get("critical_threshold", 90)
+                capacity = v_state.get("capacity", 10)
+                warn_t = v_state.get("warning_threshold", 5)
+                crit_t = v_state.get("critical_threshold", 8)
                 lat = v_state.get("latitude", 0.0)
                 lng = v_state.get("longitude", 0.0)
+                v_name = v_state.get("name", v_name)
             else:
-                # Fallback: if not in venue state, check if we have it in camera state
                 c_state = GLOBAL_STATE.get_camera_state("traffic", camera_id)
                 if c_state:
                     lat = c_state.get("latitude", 0.0)
@@ -277,22 +278,22 @@ def push_traffic_event(
         except Exception as e:
             logger.error(f"Error looking up coordinates for traffic event: {e}")
 
-    # ── 2. Threshold-based risk assignment ──
-    occupancy_pct = (count / capacity * 100) if capacity > 0 else 0
-    if occupancy_pct >= (crit_t / capacity * 100 if capacity > 0 else 90):
+    # ── 2. Threshold-based risk assignment (Supports both absolute counts and percentages) ──
+    is_crit = (crit_t > 0 and count >= crit_t) or (capacity > 0 and (count / capacity * 100) >= crit_t) or (density == "Critical")
+    is_warn = (warn_t > 0 and count >= warn_t) or (capacity > 0 and (count / capacity * 100) >= warn_t) or (density == "High")
+
+    if is_crit:
         risk_level = "critical"
         density = "Critical"
-    elif occupancy_pct >= (warn_t / capacity * 100 if capacity > 0 else 70):
+    elif is_warn:
         risk_level = "high"
         density = "High"
-    elif occupancy_pct > 25:
+    elif count >= 3 or density == "Medium":
         risk_level = "medium"
         density = "Medium"
     else:
-        # Fallback to hardcoded density if occupancy is low
-        if density == "Critical": risk_level = "critical"
-        elif density == "High": risk_level = "high"
-        elif density == "Medium": risk_level = "medium"
+        risk_level = "low"
+        density = "Low"
 
     # ── 3. Broadcast Event via SSE ──
     event = {
@@ -303,9 +304,11 @@ def push_traffic_event(
         "density": str(density),
         "velocity": float(round(float(velocity), 2)),
         "wait_time": float(round(float(wait_time), 1)),
-        "risk_score": int(risk_score),
+        "risk_score": int(risk_score) or (90 if is_crit else 70 if is_warn else 40 if count >= 3 else 15),
         "latitude": float(lat),
         "longitude": float(lng),
+        "screenshot_path": screenshot_path,
+        "screenshot_url": f"/api/v1/uploads/{os.path.basename(screenshot_path)}" if (screenshot_path and "uploads" in screenshot_path) else None
     }
     _push_traffic_event(camera_id, event)
 
@@ -321,13 +324,22 @@ def push_traffic_event(
         if last_tier != tier_label:
             _notified_traffic_tiers[camera_id] = tier_label
 
-            # Fire unified notification via NotificationService (non-blocking)
+            # Fire unified notification via NotificationService (non-blocking, thread-safe)
             if venue_id:
-                async def _fire_live_traffic_notification(vid, cnt, den, vel, wt, rs, tier, ins, rec, cid, latitude, longitude):
+                async def _fire_live_traffic_notification(vid, cnt, den, vel, wt, rs, tier, ins, rec, cid, latitude, longitude, s_path):
                     try:
                         from app.models.venue import Venue as VenueModel
+                        from app.models.intelligence_event import LaminarIntelligenceEvent, LocationPayload
+                        from app.services.event_bus import event_bus
+
+                        v_uuid = None
+                        try:
+                            v_uuid = UUID(str(vid))
+                        except Exception:
+                            pass
+
                         async with db_manager.session() as sess:
-                            v = await sess.get(VenueModel, UUID(vid))
+                            v = await sess.get(VenueModel, v_uuid) if v_uuid else None
                             if not v:
                                 stmt = select(VenueModel).limit(1)
                                 res = await sess.execute(stmt)
@@ -338,18 +350,59 @@ def push_traffic_event(
                                 count=cnt, density=den, velocity=vel,
                                 wait_time=wt, risk_score=rs, tier_label=tier,
                                 insight=ins, recommendation=rec,
-                                screenshot_path=screenshot_path,
+                                screenshot_path=s_path,
                                 camera_id=cid, lat=latitude, lng=longitude
                             )
+
+                            # Also emit to unified Event Bus for persistence and tactical GIS
+                            ev = LaminarIntelligenceEvent(
+                                event_id=f"TRF-{cid[:8]}-{int(time.time()*1000)}",
+                                event_type="traffic_density_critical" if tier == "CRITICAL" else "traffic_density_elevated",
+                                domain="traffic",
+                                venue_id=str(v.id),
+                                venue_name=v.name,
+                                camera_id=cid,
+                                camera_name=f"Camera {cid[:8]}",
+                                source_type="live_rtsp",
+                                location=LocationPayload(
+                                    latitude=latitude,
+                                    longitude=longitude,
+                                    location_source="CAMERA_CONFIG" if latitude else "UNKNOWN"
+                                ),
+                                severity=tier.lower(),
+                                confidence=0.92,
+                                state="active",
+                                title=f"Traffic {tier} Spike at {v.name}",
+                                description=f"Observed {cnt} vehicles with flow velocity {vel:.1f} px/s.",
+                                evidence={
+                                    "vehicle_count": cnt,
+                                    "density": den,
+                                    "velocity": vel,
+                                    "wait_time": wt,
+                                    "screenshot_path": s_path,
+                                    "screenshot_url": f"/api/v1/uploads/{os.path.basename(s_path)}" if (s_path and "uploads" in s_path) else None
+                                },
+                                frame_url=f"/api/v1/uploads/{os.path.basename(s_path)}" if (s_path and "uploads" in s_path) else None,
+                                explanation={"reason": ins, "rule": f"Volume {cnt} reached {tier} threshold"}
+                            )
+                            await event_bus.emit_event(ev, cooldown_seconds=30.0)
+
                     except Exception as ex:
                         logger.error(f"Live traffic notification failed: {ex}")
 
                 try:
-                    asyncio.get_running_loop().create_task(
-                        _fire_live_traffic_notification(venue_id, count, density, velocity, wait_time, risk_score, tier_label, insight, recommendation, camera_id, lat, lng)
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
+                        _fire_live_traffic_notification(venue_id, count, density, velocity, wait_time, risk_score, tier_label, insight, recommendation, camera_id, lat, lng, screenshot_path)
                     )
                 except RuntimeError:
-                    pass  # No running loop — worker is not in async context, skip
+                    import threading
+                    threading.Thread(
+                        target=lambda: asyncio.run(
+                            _fire_live_traffic_notification(venue_id, count, density, velocity, wait_time, risk_score, tier_label, insight, recommendation, camera_id, lat, lng, screenshot_path)
+                        ),
+                        daemon=True
+                    ).start()
 
         # Always store in notifications feed (used by PDF and dashboard bell)
         from app.core.global_state import GLOBAL_STATE
@@ -842,21 +895,70 @@ async def capture_traffic_video(camera_id: str = Query(...), duration: int = 15)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/report/pdf")
-async def download_traffic_report(camera_id: Optional[str] = None):
+async def download_traffic_report(camera_id: Optional[str] = None, venue_id: Optional[str] = None):
     """
     Comprehensive AI Traffic Intelligence Report.
-    Uses ONLY live data from GLOBAL_STATE and the in-memory event bus.
+    Uses live data from GLOBAL_STATE, Event Bus, and Persistent DB Records.
     Includes: executive summary, AI insights, speed analytics, density matrix,
-    per-camera breakdown, alert history, and strategic recommendations.
+    per-camera breakdown, audited alert history, embedded forensic snapshots,
+    and municipal strategic recommendations.
     """
     from fpdf import FPDF
     from app.core.global_state import GLOBAL_STATE
 
-    # ── 1. Gather all live data ──────────────────────────────────────────
+    # ── 1. Gather live and persistent data ────────────────────────────────
     live_state: Dict[str, Any] = GLOBAL_STATE.get_domain_state("traffic")
     recent_events = GLOBAL_STATE.get_events("traffic", camera_id, limit=200)
+    
+    # 1.1 In-memory notifications (both traffic and incident)
     notifs = GLOBAL_STATE.get_events("notifications", limit=50)
-    notifs = [n for n in notifs if n.get("domain") == "traffic"]
+    notifs = [n for n in notifs if n.get("domain") in ("traffic", "incident")]
+
+    # 1.2 Persistent DB events from intelligence_events table
+    db_events = []
+    try:
+        from app.core.database import async_session_factory
+        from app.models.intelligence_event import IntelligenceEventRecord
+        from sqlalchemy import select, desc
+        async with async_session_factory() as session:
+            stmt = select(IntelligenceEventRecord)
+            if venue_id:
+                stmt = stmt.where(IntelligenceEventRecord.venue_id == venue_id)
+            stmt = stmt.order_by(desc(IntelligenceEventRecord.created_at)).limit(40)
+            res = await session.execute(stmt)
+            for rec in res.scalars().all():
+                ev_data = rec.evidence or {}
+                db_events.append({
+                    "id": rec.event_id,
+                    "domain": rec.domain,
+                    "timestamp": rec.timestamp_iso or rec.created_at.isoformat(),
+                    "risk_level": rec.severity.upper(),
+                    "latitude": rec.latitude or 0.0,
+                    "longitude": rec.longitude or 0.0,
+                    "total_vehicles": ev_data.get("vehicle_count") or ev_data.get("count") or (len(ev_data.get("track_ids", [])) if ev_data.get("track_ids") else 0),
+                    "congestion_level": "Critical" if rec.severity == "critical" else "High" if rec.severity == "high" else "Medium",
+                    "velocity": float(ev_data.get("velocity", 0.0) or ev_data.get("avg_velocity", 0.0)),
+                    "wait_time": float(ev_data.get("wait_time", 0.0)),
+                    "risk_score": 95 if rec.severity == "critical" else 75 if rec.severity == "high" else 45,
+                    "insight": rec.title or rec.description or "Autonomous Event",
+                    "recommendation": (rec.explanation or {}).get("reason", "Corridor response protocol engaged."),
+                    "screenshot_path": ev_data.get("screenshot_path"),
+                    "screenshot_url": ev_data.get("screenshot_url")
+                })
+    except Exception as db_err:
+        logger.warning(f"Could not load DB events for PDF report: {db_err}")
+
+    # Deduplicate notifications
+    seen_ids = set()
+    merged_notifs = []
+    for n in list(notifs) + db_events:
+        nid = n.get("id")
+        if nid and nid not in seen_ids:
+            seen_ids.add(nid)
+            merged_notifs.append(n)
+        elif not nid:
+            merged_notifs.append(n)
+    notifs = merged_notifs[:50]
 
     # ── 2. Compute insights from live data only ──────────────────────────
     n = max(1, len(recent_events))
@@ -1234,26 +1336,78 @@ async def download_traffic_report(camera_id: Optional[str] = None):
         pdf.set_text_color(140, 140, 140)
         pdf.cell(0, 8, "No detection events recorded yet. Awaiting live camera data.", ln=True)
 
-    # ── Section 9: Recent Alert Evidence ──────────────────────────────────
+    # ── Section 9: Recent Alert Evidence (Forensic Snapshots) ─────────────
     import glob
     try:
-        screenshots = glob.glob(os.path.abspath("screenshots/traffic/*.jpg"))
-        if screenshots:
-            screenshots.sort(key=os.path.getctime, reverse=True)
+        found_screenshots = []
+        # Priority 1: Direct paths from recorded notifications
+        for n in notifs:
+            sp = n.get("screenshot_path")
+            if sp and os.path.exists(sp) and sp not in [x[0] for x in found_screenshots]:
+                found_screenshots.append((sp, n))
+
+        # Priority 2: Standard alert and upload directories
+        candidate_patterns = [
+            "screenshots/incidents/*.jpg",
+            "screenshots/traffic/*.jpg",
+            "backend/screenshots/incidents/*.jpg",
+            "backend/screenshots/traffic/*.jpg",
+            "data/uploads/incident_*.jpg",
+            "data/uploads/congestion_*.jpg",
+            "data/uploads/alert_*.jpg",
+            "data/uploads/annotated_*.jpg",
+            "backend/data/uploads/incident_*.jpg",
+            "backend/data/uploads/congestion_*.jpg",
+            "backend/data/uploads/alert_*.jpg",
+            "backend/data/uploads/annotated_*.jpg",
+        ]
+        for pat in candidate_patterns:
+            for f in glob.glob(os.path.abspath(pat)):
+                if os.path.exists(f) and not any(f == x[0] for x in found_screenshots):
+                    found_screenshots.append((f, None))
+
+        if found_screenshots:
+            # Sort by creation time (newest first)
+            found_screenshots.sort(key=lambda item: os.path.getctime(item[0]), reverse=True)
+
             pdf.add_page()
-            pdf.section_title("9. RECENT ALERT EVIDENCE (SCREENSHOTS)", color=(180, 0, 0))
-            
-            for scr in screenshots[:5]:  # Top 5 most recent
-                if os.path.exists(scr):
-                    if pdf.get_y() > 180:
-                        pdf.add_page()
-                    try:
-                        pdf.image(scr, x=15, y=pdf.get_y() + 5, w=160)
-                        pdf.ln(100)
-                    except Exception as e:
-                        logger.error(f"Failed to embed screenshot in PDF: {e}")
-    except Exception:
-        pass
+            pdf.section_title("9. FORENSIC VISUAL EVIDENCE (AI ANNOTATED FRAMES)", color=(180, 0, 0))
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(80, 80, 80)
+            pdf.multi_cell(0, 5, "Visual frames recorded autonomously by LAMINAR Neural Pipeline upon incident detection or congestion threshold breach. Features bounding boxes, velocity vectors, and kinematic callouts.")
+            pdf.ln(3)
+
+            for scr_path, alert_meta in found_screenshots[:6]:
+                if not os.path.exists(scr_path):
+                    continue
+                if pdf.get_y() > 170:
+                    pdf.add_page()
+
+                curr_y = pdf.get_y()
+                try:
+                    # Embed 160mm image
+                    pdf.image(scr_path, x=25, y=curr_y + 2, w=160, h=88)
+                    pdf.set_y(curr_y + 92)
+
+                    # Caption card
+                    pdf.set_fill_color(245, 248, 252)
+                    pdf.set_draw_color(180, 200, 220)
+                    pdf.set_font("Helvetica", "B", 8)
+                    pdf.set_text_color(20, 30, 50)
+                    
+                    c_title = alert_meta.get("insight", "Neural Tracking Forensic Frame") if alert_meta else f"Snapshot: {os.path.basename(scr_path)}"
+                    c_time = alert_meta.get("timestamp", datetime.fromtimestamp(os.path.getctime(scr_path)).strftime('%Y-%m-%d %H:%M:%S')) if alert_meta else datetime.fromtimestamp(os.path.getctime(scr_path)).strftime('%Y-%m-%d %H:%M:%S')
+                    c_risk = alert_meta.get("risk_level", "VERIFIED") if alert_meta else "RECORDED"
+
+                    pdf.cell(0, 6, f"  EVIDENCE CARD | {c_title[:60]}", 1, 1, fill=True)
+                    pdf.set_font("Helvetica", "", 7)
+                    pdf.set_text_color(70, 80, 95)
+                    pdf.cell(0, 5, f"  Timestamp: {c_time[:19]}  |  Status: {c_risk}  |  Source: {os.path.basename(scr_path)}", 1, 1, fill=True)
+                    pdf.ln(5)
+                except Exception as img_err:
+                    logger.warning(f"Could not embed image {scr_path} in PDF: {img_err}")
+    except Exception as e:
+        logger.warning(f"Error in Section 9 PDF screenshot processing: {e}")
 
     # ── Footer note ────────────────────────────────────────────────────────
     pdf.ln(6)

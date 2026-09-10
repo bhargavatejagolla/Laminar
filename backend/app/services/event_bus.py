@@ -78,7 +78,9 @@ class EventBus:
                         "confidence": event.confidence,
                         "location": event.location.model_dump(),
                         "evidence": event.evidence,
-                        "explanation": event.explanation
+                        "explanation": event.explanation,
+                        "screenshot_url": getattr(event, "frame_url", None) or (event.evidence.get("screenshot_url") if isinstance(event.evidence, dict) else None),
+                        "screenshot_path": (event.evidence.get("screenshot_path") if isinstance(event.evidence, dict) else None)
                     }
                 )
                 if isinstance(delivery_res, dict):
