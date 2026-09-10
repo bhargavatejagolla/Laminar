@@ -119,6 +119,12 @@ app.mount("/api/v1/storage/semantic_snapshots",
           StaticFiles(directory="storage/semantic_snapshots"),
           name="semantic_snapshots")
 
+# Forensic Search Evidence Thumbnails
+os.makedirs("storage/forensic_thumbs", exist_ok=True)
+app.mount("/api/v1/storage/forensic_thumbs",
+          StaticFiles(directory="storage/forensic_thumbs"),
+          name="forensic_thumbs")
+
 # Generic Storage Mount (for Journey Snapshots, etc.)
 os.makedirs("storage", exist_ok=True)
 app.mount("/storage", StaticFiles(directory="storage"), name="storage")

@@ -43,6 +43,8 @@ backend/storage/insightface_models/
 backend/storage/snapshots/
 backend/storage/dwell_snapshots/
 backend/storage/sos_uploads/
+backend/storage/forensic_thumbs/
+backend/storage/video_search_indices/
 backend/storage/*.faiss
 backend/media/
 backend/screenshots/

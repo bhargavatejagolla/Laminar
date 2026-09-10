@@ -21,8 +21,11 @@ from typing import List, Optional, Dict, Any
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import shutil
+import uuid
 from sqlalchemy import String, select
 from sqlalchemy.orm import joinedload
 
@@ -105,6 +108,16 @@ class SearchResult(BaseModel):
     confidence: float
     bbox: Optional[List[float]] = None
     distance: float = 0.0
+
+class ForensicQueryRequest(BaseModel):
+    video_id: str
+    query: str
+    threshold: Optional[float] = 0.40
+    top_k: Optional[int] = 8
+
+class IndexVideoRequest(BaseModel):
+    video_id: str
+    force_reindex: Optional[bool] = False
 
 # ──────────────────────────────────────────────────────────────
 # Helpers
@@ -375,3 +388,136 @@ async def semantic_search(req: SearchRequest):
     except Exception as exc:
         logger.exception(f"v7 Search error: {exc}")
         return []
+
+
+# ──────────────────────────────────────────────────────────────
+# Forensic Video Retrieval & Verification Endpoints (VideoRAG)
+# ──────────────────────────────────────────────────────────────
+
+from app.services.video_search_service import forensic_search_service
+
+@router.get("/video-library")
+async def get_video_library():
+    """Returns all available CCTV videos in the system library with indexing status."""
+    try:
+        videos = forensic_search_service.list_library_videos()
+        return {"count": len(videos), "videos": videos}
+    except Exception as exc:
+        logger.exception(f"Error fetching video library: {exc}")
+        return {"count": 0, "videos": []}
+
+
+@router.post("/upload-video")
+async def upload_forensic_video(
+    file: UploadFile = File(...),
+    auto_index: bool = Query(True)
+):
+    """
+    Accepts video upload (MP4/MOV/AVI/MKV), stores it in data/uploads,
+    and optionally triggers forensic indexing.
+    """
+    if not file.filename.lower().endswith((".mp4", ".mov", ".avi", ".mkv")):
+        raise HTTPException(status_code=400, detail="Unsupported video format. Use MP4, MOV, AVI, or MKV.")
+
+    video_id = str(uuid.uuid4())
+    ext = os.path.splitext(file.filename)[1]
+    save_filename = f"{video_id}{ext}"
+    save_path = os.path.join(os.getcwd(), "data", "uploads", save_filename)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    try:
+        with open(save_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as exc:
+        logger.exception(f"Failed to save uploaded video: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to save video to storage.")
+
+    index_data = None
+    if auto_index:
+        try:
+            loop = asyncio.get_running_loop()
+            index_data = await loop.run_in_executor(None, forensic_search_service.index_video, video_id, save_path)
+        except Exception as exc:
+            logger.warning(f"Auto-index failed for {video_id}: {exc}")
+
+    return {
+        "video_id": video_id,
+        "filename": file.filename,
+        "indexed": index_data is not None,
+        "telemetry": index_data.get("telemetry") if index_data else None,
+        "stream_url": f"/api/v1/search/video-stream/{video_id}"
+    }
+
+
+@router.post("/index-video")
+async def trigger_video_index(req: IndexVideoRequest):
+    """Indexes or re-indexes a video in the library."""
+    v_matches = glob.glob(os.path.join(os.getcwd(), "data", "uploads", f"{req.video_id}.*"))
+    if not v_matches:
+        raise HTTPException(status_code=404, detail="Video file not found in library.")
+
+    video_path = v_matches[0]
+    try:
+        loop = asyncio.get_running_loop()
+        index_data = await loop.run_in_executor(
+            None, forensic_search_service.index_video, req.video_id, video_path, req.force_reindex
+        )
+        return {
+            "video_id": req.video_id,
+            "status": "INDEXED",
+            "telemetry": index_data.get("telemetry"),
+            "frame_count": len(index_data.get("frames", []))
+        }
+    except Exception as exc:
+        logger.exception(f"Indexing error on {req.video_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Indexing failed: {exc}")
+
+
+@router.post("/forensic-query")
+async def forensic_video_query(req: ForensicQueryRequest):
+    """
+    Executes Evidence-Grounded forensic query against an indexed video.
+    Strictly gates irrelevant queries (VERIFIED vs NOT VERIFIED).
+    """
+    query_str = req.query.strip()
+    if not query_str:
+        raise HTTPException(status_code=400, detail="Query string cannot be empty.")
+
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            forensic_search_service.query_video,
+            req.video_id,
+            query_str,
+            req.threshold or 0.40,
+            req.top_k or 8
+        )
+        return result
+    except Exception as exc:
+        logger.exception(f"Forensic query error for {req.video_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Search execution failed: {exc}")
+
+
+@router.get("/video-stream/{video_id}")
+async def stream_forensic_video(video_id: str):
+    """
+    Streams video with standard HTTP 206 Partial Content (Byte Range) support
+    for smooth timeline scrubbing and click-to-seek playback.
+    """
+    v_matches = glob.glob(os.path.join(os.getcwd(), "data", "uploads", f"{video_id}.*"))
+    if not v_matches or not os.path.exists(v_matches[0]):
+        raise HTTPException(status_code=404, detail="Video file not found.")
+
+    file_path = v_matches[0]
+    return FileResponse(file_path, media_type="video/mp4")
+
+
+@router.get("/thumbnail/{filename}")
+async def get_evidence_thumbnail(filename: str):
+    """Serves extracted keyframe thumbnails."""
+    thumb_path = os.path.join(os.getcwd(), "storage", "forensic_thumbs", filename)
+    if not os.path.exists(thumb_path):
+        raise HTTPException(status_code=404, detail="Thumbnail not found.")
+    return FileResponse(thumb_path, media_type="image/jpeg")
+
