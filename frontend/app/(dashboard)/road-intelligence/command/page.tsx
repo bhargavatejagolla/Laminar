@@ -162,8 +162,6 @@ export default function RoadIntelligenceCommandPage() {
       toast.error(`Report generation failed: ${err.message}`, { id: toastId });
     } finally {
       setExporting(false);
-    } finally {
-      setExporting(false);
     }
   };
 
