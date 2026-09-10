@@ -39,6 +39,13 @@ interface Camera {
 interface UrbanPulse {
   overall_status: string;
   headline: string;
+  domain_readiness?: {
+    traffic?: string;
+    incident?: string;
+    parking?: string;
+    road_condition?: string;
+    traffic_signals?: string;
+  };
   metrics: {
     active_critical: number;
     active_warnings: number;
@@ -130,47 +137,31 @@ export default function RoadIntelligenceCommandPage() {
     return events.filter(e => e.domain === activeTab);
   }, [events, activeTab]);
 
-  // Export Audited Operational Report
+  // Export Audited Operational PDF Report
   const handleExportReport = async () => {
     setExporting(true);
-    const toastId = toast.loading("Generating audited operational report with data provenance…");
+    const toastId = toast.loading("Compiling certified operational PDF report with data provenance…");
     try {
-      const reportPayload = {
-        title: "LAMINAR Road Intelligence Operational Report",
-        generated_at: new Date().toISOString(),
-        venue: currentVenue ? {
-          id: currentVenue.id,
-          name: currentVenue.name,
-          city: currentVenue.city,
-          latitude: currentVenue.latitude,
-          longitude: currentVenue.longitude
-        } : null,
-        urban_pulse: urbanPulse,
-        events_summary: {
-          total: events.length,
-          critical: events.filter(e => e.severity === "critical").length,
-          warnings: events.filter(e => e.severity === "warning" || e.severity === "high").length
-        },
-        data_provenance: {
-          perception_engine: "YOLO11 Nano + ByteTrack Multi-Object Tracker",
-          configuration_source: "LAMINAR Venue Configuration Matrix",
-          location_datum: "WGS84 Geodetic Coordinates",
-          active_cameras: displayCameras.map(c => ({ id: c.id, name: c.name, type: c.camera_type }))
-        },
-        verified_events: events
-      };
+      const params = selectedVenueId ? `?venue_id=${selectedVenueId}` : "";
+      const response = await api.get(`/events/report/pdf${params}`, {
+        responseType: "blob"
+      });
 
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reportPayload, null, 2));
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const downloadUrl = window.URL.createObjectURL(blob);
       const downloadAnchor = document.createElement("a");
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `LAMINAR_ROAD_REPORT_${currentVenue?.name || "SECTOR"}_${Date.now()}.json`);
+      downloadAnchor.href = downloadUrl;
+      downloadAnchor.download = `LAMINAR_ROAD_AUDIT_${currentVenue?.name?.replace(/\s+/g, "_") || "GLOBAL"}_${Date.now()}.pdf`;
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
+      window.URL.revokeObjectURL(downloadUrl);
 
-      toast.success("Audited Operational Report Generated Successfully", { id: toastId });
+      toast.success("Certified Operational PDF Report Downloaded", { id: toastId });
     } catch (err: any) {
       toast.error(`Report generation failed: ${err.message}`, { id: toastId });
+    } finally {
+      setExporting(false);
     } finally {
       setExporting(false);
     }
@@ -300,33 +291,54 @@ export default function RoadIntelligenceCommandPage() {
             </div>
             <div className="px-3 py-1 bg-white/[0.02] border border-white/5 rounded-xl">
               <span className="text-[9px] text-slate-500 uppercase block">Road Defects</span>
-              <strong className="text-slate-400">
-                {urbanPulse?.metrics.road_defects_count ?? 0}
-              </strong>
+              {urbanPulse?.domain_readiness?.road_condition === "NOT_CONFIGURED" ? (
+                <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-white/5 border border-white/10 text-slate-400">
+                  NOT CONFIGURED
+                </span>
+              ) : (
+                <strong className="text-slate-200">
+                  {urbanPulse?.metrics.road_defects_count ?? 0}
+                </strong>
+              )}
+            </div>
+            <div className="px-3 py-1 bg-white/[0.02] border border-white/5 rounded-xl">
+              <span className="text-[9px] text-slate-500 uppercase block">Traffic Signals</span>
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/10 border border-amber-500/20 text-amber-400/80">
+                NOT CONNECTED
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── DOMAIN FILTER TABS ── */}
-      <div className="px-6 pt-4 flex items-center gap-2 border-b border-white/[0.04] bg-[#090c14]">
+      <div className="px-6 pt-4 flex items-center gap-2 border-b border-white/[0.04] bg-[#090c14] overflow-x-auto">
         {[
           { key: "all", label: "All Intelligence Domains" },
           { key: "incident", label: "Incidents & Collisions" },
           { key: "traffic", label: "Traffic & Bottlenecks" },
           { key: "parking", label: "Smart Parking Matrix" },
-          { key: "road_condition", label: "Road Condition Defects" }
+          { 
+            key: "road_condition", 
+            label: "Road Condition Defects",
+            badge: urbanPulse?.domain_readiness?.road_condition === "NOT_CONFIGURED" ? "NOT CONFIGURED" : null
+          }
         ].map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider border-b-2 transition-all ${
+            className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === tab.key
                 ? "border-cyan-400 text-white bg-cyan-500/5"
                 : "border-transparent text-slate-400 hover:text-white"
             }`}
           >
-            {tab.label}
+            <span>{tab.label}</span>
+            {tab.badge && (
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-normal bg-white/5 border border-white/10 text-slate-400">
+                {tab.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>

@@ -114,9 +114,41 @@ export function EvidenceDrawer({ event, onClose, onUpdate }: Props) {
             </div>
           </div>
 
-          {/* Location & Provenance */}
+          {/* Visual Evidence Snapshot */}
+          {(event.evidence?.frame_url || event.evidence?.screenshot_url || event.evidence?.snapshot_url) && (
+            <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Visual Evidence Capture</span>
+                <span className="text-[9px] text-cyan-400 font-mono">Forensic Frame</span>
+              </div>
+              <div className="relative rounded-xl overflow-hidden border border-white/10 bg-black max-h-60 flex items-center justify-center">
+                <img
+                  src={event.evidence.frame_url || event.evidence.screenshot_url || event.evidence.snapshot_url}
+                  alt="Incident Evidence Snapshot"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Location & Spatial Provenance (Two-Level Distinction) */}
           <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3">
-            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Location & Spatial Provenance</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Location & Spatial Provenance</span>
+              {event.location?.location_source === "CAMERA_CALIBRATED" ? (
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 font-bold text-[9px]">
+                  LEVEL 2: CALIBRATED ROAD PLANE
+                </span>
+              ) : event.location?.location_source === "CAMERA_CONFIG" ? (
+                <span className="px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/40 text-cyan-400 font-bold text-[9px]">
+                  LEVEL 1: OBSERVER GPS
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400 font-bold text-[9px]">
+                  {event.location?.location_source || "VENUE_CONFIG"}
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3 text-[11px]">
               <div>
                 <span className="text-slate-500 block text-[9px] uppercase">Venue Context</span>
@@ -130,13 +162,13 @@ export function EvidenceDrawer({ event, onClose, onUpdate }: Props) {
                 <span className="text-slate-500 block text-[9px] uppercase">GPS Coordinates</span>
                 <span className="text-slate-300 font-mono">
                   {event.location?.latitude && event.location?.longitude
-                    ? `${Number(event.location.latitude).toFixed(4)}, ${Number(event.location.longitude).toFixed(4)}`
-                    : "Anchored to Venue Datum"}
+                    ? `${Number(event.location.latitude).toFixed(5)}, ${Number(event.location.longitude).toFixed(5)}`
+                    : "No Pin Datum (Video Forensic)"}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block text-[9px] uppercase">Provenance Origin</span>
-                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-cyan-400 font-bold text-[9px]">
+                <span className="text-slate-500 block text-[9px] uppercase">Coordinate Provenance</span>
+                <span className="text-slate-300 font-mono">
                   {event.location?.location_source || "VENUE_CONFIG"}
                 </span>
               </div>
@@ -176,6 +208,35 @@ export function EvidenceDrawer({ event, onClose, onUpdate }: Props) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Model Governance & Dispatch Delivery State */}
+          <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3">
+            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Model Governance & Notification Delivery</span>
+            <div className="grid grid-cols-2 gap-3 text-[11px]">
+              <div>
+                <span className="text-slate-500 block text-[9px] uppercase">Perception Model</span>
+                <span className="text-cyan-300 font-bold">{event.model_name || "YOLO11 Nano + ByteTrack (Frozen)"}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[9px] uppercase">Model Version</span>
+                <span className="text-slate-300 font-mono">{event.model_version || "1.0.0"}</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-white/5 space-y-1 text-[10px]">
+              <span className="text-slate-500 uppercase block text-[9px]">Notification State Machine:</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">
+                  In-App: <strong className="text-emerald-400">{event.delivery_status?.in_app || "DELIVERED"}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">
+                  Email: <strong className={event.delivery_status?.email === "DELIVERED" ? "text-emerald-400" : "text-slate-400"}>{event.delivery_status?.email || "NOT_CONFIGURED"}</strong>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">
+                  SMS: <strong className={event.delivery_status?.sms === "DELIVERED" ? "text-emerald-400" : "text-amber-400"}>{event.delivery_status?.sms || "NOT_CONFIGURED (Simulation Mode)"}</strong>
+                </span>
+              </div>
             </div>
           </div>
 

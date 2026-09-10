@@ -170,60 +170,87 @@ export default function RoadCommandGisCore({
           </Marker>
         )}
 
-        {/* Connected Edge Cameras */}
-        {cameras.map((cam, idx) => {
-          const camLat = cam.latitude ? Number(cam.latitude) : defaultLat + (idx === 0 ? 0.001 : idx === 1 ? -0.001 : 0.0005);
-          const camLng = cam.longitude ? Number(cam.longitude) : defaultLng + (idx === 0 ? -0.001 : idx === 1 ? 0.001 : -0.0008);
-          return (
-            <Marker key={cam.id} position={[camLat, camLng]} icon={cameraIcon}>
-              <Tooltip direction="top" offset={[0, -14]} opacity={0.9}>
-                <div className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-[9px] font-mono text-slate-300">
-                  📷 {cam.name} · {(cam.camera_type || "Generic").toUpperCase()}
-                </div>
-              </Tooltip>
-            </Marker>
-          );
-        })}
-
-        {/* Intelligence Events Markers */}
-        {events.map((ev, idx) => {
-          // Resolve real coordinates or anchor to venue context with slight radial offset
-          let evLat = ev.location?.latitude ? Number(ev.location.latitude) : defaultLat + ((idx % 3) * 0.0012 - 0.0006);
-          let evLng = ev.location?.longitude ? Number(ev.location.longitude) : defaultLng + (((idx + 1) % 3) * 0.0012 - 0.0006);
-          
-          const isSelected = selectedEvent?.event_id === ev.event_id;
-          const markerIcon = createEventIcon(ev.severity, ev.domain, isSelected);
-
-          return (
-            <Marker
-              key={ev.event_id}
-              position={[evLat, evLng]}
-              icon={markerIcon}
-              eventHandlers={{
-                click: () => onSelectEvent && onSelectEvent(ev),
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -16]} opacity={0.95}>
-                <div className="p-2 bg-black/95 border border-white/20 rounded-lg text-xs font-mono shadow-2xl space-y-1 max-w-[220px]">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-white uppercase text-[10px] truncate">{ev.title}</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold uppercase ${
-                      ev.severity === "critical" ? "bg-rose-500/20 text-rose-400" : "bg-amber-500/20 text-amber-400"
-                    }`}>
-                      {ev.severity}
-                    </span>
+        {/* Connected Edge Cameras - Only plot cameras with real geodetic coordinates */}
+        {cameras
+          .filter((cam) => cam.latitude != null && cam.longitude != null && !isNaN(Number(cam.latitude)) && !isNaN(Number(cam.longitude)))
+          .map((cam) => {
+            const camLat = Number(cam.latitude);
+            const camLng = Number(cam.longitude);
+            return (
+              <Marker key={cam.id} position={[camLat, camLng]} icon={cameraIcon}>
+                <Tooltip direction="top" offset={[0, -14]} opacity={0.9}>
+                  <div className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-[9px] font-mono text-slate-300">
+                    📷 {cam.name} · {(cam.camera_type || "Generic").toUpperCase()}
                   </div>
-                  <p className="text-[9px] text-slate-400 leading-tight">{ev.description}</p>
-                  <div className="flex items-center justify-between text-[8px] text-cyan-400/80 pt-1 border-t border-white/10">
-                    <span>Source: {ev.location?.location_source || "VENUE_CONFIG"}</span>
-                    <span>Conf: {Math.round((ev.confidence || 0.9) * 100)}%</span>
+                </Tooltip>
+              </Marker>
+            );
+          })}
+
+        {/* Intelligence Events Markers - Only plot events with genuine geodetic coordinates */}
+        {events
+          .filter((ev) => 
+            ev.location?.latitude != null && 
+            ev.location?.longitude != null && 
+            !isNaN(Number(ev.location.latitude)) && 
+            !isNaN(Number(ev.location.longitude)) &&
+            ev.location?.location_source !== "UNKNOWN"
+          )
+          .map((ev) => {
+            const evLat = Number(ev.location.latitude);
+            const evLng = Number(ev.location.longitude);
+            
+            const isSelected = selectedEvent?.event_id === ev.event_id;
+            const markerIcon = createEventIcon(ev.severity, ev.domain, isSelected);
+
+            return (
+              <Marker
+                key={ev.event_id}
+                position={[evLat, evLng]}
+                icon={markerIcon}
+                eventHandlers={{
+                  click: () => onSelectEvent && onSelectEvent(ev),
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -16]} opacity={0.95}>
+                  <div className="p-2 bg-black/95 border border-white/20 rounded-lg text-xs font-mono shadow-2xl space-y-1 max-w-[220px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-white uppercase text-[10px] truncate">{ev.title}</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[8px] font-bold uppercase ${
+                        ev.severity === "critical" ? "bg-rose-500/20 text-rose-400" : "bg-amber-500/20 text-amber-400"
+                      }`}>
+                        {ev.severity}
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 leading-tight">{ev.description}</p>
+                    <div className="flex items-center justify-between text-[8px] text-cyan-400/80 pt-1 border-t border-white/10">
+                      <span>Source: {ev.location?.location_source || "CAMERA_CONFIG"}</span>
+                      <span>Conf: {Math.round((ev.confidence || 0.9) * 100)}%</span>
+                    </div>
                   </div>
-                </div>
-              </Tooltip>
-            </Marker>
-          );
-        })}
+                </Tooltip>
+              </Marker>
+            );
+          })}
       </MapContainer>
+
+      {/* Unlocated Events Status Badge */}
+      {(() => {
+        const unlocated = events.filter((ev) => 
+          ev.location?.latitude == null || 
+          ev.location?.longitude == null || 
+          isNaN(Number(ev.location.latitude)) || 
+          isNaN(Number(ev.location.longitude)) ||
+          ev.location?.location_source === "UNKNOWN"
+        );
+        if (unlocated.length === 0) return null;
+        return (
+          <div className="absolute top-3 right-3 z-[1000] px-3 py-1.5 bg-black/85 backdrop-blur-md border border-amber-500/40 rounded-xl text-[10px] font-mono text-amber-300 flex items-center gap-2 shadow-2xl">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            <span>{unlocated.length} Non-GIS Event(s) (Uncalibrated / Forensic Video)</span>
+          </div>
+        );
+      })()}
 
       {/* Map Legend Overlay */}
       <div className="absolute bottom-3 left-3 z-[1000] px-3 py-2 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl text-[10px] font-mono space-y-1 shadow-2xl">
