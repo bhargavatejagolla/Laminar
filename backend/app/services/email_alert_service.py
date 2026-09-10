@@ -363,8 +363,8 @@ class EmailAlertService:
             # Fetch Image for Email Attachment (Direct disk priority -> HTTP fallback)
             img_data = None
             img_cid = None
-            img_path = metadata.get("screenshot_path") if metadata else None
-            img_url = metadata.get("screenshot_url") if metadata else None
+            img_path = metadata.get("screenshot_path") or (metadata.get("evidence", {}).get("screenshot_path") if isinstance(metadata.get("evidence"), dict) else None)
+            img_url = metadata.get("screenshot_url") or (metadata.get("evidence", {}).get("screenshot_url") if isinstance(metadata.get("evidence"), dict) else None)
 
             # 1. Direct path check with directory fallbacks
             if img_path:

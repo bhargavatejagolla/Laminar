@@ -98,7 +98,8 @@ class EventBus:
                 existing = await session.execute(
                     select(IntelligenceEventRecord).where(IntelligenceEventRecord.event_id == event.event_id)
                 )
-                if not existing.scalar_one_or_none():
+                existing_rec = existing.scalar_one_or_none()
+                if not existing_rec:
                     rec = IntelligenceEventRecord(
                         event_id=event.event_id,
                         event_type=event.event_type,
@@ -124,7 +125,12 @@ class EventBus:
                         delivery_status=event.delivery_status
                     )
                     session.add(rec)
-                    await session.commit()
+                else:
+                    if event.evidence:
+                        existing_rec.evidence = event.evidence
+                    if event.delivery_status:
+                        existing_rec.delivery_status = event.delivery_status
+                await session.commit()
         except Exception as db_err:
             logger.debug(f"Event DB persistence note: {db_err}")
 

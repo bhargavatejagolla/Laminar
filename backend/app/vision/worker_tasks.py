@@ -303,6 +303,7 @@ async def async_process_upload_job(job_id: str, file_path: str, venue_id: Option
                                     "bbox": inc.get("bbox", []),
                                     "signals": inc.get("evidence", {}).get("signals", {}),
                                     "post_impact": inc.get("evidence", {}).get("post_impact", {}),
+                                    "vehicle_count": v_count,
                                     "screenshot_path": inc_snap_path,
                                     "screenshot_url": inc_snap_url
                                 },
