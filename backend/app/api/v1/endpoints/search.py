@@ -21,7 +21,7 @@ from typing import List, Optional, Dict, Any
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks, Query
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import shutil
@@ -500,6 +500,36 @@ async def forensic_video_query(req: ForensicQueryRequest):
     except Exception as exc:
         logger.exception(f"Forensic query error for {req.video_id}: {exc}")
         raise HTTPException(status_code=500, detail=f"Search execution failed: {exc}")
+
+
+@router.post("/reference-search")
+async def forensic_reference_search(
+    video_id: str = Form(...),
+    file: UploadFile = File(...),
+    threshold: Optional[float] = Form(0.52),
+    top_k: Optional[int] = Form(8)
+):
+    """
+    Executes Reference Appearance Visual Similarity Search.
+    Uploads a screenshot or crop of a suspect, vehicle, or item, compares against deep embeddings
+    of all indexed visual entities in the video, and strictly gates results with verifiable timestamps.
+    """
+    if not file:
+        raise HTTPException(status_code=400, detail="Reference image file is required.")
+
+    try:
+        image_bytes = await file.read()
+        result = await forensic_search_service.search_by_reference_image(
+            video_id=video_id,
+            image_bytes=image_bytes,
+            threshold=threshold or 0.52,
+            top_k=top_k or 8,
+            generate_brief=True
+        )
+        return result
+    except Exception as exc:
+        logger.exception(f"Reference search error for {video_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Reference search failed: {exc}")
 
 
 @router.post("/forensic-chat")
