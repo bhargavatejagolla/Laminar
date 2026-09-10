@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { AlertTriangle, Car, Activity, MapPin, ShieldAlert, Video, Info } from "lucide-react";
+import { MAP_TILES } from "@/lib/mapConfig";
 
 interface LocationPayload {
   latitude?: number;
@@ -153,11 +154,19 @@ export default function RoadCommandGisCore({
       >
         <MapPanController center={mapCenter} />
 
-        {/* Tactical Dark Matter Map Layer */}
+        {/* Tactical Dark Matter Map Layer (No Watermark) */}
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          maxZoom={19}
+          url={MAP_TILES.darkBase}
+          maxZoom={18}
+          attribution={MAP_TILES.darkAttribution}
         />
+        {MAP_TILES.darkLabels && (
+          <TileLayer
+            url={MAP_TILES.darkLabels}
+            maxZoom={18}
+            pane="overlayPane"
+          />
+        )}
 
         {/* Primary Venue Marker */}
         {venue && (

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Tooltip, LayersControl } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Tooltip, LayersControl, LayerGroup } from "react-leaflet";
 import { createPortal } from "react-dom";
+import { MAP_TILES } from "@/lib/mapConfig";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { Search, Loader2, Target, MapPin, Globe, Maximize2, Minimize2, Layers, Check, Navigation } from "lucide-react";
@@ -105,11 +106,7 @@ export default function MapPickerCore({
   const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(fullScreen);
 
-  const mapLayers = {
-    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    satellite: "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-    traffic: "https://mt1.google.com/vt/lyrs=m,traffic&x={x}&y={y}&z={z}"
-  };
+  const mapLayers = MAP_TILES;
 
   const [position, setPosition] = useState<[number, number]>([initialLat, initialLng]);
   const [zoom, setZoom] = useState(13);
@@ -234,14 +231,30 @@ export default function MapPickerCore({
         <MapController center={position} zoom={zoom} />
         
         <LayersControl position="bottomleft">
-          <LayersControl.BaseLayer checked name={t("map.layer_dark") || "Dark"}>
-            <TileLayer url={mapLayers.dark} maxZoom={20} />
+          <LayersControl.BaseLayer checked name={t("map.layer_dark") || "Tactical Dark"}>
+            <LayerGroup>
+              <TileLayer 
+                url={mapLayers.darkBase} 
+                maxZoom={18} 
+                attribution={mapLayers.darkAttribution}
+              />
+              {mapLayers.darkLabels && (
+                <TileLayer 
+                  url={mapLayers.darkLabels} 
+                  maxZoom={18} 
+                  pane="overlayPane"
+                />
+              )}
+            </LayerGroup>
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name={t("map.layer_satellite") || "Satellite"}>
-            <TileLayer url={mapLayers.satellite} maxZoom={20} />
+          <LayersControl.BaseLayer name={t("map.layer_satellite") || "Satellite Recon"}>
+            <TileLayer url={mapLayers.satellite} maxZoom={20} attribution={mapLayers.satelliteAttribution} />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name={t("map.layer_traffic") || "Traffic"}>
-            <TileLayer url={mapLayers.traffic} maxZoom={20} />
+          <LayersControl.BaseLayer name={t("map.layer_traffic") || "Live Traffic"}>
+            <TileLayer url={mapLayers.traffic} maxZoom={20} attribution={mapLayers.trafficAttribution} />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Street Vector">
+            <TileLayer url={mapLayers.street} maxZoom={19} attribution={mapLayers.streetAttribution} />
           </LayersControl.BaseLayer>
         </LayersControl>
 

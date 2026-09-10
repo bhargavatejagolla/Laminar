@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, useMap, Tooltip, Popup, useMapEvents, LayersControl } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, Tooltip, Popup, useMapEvents, LayersControl, LayerGroup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { Search, Loader2, Target, MapPin, Activity, Info, X, Globe, Zap, Filter, Maximize2, Minimize2, Layers } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
+import { MAP_TILES } from "@/lib/mapConfig";
 
 // Types
 interface POI {
@@ -236,11 +237,7 @@ export default function IntelligenceMapCore({ venues = [] }: IntelligenceMapCore
 
   const getColor = (type: string) => CATEGORIES.find(c => c.id === type)?.color || "#22d3ee";
 
-  const mapLayers = {
-    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    satellite: "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-    traffic: "https://mt1.google.com/vt/lyrs=m,traffic&x={x}&y={y}&z={z}"
-  };
+  const mapLayers = MAP_TILES;
 
   const mapContent = (
     <div className={`relative bg-[#020617] overflow-hidden ${isExpanded ? 'fixed inset-0 z-[10000] w-screen h-screen' : 'h-screen w-full'}`}>
@@ -346,14 +343,30 @@ export default function IntelligenceMapCore({ venues = [] }: IntelligenceMapCore
         <MapEvents setPosition={setPosition} setZoom={setZoom} />
 
         <LayersControl position="bottomleft">
-          <LayersControl.BaseLayer checked name="Dark">
-            <TileLayer url={mapLayers.dark} maxZoom={20} />
+          <LayersControl.BaseLayer checked name="Tactical Dark">
+            <LayerGroup>
+              <TileLayer 
+                url={mapLayers.darkBase} 
+                maxZoom={18} 
+                attribution={mapLayers.darkAttribution}
+              />
+              {mapLayers.darkLabels && (
+                <TileLayer 
+                  url={mapLayers.darkLabels} 
+                  maxZoom={18} 
+                  pane="overlayPane"
+                />
+              )}
+            </LayerGroup>
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Satellite">
-            <TileLayer url={mapLayers.satellite} maxZoom={20} />
+          <LayersControl.BaseLayer name="Satellite Recon">
+            <TileLayer url={mapLayers.satellite} maxZoom={20} attribution={mapLayers.satelliteAttribution} />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Traffic">
-            <TileLayer url={mapLayers.traffic} maxZoom={20} />
+          <LayersControl.BaseLayer name="Live Traffic">
+            <TileLayer url={mapLayers.traffic} maxZoom={20} attribution={mapLayers.trafficAttribution} />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Street Vector">
+            <TileLayer url={mapLayers.street} maxZoom={19} attribution={mapLayers.streetAttribution} />
           </LayersControl.BaseLayer>
         </LayersControl>
 

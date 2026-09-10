@@ -1,11 +1,12 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, useMapEvents, LayersControl } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, LayersControl, LayerGroup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { MAP_TILES } from "@/lib/mapConfig";
 
 // Fix for default Leaflet marker icon in NextJS
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -80,21 +81,31 @@ export default function LocationPicker({ position, setPosition }: { position: [n
             >
                 <LayersControl position="topright">
                     <BaseLayer checked name="Tactical Dark">
-                        <TileLayer
-                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                            attribution="&copy; OpenStreetMap & CARTO"
-                        />
+                        <LayerGroup>
+                            <TileLayer
+                                url={MAP_TILES.darkBase}
+                                maxZoom={18}
+                                attribution={MAP_TILES.darkAttribution}
+                            />
+                            {MAP_TILES.darkLabels && (
+                                <TileLayer
+                                    url={MAP_TILES.darkLabels}
+                                    maxZoom={18}
+                                    pane="overlayPane"
+                                />
+                            )}
+                        </LayerGroup>
                     </BaseLayer>
                     <BaseLayer name="Satellite Recon">
                         <TileLayer
-                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                            attribution="Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+                            url={MAP_TILES.satellite}
+                            attribution={MAP_TILES.satelliteAttribution}
                         />
                     </BaseLayer>
                     <BaseLayer name="Street Vector">
                         <TileLayer
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            attribution="&copy; OpenStreetMap contributors"
+                            url={MAP_TILES.street}
+                            attribution={MAP_TILES.streetAttribution}
                         />
                     </BaseLayer>
                 </LayersControl>

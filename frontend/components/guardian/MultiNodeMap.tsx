@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTranslation } from "react-i18next";
+import { MAP_TILES } from "@/lib/mapConfig";
 
 // Fix leaflet icon issue in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -88,8 +89,17 @@ export default function MultiNodeMap({ nodes, currentNodeId, targetNodeId, isTra
                 attributionControl={false}
             >
                 <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    url={MAP_TILES.darkBase}
+                    maxZoom={18}
+                    attribution={MAP_TILES.darkAttribution}
                 />
+                {MAP_TILES.darkLabels && (
+                    <TileLayer
+                        url={MAP_TILES.darkLabels}
+                        maxZoom={18}
+                        pane="overlayPane"
+                    />
+                )}
                 
                 <Polyline 
                     positions={positions} 
