@@ -76,7 +76,7 @@ router.include_router(
     prediction_monitoring.router,
     tags=["Prediction Monitoring"]
 )
-router.include_router(events_router)
+router.include_router(events_router, prefix="/events", tags=["Intelligence Events"])
 router.include_router(prediction_router)
 router.include_router(prediction_graph_router)
 router.include_router(camera_intelligence_router)

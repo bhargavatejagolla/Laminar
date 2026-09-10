@@ -46,6 +46,7 @@ backend/storage/sos_uploads/
 backend/storage/*.faiss
 backend/media/
 backend/screenshots/
+backend/data/uploads/
 
 # Media and large archives
 *.zip

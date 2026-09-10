@@ -15,6 +15,8 @@ from app.vision.traffic_worker import draw_vehicle_overlays, draw_hud
 from app.core.global_state import GLOBAL_STATE
 from app.core.logging import get_logger
 from app.services.notification_service import notification_service
+from app.services.event_bus import event_bus
+from app.models.intelligence_event import LaminarIntelligenceEvent, LocationPayload
 
 logger = get_logger(__name__)
 
@@ -208,44 +210,65 @@ async def async_process_upload_job(job_id: str, file_path: str):
                         }
                         GLOBAL_STATE.push_event("incident", "", inc_event)
 
-                        # Debounced Notification Dispatch via LAMINAR existing notification system
+                        # Debounced Notification & Event Dispatch via LAMINAR Unified Event Bus
                         if inc_id not in notified_incident_ids and inc.get("status") == "CONFIRMED":
                             notified_incident_ids.add(inc_id)
+                            ev = LaminarIntelligenceEvent(
+                                event_id=inc_id,
+                                event_type="collision_verified",
+                                domain="incident",
+                                venue_id=job_id,
+                                venue_name="Road Media Stream",
+                                camera_id=f"job_{job_id}",
+                                camera_name=f"Video Analysis Job {job_id[:8]}",
+                                source_type="upload",
+                                location=LocationPayload(location_source="VIDEO_METADATA"),
+                                severity=inc.get("priority", "CRITICAL").lower(),
+                                confidence=float(inc.get("confidence", 0.9)),
+                                state="verified",
+                                title="Collision Anomaly Verified",
+                                description=inc.get("description", "Roadway collision detected on video."),
+                                evidence={
+                                    "track_ids": inc.get("track_ids", []),
+                                    "timestamp_seconds": inc.get("timestamp_seconds", 0),
+                                    "bbox": inc.get("bbox", []),
+                                    "signals": inc.get("evidence", {}).get("signals", {})
+                                },
+                                explanation={
+                                    "reason": "4+ consecutive frames of trajectory convergence and deceleration verified.",
+                                    "confidence": inc.get("confidence", 0.9)
+                                }
+                            )
                             try:
-                                await notification_service.push_notification(
-                                    type=inc.get("type", "collision").upper(),
-                                    priority=inc.get("priority", "CRITICAL"),
-                                    description=inc.get("description", "Roadway hazard detected on video."),
-                                    venue_id=job_id,
-                                    venue_name="Road Media Stream",
-                                    camera_id=f"job_{job_id}",
-                                    domain="incident",
-                                    metadata={
-                                        "incident_id": inc_id,
-                                        "confidence": inc.get("confidence", 0.9),
-                                        "track_ids": inc.get("track_ids", []),
-                                        "timestamp_seconds": inc.get("timestamp_seconds", 0)
-                                    }
-                                )
+                                await event_bus.emit_event(ev, cooldown_seconds=10.0)
                             except Exception as notif_err:
-                                logger.warning(f"Could not dispatch notification for {inc_id}: {notif_err}")
+                                logger.warning(f"Could not emit event for {inc_id}: {notif_err}")
 
-                # Debounced high density notification for critical volume
+                # Debounced high density event for critical volume
                 if v_count >= 16 and not density_alert_sent:
                     density_alert_sent = True
+                    dens_ev = LaminarIntelligenceEvent(
+                        event_id=f"DENS-{job_id[:8]}-{frame_idx}",
+                        event_type="traffic_density_critical",
+                        domain="traffic",
+                        venue_id=job_id,
+                        venue_name="Road Media Stream",
+                        camera_id=f"job_{job_id}",
+                        camera_name=f"Video Analysis Job {job_id[:8]}",
+                        source_type="upload",
+                        location=LocationPayload(location_source="VIDEO_METADATA"),
+                        severity="high",
+                        confidence=0.95,
+                        state="active",
+                        title="Corridor Density Critical",
+                        description=f"Corridor congestion critical: {v_count} concurrent vehicles detected.",
+                        evidence={"vehicle_count": v_count, "timestamp_seconds": round(frame_idx / fps, 2)},
+                        explanation={"observed_count": v_count, "threshold": 16, "rule": f"Observed {v_count} vehicles >= 16 threshold"}
+                    )
                     try:
-                        await notification_service.push_notification(
-                            type="HIGH_DENSITY",
-                            priority="HIGH",
-                            description=f"Corridor congestion critical: {v_count} concurrent vehicles detected.",
-                            venue_id=job_id,
-                            venue_name="Road Media Stream",
-                            camera_id=f"job_{job_id}",
-                            domain="traffic",
-                            metadata={"vehicle_count": v_count, "timestamp_seconds": round(frame_idx / fps, 2)}
-                        )
+                        await event_bus.emit_event(dens_ev, cooldown_seconds=60.0)
                     except Exception as notif_err:
-                        logger.warning(f"Could not dispatch density notification: {notif_err}")
+                        logger.warning(f"Could not emit density event: {notif_err}")
 
                 active_draw_objs = tracked_objs
             else:

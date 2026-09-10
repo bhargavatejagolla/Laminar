@@ -261,6 +261,7 @@ function RoadIntelligenceContent() {
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<"traffic" | "parking" | null>(null);
   const [selectedVenueId, setSelectedVenueId] = useState<string>("");
+  const [cameraDomainFilter, setCameraDomainFilter] = useState<"all" | "traffic" | "parking">("all");
 
   // Forensic Upload Video & Image State
   const [sourceMode, setSourceMode] = useState<"live" | "upload">("live");
@@ -473,10 +474,14 @@ function RoadIntelligenceContent() {
   // Active venue metadata
   const currentVenue = venues.find(v => v.id === selectedVenueId);
 
-  // Cameras matching selected venue or all road cameras
-  const displayCameras = selectedVenueId
+  // Cameras matching selected venue or all road cameras (with strict domain filtering)
+  const venueCameras = selectedVenueId
     ? cameras.filter(c => c.venue_id === selectedVenueId)
     : cameras;
+
+  const displayCameras = cameraDomainFilter === "all"
+    ? venueCameras
+    : venueCameras.filter(c => (c.camera_type || "").toLowerCase() === cameraDomainFilter);
 
   // Parking Configuration Awareness (True if parking cameras exist or zones mapped)
   const hasParkingCameras = displayCameras.some(c => (c.camera_type || "").toLowerCase() === "parking");
@@ -588,6 +593,16 @@ function RoadIntelligenceContent() {
               </Link>
             )}
           </div>
+
+          {/* Central GIS Command Center Shortcut */}
+          <Link
+            href={`/road-intelligence/command${selectedVenueId ? `?venue_id=${selectedVenueId}` : ""}`}
+            className="flex items-center gap-2 px-3.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 rounded-xl text-xs font-mono font-black uppercase tracking-wider text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.2)] transition-all"
+            title="Open Central GIS Command Center"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-indigo-400" />
+            Command Center
+          </Link>
 
           {/* Hazard Status Badge */}
           {sourceMode === "upload" && jobStatus === "FAILED" ? (
@@ -1052,7 +1067,35 @@ function RoadIntelligenceContent() {
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-mono text-slate-500">{displayCameras.length} Node Feeds Displayed</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center p-0.5 bg-black/60 border border-white/10 rounded-lg text-[10px] font-mono">
+                    <button
+                      onClick={() => setCameraDomainFilter("all")}
+                      className={`px-2.5 py-1 rounded-md font-bold uppercase transition-all ${
+                        cameraDomainFilter === "all" ? "bg-cyan-500 text-black" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      All ({venueCameras.length})
+                    </button>
+                    <button
+                      onClick={() => setCameraDomainFilter("traffic")}
+                      className={`px-2.5 py-1 rounded-md font-bold uppercase transition-all ${
+                        cameraDomainFilter === "traffic" ? "bg-rose-500 text-white" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      🚦 Traffic ({venueCameras.filter(c => (c.camera_type || "").toLowerCase() === "traffic").length})
+                    </button>
+                    <button
+                      onClick={() => setCameraDomainFilter("parking")}
+                      className={`px-2.5 py-1 rounded-md font-bold uppercase transition-all ${
+                        cameraDomainFilter === "parking" ? "bg-emerald-500 text-black" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      🅿 Parking ({venueCameras.filter(c => (c.camera_type || "").toLowerCase() === "parking").length})
+                    </button>
+                  </div>
+                  <span className="text-xs font-mono text-slate-500">{displayCameras.length} Node Feeds Displayed</span>
+                </div>
               </div>
 
               {displayCameras.length === 0 ? (

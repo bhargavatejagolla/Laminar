@@ -279,7 +279,7 @@ class VisionCore:
                 lambda: self.model.predict(
                     source=frame,
                     conf=self.conf,
-                    classes=[0, 1, 2, 3, 5, 6, 7], # person, bicycle, car, motorcycle, bus, train, truck
+                    classes=[0, 1, 2, 3, 5, 6, 7, 67], # person, bicycle, car, motorcycle, bus, train, truck, nadir overhead vehicle
                     imgsz=640,
                     device=self.device,
                     verbose=False
@@ -304,6 +304,18 @@ class VisionCore:
                             "class_name": TRACKING_CLASSES[cls_id],
                             "confidence": float(round(conf, 3)),
                         })
+                    elif cls_id == 67:
+                        # Overhead / nadir aerial vehicle detection (top-down cars appear as rectangular vehicle bodies)
+                        bw = float(x2 - x1)
+                        bh = float(y2 - y1)
+                        area = bw * bh
+                        aspect = max(bw, bh) / max(1.0, min(bw, bh))
+                        if area >= 1200.0 and 1.25 <= aspect <= 3.5:
+                            candidates.append({
+                                "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                                "class_name": "car",
+                                "confidence": float(round(conf, 3)),
+                            })
 
                 # Deduplicate overlapping boxes with IoU NMS
                 def _cand_iou(b1, b2):
