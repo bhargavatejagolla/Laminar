@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import asyncio
 from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 from sqlalchemy.future import select
 import psutil
 
@@ -35,7 +36,7 @@ def process_upload_job(job_id: str, file_path: str, job_timeout: int = 3600):
 
     asyncio.run(async_process_upload_job(job_id, file_path))
 
-async def async_process_upload_job(job_id: str, file_path: str):
+async def async_process_upload_job(job_id: str, file_path: str, venue_id: Optional[str] = None):
     """
     Async logic for analyzing uploaded video using VisionCore.
     Generates annotated video with bounding boxes, speeds, and incident highlights,
@@ -213,18 +214,39 @@ async def async_process_upload_job(job_id: str, file_path: str):
                         # Debounced Notification & Event Dispatch via LAMINAR Unified Event Bus
                         if inc_id not in notified_incident_ids and inc.get("status") == "CONFIRMED":
                             notified_incident_ids.add(inc_id)
+
+                            v_lat, v_lon = None, None
+                            v_name = "Road Media Stream"
+                            target_venue_id = venue_id or job_id
+                            if venue_id:
+                                try:
+                                    from app.models.venue import Venue as VenueModel
+                                    from uuid import UUID
+                                    async with async_session_factory() as session:
+                                        v_obj = await session.get(VenueModel, UUID(venue_id))
+                                        if v_obj:
+                                            v_name = v_obj.name
+                                            v_lat = float(v_obj.latitude) if v_obj.latitude else None
+                                            v_lon = float(v_obj.longitude) if v_obj.longitude else None
+                                except Exception as v_err:
+                                    logger.warning(f"Could not resolve venue {venue_id}: {v_err}")
+
                             ev = LaminarIntelligenceEvent(
                                 event_id=inc_id,
                                 event_type="collision_verified",
                                 domain="incident",
-                                venue_id=job_id,
-                                venue_name="Road Media Stream",
+                                venue_id=target_venue_id,
+                                venue_name=v_name,
                                 camera_id=f"job_{job_id}",
                                 camera_name=f"Video Analysis Job {job_id[:8]}",
                                 source_type="upload",
-                                location=LocationPayload(location_source="VIDEO_METADATA"),
+                                location=LocationPayload(
+                                    latitude=v_lat,
+                                    longitude=v_lon,
+                                    location_source="VENUE_CONFIG" if v_lat else "VIDEO_METADATA"
+                                ),
                                 severity=inc.get("priority", "CRITICAL").lower(),
-                                confidence=float(inc.get("confidence", 0.9)),
+                                confidence=float(inc.get("confidence", 0.85)),
                                 state="verified",
                                 title="Collision Anomaly Verified",
                                 description=inc.get("description", "Roadway collision detected on video."),
@@ -232,11 +254,12 @@ async def async_process_upload_job(job_id: str, file_path: str):
                                     "track_ids": inc.get("track_ids", []),
                                     "timestamp_seconds": inc.get("timestamp_seconds", 0),
                                     "bbox": inc.get("bbox", []),
-                                    "signals": inc.get("evidence", {}).get("signals", {})
+                                    "signals": inc.get("evidence", {}).get("signals", {}),
+                                    "post_impact": inc.get("evidence", {}).get("post_impact", {})
                                 },
                                 explanation={
-                                    "reason": "4+ consecutive frames of trajectory convergence and deceleration verified.",
-                                    "confidence": inc.get("confidence", 0.9)
+                                    "reason": "Severe physical impact signature verified with post-impact evidence continuity.",
+                                    "confidence": inc.get("confidence", 0.85)
                                 }
                             )
                             try:

@@ -394,9 +394,10 @@ function RoadIntelligenceContent() {
     formData.append("file", file);
 
     try {
+      const venueParam = selectedVenueId ? `?venue_id=${encodeURIComponent(selectedVenueId)}` : "";
       if (file.type.startsWith("video/")) {
         setUploadedImageUrl(null);
-        const res = await api.post("/jobs/analyze-video", formData, {
+        const res = await api.post(`/jobs/analyze-video${venueParam}`, formData, {
           headers: { "Content-Type": "multipart/form-data" }
         });
         const jobId = res.data?.job_id;
@@ -406,7 +407,7 @@ function RoadIntelligenceContent() {
           toast.success("Video queued. Neural tracking initiated.", { id: toastId });
         }
       } else {
-        const res = await api.post("/traffic/upload-image", formData, {
+        const res = await api.post(`/traffic/upload-image${venueParam}`, formData, {
           headers: { "Content-Type": "multipart/form-data" }
         });
         setActiveJobId(null);
