@@ -55,6 +55,7 @@ backend/data/*.pdf
 *.zip
 *.mp4
 *.webm
+!backend/data/scenarios/*.mp4
 
 # Test / debug scripts
 backend/test_*.py

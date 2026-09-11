@@ -26,7 +26,13 @@ import {
     Check,
     Sliders,
     Layers,
-    Lock
+    Lock,
+    RotateCcw,
+    FlaskConical,
+    Upload,
+    Radio,
+    Video,
+    RefreshCw
 } from "lucide-react";
 
 interface CameraNode {
@@ -83,6 +89,29 @@ interface DecoupledHealth {
     provenance?: string;
 }
 
+interface ScenarioItem {
+    id: string;
+    title: string;
+    badge: string;
+    category: string;
+    risk_level: string;
+    filename: string;
+    duration_seconds: number;
+    fps: number;
+    resolution: string;
+    description: string;
+    expected_outcome: string;
+    capabilities: {
+        person_detection: boolean;
+        pose_estimation: boolean;
+        tracking: boolean;
+        temporal_behavior: boolean;
+        audio: string;
+        location_provenance: string;
+    };
+    file_available: boolean;
+}
+
 export default function SmartKineticPage() {
     const { t } = useTranslation();
     const router = useRouter();
@@ -95,6 +124,21 @@ export default function SmartKineticPage() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [streamKey, setStreamKey] = useState<number>(Date.now());
     const [streamError, setStreamError] = useState(false);
+
+    // Source Lab & Scenario Management
+    const [scenarios, setScenarios] = useState<ScenarioItem[]>([]);
+    const [activeScenarioId, setActiveScenarioId] = useState<string>("road_rage");
+    const [activeSource, setActiveSource] = useState<any>(null);
+    const [showSourceLabModal, setShowSourceLabModal] = useState(false);
+    const [sourceLabTab, setSourceLabTab] = useState<"demo" | "live" | "upload">("demo");
+    const [isUploading, setIsUploading] = useState(false);
+    const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
+    const [confirmAction, setConfirmAction] = useState<{
+        type: "DISPATCH" | "BROADCAST";
+        title: string;
+        description: string;
+    } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Unified Canonical Telemetry
     const [telemetry, setTelemetry] = useState<GroundedTelemetry>({
@@ -147,6 +191,7 @@ export default function SmartKineticPage() {
     useEffect(() => {
         setMounted(true);
         fetchNodes();
+        fetchScenarios();
 
         // 1 Hz telemetry polling
         const interval = setInterval(() => {
@@ -155,6 +200,18 @@ export default function SmartKineticPage() {
 
         return () => clearInterval(interval);
     }, [selectedCameraId]);
+
+    const fetchScenarios = async () => {
+        try {
+            const res = await fetch("/api/v1/kinetic/scenarios");
+            if (res.ok) {
+                const data = await res.json();
+                setScenarios(data);
+            }
+        } catch (e) {
+            console.error("Failed to load scenarios:", e);
+        }
+    };
 
     // ── SSE Event Stream ───────────────────────────────────────────────────────
     useEffect(() => {
@@ -190,7 +247,6 @@ export default function SmartKineticPage() {
                         setSelectedCameraId(data[0].camera_id);
                     }
                 } else {
-                    // Fallback demo node seed
                     setNodes([
                         {
                             camera_id: "KINETIC_DEMO_NODE_01",
@@ -213,7 +269,6 @@ export default function SmartKineticPage() {
             const res = await fetch("/api/v1/kinetic/insights");
             if (res.ok) {
                 const data = await res.json();
-                // Single canonical source of truth for subjects count
                 const count = typeof data.active_subjects === "number" ? data.active_subjects : 0;
                 setActiveSubjects(count);
 
@@ -226,8 +281,14 @@ export default function SmartKineticPage() {
 
                 if (data.node_health) {
                     setNodeHealth(data.node_health);
-                    if (data.node_health.provenance === "DEMO_VIDEO") {
-                        setIsDemoRunning(true);
+                    const isDemo = data.node_health.provenance === "DEMO_SCENARIO" || data.node_health.provenance === "CUSTOM_UPLOAD" || data.node_health.provenance === "DEMO_VIDEO";
+                    setIsDemoRunning(isDemo);
+                }
+
+                if (data.active_source) {
+                    setActiveSource(data.active_source);
+                    if (data.active_source.scenario_id) {
+                        setActiveScenarioId(data.active_source.scenario_id);
                     }
                 }
             }
@@ -236,81 +297,162 @@ export default function SmartKineticPage() {
         }
     };
 
-    // ── 1-Click Demonstration Trigger ──────────────────────────────────────────
-    const handleToggleDemo = async () => {
-        if (!isDemoRunning) {
-            try {
-                const res = await fetch(`/api/v1/kinetic/demo/start?camera_id=${selectedCameraId}`, {
-                    method: "POST"
-                });
-                if (res.ok) {
-                    setIsDemoRunning(true);
-                    setStreamError(false);
-                    setStreamKey(Date.now());
-                    setActionMessage("Incident Demonstration launched. Ingesting footage through perception engine.");
-                    setTimeout(() => setActionMessage(null), 5000);
-                    fetchInsights();
-                }
-            } catch (e) {
-                console.error("Failed to start demo:", e);
-            }
-        } else {
-            try {
-                const res = await fetch(`/api/v1/kinetic/demo/stop?camera_id=${selectedCameraId}`, {
-                    method: "POST"
-                });
-                if (res.ok) {
-                    setIsDemoRunning(false);
-                    setStreamKey(Date.now());
-                    setActionMessage("Demonstration stopped. Reverted to STANDBY mode.");
-                    setTimeout(() => setActionMessage(null), 4000);
-                    fetchInsights();
-                }
-            } catch (e) {
-                console.error("Failed to stop demo:", e);
-            }
-        }
-    };
-
-    // ── Operator Response Actions ──────────────────────────────────────────────
-    const handleDispatchPatrol = async () => {
-        if (telemetry.scene_state === "NORMAL" || isStandby) return;
+    // ── Kinetic Source Lab: Scenario Ingestion ────────────────────────────────
+    const handleSelectScenario = async (scId: string) => {
         try {
-            const res = await fetch("/api/v1/kinetic/actions/dispatch", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    camera_id: selectedCameraId,
-                    venue_id: "TACTICAL-SECTOR-1",
-                    reason: `Verified ${telemetry.scene_state} state with persistence ${telemetry.persistence_seconds.toFixed(1)}s`
-                })
+            const res = await fetch(`/api/v1/kinetic/demo/start?scenario_id=${scId}&camera_id=${selectedCameraId}`, {
+                method: "POST"
             });
             if (res.ok) {
-                setActionMessage("SECURITY PATROL DISPATCHED. Tactical mesh units notified with live coordinates.");
+                setActiveScenarioId(scId);
+                setIsDemoRunning(true);
+                setStreamError(false);
+                setStreamKey(Date.now());
+                setShowSourceLabModal(false);
+                const sc = scenarios.find((s) => s.id === scId);
+                setActionMessage(`SCENARIO INGESTED: ${sc?.title || scId}. Ingesting video frames through real perception & temporal engine.`);
                 setTimeout(() => setActionMessage(null), 6000);
+                fetchInsights();
             }
         } catch (e) {
-            console.error("Dispatch failed:", e);
+            console.error("Failed to start scenario:", e);
         }
     };
 
-    const handleBroadcastPA = async () => {
-        if (telemetry.scene_state === "NORMAL" || isStandby) return;
+    const handleReplayScenario = async () => {
         try {
-            const res = await fetch("/api/v1/kinetic/actions/broadcast", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    camera_id: selectedCameraId,
-                    message: "Security warning: Autonomous camera monitoring has engaged. Patrol dispatched."
-                })
+            const res = await fetch(`/api/v1/kinetic/demo/replay?camera_id=${selectedCameraId}`, {
+                method: "POST"
             });
             if (res.ok) {
-                setActionMessage("PA ANNOUNCEMENT BROADCASTED. High-priority acoustic deterrent active.");
+                setStreamKey(Date.now());
+                setActionMessage("SCENARIO REPLAYED: Video rewound to frame 0. Temporal tracks, hysteresis, and candidate state reset.");
+                setTimeout(() => setActionMessage(null), 5000);
+                fetchInsights();
+            }
+        } catch (e) {
+            console.error("Failed to replay scenario:", e);
+        }
+    };
+
+    const handleStopSource = async () => {
+        try {
+            const res = await fetch(`/api/v1/kinetic/demo/stop?camera_id=${selectedCameraId}`, {
+                method: "POST"
+            });
+            if (res.ok) {
+                setIsDemoRunning(false);
+                setStreamKey(Date.now());
+                setActionMessage("SOURCE HALTED: System returned to clean STANDBY mode.");
+                setTimeout(() => setActionMessage(null), 4000);
+                fetchInsights();
+            }
+        } catch (e) {
+            console.error("Failed to stop source:", e);
+        }
+    };
+
+    const handleUploadVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await fetch(`/api/v1/kinetic/upload?camera_id=${selectedCameraId}`, {
+                method: "POST",
+                body: formData
+            });
+            if (res.ok) {
+                setIsDemoRunning(true);
+                setStreamKey(Date.now());
+                setShowSourceLabModal(false);
+                setSelectedUploadFile(file);
+                setActionMessage(`UPLOAD INGESTED: ${file.name}. Running downstream perception and temporal inference.`);
+                setTimeout(() => setActionMessage(null), 6000);
+                fetchInsights();
+            } else {
+                const err = await res.json();
+                setActionMessage(`UPLOAD FAILED: ${err.detail || "Server rejected file."}`);
                 setTimeout(() => setActionMessage(null), 5000);
             }
         } catch (e) {
-            console.error("PA broadcast failed:", e);
+            console.error("Upload failed:", e);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleSelectLiveCamera = async (camId: string) => {
+        if (isDemoRunning) {
+            await fetch(`/api/v1/kinetic/demo/stop?camera_id=${selectedCameraId}`, { method: "POST" });
+        }
+        setSelectedCameraId(camId);
+        setIsDemoRunning(false);
+        setStreamKey(Date.now());
+        setShowSourceLabModal(false);
+        setActionMessage(`LIVE CAMERA CONNECTED: Switched to camera feed ${camId}.`);
+        setTimeout(() => setActionMessage(null), 4000);
+        fetchInsights();
+    };
+
+    // ── Operator Response Confirmation Gate ────────────────────────────────────
+    const handleTriggerAction = (type: "DISPATCH" | "BROADCAST") => {
+        if (telemetry.scene_state === "NORMAL" || isStandby) return;
+
+        if (type === "DISPATCH") {
+            setConfirmAction({
+                type: "DISPATCH",
+                title: "CONFIRM TACTICAL PATROL DISPATCH",
+                description: `Autonomous kinetic verification detected ${telemetry.scene_state} with ${telemetry.persistence_seconds.toFixed(1)}s continuous persistence. Dispatch tactical mesh units to verify coordinates.`
+            });
+        } else {
+            setConfirmAction({
+                type: "BROADCAST",
+                title: "CONFIRM PUBLIC ADDRESS WARNING",
+                description: `Broadcast high-priority audible warning in camera sector ${selectedCameraId}: 'Security monitoring engaged. Response units dispatched.'`
+            });
+        }
+    };
+
+    const handleExecuteConfirmedAction = async () => {
+        if (!confirmAction) return;
+        const act = confirmAction;
+        setConfirmAction(null);
+
+        try {
+            if (act.type === "DISPATCH") {
+                const res = await fetch("/api/v1/kinetic/actions/dispatch", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        camera_id: selectedCameraId,
+                        venue_id: "TACTICAL-SECTOR-1",
+                        reason: `Verified ${telemetry.scene_state} with persistence ${telemetry.persistence_seconds.toFixed(1)}s`
+                    })
+                });
+                if (res.ok) {
+                    setActionMessage("TACTICAL PATROL DISPATCHED. Incident coordinates routed to field response mesh.");
+                    setTimeout(() => setActionMessage(null), 6000);
+                }
+            } else {
+                const res = await fetch("/api/v1/kinetic/actions/broadcast", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        camera_id: selectedCameraId,
+                        message: "Security warning: Autonomous camera monitoring has engaged. Patrol dispatched."
+                    })
+                });
+                if (res.ok) {
+                    setActionMessage("PA ANNOUNCEMENT BROADCASTED. High-priority acoustic deterrent active.");
+                    setTimeout(() => setActionMessage(null), 5000);
+                }
+            }
+        } catch (e) {
+            console.error("Action execution failed:", e);
         }
     };
 
@@ -393,13 +535,25 @@ export default function SmartKineticPage() {
                                     LAMINAR KINETIC INTELLIGENCE
                                 </h1>
                                 <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-widest border ${
-                                    provenanceLabel === "DEMO SOURCE"
-                                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                                        : provenanceLabel === "LIVE RTSP"
+                                    isDemoRunning && activeScenarioId === "normal_traffic"
                                         ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                                        : isDemoRunning
+                                        ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                                        : nodeHealth.provenance === "LIVE_RTSP"
+                                        ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                                        : nodeHealth.provenance === "CUSTOM_UPLOAD"
+                                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                                         : "bg-slate-800 text-slate-400 border-slate-700"
                                 }`}>
-                                    {provenanceLabel}
+                                    {isDemoRunning && activeSource?.title
+                                        ? `DEMO: ${activeSource.title.toUpperCase()}`
+                                        : isDemoRunning
+                                        ? "DEMO SCENARIO ACTIVE"
+                                        : nodeHealth.provenance === "CUSTOM_UPLOAD"
+                                        ? "CUSTOM UPLOAD"
+                                        : nodeHealth.provenance === "LIVE_RTSP"
+                                        ? "LIVE RTSP"
+                                        : "STANDBY"}
                                 </span>
                             </div>
                             <p className="text-xs text-slate-400 font-mono mt-0.5">
@@ -408,13 +562,47 @@ export default function SmartKineticPage() {
                         </div>
                     </div>
 
-                    {/* Camera Selector & 1-Click Demo Launcher */}
-                    <div className="flex flex-wrap items-center gap-3">
+                    {/* Source Lab Controller Buttons */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        {/* Open Source Lab Modal Button */}
+                        <button
+                            onClick={() => setShowSourceLabModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white transition-all text-xs font-mono font-bold tracking-wider shadow-lg shadow-indigo-900/30"
+                        >
+                            <FlaskConical className="w-4 h-4 text-purple-200" />
+                            <span>KINETIC SOURCE LAB</span>
+                        </button>
+
+                        {/* Replay Button (When scenario or upload active) */}
+                        {isDemoRunning && (
+                            <button
+                                onClick={handleReplayScenario}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/10 transition-all text-xs font-mono tracking-wider"
+                                title="Replay scenario from frame 0 with clean temporal reset"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                                <span className="hidden sm:inline">REPLAY</span>
+                            </button>
+                        )}
+
+                        {/* Stop / Standby Button */}
+                        {isDemoRunning && (
+                            <button
+                                onClick={handleStopSource}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all text-xs font-mono font-bold tracking-wider"
+                                title="Halt playback and reset to STANDBY"
+                            >
+                                <Square className="w-3.5 h-3.5 fill-rose-400" />
+                                <span className="hidden sm:inline">STANDBY</span>
+                            </button>
+                        )}
+
+                        {/* Camera Selector */}
                         <div className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10">
                             <Camera className="w-4 h-4 text-indigo-400 shrink-0" />
                             <select
                                 value={selectedCameraId}
-                                onChange={(e) => setSelectedCameraId(e.target.value)}
+                                onChange={(e) => handleSelectLiveCamera(e.target.value)}
                                 className="bg-transparent text-xs font-mono text-slate-200 outline-none cursor-pointer pr-2"
                             >
                                 {nodes.map((n) => (
@@ -425,19 +613,6 @@ export default function SmartKineticPage() {
                             </select>
                         </div>
 
-                        {/* 1-Click Demo Trigger */}
-                        <button
-                            onClick={handleToggleDemo}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold tracking-wider transition-all shadow-lg ${
-                                isDemoRunning
-                                    ? "bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white shadow-rose-900/30"
-                                    : "bg-gradient-to-r from-indigo-600 via-purple-600 to-rose-600 hover:from-indigo-500 hover:to-rose-500 text-white shadow-indigo-900/30"
-                            }`}
-                        >
-                            {isDemoRunning ? <Square className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
-                            {isDemoRunning ? "STOP DEMONSTRATION" : "LAUNCH INCIDENT DEMO"}
-                        </button>
-
                         <button
                             onClick={() => setShowConfigModal(true)}
                             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition-colors"
@@ -446,6 +621,47 @@ export default function SmartKineticPage() {
                             <Sliders className="w-4 h-4" />
                         </button>
                     </div>
+                </div>
+
+                {/* ── Dynamic Scene Context & Ground Truth Transparency Banner ── */}
+                <div className={`p-3.5 rounded-2xl border backdrop-blur-md flex items-center justify-between text-xs font-mono transition-all ${
+                    isDemoRunning && activeScenarioId === "normal_traffic"
+                        ? "bg-emerald-950/25 border-emerald-500/30 text-emerald-200"
+                        : isDemoRunning && (activeScenarioId === "road_rage" || activeScenarioId === "sudden_collapse")
+                        ? "bg-rose-950/25 border-rose-500/30 text-rose-200"
+                        : nodeHealth.provenance === "CUSTOM_UPLOAD"
+                        ? "bg-amber-950/25 border-amber-500/30 text-amber-200"
+                        : "bg-indigo-950/20 border-indigo-500/20 text-indigo-200"
+                }`}>
+                    <div className="flex items-center gap-2.5">
+                        <Info className="w-4 h-4 shrink-0" />
+                        <span>
+                            {isDemoRunning && activeScenarioId === "normal_traffic" ? (
+                                <span><strong>NEGATIVE CONTROL (BASELINE):</strong> Ingesting Normal Arterial Traffic footage through real neural pose estimator. Zero anomalous movements detected; pipeline holds firmly in <strong>NORMAL</strong> state without false alarms.</span>
+                            ) : isDemoRunning && activeScenarioId === "road_rage" ? (
+                                <span><strong>ACTIVE SCENARIO:</strong> Physical Aggression Pattern. Ingesting footage with real pose estimation and ByteTrack. Observe temporal progression: <strong>NORMAL &rarr; CANDIDATE &rarr; VERIFIED</strong> upon 3.0s continuous persistence.</span>
+                            ) : isDemoRunning && activeScenarioId === "sudden_collapse" ? (
+                                <span><strong>ACTIVE SCENARIO:</strong> Sudden Collapse / Fall. Aspect ratio collapse and downward displacement trigger accelerated 1.8s medical distress verification.</span>
+                            ) : isDemoRunning && activeScenarioId === "perimeter_intrusion" ? (
+                                <span><strong>ACTIVE SCENARIO:</strong> Restricted Perimeter Intrusion. Geometric spatial ray-casting against virtual security polygon triggers breach candidate.</span>
+                            ) : nodeHealth.provenance === "CUSTOM_UPLOAD" ? (
+                                <span><strong>CUSTOM TEST INGESTION:</strong> Ingesting user-provided video file through the exact same downstream perception and temporal hysteresis engine.</span>
+                            ) : isStreaming ? (
+                                <span><strong>LIVE CAMERA STREAM:</strong> Ingesting live feed from <strong>{selectedCameraId}</strong>. Frame quality gating and temporal reasoning active.</span>
+                            ) : (
+                                <span><strong>ENGINE STANDBY:</strong> No active stream. Launch a demonstration scenario, connect an RTSP camera, or upload video in the <strong>Kinetic Source Lab</strong>.</span>
+                            )}
+                        </span>
+                    </div>
+                    {isDemoRunning && (
+                        <button
+                            onClick={handleReplayScenario}
+                            className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-mono text-white tracking-wider shrink-0 ml-3 border border-white/10"
+                        >
+                            <RotateCcw className="w-3.5 h-3.5 text-cyan-300" />
+                            REPLAY FROM ONSET
+                        </button>
+                    )}
                 </div>
 
                 {/* Operator Toast Notification */}
@@ -591,11 +807,11 @@ export default function SmartKineticPage() {
                                     </p>
 
                                     <button
-                                        onClick={handleToggleDemo}
+                                        onClick={() => setShowSourceLabModal(true)}
                                         className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-600 via-purple-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white text-xs font-mono font-bold uppercase tracking-wider shadow-xl shadow-rose-950/40 transition-all transform hover:scale-[1.02]"
                                     >
-                                        <Play className="w-4 h-4 fill-white" />
-                                        ENGAGE INCIDENT DEMONSTRATION
+                                        <FlaskConical className="w-4 h-4 text-white" />
+                                        OPEN KINETIC SOURCE LAB
                                     </button>
                                 </div>
                             )}
@@ -843,14 +1059,14 @@ export default function SmartKineticPage() {
                                 </div>
                             </div>
 
-                            {/* Operator Action Controls (State-Aware) */}
+                            {/* Operator Action Controls (State-Aware with Confirmation Gate) */}
                             <div className="space-y-2.5">
                                 <p className="text-[9px] font-mono uppercase tracking-widest text-slate-400">
                                     TACTICAL RESPONSE ACTIONS
                                 </p>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button
-                                        onClick={handleDispatchPatrol}
+                                        onClick={() => handleTriggerAction("DISPATCH")}
                                         disabled={!hasActiveIncident}
                                         className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition-all ${
                                             hasActiveIncident
@@ -864,7 +1080,7 @@ export default function SmartKineticPage() {
                                     </button>
 
                                     <button
-                                        onClick={handleBroadcastPA}
+                                        onClick={() => handleTriggerAction("BROADCAST")}
                                         disabled={!hasActiveIncident}
                                         className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider transition-all ${
                                             hasActiveIncident
@@ -1130,6 +1346,290 @@ export default function SmartKineticPage() {
                                     className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-mono font-bold text-white"
                                 >
                                     APPLY SETTINGS
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ── MODAL: Kinetic Source Lab ───────────────────────────────────── */}
+            <AnimatePresence>
+                {showSourceLabModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-[#0b0f19] border border-white/15 rounded-3xl p-6 max-w-4xl w-full shadow-2xl space-y-5 my-8"
+                        >
+                            {/* Header */}
+                            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-2xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
+                                        <FlaskConical className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-mono font-black text-base uppercase tracking-wider text-white flex items-center gap-2">
+                                            KINETIC SOURCE LAB
+                                        </h3>
+                                        <p className="text-xs font-mono text-slate-400">
+                                            Scenario Ingestion • Live RTSP Camera Switching • Custom Video Ingestion
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowSourceLabModal(false)}
+                                    className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Tabs */}
+                            <div className="flex border-b border-white/10 gap-2 text-xs font-mono">
+                                <button
+                                    onClick={() => setSourceLabTab("demo")}
+                                    className={`flex items-center gap-2 px-4 py-2.5 border-b-2 font-bold transition-all ${
+                                        sourceLabTab === "demo"
+                                            ? "border-purple-500 text-purple-300 bg-purple-500/10 rounded-t-xl"
+                                            : "border-transparent text-slate-400 hover:text-white"
+                                    }`}
+                                >
+                                    <FlaskConical className="w-4 h-4" />
+                                    DEMO SCENARIOS ({scenarios.length})
+                                </button>
+                                <button
+                                    onClick={() => setSourceLabTab("live")}
+                                    className={`flex items-center gap-2 px-4 py-2.5 border-b-2 font-bold transition-all ${
+                                        sourceLabTab === "live"
+                                            ? "border-emerald-500 text-emerald-300 bg-emerald-500/10 rounded-t-xl"
+                                            : "border-transparent text-slate-400 hover:text-white"
+                                    }`}
+                                >
+                                    <Radio className="w-4 h-4" />
+                                    LIVE CAMERAS ({nodes.filter(n => n.stream_type !== 'demo').length})
+                                </button>
+                                <button
+                                    onClick={() => setSourceLabTab("upload")}
+                                    className={`flex items-center gap-2 px-4 py-2.5 border-b-2 font-bold transition-all ${
+                                        sourceLabTab === "upload"
+                                            ? "border-amber-500 text-amber-300 bg-amber-500/10 rounded-t-xl"
+                                            : "border-transparent text-slate-400 hover:text-white"
+                                    }`}
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    UPLOAD VIDEO
+                                </button>
+                            </div>
+
+                            {/* Tab 1: Demo Scenarios */}
+                            {sourceLabTab === "demo" && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[58vh] overflow-y-auto pr-1">
+                                    {scenarios.map((sc) => {
+                                        const isSelected = isDemoRunning && activeScenarioId === sc.id;
+                                        return (
+                                            <div
+                                                key={sc.id}
+                                                className={`p-4 rounded-2xl border transition-all flex flex-col justify-between space-y-3 ${
+                                                    isSelected
+                                                        ? "bg-purple-950/20 border-purple-500/60 shadow-lg shadow-purple-950/30"
+                                                        : "bg-black/40 border-white/10 hover:border-white/20"
+                                                }`}
+                                            >
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold tracking-wider uppercase border ${
+                                                            sc.category === "BASELINE"
+                                                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                                                                : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                                                        }`}>
+                                                            {sc.badge}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-slate-400">
+                                                            {sc.resolution} • {sc.fps} FPS
+                                                        </span>
+                                                    </div>
+
+                                                    <h4 className="font-mono font-bold text-sm text-white">
+                                                        {sc.title}
+                                                    </h4>
+
+                                                    <p className="text-[11px] font-mono text-slate-300 leading-relaxed">
+                                                        {sc.description}
+                                                    </p>
+
+                                                    {/* Capabilities Matrix */}
+                                                    <div className="bg-black/50 p-2.5 rounded-xl border border-white/5 space-y-1 text-[10px] font-mono">
+                                                        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-slate-400">
+                                                            <span>✓ Pose Estimation: <strong className="text-slate-200">Active</strong></span>
+                                                            <span>✓ ByteTrack: <strong className="text-slate-200">Active</strong></span>
+                                                            <span>✓ Temporal Engine: <strong className="text-slate-200">Active</strong></span>
+                                                            <span>○ Audio Distress: <strong className="text-slate-500">Unconfigured</strong></span>
+                                                        </div>
+                                                        <div className="border-t border-white/5 pt-1 mt-1 text-[9px] text-slate-400">
+                                                            Reference Outcome: <span className="text-indigo-300 font-semibold">{sc.expected_outcome}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    onClick={() => handleSelectScenario(sc.id)}
+                                                    className={`w-full py-2.5 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                                                        isSelected
+                                                            ? "bg-purple-600 text-white shadow-lg shadow-purple-900/40 cursor-default"
+                                                            : "bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white border border-white/10 cursor-pointer"
+                                                    }`}
+                                                >
+                                                    {isSelected ? <CheckCircle2 className="w-4 h-4 text-purple-200" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+                                                    {isSelected ? "ACTIVE DEMO SCENARIO" : "INGEST THIS SCENARIO"}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Tab 2: Live Cameras */}
+                            {sourceLabTab === "live" && (
+                                <div className="space-y-3 max-h-[58vh] overflow-y-auto pr-1">
+                                    {nodes.filter(n => n.stream_type !== "demo").length === 0 ? (
+                                        <div className="p-8 text-center bg-black/30 rounded-2xl border border-white/5 font-mono text-xs text-slate-400">
+                                            No external RTSP camera nodes currently online in registry. Demo node is available.
+                                        </div>
+                                    ) : (
+                                        nodes.filter(n => n.stream_type !== "demo").map((cam) => {
+                                            const isSelected = selectedCameraId === cam.camera_id && !isDemoRunning;
+                                            return (
+                                                <div
+                                                    key={cam.camera_id}
+                                                    className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
+                                                        isSelected
+                                                            ? "bg-emerald-950/20 border-emerald-500/50"
+                                                            : "bg-black/40 border-white/10 hover:border-white/20"
+                                                    }`}
+                                                >
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-2 h-2 rounded-full ${cam.is_online ? "bg-emerald-400 animate-pulse" : "bg-red-400"}`} />
+                                                            <h4 className="font-mono font-bold text-sm text-white">{cam.name}</h4>
+                                                            <span className="text-[10px] font-mono text-slate-400">({cam.stream_type.toUpperCase()})</span>
+                                                        </div>
+                                                        <p className="text-[11px] font-mono text-slate-400">
+                                                            URI: <code className="text-indigo-300">{cam.stream_url}</code> • Venue: {cam.venue_id}
+                                                        </p>
+                                                    </div>
+
+                                                    <button
+                                                        onClick={() => handleSelectLiveCamera(cam.camera_id)}
+                                                        className={`px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase tracking-wider transition-all ${
+                                                            isSelected
+                                                                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/40"
+                                                                : "bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white"
+                                                        }`}
+                                                    >
+                                                        {isSelected ? "ACTIVE FEED" : "CONNECT FEED"}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Tab 3: Upload Video */}
+                            {sourceLabTab === "upload" && (
+                                <div className="space-y-4">
+                                    <div
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="border-2 border-dashed border-white/15 hover:border-amber-500/50 rounded-3xl p-8 text-center cursor-pointer bg-black/40 hover:bg-amber-500/5 transition-all space-y-3"
+                                    >
+                                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                                            <Upload className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-mono font-bold text-sm text-white">Click or drag & drop video file</h4>
+                                            <p className="text-xs font-mono text-slate-400 mt-1">Supported formats: .mp4, .webm, .avi</p>
+                                        </div>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="video/mp4,video/webm,video/avi"
+                                            className="hidden"
+                                            onChange={handleUploadVideo}
+                                        />
+                                    </div>
+
+                                    {isUploading && (
+                                        <div className="p-3 bg-amber-950/30 border border-amber-500/30 rounded-xl text-xs font-mono text-amber-300 flex items-center gap-3">
+                                            <Sparkles className="w-4 h-4 animate-spin text-amber-400" />
+                                            <span>Uploading and initializing neural ingestion pipeline...</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ── MODAL: Operator Action Confirmation Gate ────────────────────── */}
+            <AnimatePresence>
+                {confirmAction && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-[#0f1422] border border-white/20 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4"
+                        >
+                            <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+                                <div className={`p-2.5 rounded-2xl border ${
+                                    confirmAction.type === "DISPATCH"
+                                        ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                                        : "bg-indigo-500/10 border-indigo-500/30 text-indigo-400"
+                                }`}>
+                                    {confirmAction.type === "DISPATCH" ? <Send className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                                </div>
+                                <div>
+                                    <h3 className="font-mono font-bold text-sm uppercase tracking-wider text-white">
+                                        {confirmAction.title}
+                                    </h3>
+                                    <p className="text-[10px] font-mono text-slate-400">
+                                        Operator Authorization Gate • Manual Execution Required
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 text-xs font-mono text-slate-300">
+                                <div className="bg-black/50 p-3.5 rounded-2xl border border-white/5 space-y-2">
+                                    <p><span className="text-slate-500">TARGET NODE:</span> <strong className="text-white">{selectedCameraId}</strong></p>
+                                    <p><span className="text-slate-500">VERIFIED STATE:</span> <strong className="text-rose-400">{telemetry.scene_state}</strong> ({telemetry.persistence_seconds.toFixed(1)}s sustained)</p>
+                                    <p><span className="text-slate-500">INCIDENT ID:</span> <strong className="text-indigo-300">{auditData?.track_id ? `EVENT-TRK-${auditData.track_id}` : "ACTIVE-KINETIC-INCIDENT"}</strong></p>
+                                    <p><span className="text-slate-500">ACTION TYPE:</span> <strong className="text-white">{confirmAction.type}</strong></p>
+                                </div>
+
+                                <p className="text-[11px] text-slate-400 leading-relaxed">
+                                    {confirmAction.description}
+                                </p>
+                            </div>
+
+                            <div className="pt-2 flex justify-end gap-2.5">
+                                <button
+                                    onClick={() => setConfirmAction(null)}
+                                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-mono text-slate-300"
+                                >
+                                    CANCEL
+                                </button>
+                                <button
+                                    onClick={handleExecuteConfirmedAction}
+                                    className={`px-5 py-2 rounded-xl text-xs font-mono font-bold tracking-wider uppercase transition-all shadow-lg ${
+                                        confirmAction.type === "DISPATCH"
+                                            ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/40"
+                                            : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-950/40"
+                                    }`}
+                                >
+                                    CONFIRM & EXECUTE
                                 </button>
                             </div>
                         </motion.div>

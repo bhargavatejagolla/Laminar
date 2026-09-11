@@ -447,215 +447,145 @@ async def kinetic_video_stream(camera_id: str):
     return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
-# ── 1-Click Demonstration Stream Execution ─────────────────────────────────────
+# ── Kinetic Source Lab: Scenarios, Uploads & Dynamic Ingestion ──────────────────
 
-@router.post("/demo/start")
-async def start_kinetic_demo(camera_id: Optional[str] = Query(None)):
-    """
-    1-Click Incident Demonstration.
-    Ingests actual incident video through the exact same perception & temporal reasoning loop,
-    feeding frames into the stream and emitting verified events to the EventBus.
-    """
-    target_cam_id = camera_id or "KINETIC_DEMO_NODE_01"
-    
-    # Locate candidate incident video file
-    candidate_paths = [
-        os.path.join(os.getcwd(), "data", "uploads", "07d43ffc-e694-4642-b69e-54c7b8348fc1.mp4"),
-        os.path.join(os.getcwd(), "..", "frontend", "public", "test_incident.mp4"),
-        os.path.join(os.getcwd(), "data", "uploads", "0b105e87-309b-427f-a2b7-745e13fcf9e4.mp4")
-    ]
-    
-    video_path = None
-    for p in candidate_paths:
-        if os.path.exists(p):
-            video_path = p
-            break
-
-    if not video_path:
-        raise HTTPException(status_code=404, detail="Incident demonstration video asset not found.")
-
-    # Stop any existing task for this camera
-    if target_cam_id in _standalone_kinetic_tasks:
-        _standalone_kinetic_tasks[target_cam_id].cancel()
-        del _standalone_kinetic_tasks[target_cam_id]
-
-    kinetic_engine = KineticDetector(fps=20)
-    _standalone_kinetic_engines[target_cam_id] = kinetic_engine
-
-    async def run_demo_pipeline():
-        from app.vision.detector import get_detector
-        detector = get_detector()
-        
-        cap = cv2.VideoCapture(video_path)
-        fps = cap.get(cv2.CAP_PROP_FPS) or 20.0
-        frame_delay = 1.0 / max(10.0, min(30.0, fps))
-        
-        logger.info(f"Starting 1-Click Incident Demo on {target_cam_id} using {video_path}")
-        
-        try:
-            while True:
-                if not cap.isOpened():
-                    cap = cv2.VideoCapture(video_path)
-                
-                ret, frame = cap.read()
-                if not ret or frame is None:
-                    # Loop video seamlessly for continuous demonstration
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    ret, frame = cap.read()
-                    if not ret or frame is None:
-                        break
-
-                # 1. Quality evaluation
-                quality = evaluate_frame_quality(frame)
-
-                # 2. Pose estimation with ByteTrack
-                result = await asyncio.to_thread(detector.detect_pose, frame.copy(), return_boxes=True)
-
-                # 3. Temporal behavioral reasoning
-                anomalies = []
-                if hasattr(result, 'keypoints') and result.keypoints:
-                    anomalies = kinetic_engine.detect_anomalies(
-                        result.bounding_boxes,
-                        result.keypoints,
-                        frame_quality=quality
-                    )
-
-                # 4. Decoupled node health state
-                _camera_node_states[target_cam_id] = {
-                    "camera_id": target_cam_id,
-                    "connection_status": "CONNECTED",
-                    "stream_health": "HEALTHY" if quality["passed"] else "DEGRADED",
-                    "frame_ingestion": "ACTIVE",
-                    "input_quality": quality["status"],
-                    "ai_analysis": "SUPPRESSED" if not quality["passed"] else "ACTIVE",
-                    "fps": round(fps, 1),
-                    "ai_fps": 15.0,
-                    "latency_ms": 112.0,
-                    "sharpness": quality["sharpness"],
-                    "mean_intensity": quality["mean_intensity"],
-                    "provenance": "DEMO_VIDEO",
-                    "last_seen": datetime.now(timezone.utc).isoformat()
-                }
-
-                # 5. Handle verified events
-                for inc in anomalies:
-                    push_kinetic_event(target_cam_id, inc)
-                    
-                    if inc.get("risk_level") in ("CRITICAL", "HIGH"):
-                        # Snapshot
-                        snapshot_path = None
-                        try:
-                            svc = EvidenceSnapshotService()
-                            filename = f"demo_kinetic_{target_cam_id[:8]}_{int(time.time())}.jpg"
-                            full_path = os.path.join(SNAPSHOT_DIR, filename)
-                            annotated_snap = draw_pose_overlay(frame.copy(), result, anomalies)
-                            stamped = svc._stamp_frame(annotated_snap, inc.get("risk_level", "CRITICAL").lower(), "DEMO CORRIDOR", datetime.now(timezone.utc))
-                            success = await asyncio.to_thread(svc._save_snapshot, stamped, full_path)
-                            if success:
-                                snapshot_path = full_path
-                        except Exception as e:
-                            logger.warning(f"Demo snapshot save failed: {e}")
-
-                        event_id = f"KINETIC-DEMO-{str(uuid.uuid4())[:6].upper()}"
-                        explainability = inc.get("explainability", {})
-                        _verified_event_explanations[event_id] = explainability
-
-                        le_event = LaminarIntelligenceEvent(
-                            event_id=event_id,
-                            event_type="kinetic_incident_verified",
-                            domain="incident",
-                            venue_id="DEMO-VENUE-01",
-                            venue_name="Demonstration Corridor",
-                            camera_id=target_cam_id,
-                            camera_name="Demo Incident Cam",
-                            source_type="demo",
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            location=LocationPayload(location_source="CAMERA_CONFIG"),
-                            severity="critical" if inc.get("risk_level") == "CRITICAL" else "high",
-                            confidence=round(inc.get("confidence", 88.0) / 100.0, 2),
-                            state="verified",
-                            title=f"Kinetic Incident: {inc['type'].replace('_', ' ').title()}",
-                            description=inc.get("message", "Behavioral anomaly sustained past verification threshold."),
-                            evidence={
-                                "screenshot_path": snapshot_path,
-                                "track_id": inc.get("track_id"),
-                                "bbox": inc.get("bbox"),
-                                "provenance": "DEMO_VIDEO"
-                            },
-                            explanation=explainability
-                        )
-                        await event_bus.emit_event(le_event, cooldown_seconds=25.0, enforce_transition=True)
-
-                # 6. Global state update for UI
-                fusion_state = kinetic_engine.get_fusion_state()
-                GLOBAL_STATE.update(
-                    domain="kinetic",
-                    venue_id="DEMO-VENUE-01",
-                    payload={
-                        "venue_id": "DEMO-VENUE-01",
-                        "camera_id": target_cam_id,
-                        "active_subjects": result.count if hasattr(result, 'count') else 0,
-                        "anomalies_detected": len(anomalies),
-                        "latest_anomalies": anomalies,
-                        "fusion_state": fusion_state,
-                        "node_health": _camera_node_states[target_cam_id],
-                        "last_updated": datetime.now(timezone.utc).isoformat()
-                    }
-                )
-
-                # 7. Render pose overlay & buffer frame
-                annotated = draw_pose_overlay(frame.copy(), result, anomalies)
-                
-                # Stamp watermark
-                cv2.putText(annotated, "SOURCE: DEMO VIDEO", (14, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1, cv2.LINE_AA)
-                
-                _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
-                _standalone_kinetic_frames[target_cam_id] = jpeg.tobytes()
-
-                await asyncio.sleep(frame_delay)
-
-        except asyncio.CancelledError:
-            logger.info(f"Incident Demo cancelled on {target_cam_id}")
-        except Exception as e:
-            logger.error(f"Incident Demo crashed: {e}", exc_info=True)
-        finally:
-            if cap is not None:
-                cap.release()
-            _standalone_kinetic_frames.pop(target_cam_id, None)
-
-    task = asyncio.create_task(run_demo_pipeline())
-    _standalone_kinetic_tasks[target_cam_id] = task
-
-    return {
-        "status": "DEMO_STARTED",
-        "camera_id": target_cam_id,
-        "video_source": os.path.basename(video_path),
-        "provenance": "DEMO_VIDEO"
+SCENARIO_CATALOG: Dict[str, Dict[str, Any]] = {
+    "normal_traffic": {
+        "id": "normal_traffic",
+        "title": "Normal Arterial Traffic Flow",
+        "badge": "Baseline / Negative Control",
+        "category": "BASELINE",
+        "risk_level": "LOW",
+        "filename": "normal_traffic.mp4",
+        "duration_seconds": 24.0,
+        "fps": 30.0,
+        "resolution": "1280x720",
+        "description": "Baseline arterial highway flow with vehicles moving in designated lanes. Zero pedestrian anomalies. Demonstrates that LAMINAR holds in NORMAL state without false alarms.",
+        "expected_outcome": "NORMAL (0 anomalies, 0% behavioral evidence)",
+        "capabilities": {
+            "person_detection": True,
+            "pose_estimation": True,
+            "tracking": True,
+            "temporal_behavior": True,
+            "audio": "NOT CONFIGURED / UNAVAILABLE",
+            "location_provenance": "DEMO / NOT REAL GPS"
+        }
+    },
+    "road_rage": {
+        "id": "road_rage",
+        "title": "Physical Aggression Pattern",
+        "badge": "High-Risk Altercation",
+        "category": "INCIDENT",
+        "risk_level": "CRITICAL",
+        "filename": "road_rage.mp4",
+        "duration_seconds": 5.2,
+        "fps": 24.0,
+        "resolution": "464x832",
+        "description": "Multi-person altercation with aggressive stances, rapid upper-limb kinetic dynamics, and intimate proximity clustering. Evaluates multi-frame temporal persistence.",
+        "expected_outcome": "NORMAL -> CANDIDATE -> VERIFIED (Physical Aggression Pattern)",
+        "capabilities": {
+            "person_detection": True,
+            "pose_estimation": True,
+            "tracking": True,
+            "temporal_behavior": True,
+            "audio": "NOT CONFIGURED / UNAVAILABLE",
+            "location_provenance": "DEMO / NOT REAL GPS"
+        }
+    },
+    "sudden_collapse": {
+        "id": "sudden_collapse",
+        "title": "Sudden Collapse / Slip & Fall",
+        "badge": "Urgent Medical Distress",
+        "category": "INCIDENT",
+        "risk_level": "CRITICAL",
+        "filename": "sudden_collapse.mp4",
+        "duration_seconds": 5.2,
+        "fps": 24.0,
+        "resolution": "464x832",
+        "description": "Pedestrian experiencing sudden downward vertical displacement and bounding-box horizontal aspect ratio expansion, indicating loss of consciousness or severe slip-and-fall.",
+        "expected_outcome": "NORMAL -> CANDIDATE -> VERIFIED (Sudden Collapse Pattern)",
+        "capabilities": {
+            "person_detection": True,
+            "pose_estimation": True,
+            "tracking": True,
+            "temporal_behavior": True,
+            "audio": "NOT CONFIGURED / UNAVAILABLE",
+            "location_provenance": "DEMO / NOT REAL GPS"
+        }
+    },
+    "perimeter_intrusion": {
+        "id": "perimeter_intrusion",
+        "title": "Restricted Perimeter Breach",
+        "badge": "Security Perimeter Breach",
+        "category": "INCIDENT",
+        "risk_level": "HIGH",
+        "filename": "perimeter_intrusion.mp4",
+        "duration_seconds": 5.2,
+        "fps": 24.0,
+        "resolution": "464x832",
+        "description": "Subjects crossing virtual perimeter polygon boundaries into prohibited access zones, triggering spatial ray-casting geometric verification.",
+        "expected_outcome": "NORMAL -> CANDIDATE -> VERIFIED (Restricted Zone Intrusion)",
+        "capabilities": {
+            "person_detection": True,
+            "pose_estimation": True,
+            "tracking": True,
+            "temporal_behavior": True,
+            "audio": "NOT CONFIGURED / UNAVAILABLE",
+            "location_provenance": "DEMO / NOT REAL GPS"
+        }
     }
+}
+
+_active_source_info: Dict[str, Dict[str, Any]] = {}
 
 
-@router.post("/demo/stop")
-async def stop_kinetic_demo(camera_id: Optional[str] = Query(None)):
-    """Stops the active incident demonstration and resets to standby."""
-    target_cam_id = camera_id or "KINETIC_DEMO_NODE_01"
-    cleared = False
-    
+def _resolve_scenario_path(filename: str) -> Optional[str]:
+    """Finds scenario video file across data directories."""
+    candidates = [
+        os.path.join(os.getcwd(), "data", "scenarios", filename),
+        os.path.join(os.getcwd(), "backend", "data", "scenarios", filename),
+        os.path.join(os.getcwd(), "data", "uploads", filename),
+        os.path.join(os.getcwd(), "..", "frontend", "public", "images", filename)
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _reset_source_state(target_cam_id: str):
+    """
+    Strict clean reset of all tracking, temporal history, transient frames,
+    and candidate state to prevent any state leakage across sources.
+    """
     if target_cam_id in _standalone_kinetic_tasks:
         _standalone_kinetic_tasks[target_cam_id].cancel()
         del _standalone_kinetic_tasks[target_cam_id]
-        cleared = True
-        
+
     if target_cam_id in _standalone_kinetic_frames:
         del _standalone_kinetic_frames[target_cam_id]
-        cleared = True
 
-    if target_cam_id in _camera_node_states:
-        _camera_node_states[target_cam_id]["connection_status"] = "STANDBY"
-        _camera_node_states[target_cam_id]["stream_health"] = "HEALTHY"
-        _camera_node_states[target_cam_id]["frame_ingestion"] = "IDLE"
-        _camera_node_states[target_cam_id]["ai_analysis"] = "STANDBY"
+    if target_cam_id in _standalone_kinetic_engines:
+        _standalone_kinetic_engines[target_cam_id].reset()
 
-    # Reset Global State
+    _active_source_info.pop(target_cam_id, None)
+
+    _camera_node_states[target_cam_id] = {
+        "camera_id": target_cam_id,
+        "connection_status": "STANDBY",
+        "stream_health": "HEALTHY",
+        "frame_ingestion": "IDLE",
+        "input_quality": "OPTIMAL",
+        "ai_analysis": "STANDBY",
+        "fps": 0.0,
+        "ai_fps": 0.0,
+        "latency_ms": 0.0,
+        "sharpness": 95.0,
+        "mean_intensity": 128.0,
+        "provenance": "STANDBY",
+        "last_seen": datetime.now(timezone.utc).isoformat()
+    }
+
     GLOBAL_STATE.update(
         domain="kinetic",
         venue_id="DEMO-VENUE-01",
@@ -676,15 +606,430 @@ async def stop_kinetic_demo(camera_id: Optional[str] = Query(None)):
                 "persistence_seconds": 0.0,
                 "audio_configured": False,
                 "audio_status": "NOT CONFIGURED / UNAVAILABLE",
+                "audio_conf": 0.0,
                 "sos_activated": False,
                 "active_tracks_count": 0,
                 "timeline": []
             },
+            "node_health": _camera_node_states[target_cam_id],
             "last_updated": datetime.now(timezone.utc).isoformat()
         }
     )
 
-    return {"message": "Demo stopped. System returned to STANDBY.", "camera_id": target_cam_id, "cleared": cleared}
+
+@router.get("/scenarios")
+async def get_kinetic_scenarios():
+    """Returns curated scenario catalog with capabilities and descriptions."""
+    scenarios = []
+    for sc_id, sc in SCENARIO_CATALOG.items():
+        scenarios.append({
+            **sc,
+            "file_available": _resolve_scenario_path(sc["filename"]) is not None
+        })
+    return scenarios
+
+
+@router.post("/demo/start")
+async def start_kinetic_demo(
+    scenario_id: str = Query("road_rage"),
+    camera_id: Optional[str] = Query(None)
+):
+    """
+    Starts video ingestion for a chosen demonstration scenario through the exact same
+    downstream perception, ByteTrack, and temporal hysteresis pipeline.
+    Note: expected_outcome is informational only and never influences the detector.
+    """
+    target_cam_id = camera_id or "KINETIC_DEMO_NODE_01"
+    
+    # 1. Clean Reset of previous source state
+    _reset_source_state(target_cam_id)
+
+    scenario_meta = SCENARIO_CATALOG.get(scenario_id)
+    if not scenario_meta:
+        raise HTTPException(status_code=400, detail=f"Unknown scenario ID: {scenario_id}")
+
+    video_path = _resolve_scenario_path(scenario_meta["filename"])
+    if not video_path:
+        raise HTTPException(status_code=404, detail=f"Scenario video asset '{scenario_meta['filename']}' not found on disk.")
+
+    kinetic_engine = KineticDetector(fps=int(scenario_meta.get("fps", 20)))
+    _standalone_kinetic_engines[target_cam_id] = kinetic_engine
+    _active_source_info[target_cam_id] = {
+        "source_type": "demo",
+        "scenario_id": scenario_id,
+        "title": scenario_meta["title"],
+        "video_path": video_path,
+        "fps": scenario_meta.get("fps", 24.0)
+    }
+
+    async def run_scenario_pipeline():
+        from app.vision.detector import get_detector
+        detector = get_detector()
+
+        cap = cv2.VideoCapture(video_path)
+        fps = cap.get(cv2.CAP_PROP_FPS) or scenario_meta.get("fps", 24.0)
+        frame_delay = 1.0 / max(10.0, min(30.0, fps))
+        frame_idx = 0
+
+        logger.info(f"Starting Scenario '{scenario_id}' on {target_cam_id} using {video_path}")
+
+        try:
+            while True:
+                if not cap.isOpened():
+                    cap = cv2.VideoCapture(video_path)
+
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    # Seamless loop
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    frame_idx = 0
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        break
+
+                frame_idx += 1
+                # Source timestamp uses actual video time (frame_idx / fps)
+                source_timestamp = frame_idx / max(1.0, fps)
+
+                # 1. Real frame optical quality evaluation
+                quality = evaluate_frame_quality(frame)
+
+                # 2. Pose estimation using validated pose model
+                result = await asyncio.to_thread(detector.detect_pose, frame.copy(), return_boxes=True)
+
+                # 3. Grounded temporal behavioral reasoning
+                anomalies = []
+                if hasattr(result, 'keypoints') and result.keypoints:
+                    anomalies = kinetic_engine.detect_anomalies(
+                        result.bounding_boxes,
+                        result.keypoints,
+                        frame_quality=quality,
+                        source_timestamp=source_timestamp
+                    )
+
+                # 4. Update decoupled node health
+                _camera_node_states[target_cam_id] = {
+                    "camera_id": target_cam_id,
+                    "connection_status": "CONNECTED",
+                    "stream_health": "HEALTHY" if quality["passed"] else "DEGRADED",
+                    "frame_ingestion": "ACTIVE",
+                    "input_quality": quality["status"],
+                    "ai_analysis": "SUPPRESSED" if not quality["passed"] else "ACTIVE",
+                    "fps": round(fps, 1),
+                    "ai_fps": round(fps, 1),
+                    "latency_ms": 95.0,
+                    "sharpness": quality["sharpness"],
+                    "mean_intensity": quality["mean_intensity"],
+                    "provenance": "DEMO_SCENARIO",
+                    "scenario_title": scenario_meta["title"],
+                    "last_seen": datetime.now(timezone.utc).isoformat()
+                }
+
+                # 5. Handle verified incidents -> Emit to EventBus (deduped to avoid polluting history on replays)
+                for inc in anomalies:
+                    push_kinetic_event(target_cam_id, inc)
+
+                    if inc.get("risk_level") in ("CRITICAL", "HIGH"):
+                        snapshot_path = None
+                        try:
+                            svc = EvidenceSnapshotService()
+                            filename = f"demo_kinetic_{scenario_id}_{int(time.time())}.jpg"
+                            full_path = os.path.join(SNAPSHOT_DIR, filename)
+                            annotated_snap = draw_pose_overlay(frame.copy(), result, anomalies)
+                            stamped = svc._stamp_frame(
+                                annotated_snap,
+                                inc.get("risk_level", "CRITICAL").lower(),
+                                f"DEMO: {scenario_meta['title']}",
+                                datetime.now(timezone.utc)
+                            )
+                            success = await asyncio.to_thread(svc._save_snapshot, stamped, full_path)
+                            if success:
+                                snapshot_path = full_path
+                        except Exception as e:
+                            logger.warning(f"Demo snapshot save failed: {e}")
+
+                        # Explicit demo event namespace with deduplication window
+                        event_id = f"KINETIC-DEMO-{scenario_id.upper()}-{int(time.time() // 60)}"
+                        explainability = inc.get("explainability", {})
+                        _verified_event_explanations[event_id] = explainability
+
+                        le_event = LaminarIntelligenceEvent(
+                            event_id=event_id,
+                            event_type="kinetic_incident_verified",
+                            domain="incident",
+                            venue_id="DEMO-VENUE-01",
+                            venue_name="Demonstration Corridor",
+                            camera_id=target_cam_id,
+                            camera_name=f"Demo: {scenario_meta['title']}",
+                            source_type="demo",
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                            location=LocationPayload(location_source="CAMERA_CONFIG"),
+                            severity="critical" if inc.get("risk_level") == "CRITICAL" else "high",
+                            confidence=round(inc.get("confidence", 88.0) / 100.0, 2),
+                            state="verified",
+                            title=f"Kinetic Incident: {inc['type'].replace('_', ' ').title()}",
+                            description=inc.get("message", "Behavioral pattern sustained past verification threshold."),
+                            evidence={
+                                "screenshot_path": snapshot_path,
+                                "track_id": inc.get("track_id"),
+                                "bbox": inc.get("bbox"),
+                                "provenance": "DEMO_SCENARIO",
+                                "scenario_id": scenario_id
+                            },
+                            explanation=explainability
+                        )
+                        await event_bus.emit_event(le_event, cooldown_seconds=60.0, enforce_transition=True)
+
+                # 6. Global State Update
+                fusion_state = kinetic_engine.get_fusion_state()
+                GLOBAL_STATE.update(
+                    domain="kinetic",
+                    venue_id="DEMO-VENUE-01",
+                    payload={
+                        "venue_id": "DEMO-VENUE-01",
+                        "camera_id": target_cam_id,
+                        "active_subjects": result.count if hasattr(result, 'count') else 0,
+                        "anomalies_detected": len(anomalies),
+                        "latest_anomalies": anomalies,
+                        "fusion_state": fusion_state,
+                        "node_health": _camera_node_states[target_cam_id],
+                        "active_source": _active_source_info.get(target_cam_id),
+                        "last_updated": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+
+                # 7. Render pose overlay & watermark stream
+                annotated = draw_pose_overlay(frame.copy(), result, anomalies)
+                cv2.putText(
+                    annotated,
+                    f"SOURCE: DEMO SCENARIO - {scenario_meta['title'].upper()}",
+                    (14, 455),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.38,
+                    (0, 255, 255),
+                    1,
+                    cv2.LINE_AA
+                )
+                cv2.putText(
+                    annotated,
+                    f"VIDEO TIME: {source_timestamp:.1f}s",
+                    (14, 470),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.34,
+                    (200, 200, 200),
+                    1,
+                    cv2.LINE_AA
+                )
+
+                _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                _standalone_kinetic_frames[target_cam_id] = jpeg.tobytes()
+
+                await asyncio.sleep(frame_delay)
+
+        except asyncio.CancelledError:
+            logger.info(f"Scenario loop cancelled for {target_cam_id}")
+        except Exception as e:
+            logger.error(f"Scenario pipeline crashed: {e}", exc_info=True)
+        finally:
+            if cap is not None:
+                cap.release()
+            _standalone_kinetic_frames.pop(target_cam_id, None)
+
+    task = asyncio.create_task(run_scenario_pipeline())
+    _standalone_kinetic_tasks[target_cam_id] = task
+
+    return {
+        "status": "SCENARIO_STARTED",
+        "camera_id": target_cam_id,
+        "scenario_id": scenario_id,
+        "scenario_title": scenario_meta["title"],
+        "provenance": "DEMO_SCENARIO"
+    }
+
+
+@router.post("/demo/replay")
+async def replay_kinetic_demo(camera_id: Optional[str] = Query(None)):
+    """
+    Restarts the active demonstration scenario from frame 0 with a complete temporal reset.
+    Resets track IDs, temporal history, candidate state, persistence, and UI timeline.
+    """
+    target_cam_id = camera_id or "KINETIC_DEMO_NODE_01"
+    curr_source = _active_source_info.get(target_cam_id)
+    
+    if not curr_source:
+        raise HTTPException(status_code=400, detail="No active scenario or video stream to replay.")
+
+    scenario_id = curr_source.get("scenario_id", "road_rage")
+    return await start_kinetic_demo(scenario_id=scenario_id, camera_id=target_cam_id)
+
+
+@router.post("/demo/stop")
+async def stop_kinetic_demo(camera_id: Optional[str] = Query(None)):
+    """Stops the active scenario demonstration and resets the engine cleanly to STANDBY."""
+    target_cam_id = camera_id or "KINETIC_DEMO_NODE_01"
+    _reset_source_state(target_cam_id)
+    return {"message": "Source halted. System returned to clean STANDBY.", "camera_id": target_cam_id}
+
+
+@router.post("/upload")
+async def upload_kinetic_video(
+    file: UploadFile = File(...),
+    camera_id: Optional[str] = Query(None)
+):
+    """
+    Ingests custom video footage through the exact same perception, ByteTrack,
+    and temporal reasoning pipeline, watermarked with CUSTOM UPLOAD provenance.
+    """
+    target_cam_id = camera_id or "KINETIC_DEMO_NODE_01"
+    
+    # 1. Validate file extension
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in [".mp4", ".webm", ".avi", ".mov"]:
+        raise HTTPException(status_code=400, detail="Unsupported video format. Please upload .mp4, .webm, or .avi.")
+
+    # 2. Save upload file securely
+    upload_dir = os.path.join(os.getcwd(), "data", "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    saved_filename = f"upload_{uuid.uuid4().hex[:8]}_{file.filename}"
+    saved_path = os.path.join(upload_dir, saved_filename)
+    
+    with open(saved_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    # 3. Clean Reset old source
+    _reset_source_state(target_cam_id)
+
+    kinetic_engine = KineticDetector(fps=24)
+    _standalone_kinetic_engines[target_cam_id] = kinetic_engine
+    _active_source_info[target_cam_id] = {
+        "source_type": "upload",
+        "filename": file.filename,
+        "video_path": saved_path,
+        "fps": 24.0
+    }
+
+    async def run_upload_pipeline():
+        from app.vision.detector import get_detector
+        detector = get_detector()
+
+        cap = cv2.VideoCapture(saved_path)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
+        frame_delay = 1.0 / max(10.0, min(30.0, fps))
+        frame_idx = 0
+
+        logger.info(f"Starting Upload Video Ingestion on {target_cam_id} from {saved_path}")
+
+        try:
+            while True:
+                if not cap.isOpened():
+                    cap = cv2.VideoCapture(saved_path)
+
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    frame_idx = 0
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        break
+
+                frame_idx += 1
+                source_timestamp = frame_idx / max(1.0, fps)
+
+                quality = evaluate_frame_quality(frame)
+                result = await asyncio.to_thread(detector.detect_pose, frame.copy(), return_boxes=True)
+
+                anomalies = []
+                if hasattr(result, 'keypoints') and result.keypoints:
+                    anomalies = kinetic_engine.detect_anomalies(
+                        result.bounding_boxes,
+                        result.keypoints,
+                        frame_quality=quality,
+                        source_timestamp=source_timestamp
+                    )
+
+                _camera_node_states[target_cam_id] = {
+                    "camera_id": target_cam_id,
+                    "connection_status": "CONNECTED",
+                    "stream_health": "HEALTHY" if quality["passed"] else "DEGRADED",
+                    "frame_ingestion": "ACTIVE",
+                    "input_quality": quality["status"],
+                    "ai_analysis": "SUPPRESSED" if not quality["passed"] else "ACTIVE",
+                    "fps": round(fps, 1),
+                    "ai_fps": round(fps, 1),
+                    "latency_ms": 110.0,
+                    "sharpness": quality["sharpness"],
+                    "mean_intensity": quality["mean_intensity"],
+                    "provenance": "CUSTOM_UPLOAD",
+                    "filename": file.filename,
+                    "last_seen": datetime.now(timezone.utc).isoformat()
+                }
+
+                for inc in anomalies:
+                    push_kinetic_event(target_cam_id, inc)
+
+                fusion_state = kinetic_engine.get_fusion_state()
+                GLOBAL_STATE.update(
+                    domain="kinetic",
+                    venue_id="DEMO-VENUE-01",
+                    payload={
+                        "venue_id": "DEMO-VENUE-01",
+                        "camera_id": target_cam_id,
+                        "active_subjects": result.count if hasattr(result, 'count') else 0,
+                        "anomalies_detected": len(anomalies),
+                        "latest_anomalies": anomalies,
+                        "fusion_state": fusion_state,
+                        "node_health": _camera_node_states[target_cam_id],
+                        "active_source": _active_source_info.get(target_cam_id),
+                        "last_updated": datetime.now(timezone.utc).isoformat()
+                    }
+                )
+
+                annotated = draw_pose_overlay(frame.copy(), result, anomalies)
+                cv2.putText(
+                    annotated,
+                    f"SOURCE: CUSTOM UPLOAD - {file.filename.upper()}",
+                    (14, 455),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.38,
+                    (255, 180, 0),
+                    1,
+                    cv2.LINE_AA
+                )
+                cv2.putText(
+                    annotated,
+                    f"VIDEO TIME: {source_timestamp:.1f}s",
+                    (14, 470),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.34,
+                    (200, 200, 200),
+                    1,
+                    cv2.LINE_AA
+                )
+
+                _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                _standalone_kinetic_frames[target_cam_id] = jpeg.tobytes()
+
+                await asyncio.sleep(frame_delay)
+
+        except asyncio.CancelledError:
+            logger.info(f"Upload loop cancelled for {target_cam_id}")
+        except Exception as e:
+            logger.error(f"Upload pipeline crashed: {e}", exc_info=True)
+        finally:
+            if cap is not None:
+                cap.release()
+            _standalone_kinetic_frames.pop(target_cam_id, None)
+
+    task = asyncio.create_task(run_upload_pipeline())
+    _standalone_kinetic_tasks[target_cam_id] = task
+
+    return {
+        "status": "UPLOAD_ANALYSIS_STARTED",
+        "camera_id": target_cam_id,
+        "filename": file.filename,
+        "provenance": "CUSTOM_UPLOAD"
+    }
 
 
 @router.post("/clear-media/{camera_id}")

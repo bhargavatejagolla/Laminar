@@ -18,11 +18,12 @@ from datetime import datetime, timezone
 
 class TrackState:
     """Tracks the temporal state and trajectory of an individual subject."""
-    def __init__(self, track_id: Any, initial_bbox: List[float], initial_centroid: Tuple[float, float]):
+    def __init__(self, track_id: Any, initial_bbox: List[float], initial_centroid: Tuple[float, float], now: Optional[float] = None):
         self.track_id = track_id
-        self.first_seen_ts = time.time()
-        self.last_seen_ts = time.time()
-        self.centroids: List[Tuple[float, float, float]] = [(initial_centroid[0], initial_centroid[1], time.time())]
+        ts = now if now is not None else time.time()
+        self.first_seen_ts = ts
+        self.last_seen_ts = ts
+        self.centroids: List[Tuple[float, float, float]] = [(initial_centroid[0], initial_centroid[1], ts)]
         self.bboxes: List[List[float]] = [initial_bbox]
         
         # State machine: "NORMAL" -> "CANDIDATE" -> "VERIFIED" -> "RESOLVING"
@@ -43,10 +44,10 @@ class TrackState:
         self.last_incident_type: Optional[str] = None
         self.last_explainability: Optional[Dict[str, Any]] = None
 
-    def update(self, bbox: List[float], centroid: Tuple[float, float]):
-        now = time.time()
-        self.last_seen_ts = now
-        self.centroids.append((centroid[0], centroid[1], now))
+    def update(self, bbox: List[float], centroid: Tuple[float, float], now: Optional[float] = None):
+        ts = now if now is not None else time.time()
+        self.last_seen_ts = ts
+        self.centroids.append((centroid[0], centroid[1], ts))
         self.bboxes.append(bbox)
         
         # Keep last 60 observations (~2-4 seconds depending on frame rate)
@@ -89,6 +90,22 @@ class KineticDetector:
         
         # Spatial zones: list of dicts with {"name": str, "type": "RESTRICTED"|"HIGH_RISK", "polygon": [[x,y],...]}
         self.spatial_zones: List[Dict[str, Any]] = []
+
+    def reset(self):
+        """Complete state reset when switching sources or initiating replay."""
+        self.tracks.clear()
+        self.frame_count = 0
+        self.motion_conf = 0.0
+        self.trajectory_conf = 0.0
+        self.velocity_conf = 0.0
+        self.fall_conf = 0.0
+        self.persistence_conf = 0.0
+        self.fusion_score = 0.0
+        self.scene_state = "NORMAL"
+        self.sos_activated = False
+        self.timeline.clear()
+        self.last_verified_event = None
+        self.start_time = time.time()
 
     def set_spatial_zones(self, zones: List[Dict[str, Any]]):
         """Configures spatial zones for restricted perimeter enforcement."""
@@ -139,7 +156,8 @@ class KineticDetector:
         self,
         bounding_boxes: List[Dict[str, Any]],
         keypoints: Optional[List[List[Any]]] = None,
-        frame_quality: Optional[Dict[str, Any]] = None
+        frame_quality: Optional[Dict[str, Any]] = None,
+        source_timestamp: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """
         Core perceptual & temporal evaluation function.
@@ -148,8 +166,9 @@ class KineticDetector:
             bounding_boxes: Detected boxes with track IDs and coordinates.
             keypoints: 17-point skeletal pose estimations.
             frame_quality: Dict containing sharpness (Laplacian var) and mean intensity (0-255).
+            source_timestamp: Monotonic video/stream time in seconds (ensures persistence uses video time).
         """
-        now = time.time()
+        now = source_timestamp if source_timestamp is not None else time.time()
         self.frame_count += 1
         events: List[Dict[str, Any]] = []
 
@@ -219,11 +238,11 @@ class KineticDetector:
                             closest_tid = tid
                 track_id = closest_tid if closest_tid is not None else f"trk_{idx}_{int(now)}"
 
-            # Instantiate or update track
+            # Instantiate or update track with source timestamp
             if track_id not in self.tracks:
-                self.tracks[track_id] = TrackState(track_id, [bx1, by1, bx2, by2], (cx, cy))
+                self.tracks[track_id] = TrackState(track_id, [bx1, by1, bx2, by2], (cx, cy), now=now)
             track = self.tracks[track_id]
-            track.update([bx1, by1, bx2, by2], (cx, cy))
+            track.update([bx1, by1, bx2, by2], (cx, cy), now=now)
 
             # Feature A: Sudden Velocity Change & Trajectory Deviation
             velocity_px_sec = 0.0
@@ -305,24 +324,41 @@ class KineticDetector:
                     zone_name = zone.get("name", "Restricted Area")
                     break
 
+            # Feature E: Proximity to other subjects (Inter-person physical interaction)
+            min_other_dist = 9999.0
+            for idx_other, c_other in enumerate(current_frame_centroids):
+                if idx_other != idx:
+                    d_other = self.calculate_distance((cx, cy), c_other)
+                    if d_other < min_other_dist:
+                        min_other_dist = d_other
+            
+            if min_other_dist < 65.0:
+                track.proximity_score = min(100.0, (65.0 - min_other_dist) * 2.0 + 35.0)
+                self.motion_conf = min(100.0, self.motion_conf + 15.0)
+            else:
+                track.proximity_score = max(0.0, track.proximity_score - 4.0)
+
             # 3. Temporal State Machine for this Track
             active_signals: List[Dict[str, Any]] = []
             if track.velocity_delta_score > 40.0:
                 active_signals.append({"name": "SUDDEN_VELOCITY_CHANGE", "score": round(track.velocity_delta_score, 1)})
             if track.trajectory_anomaly_score > 40.0:
                 active_signals.append({"name": "TRAJECTORY_DEVIATION", "score": round(track.trajectory_anomaly_score, 1)})
-            if track.motion_anomaly_score > 45.0:
+            if track.motion_anomaly_score > 35.0:
                 active_signals.append({"name": "MOTION_ANOMALY", "score": round(track.motion_anomaly_score, 1)})
             if track.collapse_score > 50.0:
                 active_signals.append({"name": "COLLAPSE_DETECTED", "score": round(track.collapse_score, 1)})
+            if track.proximity_score > 35.0 and track.motion_anomaly_score > 30.0:
+                active_signals.append({"name": "PROXIMITY_CLASH", "score": round(track.proximity_score, 1)})
             if in_restricted_zone:
                 active_signals.append({"name": "RESTRICTED_ZONE_BREACH", "score": 90.0, "zone": zone_name})
 
             # Evaluate Candidate Condition
             candidate_condition = (len(active_signals) >= 1 and (
                 track.velocity_delta_score > 45.0 or 
-                track.motion_anomaly_score > 50.0 or 
+                track.motion_anomaly_score > 40.0 or 
                 track.collapse_score > 50.0 or 
+                (track.proximity_score > 35.0 and track.motion_anomaly_score > 30.0) or
                 in_restricted_zone
             ))
 
@@ -330,7 +366,8 @@ class KineticDetector:
                 if track.candidate_since_ts is None:
                     track.candidate_since_ts = now
                     track.state = "CANDIDATE"
-                    self._add_timeline_event(f"Track #{track.track_id}: Candidate state flagged", "WARNING")
+                    cand_desc = "AGGRESSIVE_INTERACTION_CANDIDATE" if (track.proximity_score > 35.0 or track.motion_anomaly_score > 40.0) else "Candidate state"
+                    self._add_timeline_event(f"Track #{track.track_id}: {cand_desc} flagged", "WARNING")
                 
                 track.persistence_duration = now - track.candidate_since_ts
                 persistence_pct = min(100.0, (track.persistence_duration / 3.0) * 100.0)
@@ -349,19 +386,21 @@ class KineticDetector:
                         track.state = "CANDIDATE"
                         self._add_timeline_event(f"Track #{track.track_id}: Verification held due to {suppression_reason}", "WARNING")
                     elif track.state != "VERIFIED":
-                        # Promote to VERIFIED
+                        # Promote to VERIFIED with grounded, defensible naming
                         track.state = "VERIFIED"
                         track.verified_ts = now
                         self.scene_state = "VERIFIED"
                         self.sos_activated = True
 
-                        incident_type = "MOTION_ANOMALY"
+                        incident_type = "ANOMALOUS_KINETIC_PATTERN"
                         if track.collapse_score > 55.0:
-                            incident_type = "COLLAPSE_DETECTED"
+                            incident_type = "SUDDEN_COLLAPSE_PATTERN"
                         elif in_restricted_zone:
-                            incident_type = "ZONE_INTRUSION"
+                            incident_type = "RESTRICTED_ZONE_INTRUSION"
+                        elif track.proximity_score > 35.0 or track.motion_anomaly_score > 40.0:
+                            incident_type = "PHYSICAL_AGGRESSION_PATTERN"
                         elif track.velocity_delta_score > 50.0 and track.trajectory_anomaly_score > 40.0:
-                            incident_type = "TRAJECTORY_DEVIATION"
+                            incident_type = "ERRATIC_TRAJECTORY_PATTERN"
 
                         track.last_incident_type = incident_type
 
@@ -387,7 +426,7 @@ class KineticDetector:
 
                         events.append({
                             "type": incident_type,
-                            "risk_level": "CRITICAL" if track.collapse_score > 55.0 or in_restricted_zone else "HIGH",
+                            "risk_level": "CRITICAL" if (track.collapse_score > 55.0 or in_restricted_zone or incident_type == "PHYSICAL_AGGRESSION_PATTERN") else "HIGH",
                             "track_id": track.track_id,
                             "confidence": round(min(100.0, 60.0 + (track.persistence_duration * 10.0)), 1),
                             "bbox": [bx1, by1, bx2, by2],
@@ -402,14 +441,6 @@ class KineticDetector:
                         track.state = "NORMAL"
                         track.candidate_since_ts = None
                         track.persistence_duration = 0.0
-
-        # Feature E: Inter-Person Proximity Clustering
-        if len(current_frame_centroids) >= 2:
-            for i in range(len(current_frame_centroids)):
-                for j in range(i + 1, len(current_frame_centroids)):
-                    p_dist = self.calculate_distance(current_frame_centroids[i], current_frame_centroids[j])
-                    if p_dist < 45.0:  # Intimate physical clash range
-                        self.motion_conf = min(100.0, self.motion_conf + 15.0)
 
         # 4. Calculate Scene-Wide Fusion Score
         self.fusion_score = (
