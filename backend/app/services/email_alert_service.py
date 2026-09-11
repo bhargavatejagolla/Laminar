@@ -341,6 +341,7 @@ class EmailAlertService:
                 coords = str(metadata["coordinates"])
 
             venue_name = (metadata.get("venue_name") or "Municipal Traffic Corridor") if metadata else "Municipal Traffic Corridor"
+            camera_name = (metadata.get("camera_name") or metadata.get("camera_id") or "CCTV Node") if metadata else "CCTV Node"
             action = (metadata.get("recommended_action") or "Notify emergency response personnel and deploy on-duty traffic marshals for corridor clearance.") if metadata else "Notify emergency response personnel and deploy on-duty traffic marshals for corridor clearance."
             
             # Neural Insight / Explanation

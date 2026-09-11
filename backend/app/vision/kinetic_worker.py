@@ -12,7 +12,6 @@ from app.vision.kinetic_detector import KineticDetector
 from app.core.global_state import GLOBAL_STATE
 from app.core.database import db_manager
 from app.services.notification_service import notification_service
-from app.api.v1.endpoints.kinetic import push_kinetic_event
 
 logger = get_logger(__name__)
 
@@ -31,16 +30,19 @@ def draw_pose_overlay(frame: np.ndarray, result, anomalies: list = None) -> np.n
     if hasattr(result, 'keypoints') and result.keypoints:
         for i, (kpts, box) in enumerate(zip(result.keypoints, result.bounding_boxes)):
             color = SKELETON_COLORS[i % len(SKELETON_COLORS)]
-            x1, y1, x2, y2 = [int(p) for p in box["bbox"][0]]
+            raw_b = box.get("bbox", [0, 0, 0, 0])
+            if len(raw_b) == 1 and isinstance(raw_b[0], (list, tuple)):
+                raw_b = raw_b[0]
+            x1, y1, x2, y2 = [int(float(p)) for p in raw_b]
+            track_id = box.get("id")
             
             # Check if this person is part of an anomaly
             person_anomaly = None
             for a in anomalies:
                 ax1, ay1, ax2, ay2 = a["bbox"]
-                # naive IoU or center distance check (using center for simplicity)
                 cx, cy = (x1+x2)/2, (y1+y2)/2
                 acx, acy = (ax1+ax2)/2, (ay1+ay2)/2
-                if abs(cx-acx) < 50 and abs(cy-acy) < 50:
+                if abs(cx-acx) < 60 and abs(cy-acy) < 60:
                     person_anomaly = a
                     break
             
@@ -61,67 +63,20 @@ def draw_pose_overlay(frame: np.ndarray, result, anomalies: list = None) -> np.n
                     box_color = (0, 255, 255) # Yellow
                     bg_color = (0, 150, 150)
                     thickness = 2
-            # Draw Safety Bubble and Threat Levels
-            threat_level = box.get("threat_level")
-            is_primary = box.get("primary")
             
-            if threat_level:
-                if threat_level == "Red":
-                    box_color = (0, 0, 255)
-                    bg_color = (0, 0, 150)
-                elif threat_level == "Orange":
-                    box_color = (0, 128, 255)
-                    bg_color = (0, 80, 150)
-                elif threat_level == "Yellow":
-                    box_color = (0, 255, 255)
-                    bg_color = (0, 150, 150)
-                elif threat_level == "Green":
-                    box_color = (0, 255, 0)
-                    bg_color = (0, 150, 0)
-                    
-            if is_primary:
-                box_color = (0, 255, 0) # Green for primary subject
-                bubble_radius = int(max(x2-x1, y2-y1) * 1.5)
-                cx, cy = int((x1+x2)/2), int((y1+y2)/2)
-                cv2.circle(overlay, (cx, cy), bubble_radius, (0, 255, 0), 2, cv2.LINE_AA)
-                
-                label = "PROTECTED SUBJECT"
-                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-                text_y = max(th + 5, y1 - 25)
-                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), (0, 150, 0), -1)
-                cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-            elif threat_level:
-                label = f"THREAT: {threat_level.upper()}"
-                bubble_radius = int(max(x2-x1, y2-y1) * 0.8)
-                cx, cy = int((x1+x2)/2), int((y1+y2)/2)
-                dist_str = "1.2m" # mock distance
-                
-                if threat_level == "Red":
-                    box_color = (0, 0, 255)
-                    bg_color = (0, 0, 150)
-                    cv2.circle(overlay, (cx, cy), bubble_radius, (0, 0, 255), 2, cv2.LINE_AA)
-                    dist_str = "0.5m"
-                    label = "THREAT ACTOR"
-                elif threat_level == "Orange":
-                    box_color = (0, 165, 255)
-                    bg_color = (0, 100, 200)
-                    cv2.circle(overlay, (cx, cy), bubble_radius, (0, 165, 255), 2, cv2.LINE_AA)
-                    dist_str = "0.8m"
-                    label = "UNKNOWN PERSON"
-                else:
-                    cv2.circle(overlay, (cx, cy), bubble_radius, box_color, 1, cv2.LINE_AA)
+            # Label track ID
+            track_label = f"TRACK #{track_id}" if track_id is not None else f"ID #{i+1}"
+            (tw, th), _ = cv2.getTextSize(track_label, cv2.FONT_HERSHEY_SIMPLEX, 0.40, 1)
+            text_y = max(th + 5, y1 - 8)
+            cv2.rectangle(overlay, (x1, text_y - th - 4), (x1 + tw + 8, text_y + 4), (20, 20, 30), -1)
+            cv2.putText(overlay, track_label, (x1 + 4, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (220, 220, 220), 1, cv2.LINE_AA)
 
-                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-                text_y = max(th + 5, y1 - 8)
-                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), bg_color, -1)
-                cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-                cv2.putText(overlay, f"Dist: {dist_str}", (cx - 20, y2 + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, box_color, 1, cv2.LINE_AA)
             # Draw glowing bounding box
             cv2.rectangle(overlay, (x1, y1), (x2, y2), box_color, thickness)
             
             # Add corner accents (Cyberpunk style)
-            length = min(30, int((x2-x1)*0.2))
-            c_thick = thickness + 2
+            length = min(30, int(max(10, (x2-x1)*0.2)))
+            c_thick = thickness + 1
             cv2.line(overlay, (x1, y1), (x1 + length, y1), box_color, c_thick)
             cv2.line(overlay, (x1, y1), (x1, y1 + length), box_color, c_thick)
             cv2.line(overlay, (x2, y1), (x2 - length, y1), box_color, c_thick)
@@ -132,11 +87,13 @@ def draw_pose_overlay(frame: np.ndarray, result, anomalies: list = None) -> np.n
             cv2.line(overlay, (x2, y2), (x2, y2 - length), box_color, c_thick)
             
             if person_anomaly:
-                label = f"[{person_anomaly['type']}] CONF: {person_anomaly.get('confidence', 0)}%"
+                anom_type = person_anomaly.get("type", "ANOMALY").replace("_", " ")
+                conf = person_anomaly.get("confidence", 0)
+                label = f"[{anom_type}] {conf}%"
                 (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-                text_y = max(th + 5, y1 - 8)
-                cv2.rectangle(overlay, (x1, text_y - th - 5), (x1 + tw + 10, text_y + 5), bg_color, -1)
-                cv2.putText(overlay, label, (x1 + 5, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                text_y = y2 + th + 12
+                cv2.rectangle(overlay, (x1, text_y - th - 4), (x1 + tw + 8, text_y + 4), bg_color, -1)
+                cv2.putText(overlay, label, (x1 + 4, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
 
             if kpts:
                 # Draw keypoints
