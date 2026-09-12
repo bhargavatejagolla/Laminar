@@ -5,481 +5,973 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import {
-    ArrowLeft, 
-    AlertTriangle, 
-    Cpu, 
+    ArrowLeft,
+    AlertTriangle,
+    Cpu,
     Zap,
     UploadCloud,
     Siren,
     Clock,
     Activity,
-    Trash2,
     CheckCircle2,
     ShieldCheck,
     Navigation,
     Route,
-    Search,
-    Target
+    Radio,
+    Compass,
+    Sliders,
+    Layers,
+    Play,
+    RotateCcw,
+    Power,
+    Check,
+    Lock,
+    ExternalLink,
+    Video,
+    ShieldAlert,
+    Camera,
+    Info,
+    ChevronRight,
+    Send
 } from "lucide-react";
 
-const WaveBackground = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20 mix-blend-screen z-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] opacity-20">
-            <div className="w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.15)_0%,transparent_50%)] animate-pulse" style={{ animationDuration: '4s' }} />
-        </div>
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.05)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_80%,transparent_100%)]"></div>
-    </div>
-);
+interface ScenarioItem {
+    id: string;
+    title: string;
+    badge: string;
+    category: string;
+    risk_level: string;
+    filename: string;
+    duration_seconds: number;
+    fps: number;
+    resolution: string;
+    description: string;
+    expected_outcome: string;
+    file_available: boolean;
+    capabilities: {
+        vehicle_detection: boolean;
+        emergency_classification: boolean;
+        beacon_analysis: string;
+        tracking: boolean;
+        route_prediction: boolean;
+        signal_controller: string;
+    };
+}
 
-type SignalState = "red" | "green" | "yellow";
+interface CameraNode {
+    id: string;
+    name: string;
+    stream_type: string;
+    stream_url: string;
+    venue_id: string;
+}
 
 export default function SmartGreenWavePage() {
-  const { t } = useTranslation();
-
+    const { t } = useTranslation();
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
-    
-    // Core App States
-    const [videoUrl, setVideoUrl] = useState<string | null>(null);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-    // Simulation States
-    const [logs, setLogs] = useState<{time: string, text: string, type: 'info' | 'alert'}[]>([]);
-    const [density, setDensity] = useState<string>("Low");
-    const [targetId, setTargetId] = useState<string>("");
-    const [confidence, setConfidence] = useState<number>(0);
+    // Source Lab & Stream States
+    const [selectedSessionId, setSelectedSessionId] = useState<string>("GREENWAVE_DEMO_NODE_01");
+    const [streamKey, setStreamKey] = useState<number>(Date.now());
+    const [streamError, setStreamError] = useState(false);
+    const [isDemoRunning, setIsDemoRunning] = useState(false);
+    const [activeScenarioId, setActiveScenarioId] = useState<string>("ambulance_transit");
+    const [scenarios, setScenarios] = useState<ScenarioItem[]>([]);
+    const [liveCameras, setLiveCameras] = useState<CameraNode[]>([]);
+    const [showSourceLabModal, setShowSourceLabModal] = useState(false);
+    const [sourceLabTab, setSourceLabTab] = useState<"demo" | "live" | "upload">("demo");
+    const [uploading, setUploading] = useState(false);
+    const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+    // Operator Authorization Modal States
+    const [showAuthorizeModal, setShowAuthorizeModal] = useState(false);
+    const [operatorId, setOperatorId] = useState("OPERATOR_TRAFFIC_CHIEF");
+    const [operatorNotes, setOperatorNotes] = useState("Authorized based on verified multi-frame ambulance persistence.");
+    const [isAuthorizing, setIsAuthorizing] = useState(false);
+    const [authorizationAudit, setAuthorizationAudit] = useState<any>(null);
+
+    // Live Telemetry States
+    const [sceneState, setSceneState] = useState<string>("MONITORING");
     const [vehicleCount, setVehicleCount] = useState<number>(0);
-    const [candidateCount, setCandidateCount] = useState<number>(0);
-    const [avgSpeed, setAvgSpeed] = useState<number>(0);
-    const [congestionIndex, setCongestionIndex] = useState<number>(0);
-    const [status, setStatus] = useState<string>("NO EMERGENCY");
-    const [reasoning, setReasoning] = useState<any>({ light: 0, motion: 0, vehicle: 0, priority: 0 });
-    const [sessionId, setSessionId] = useState<string | null>(null);
-    const [simStep, setSimStep] = useState(0);
-
-    const [corridorNodes, setCorridorNodes] = useState({
-        A: { eta: "8s", cleared: false, status: "Preparing" },
-        B: { eta: "19s", cleared: false, status: "Standby" },
-        C: { eta: "31s", cleared: false, status: "Standby" }
+    const [emergencyVehicles, setEmergencyVehicles] = useState<number>(0);
+    const [candidateTrackId, setCandidateTrackId] = useState<string | null>(null);
+    const [verifiedTrackId, setVerifiedTrackId] = useState<string | null>(null);
+    const [persistenceSeconds, setPersistenceSeconds] = useState<number>(0.0);
+    const [evidence, setEvidence] = useState<any>({
+        vehicle_classification: 0.0,
+        emergency_markings: 0.0,
+        track_consistency: 0.0,
+        temporal_consistency: 0.0,
+        motion_consistency: 0.0,
+        beacon_signal: "SUPPORTING (STATIC)",
+        composite_confidence: 0.0,
+        evidence_quality: "INSUFFICIENT",
+        decision: "STANDBY - AWAITING CAMERA SIGNAL"
     });
+    const [corridorPlan, setCorridorPlan] = useState<any>({
+        corridor_id: "PVNR-CORRIDOR-01",
+        corridor_name: "PVNR Expressway Corridor",
+        city: "Hyderabad Smart City Core",
+        junctions: [
+            { id: "J1", name: "Mehdipatnam Junction (J1)", distance_meters: 220, dynamic_eta_sec: 16, clearance_recommendation: "STANDBY / NORMAL CYCLE", active: false },
+            { id: "J2", name: "Attapur Crossing (J2)", distance_meters: 540, dynamic_eta_sec: 39, clearance_recommendation: "STANDBY / NORMAL CYCLE", active: false },
+            { id: "J3", name: "Aramghar Junction (J3)", distance_meters: 980, dynamic_eta_sec: 67, clearance_recommendation: "STANDBY / NORMAL CYCLE", active: false }
+        ],
+        signal_controller: {
+            status: "NOT CONNECTED (ADVISORY MODE)",
+            protocol: "NTCIP-1202 / SCATS (ADVISORY)"
+        }
+    });
+    const [activeTrack, setActiveTrack] = useState<any>(null);
+    const [timeline, setTimeline] = useState<any[]>([]);
 
     useEffect(() => {
         setMounted(true);
+        fetchScenarios();
+        fetchLiveCameras();
+        fetchTelemetry();
+
+        // Engage initial demo scenario automatically
+        handleSelectScenario("ambulance_transit");
+
+        // Polling fallback every 1.5s
+        const interval = setInterval(fetchTelemetry, 1500);
+
+        // Connect SSE stream
+        let es: EventSource | null = null;
+        try {
+            es = new EventSource(`/api/v1/greenwave/events/stream/${selectedSessionId}`);
+            es.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.scene_state) setSceneState(data.scene_state);
+                    if (data.vehicle_count !== undefined) setVehicleCount(data.vehicle_count);
+                    if (data.emergency_vehicles !== undefined) setEmergencyVehicles(data.emergency_vehicles);
+                    if (data.candidate_track_id !== undefined) setCandidateTrackId(data.candidate_track_id);
+                    if (data.verified_track_id !== undefined) setVerifiedTrackId(data.verified_track_id);
+                    if (data.persistence_seconds !== undefined) setPersistenceSeconds(data.persistence_seconds);
+                    if (data.evidence) setEvidence(data.evidence);
+                    if (data.corridor_plan) setCorridorPlan(data.corridor_plan);
+                    if (data.active_track !== undefined) setActiveTrack(data.active_track);
+                    if (data.timeline) setTimeline(data.timeline);
+                } catch (err) {
+                    console.error("SSE parse error:", err);
+                }
+            };
+        } catch (e) {
+            console.error("SSE connection error:", e);
+        }
+
+        return () => {
+            clearInterval(interval);
+            if (es) es.close();
+        };
     }, []);
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setIsAnalyzing(true);
-            setSimStep(1);
-            setLogs([{ time: new Date().toLocaleTimeString('en-US', { hour12: false }), text: "Uploading video to analysis engine...", type: "info" }]);
-            
-            const formData = new FormData();
-            formData.append("file", file);
-            
-            try {
-                const res = await fetch("http://localhost:8000/api/v1/greenwave/upload", {
-                    method: "POST",
-                    body: formData
-                });
+    const fetchScenarios = async () => {
+        try {
+            const res = await fetch("/api/v1/greenwave/scenarios");
+            if (res.ok) {
                 const data = await res.json();
-                const session_id = data.session_id;
-                setSessionId(session_id);
-                
-                // Connect to stream
-                setVideoUrl(`http://localhost:8000/api/v1/greenwave/stream/${session_id}`);
-                
-                // Connect to SSE
-                const sse = new EventSource(`http://localhost:8000/api/v1/greenwave/events/stream/${session_id}`);
-                sse.onmessage = (event) => {
-                    const parsed = JSON.parse(event.data);
-                    if (parsed.status) {
-                        setStatus(parsed.status);
-                        
-                        // Map status to simStep for visual timeline if needed
-                        if (parsed.status === "SCANNING") setSimStep(1);
-                        else if (parsed.status === "CANDIDATE" || parsed.status === "CANDIDATE FOUND") setSimStep(2);
-                        else if (parsed.status === "VERIFYING" || parsed.status === "TRACKING") setSimStep(3);
-                        else if (parsed.status === "CONFIRMED") setSimStep(4);
-                        else if (parsed.status === "CORRIDOR ACTIVE") setSimStep(5);
-                        else if (parsed.status === "MISSION COMPLETE") setSimStep(6);
-                        
-                        setLogs(parsed.logs || []);
-                        if (parsed.target_id !== undefined) setTargetId(parsed.target_id);
-                        if (parsed.confidence !== undefined) setConfidence(parsed.confidence);
-                        if (parsed.density !== undefined) setDensity(parsed.density);
-                        if (parsed.vehicle_count !== undefined) setVehicleCount(parsed.vehicle_count);
-                        if (parsed.candidate_count !== undefined) setCandidateCount(parsed.candidate_count);
-                        if (parsed.avg_speed !== undefined) setAvgSpeed(parsed.avg_speed);
-                        if (parsed.congestion_index !== undefined) setCongestionIndex(parsed.congestion_index);
-                        if (parsed.reasoning !== undefined) setReasoning(parsed.reasoning);
-                        if (parsed.corridor_nodes) setCorridorNodes(parsed.corridor_nodes);
-                    }
-                };
-            } catch (err) {
-                console.error(err);
-                setLogs(prev => [{ time: new Date().toLocaleTimeString('en-US', { hour12: false }), text: "Failed to upload video to engine", type: "alert" }, ...prev]);
+                setScenarios(data);
             }
+        } catch (e) {
+            console.error("Failed to load scenarios:", e);
         }
     };
 
-    const resetSystem = async () => {
-        if (sessionId) {
-            try {
-                await fetch(`http://localhost:8000/api/v1/greenwave/reset/${sessionId}`, { method: "POST" });
-            } catch(e) {}
+    const fetchLiveCameras = async () => {
+        try {
+            const res = await fetch("/api/v1/cameras");
+            if (res.ok) {
+                const data = await res.json();
+                setLiveCameras(data);
+            }
+        } catch (e) {
+            console.error("Failed to load cameras:", e);
         }
-        if (videoUrl && !videoUrl.includes('localhost')) URL.revokeObjectURL(videoUrl);
-        setVideoUrl(null);
-        setIsAnalyzing(false);
-        setLogs([]);
-        setSimStep(0);
-        setSessionId(null);
-        setTargetId("");
-        setConfidence(0);
-        setVehicleCount(0);
-        setCandidateCount(0);
-        setAvgSpeed(0);
-        setCongestionIndex(0);
-        setDensity("Low");
-        setStatus("NO EMERGENCY");
-        setReasoning({ light: 0, motion: 0, vehicle: 0, priority: 0 });
-        setCorridorNodes({
-            A: { eta: "8s", cleared: false, status: "Preparing" },
-            B: { eta: "19s", cleared: false, status: "Standby" },
-            C: { eta: "31s", cleared: false, status: "Standby" }
-        });
+    };
+
+    const fetchTelemetry = async () => {
+        try {
+            const res = await fetch(`/api/v1/greenwave/telemetry/${selectedSessionId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.scene_state) setSceneState(data.scene_state);
+                if (data.vehicle_count !== undefined) setVehicleCount(data.vehicle_count);
+                if (data.emergency_vehicles !== undefined) setEmergencyVehicles(data.emergency_vehicles);
+                if (data.candidate_track_id !== undefined) setCandidateTrackId(data.candidate_track_id);
+                if (data.verified_track_id !== undefined) setVerifiedTrackId(data.verified_track_id);
+                if (data.persistence_seconds !== undefined) setPersistenceSeconds(data.persistence_seconds);
+                if (data.evidence) setEvidence(data.evidence);
+                if (data.corridor_plan) setCorridorPlan(data.corridor_plan);
+                if (data.active_track !== undefined) setActiveTrack(data.active_track);
+                if (data.timeline) setTimeline(data.timeline);
+            }
+        } catch (e) {
+            console.error("Telemetry fetch error:", e);
+        }
+    };
+
+    const handleSelectScenario = async (scId: string) => {
+        try {
+            const res = await fetch(`/api/v1/greenwave/demo/start?scenario_id=${scId}&camera_id=${selectedSessionId}`, {
+                method: "POST"
+            });
+            if (res.ok) {
+                setActiveScenarioId(scId);
+                setIsDemoRunning(true);
+                setStreamError(false);
+                setStreamKey(Date.now());
+                setShowSourceLabModal(false);
+                const sc = scenarios.find((s) => s.id === scId);
+                setActionMessage(`SCENARIO INGESTED: ${sc?.title || scId}. Running multi-signal vehicle perception and temporal tracking.`);
+                setTimeout(() => setActionMessage(null), 5000);
+                fetchTelemetry();
+            }
+        } catch (e) {
+            console.error("Failed to start scenario:", e);
+        }
+    };
+
+    const handleReplayScenario = async () => {
+        try {
+            const res = await fetch(`/api/v1/greenwave/demo/replay?camera_id=${selectedSessionId}`, {
+                method: "POST"
+            });
+            if (res.ok) {
+                setStreamKey(Date.now());
+                setActionMessage("SCENARIO REPLAYED: Video rewound to frame 0. Temporal tracks, hysteresis, and candidate state reset.");
+                setTimeout(() => setActionMessage(null), 4000);
+                fetchTelemetry();
+            }
+        } catch (e) {
+            console.error("Failed to replay scenario:", e);
+        }
+    };
+
+    const handleStopSource = async () => {
+        try {
+            const res = await fetch(`/api/v1/greenwave/demo/stop?camera_id=${selectedSessionId}`, {
+                method: "POST"
+            });
+            if (res.ok) {
+                setIsDemoRunning(false);
+                setStreamKey(Date.now());
+                setActionMessage("SOURCE HALTED: Green Wave returned to clean STANDBY mode.");
+                setTimeout(() => setActionMessage(null), 4000);
+                fetchTelemetry();
+            }
+        } catch (e) {
+            console.error("Failed to stop source:", e);
+        }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const res = await fetch(`/api/v1/greenwave/upload?camera_id=${selectedSessionId}`, {
+                method: "POST",
+                body: formData
+            });
+            if (res.ok) {
+                setIsDemoRunning(true);
+                setStreamError(false);
+                setStreamKey(Date.now());
+                setShowSourceLabModal(false);
+                setActionMessage(`UPLOAD INGESTED: ${file.name}. Running downstream perception and temporal engine.`);
+                setTimeout(() => setActionMessage(null), 5000);
+                fetchTelemetry();
+            }
+        } catch (err) {
+            console.error("Upload failed:", err);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleAuthorizeCorridor = async () => {
+        setIsAuthorizing(true);
+        try {
+            const res = await fetch("/api/v1/greenwave/actions/authorize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    camera_id: selectedSessionId,
+                    corridor_id: corridorPlan.corridor_id,
+                    operator_id: operatorId,
+                    notes: operatorNotes,
+                    action: "AUTHORIZE_CLEARANCE"
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setAuthorizationAudit(data.audit);
+                setActionMessage("OPERATOR AUTHORIZATION LOGGED: Advisory clearance instructions generated.");
+                setTimeout(() => setActionMessage(null), 6000);
+            }
+        } catch (e) {
+            console.error("Authorization failed:", e);
+        } finally {
+            setIsAuthorizing(false);
+        }
     };
 
     if (!mounted) return null;
 
-    return (
-        <div className="min-h-screen bg-[#0a0a0c] text-white pb-24 relative overflow-hidden font-sans selection:bg-emerald-500/30 selection:text-emerald-200" style={{ '--emerald-400': '#34d399', '--emerald-500': '#10b981', '--slate-400': '#94a3b8', '--slate-500': '#64748b' } as React.CSSProperties}>
-            <WaveBackground />
-            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600 z-50 shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
+    const activeScenario = scenarios.find((s) => s.id === activeScenarioId);
+    const isVerified = sceneState === "VERIFIED" || sceneState === "TRANSIT ACTIVE";
+    const isCandidate = sceneState === "CANDIDATE";
 
-            <div className="relative z-10 px-6 pt-10 max-w-7xl mx-auto">
-                
-                {/* Header Section */}
-                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-10">
-                    <div className="flex items-start gap-6">
+    return (
+        <div className="relative min-h-screen w-full bg-[#070b10] text-slate-100 p-6 font-sans overflow-x-hidden">
+            {/* Top Navigation & Operational Control Header */}
+            <div className="flex flex-col gap-4 mb-6">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
                         <button
-                            onClick={() => router.push("/sentinel-command")}
-                            className="group flex flex-col items-center justify-center gap-1 mt-1 transition-all"
+                            onClick={() => router.push("/")}
+                            className="p-2.5 rounded-lg border border-slate-800 bg-slate-900/80 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50 transition-all shadow-sm"
                         >
-                            <div className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all shadow-[0_0_15px_rgba(0,0,0,0.3)]">
-                                <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors group-hover:-translate-x-0.5" />
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono tracking-widest uppercase text-emerald-400 font-semibold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40">
+                                    EMERGENCY CORRIDOR INTELLIGENCE ENGINE
+                                </span>
+                                <span className="text-xs text-slate-500">•</span>
+                                <span className="text-xs text-slate-400 font-mono">NODE: {selectedSessionId}</span>
                             </div>
-                            <span className="text-[9px] font-black tracking-[0.1em] text-slate-500 uppercase mt-1">{t("auto.Backto_7489") || "Back to"}<br/>{t("auto.Command_9711") || "Command"}</span>
+                            <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3 mt-0.5">
+                                LAMINAR GREEN WAVE 2.0
+                                <span className="text-xs font-normal px-2.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 font-mono">
+                                    CORRIDOR ADVISORY ACTIVE
+                                </span>
+                            </h1>
+                        </div>
+                    </div>
+
+                    {/* Workstation Source Controls */}
+                    <div className="flex items-center gap-2.5">
+                        <button
+                            onClick={() => setShowSourceLabModal(true)}
+                            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-mono text-xs font-medium transition-all shadow-sm hover:border-emerald-400"
+                        >
+                            <Video className="w-3.5 h-3.5" />
+                            GREEN WAVE SOURCE LAB
                         </button>
 
-                        <div>
-                            <div className="flex items-center gap-3 mb-1">
-                                <Activity className="w-5 h-5 text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-500">
-                                    {t("auto.EmergencyCorrid_808") || "Emergency Corridor Intelligence Engine"}
+                        <button
+                            onClick={handleReplayScenario}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 text-slate-300 font-mono text-xs transition-all"
+                            title="Rewind video and reset temporal engine"
+                        >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            REPLAY
+                        </button>
+
+                        <button
+                            onClick={handleStopSource}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-950/30 hover:bg-rose-900/40 border border-rose-800/40 text-rose-300 font-mono text-xs transition-all"
+                            title="Halt source to clean standby"
+                        >
+                            <Power className="w-3.5 h-3.5" />
+                            STANDBY
+                        </button>
+                    </div>
+                </div>
+
+                {/* Dynamic Scene Context Banner */}
+                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5 flex items-center justify-between shadow-inner">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-emerald-950/60 border border-emerald-800/40 text-emerald-400">
+                            <Info className="w-4 h-4" />
+                        </div>
+                        <div className="text-xs">
+                            <div className="flex items-center gap-2 font-mono">
+                                <span className="text-slate-400">SOURCE CONTEXT:</span>
+                                <span className="font-semibold text-white">
+                                    {activeScenario?.title || "Custom Source Feed"}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    activeScenario?.category === "BASELINE"
+                                        ? "bg-slate-800 text-slate-300 border border-slate-700"
+                                        : "bg-rose-950/60 text-rose-300 border border-rose-800/50"
+                                }`}>
+                                    {activeScenario?.badge || "ACTIVE FEED"}
                                 </span>
                             </div>
-                            <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase drop-shadow-[0_0_10px_rgba(255,255,255,0.1)] mb-2">
-                                {t("auto.LaminarGreenWav_2687") || "Laminar Green Wave"} <span className="text-emerald-500">2.0</span>
-                            </h1>
-                            <p className="text-xs md:text-sm font-bold text-slate-400 tracking-widest uppercase flex items-center gap-2">
-                                Detect • Verify • Track • Predict • Clear Corridor • Measure Impact
+                            <p className="text-slate-400 mt-0.5 text-[11px]">
+                                {activeScenarioId === "normal_traffic"
+                                    ? "TESTED NEGATIVE CONTROL: Arterial highway traffic with ordinary vehicles. Evaluates zero verified emergency false positives."
+                                    : activeScenarioId === "ambulance_transit"
+                                    ? "HERO EMERGENCY TRANSIT: Real ambulance in congested corridor. Demonstrates multi-signal livery analysis, candidate flagging, persistence verification (≥3.0s), and dynamic road-graph junction clearance."
+                                    : "Ingesting external video source through downstream perception, tracking, and road-graph prediction engine."}
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shadow-[0_0_8px_rgba(16,185,129,1)]"></span>
-                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">{t("auto.SystemOnline_4221") || "System Online"}</span>
+                    <div className="flex items-center gap-4 text-right font-mono text-xs">
+                        <div>
+                            <div className="text-[10px] text-slate-500 uppercase">Perception Status</div>
+                            <div className="text-emerald-400 font-medium">YOLOv11 + Multi-Signal Fusion</div>
                         </div>
-                        {isAnalyzing && (
-                            <button onClick={resetSystem} className="p-2 bg-red-500/10 border border-red-500/30 rounded-xl hover:bg-red-500/20 transition-all text-red-400" title={t("auto.DeleteFeedReset_5940") || "Delete Feed & Reset"}>
-                                <Trash2 className="w-5 h-5" />
-                            </button>
-                        )}
+                        <div className="h-6 w-px bg-slate-800" />
+                        <div>
+                            <div className="text-[10px] text-slate-500 uppercase">Controller Status</div>
+                            <div className="text-amber-400 font-medium">ADVISORY MODE (NOT CONNECTED)</div>
+                        </div>
                     </div>
-                </motion.div>
+                </div>
 
-                <AnimatePresence mode="wait">
-                    {!isAnalyzing ? (
-                        // EMPTY STATE
-                        <motion.div 
-                            key="empty"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-                        >
-                            <div className="lg:col-span-2 bg-[#121216] border border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden group shadow-inner">
-                                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.05)_0%,transparent_60%)]"></div>
-                                
-                                <motion.div 
-                                    animate={{ opacity: [0.5, 1, 0.5] }} 
-                                    transition={{ duration: 3, repeat: Infinity }}
-                                    className="mb-8 p-6 bg-white/5 rounded-full border border-white/5"
-                                >
-                                    <AlertTriangle className="w-16 h-16 text-slate-500" strokeWidth={1.5} />
-                                </motion.div>
-                                
-                                <h2 className="text-2xl font-black uppercase tracking-widest text-white mb-4 drop-shadow-md">{t("auto.NoEmergencyVehi_4020") || "No Emergency Vehicle Detected"}</h2>
-                                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-md text-center leading-relaxed mb-8">
-                                    {t("auto.CorridorEngines_8976") || "Corridor Engine standby. Upload a video, stream RTSP, or trigger via Guardian SOS."}
-                                </p>
-                                
-                                <label className="cursor-pointer relative z-10 group/btn flex flex-col items-center">
-                                    <div className="px-6 py-3 rounded-xl bg-emerald-500 text-black font-black uppercase tracking-widest flex items-center gap-3 transition-all group-hover/btn:bg-emerald-400 group-hover/btn:scale-105 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-                                        <UploadCloud className="w-5 h-5" /> {t("auto.UploadVideo_8630") || "Upload Video"}
-                                    </div>
-                                    <input type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
-                                    <span className="text-[10px] text-slate-500 font-mono mt-3 uppercase tracking-widest">or RTSP / Guardian Trigger</span>
-                                </label>
+                {/* Transient Action Message Banner */}
+                {actionMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="rounded-lg border border-emerald-500/40 bg-emerald-950/70 text-emerald-200 px-4 py-2.5 text-xs font-mono flex items-center gap-2"
+                    >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{actionMessage}</span>
+                    </motion.div>
+                )}
+            </div>
+
+            {/* 3-Column Workstation Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* ── Left Column: Video Viewport & Scene Matrix (Cols 1-5) ───────────── */}
+                <div className="lg:col-span-5 flex flex-col gap-4">
+                    {/* Viewport Card */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-lg flex flex-col">
+                        <div className="px-4 py-2.5 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between font-mono text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="font-semibold text-slate-200">EMERGENCY VEHICLE DISCOVERY</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                                <span>CAM-ID: {selectedSessionId}</span>
+                                <span>30 FPS</span>
+                            </div>
+                        </div>
+
+                        {/* Stream Frame Container */}
+                        <div className="relative aspect-[4/3] bg-black flex items-center justify-center overflow-hidden">
+                            {!streamError ? (
+                                <img
+                                    key={streamKey}
+                                    src={`/api/v1/greenwave/stream/${selectedSessionId}?t=${streamKey}`}
+                                    alt="Laminar Green Wave Live Stream"
+                                    className="w-full h-full object-cover"
+                                    onError={() => setStreamError(true)}
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center p-6 text-center">
+                                    <AlertTriangle className="w-8 h-8 text-amber-400 mb-2" />
+                                    <p className="text-xs font-mono text-slate-300">Re-establishing Green Wave stream connection...</p>
+                                    <button
+                                        onClick={() => {
+                                            setStreamError(false);
+                                            setStreamKey(Date.now());
+                                        }}
+                                        className="mt-3 px-3 py-1.5 rounded bg-slate-800 text-xs font-mono text-emerald-400 border border-slate-700"
+                                    >
+                                        RETRY STREAM
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Viewport Provenance Watermark */}
+                            <div className="absolute top-3 left-3 px-2 py-1 rounded bg-black/70 backdrop-blur border border-white/10 text-[10px] font-mono text-emerald-400 flex items-center gap-1.5">
+                                <Radio className="w-3 h-3 animate-pulse" />
+                                LIVE FEED
                             </div>
 
-                            <div className="space-y-6">
-                                {/* Infrastructure Load */}
-                                <div className="bg-[#121216] border border-emerald-500/20 rounded-3xl p-6 relative overflow-hidden shadow-[inset_0_0_20px_rgba(16,185,129,0.02)]">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-6">{t("auto.InfrastructureL_4398") || "Infrastructure Load"}</h3>
-                                    
-                                    <div className="mb-8">
-                                        <div className="flex justify-between items-end mb-2">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("auto.ActiveCapacity_4979") || "Active Capacity"}</span>
-                                            <span className="text-xl font-black font-mono">0%</span>
-                                        </div>
-                                        <div className="w-full h-2 bg-black rounded-full overflow-hidden border border-white/5">
-                                            <div className="h-full w-0 bg-emerald-500"></div>
-                                        </div>
-                                    </div>
+                            <div className="absolute top-3 right-3 px-2 py-1 rounded bg-black/70 backdrop-blur border border-white/10 text-[10px] font-mono text-slate-300">
+                                {activeScenario?.title || "CUSTOM"}
+                            </div>
+                        </div>
 
-                                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                                        <div>
-                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">{t("auto.Venues_9902") || "Venues"}</span>
-                                            <span className="text-2xl font-black font-mono text-white">0</span>
+                        {/* Viewport Bottom Telemetry Bar */}
+                        <div className="p-3 bg-slate-950/60 border-t border-slate-800 grid grid-cols-2 gap-3 text-xs font-mono">
+                            <div className="rounded-lg bg-slate-900/80 p-2.5 border border-slate-800/80">
+                                <div className="text-[10px] text-slate-400 uppercase">Live Vehicles In FOV</div>
+                                <div className="text-lg font-bold text-white mt-0.5">{vehicleCount} <span className="text-xs font-normal text-slate-400">Tracked</span></div>
+                            </div>
+                            <div className="rounded-lg bg-slate-900/80 p-2.5 border border-slate-800/80">
+                                <div className="text-[10px] text-slate-400 uppercase">Emergency Vehicles</div>
+                                <div className={`text-lg font-bold mt-0.5 ${emergencyVehicles > 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                                    {emergencyVehicles} <span className="text-xs font-normal text-slate-400">{emergencyVehicles > 0 ? "Verified" : "None"}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Scene Context & Spatial Matrix */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm flex flex-col gap-3 font-mono text-xs">
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <span className="text-slate-400 font-semibold uppercase text-[11px] flex items-center gap-2">
+                                <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                                TRAJECTORY & SPEED CALIBRATION MATRIX
+                            </span>
+                            <span className="text-[10px] text-slate-500">HOMOGRAPHY GATE</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-lg bg-slate-950/60 p-2.5 border border-slate-800/60">
+                                <div className="text-[10px] text-slate-500 uppercase">Direction of Travel</div>
+                                <div className="text-sm font-bold text-slate-200 mt-1 flex items-center gap-1.5">
+                                    <Navigation className="w-3.5 h-3.5 text-emerald-400 rotate-45" />
+                                    {activeTrack?.direction || "STANDBY"}
+                                </div>
+                            </div>
+
+                            <div className="rounded-lg bg-slate-950/60 p-2.5 border border-slate-800/60">
+                                <div className="text-[10px] text-slate-500 uppercase">Speed Velocity</div>
+                                <div className="text-sm font-bold text-slate-200 mt-1">
+                                    {activeTrack?.speed_kmh ? (
+                                        <span className="text-emerald-400">{activeTrack.speed_kmh} km/h <span className="text-[9px] text-emerald-600 block font-normal">CALIBRATED</span></span>
+                                    ) : (
+                                        <span className="text-slate-300">{activeTrack?.speed_px_sec || 0} px/s <span className="text-[9px] text-amber-500/80 block font-normal">CALIBRATION REQ.</span></span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg bg-slate-950/60 p-2.5 border border-slate-800/60 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400">Target Track ID:</span>
+                            <span className="font-bold text-emerald-400">{candidateTrackId || verifiedTrackId || "NO CANDIDATE"}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Center Column: Lifecycle State & Multi-Signal Evidence (Cols 6-8) ─ */}
+                <div className="lg:col-span-4 flex flex-col gap-4">
+                    {/* Emergency Lifecycle State */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm flex flex-col gap-3 font-mono text-xs">
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <span className="text-slate-400 font-semibold uppercase text-[11px] flex items-center gap-2">
+                                <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                                EMERGENCY LIFECYCLE ENGINE
+                            </span>
+                            <span className="text-[10px] text-slate-500">5-STAGE HYSTERESIS</span>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                            {[
+                                { stage: "MONITORING", desc: "Arterial flow active. No emergency vehicle verified." },
+                                { stage: "CANDIDATE", desc: "Vehicle detected with candidate emergency markings." },
+                                { stage: "VERIFIED", desc: "Persistence satisfied (≥3.0s). Ambulance confirmed." },
+                                { stage: "TRANSIT ACTIVE", desc: "Ambulance actively traversing the configured corridor." },
+                                { stage: "RESOLVING", desc: "Emergency transit cleared. System returning to monitoring." }
+                            ].map((s) => {
+                                const isActive = sceneState === s.stage;
+                                return (
+                                    <div
+                                        key={s.stage}
+                                        className={`p-2.5 rounded-lg border transition-all ${
+                                            isActive
+                                                ? s.stage === "MONITORING"
+                                                    ? "bg-emerald-950/50 border-emerald-600/60 text-emerald-300 shadow-sm"
+                                                    : s.stage === "CANDIDATE"
+                                                    ? "bg-amber-950/50 border-amber-600/60 text-amber-300 shadow-sm"
+                                                    : "bg-rose-950/50 border-rose-600/60 text-rose-300 shadow-sm animate-pulse"
+                                                : "bg-slate-950/30 border-slate-800/50 text-slate-500"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-bold text-[11px]">{s.stage}</span>
+                                            {isActive && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
                                         </div>
-                                        <div>
-                                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-1">{t("auto.EdgeNodes_7901") || "Edge Nodes"}</span>
-                                            <span className="text-2xl font-black font-mono text-emerald-500">0</span>
-                                        </div>
+                                        <p className="text-[10px] mt-0.5 opacity-80">{s.desc}</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Multi-Signal Evidence Fusion Card */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm flex flex-col gap-3 font-mono text-xs">
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <span className="text-slate-400 font-semibold uppercase text-[11px] flex items-center gap-2">
+                                <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                                AMBULANCE EVIDENCE FUSION
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                evidence.evidence_quality === "STRONG"
+                                    ? "bg-rose-950 text-rose-300 border border-rose-800"
+                                    : evidence.evidence_quality === "MODERATE"
+                                    ? "bg-amber-950 text-amber-300 border border-amber-800"
+                                    : "bg-slate-950 text-slate-400 border border-slate-800"
+                            }`}>
+                                {evidence.evidence_quality}
+                            </span>
+                        </div>
+
+                        {/* Evidence Metric Bars */}
+                        <div className="flex flex-col gap-2.5">
+                            {[
+                                { label: "Vehicle Classification", val: evidence.vehicle_classification },
+                                { label: "Emergency Markings (Livery)", val: evidence.emergency_markings },
+                                { label: "Track Consistency", val: evidence.track_consistency },
+                                { label: "Temporal Consistency", val: evidence.temporal_consistency },
+                                { label: "Motion Consistency", val: evidence.motion_consistency }
+                            ].map((m) => (
+                                <div key={m.label}>
+                                    <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                                        <span>{m.label}</span>
+                                        <span className="text-slate-200 font-bold">{m.val}%</span>
+                                    </div>
+                                    <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full transition-all duration-300 ${
+                                                m.val > 70 ? "bg-rose-500" : m.val > 40 ? "bg-amber-500" : "bg-slate-700"
+                                            }`}
+                                            style={{ width: `${Math.min(100, Math.max(0, m.val))}%` }}
+                                        />
                                     </div>
                                 </div>
+                            ))}
+                        </div>
 
-                                {/* Decision Engine */}
-                                <div className="bg-[#121216] border border-fuchsia-500/20 rounded-3xl p-6 relative overflow-hidden shadow-[inset_0_0_20px_rgba(217,70,239,0.02)]">
-                                    <div className="flex items-start gap-4 mb-4">
-                                        <div className="p-3 bg-fuchsia-500/10 rounded-xl border border-fuchsia-500/20">
-                                            <Cpu className="w-6 h-6 text-fuchsia-400" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-[12px] font-black uppercase tracking-[0.1em] text-white">{t("auto.DecisionEngine_1355") || "Decision Engine"}</h3>
-                                            <span className="text-[9px] font-bold text-fuchsia-400 uppercase tracking-widest">{t("auto.AutonomousPhase_3203") || "Autonomous Phase"}</span>
-                                        </div>
+                        {/* Beacon Activity (Supporting Signal) */}
+                        <div className="rounded-lg bg-slate-950/60 p-2.5 border border-slate-800/60 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400">Roof Beacon Strobe:</span>
+                            <span className="font-semibold text-slate-200">{evidence.beacon_signal}</span>
+                        </div>
+
+                        {/* Decision Summary */}
+                        <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px]">
+                            <div className="text-[10px] text-slate-500 uppercase">Current Decision</div>
+                            <div className="font-bold text-white mt-0.5">{evidence.decision}</div>
+                            <div className="text-[10px] text-slate-400 mt-1">
+                                Persistence: <span className="text-emerald-400 font-bold">{persistenceSeconds}s</span> / 3.0s threshold
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Right Column: Corridor Road Graph & Signal Controller (Cols 9-12) ─ */}
+                <div className="lg:col-span-3 flex flex-col gap-4">
+                    {/* Road Graph & Corridor Plan Card */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm flex flex-col gap-3 font-mono text-xs">
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <span className="text-slate-400 font-semibold uppercase text-[11px] flex items-center gap-2">
+                                <Route className="w-3.5 h-3.5 text-emerald-400" />
+                                CORRIDOR ROAD GRAPH
+                            </span>
+                            <span className="text-[10px] text-slate-500">PVNR CORRIDOR</span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-400 mb-1">
+                            Upcoming junction pre-emption recommendations:
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                            {corridorPlan?.junctions?.map((j: any) => (
+                                <div
+                                    key={j.id}
+                                    className={`p-3 rounded-lg border flex flex-col gap-1 transition-all ${
+                                        j.active
+                                            ? "bg-rose-950/40 border-rose-600/50 text-rose-200"
+                                            : "bg-slate-950/60 border-slate-800/60 text-slate-400"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-[11px] text-white">{j.name}</span>
+                                        <span className="text-[10px] font-bold text-emerald-400">{j.dynamic_eta_sec}s ETA</span>
                                     </div>
-                                    
-                                    <p className="text-xs font-mono text-slate-400 leading-relaxed pt-2">
-                                        {t("auto.Novehiclescurre_9933") || "No vehicles currently detected. Maintain standard dynamic pattern."}
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                        <span>Dist: {j.distance_meters}m</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                            j.active ? "bg-rose-900/60 text-rose-300" : "bg-slate-800 text-slate-400"
+                                        }`}>
+                                            {j.clearance_recommendation}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Signal Controller Status (Scientifically Honest) */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm flex flex-col gap-3 font-mono text-xs">
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <span className="text-slate-400 font-semibold uppercase text-[11px] flex items-center gap-2">
+                                <Radio className="w-3.5 h-3.5 text-amber-400" />
+                                SIGNAL CONTROLLER STATUS
+                            </span>
+                            <span className="text-[10px] text-amber-400">ADVISORY</span>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-amber-950/30 border border-amber-800/40 text-[11px] text-amber-200/90 leading-relaxed">
+                            <p className="font-bold text-amber-300 mb-0.5">CONTROLLER: NOT CONNECTED</p>
+                            Green Wave operates in <strong>Recommendation & Advisory Pre-Emption Mode</strong>. No municipal signal hardware is directly controlled.
+                        </div>
+
+                        <div className="text-[10px] text-slate-400 flex flex-col gap-1">
+                            <div>Protocol: <span className="text-slate-200">NTCIP-1202 / SCATS (Simulated)</span></div>
+                            <div>Corridor Node: <span className="text-slate-200">{corridorPlan?.corridor_id}</span></div>
+                        </div>
+                    </div>
+
+                    {/* Operator Authorization Gate */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-sm flex flex-col gap-3 font-mono text-xs">
+                        <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                            <span className="text-slate-400 font-semibold uppercase text-[11px] flex items-center gap-2">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                OPERATOR AUTHORIZATION GATE
+                            </span>
+                        </div>
+
+                        <p className="text-[11px] text-slate-400">
+                            Execution of corridor pre-emption requires deliberate operator authorization with an immutable audit log.
+                        </p>
+
+                        <button
+                            disabled={!isVerified}
+                            onClick={() => setShowAuthorizeModal(true)}
+                            className={`w-full py-2.5 px-4 rounded-lg font-bold text-xs font-mono transition-all flex items-center justify-center gap-2 ${
+                                isVerified
+                                    ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/40 animate-pulse cursor-pointer"
+                                    : "bg-slate-800/60 text-slate-500 border border-slate-700/40 cursor-not-allowed"
+                            }`}
+                        >
+                            {isVerified ? (
+                                <>
+                                    <Siren className="w-4 h-4" />
+                                    AUTHORIZE CORRIDOR CLEARANCE
+                                </>
+                            ) : (
+                                <>
+                                    <Lock className="w-3.5 h-3.5" />
+                                    CORRIDOR PRE-EMPTION (STANDBY)
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Green Wave Source Lab Modal ────────────────────────────────────────── */}
+            <AnimatePresence>
+                {showSourceLabModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl font-mono text-xs flex flex-col gap-5"
+                        >
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                <div>
+                                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                        <Video className="w-4 h-4 text-emerald-400" />
+                                        GREEN WAVE SOURCE LAB
+                                    </h2>
+                                    <p className="text-slate-400 text-[11px] mt-0.5">
+                                        Ingest curated demonstration scenarios, live CCTV RTSP feeds, or custom traffic videos.
                                     </p>
                                 </div>
-                            </div>
-                        </motion.div>
-
-                    ) : (
-                        
-                        // LIVE ANALYSIS STATE
-                        <motion.div 
-                            key="analyzing"
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-                        >
-                            {/* LEFT PANEL: Emergency Vehicle Discovery */}
-                            <div className="space-y-6 flex flex-col">
-                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500">{t("auto.EmergencyVehicl_9078") || "Emergency Vehicle Discovery"}</h3>
-                                
-                                <div className="bg-black border border-emerald-500/30 rounded-3xl overflow-hidden relative shadow-[0_0_30px_rgba(16,185,129,0.1)] group">
-                                    <img 
-                                        src={videoUrl!} 
-                                        alt="Green Wave Live Feed"
-                                        className="w-full h-[250px] object-cover opacity-80"
-                                    />
-                                    <div className="absolute top-4 left-4 px-3 py-1 bg-black/60 backdrop-blur-sm border border-emerald-500/50 rounded-lg text-emerald-400 font-mono text-[10px] font-black uppercase flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> {t("auto.LIVEFEED_3045") || "LIVE FEED"}
-                                    </div>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-[#121216] border border-white/5 rounded-2xl p-4 shadow-inner">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{t("auto.LiveTraffic_3435") || "Live Traffic"}</div>
-                                        <div className="text-xl font-black text-white">{vehicleCount} <span className="text-xs text-slate-400">{t("auto.TotalVehicles_7055") || "Total Vehicles"}</span></div>
-                                    </div>
-                                    <div className="bg-[#121216] border border-white/5 rounded-2xl p-4 shadow-inner">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">{t("auto.Congestion_2092") || "Congestion"}</div>
-                                        <div className={`text-xl font-black ${density === 'High' ? 'text-rose-400' : density === 'Medium' ? 'text-yellow-400' : 'text-emerald-400'}`}>{density}</div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-[#121216] border border-rose-500/20 rounded-2xl p-6 shadow-inner flex-1 flex flex-col justify-center">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-4">{t("auto.EmergencyCandid_1577") || "Emergency Candidate Panel"}</h4>
-                                    {targetId ? (
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                                <span className="text-xs font-mono text-slate-400">{t("auto.CandidateID_4007") || "Candidate ID"}</span>
-                                                <span className="text-sm font-bold font-mono text-white">{targetId}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                                <span className="text-xs font-mono text-slate-400">{t("auto.Type_7956") || "Type"}</span>
-                                                <span className="text-sm font-bold font-mono text-rose-400">{t("auto.EmergencyVehicl_3294") || "Emergency Vehicle"}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-xs font-mono text-slate-400">{t("auto.CurrentConfiden_3339") || "Current Confidence"}</span>
-                                                <span className="text-sm font-bold font-mono text-emerald-400">{confidence}%</span>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center text-slate-500 font-mono text-xs">{t("auto.Scanningforcand_2358") || "Scanning for candidates..."}</div>
-                                    )}
-                                </div>
+                                <button
+                                    onClick={() => setShowSourceLabModal(false)}
+                                    className="p-1 rounded-lg text-slate-400 hover:text-white"
+                                >
+                                    ✕
+                                </button>
                             </div>
 
-                            {/* CENTER PANEL: Emergency Lifecycle Engine */}
-                            <div className="bg-[#121216] border border-white/5 rounded-3xl p-8 shadow-inner relative overflow-hidden flex flex-col">
-                                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(16,185,129,0.03)_0%,transparent_70%)]"></div>
-                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-8 relative z-10">{t("auto.EmergencyLifecy_3512") || "Emergency Lifecycle Engine"}</h3>
-                                
-                                <div className="space-y-4 relative z-10 flex-1">
-                                    <LifecycleStep title={t("auto.SEARCHING_7284") || "SEARCHING"} active={simStep >= 1} current={simStep === 1} icon={Search} />
-                                    <LifecycleStep title={t("auto.CANDIDATEFOUND_9141") || "CANDIDATE FOUND"} active={simStep >= 2} current={simStep === 2} icon={Target} />
-                                    <LifecycleStep title={t("auto.VERIFYING_108") || "VERIFYING"} active={simStep >= 3} current={simStep === 3} icon={Navigation} />
-                                    <LifecycleStep title={t("auto.CONFIRMED_1167") || "CONFIRMED"} active={simStep >= 4} current={simStep === 4} icon={CheckCircle2} />
-                                    <LifecycleStep title={t("auto.CORRIDORACTIVE_1096") || "CORRIDOR ACTIVE"} active={simStep >= 5} current={simStep === 5} icon={Zap} />
-                                    <LifecycleStep title={t("auto.MISSIONCOMPLETE_6056") || "MISSION COMPLETE"} active={simStep >= 6} current={simStep === 6} icon={ShieldCheck} />
-                                </div>
-                                
-                                <AnimatePresence>
-                                    {(simStep >= 4) && (
-                                        <motion.div 
-                                            initial={{ opacity: 0, height: 0, marginTop: 0 }} 
-                                            animate={{ opacity: 1, height: 'auto', marginTop: 32 }}
-                                            exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                                            className="pt-6 border-t border-white/10"
+                            {/* 3 Workspace Tabs */}
+                            <div className="flex border-b border-slate-800">
+                                {[
+                                    { id: "demo", label: "DEMO SCENARIOS" },
+                                    { id: "live", label: `LIVE CAMERAS (${liveCameras.length})` },
+                                    { id: "upload", label: "UPLOAD TRAFFIC VIDEO" }
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setSourceLabTab(tab.id as any)}
+                                        className={`px-4 py-2 border-b-2 font-bold transition-all ${
+                                            sourceLabTab === tab.id
+                                                ? "border-emerald-400 text-emerald-300"
+                                                : "border-transparent text-slate-500 hover:text-slate-300"
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Tab 1: Demo Scenarios */}
+                            {sourceLabTab === "demo" && (
+                                <div className="flex flex-col gap-3 max-h-[380px] overflow-y-auto pr-1">
+                                    {scenarios.map((sc) => (
+                                        <div
+                                            key={sc.id}
+                                            onClick={() => handleSelectScenario(sc.id)}
+                                            className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
+                                                activeScenarioId === sc.id
+                                                    ? "bg-emerald-950/40 border-emerald-500/60 shadow-md"
+                                                    : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                                            }`}
                                         >
-                                            <div className="flex items-center justify-between mb-6">
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400">{t("auto.CenterMapCorrid_212") || "Center Map Corridor"}</h4>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-white text-xs">{sc.title}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                                        sc.category === "BASELINE"
+                                                            ? "bg-slate-800 text-slate-300"
+                                                            : "bg-rose-950 text-rose-300 border border-rose-800"
+                                                    }`}>
+                                                        {sc.badge}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[10px] text-slate-400">{sc.duration_seconds}s • {sc.fps} FPS</span>
                                             </div>
-                                            <div className="space-y-4 px-2">
-                                                <JunctionNode name="Junction A" eta={corridorNodes.A.eta} status={corridorNodes.A.status} cleared={corridorNodes.A.cleared} />
-                                                <JunctionNode name="Junction B" eta={corridorNodes.B.eta} status={corridorNodes.B.status} cleared={corridorNodes.B.cleared} />
-                                                <JunctionNode name="Junction C" eta={corridorNodes.C.eta} status={corridorNodes.C.status} cleared={corridorNodes.C.cleared} />
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
 
-                            {/* RIGHT PANEL: AI Reasoning Engine & Impact */}
-                            <div className="space-y-6 flex flex-col">
-                                <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-500">{t("auto.AIReasoningEngi_141") || "AI Reasoning Engine"}</h3>
-                                
-                                <div className="bg-[#121216] border border-white/5 rounded-3xl p-6 shadow-inner flex-1">
-                                    <div className="space-y-4 mb-8">
-                                        <ReasoningRow label={t("auto.LightSignature_1445") || "Light Signature"} score={reasoning.light} />
-                                        <ReasoningRow label={t("auto.RouteConsistenc_2912") || "Route Consistency"} score={reasoning.priority} />
-                                        <ReasoningRow label={t("auto.VehicleProfile_9456") || "Vehicle Profile"} score={reasoning.vehicle} />
-                                        <ReasoningRow label={t("auto.MotionPriority_3768") || "Motion Priority"} score={reasoning.motion} />
-                                        <div className="pt-4 mt-4 border-t border-white/10 flex justify-between items-center">
-                                            <span className="text-xs font-black uppercase tracking-widest text-white">{t("auto.FinalConfidence_3314") || "Final Confidence"}</span>
-                                            <span className="text-2xl font-black font-mono text-emerald-400">{confidence}%</span>
+                                            <p className="text-[11px] text-slate-400 leading-relaxed">{sc.description}</p>
+
+                                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
+                                                <span>Expected: <strong className="text-slate-300">{sc.expected_outcome}</strong></span>
+                                                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                                    SELECT SCENARIO <ChevronRight className="w-3 h-3" />
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div className="bg-black/50 p-4 rounded-xl border border-white/5 mb-6">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">{t("auto.Reasoning_9608") || "Reasoning"}</h4>
-                                        <ul className="space-y-2">
-                                            <ReasoningCheck text="Emergency light sequence detected" active={reasoning.light > 60} />
-                                            <ReasoningCheck text="Persistent route trajectory" active={reasoning.priority > 60} />
-                                            <ReasoningCheck text="Priority vehicle profile" active={reasoning.vehicle > 60} />
-                                            <ReasoningCheck text="Traffic density context active" active={density !== 'Low'} />
-                                            <ReasoningCheck text="Confidence > 75%" active={confidence > 75} />
-                                        </ul>
-                                    </div>
+                                    ))}
                                 </div>
+                            )}
 
-                                <div className="bg-[#121216] border border-sky-500/20 rounded-3xl p-6 shadow-inner mt-auto">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-sky-400 mb-4">{t("auto.ImpactIntellige_4364") || "Impact Intelligence"}</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <ImpactStat label={t("auto.VehiclesAnalyse_8158") || "Vehicles Analysed"} value={vehicleCount * 14} />
-                                        <ImpactStat label={t("auto.EmergencyVehicl_2461") || "Emergency Vehicles"} value={simStep >= 4 ? "1" : "0"} />
-                                        <ImpactStat label={t("auto.JunctionsCleare_9198") || "Junctions Cleared"} value={Object.values(corridorNodes).filter(n => n.cleared).length.toString()} />
-                                        <ImpactStat label={t("auto.SystemConfidenc_1603") || "System Confidence"} value={`${confidence}%`} />
+                            {/* Tab 2: Live Cameras */}
+                            {sourceLabTab === "live" && (
+                                <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1">
+                                    {liveCameras.length === 0 ? (
+                                        <div className="p-8 text-center text-slate-500">No CCTV cameras registered in database.</div>
+                                    ) : (
+                                        liveCameras.map((cam) => (
+                                            <div
+                                                key={cam.id}
+                                                onClick={() => {
+                                                    setSelectedSessionId(cam.id);
+                                                    setShowSourceLabModal(false);
+                                                }}
+                                                className="p-3 rounded-lg border border-slate-800 bg-slate-950 hover:border-emerald-500/50 cursor-pointer flex items-center justify-between"
+                                            >
+                                                <div>
+                                                    <div className="font-bold text-white">{cam.name}</div>
+                                                    <div className="text-[10px] text-slate-500">{cam.stream_url}</div>
+                                                </div>
+                                                <button className="px-2.5 py-1 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
+                                                    ATTACH
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Tab 3: Upload Video */}
+                            {sourceLabTab === "upload" && (
+                                <div className="p-6 border-2 border-dashed border-slate-800 rounded-xl bg-slate-950 text-center flex flex-col items-center justify-center gap-3">
+                                    <UploadCloud className="w-10 h-10 text-emerald-400" />
+                                    <div>
+                                        <p className="font-bold text-white text-xs">Drop .mp4 or .webm traffic video here</p>
+                                        <p className="text-slate-500 text-[11px] mt-1">Video will run through the exact same downstream pipeline</p>
                                     </div>
+                                    <label className="mt-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer">
+                                        {uploading ? "Ingesting Video..." : "Browse Local File"}
+                                        <input
+                                            type="file"
+                                            accept="video/mp4,video/webm"
+                                            className="hidden"
+                                            onChange={handleFileUpload}
+                                            disabled={uploading}
+                                        />
+                                    </label>
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* ── Operator Authorization Modal ────────────────────────────────────────── */}
+            <AnimatePresence>
+                {showAuthorizeModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="w-full max-w-lg bg-slate-900 border border-rose-600/50 rounded-2xl p-6 shadow-2xl font-mono text-xs flex flex-col gap-4"
+                        >
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                                <div className="flex items-center gap-2 text-rose-400">
+                                    <ShieldAlert className="w-5 h-5" />
+                                    <h2 className="text-sm font-bold text-white">OPERATOR CORRIDOR AUTHORIZATION</h2>
+                                </div>
+                                <button onClick={() => setShowAuthorizeModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-rose-950/30 border border-rose-800/40 text-rose-200 text-[11px] leading-relaxed">
+                                Confirming authorization will log an immutable tactical audit record and transmit advisory clearance timings for <strong>{corridorPlan?.corridor_id}</strong>.
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                <div>
+                                    <label className="text-[10px] text-slate-400 uppercase">Operator ID / Call Sign</label>
+                                    <input
+                                        type="text"
+                                        value={operatorId}
+                                        onChange={(e) => setOperatorId(e.target.value)}
+                                        className="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-slate-400 uppercase">Tactical Justification Notes</label>
+                                    <textarea
+                                        rows={3}
+                                        value={operatorNotes}
+                                        onChange={(e) => setOperatorNotes(e.target.value)}
+                                        className="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-mono"
+                                    />
                                 </div>
                             </div>
 
+                            {authorizationAudit && (
+                                <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 text-[11px]">
+                                    ✓ Authorization Recorded: <strong>{authorizationAudit.audit_id}</strong>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                                <button
+                                    onClick={() => setShowAuthorizeModal(false)}
+                                    className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    disabled={isAuthorizing}
+                                    onClick={handleAuthorizeCorridor}
+                                    className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-2"
+                                >
+                                    <Send className="w-3.5 h-3.5" />
+                                    {isAuthorizing ? "Authorizing..." : "CONFIRM & TRANSMIT ADVISORY"}
+                                </button>
+                            </div>
                         </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-        </div>
-    );
-}
-
-// Subcomponents
-
-function JunctionNode({ name, eta, status, cleared }: { name: string, eta: string, status: string, cleared: boolean }) {
-    return (
-        <div className={`flex justify-between items-center p-3 rounded-xl border transition-all ${cleared ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-black/40 border-white/5'}`}>
-            <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-white">{name}</div>
-                <div className="text-[9px] font-mono text-slate-500">ETA {eta}</div>
-            </div>
-            <div className={`text-[10px] font-black uppercase tracking-widest ${cleared ? 'text-emerald-400' : status === 'Preparing' ? 'text-yellow-400' : 'text-slate-500'}`}>
-                {cleared ? '✓ Cleared' : status}
-            </div>
-        </div>
-    );
-}
-
-function LifecycleStep({ title, active, current, icon: Icon }: { title: string, active: boolean, current: boolean, icon: any }) {
-    return (
-        <div className={`flex items-center gap-4 p-3 rounded-xl border transition-all duration-500 ${current ? 'bg-emerald-500/10 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : active ? 'bg-white/5 border-emerald-500/20' : 'bg-transparent border-transparent opacity-40'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${current ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : active ? 'bg-emerald-500 border-emerald-400 text-black' : 'bg-white/5 border-white/10 text-slate-500'}`}>
-                {active && !current ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
-            </div>
-            <div className="flex-1">
-                <div className={`text-[10px] font-black uppercase tracking-widest ${current ? 'text-emerald-400' : active ? 'text-white' : 'text-slate-500'}`}>{title}</div>
-            </div>
-            {current && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />}
-        </div>
-    );
-}
-
-function ReasoningRow({ label, score }: { label: string, score: number }) {
-    return (
-        <div className="bg-black/40 border border-white/5 rounded-xl p-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</div>
-            </div>
-            <div className="flex items-center gap-4">
-                <div className={`text-sm font-black font-mono ${score > 70 ? 'text-emerald-400' : score > 30 ? 'text-yellow-400' : 'text-rose-400'}`}>{score}%</div>
-            </div>
-        </div>
-    );
-}
-
-function ReasoningCheck({ text, active }: { text: string, active: boolean }) {
-    return (
-        <li className="flex items-start gap-2">
-            <span className={`text-[10px] font-black mt-0.5 ${active ? 'text-emerald-500' : 'text-slate-600'}`}>{active ? '✓' : '○'}</span>
-            <span className={`text-[10px] font-mono leading-tight ${active ? 'text-emerald-100' : 'text-slate-600'}`}>{text}</span>
-        </li>
-    );
-}
-
-function ImpactStat({ label, value }: { label: string, value: string | number }) {
-    return (
-        <div className="flex flex-col">
-            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">{label}</span>
-            <span className="text-xl font-black font-mono text-white">{value}</span>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
