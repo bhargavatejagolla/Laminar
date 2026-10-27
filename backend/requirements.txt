@@ -1,7 +1,7 @@
 psutil==5.9.8  # For system metrics (optional)
 apscheduler>=3.10.0
 email-validator>=2.1.1
-google-auth>=2.29.0
+google-auth>=2.56.3
 
 fastapi==0.115.0
 
