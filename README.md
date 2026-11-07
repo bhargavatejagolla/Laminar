@@ -1,19 +1,3 @@
-<div align="center">
-  
-  <img src="https://capsules-cdn.vercel.app/api?type=waving&color=009688&height=250&section=header&text=LAMINAR&fontSize=80&fontAlignY=35&animation=twinkling&fontColor=ffffff" alt="Laminar Header" />
-
-  <a href="https://github.com/bhargavatejagolla/Laminar">
-    <img src="https://readme-typing-svg.demolab.com?font=Inter&weight=600&size=22&pause=1000&color=009688&center=true&vCenter=true&width=800&lines=Next-Generation+AI-Powered+Analytics;Vision+Intelligence+Platform;Autonomous+Smart+City+Operating+System;Powered+by+FastAPI,+Next.js,+and+YOLOv8" alt="Typing SVG" />
-  </a>
-
-  <br />
-
-  <p align="center">
-    <a href="https://github.com/bhargavatejagolla/Laminar/stargazers"><img src="https://img.shields.io/github/stars/bhargavatejagolla/Laminar?style=for-the-badge&color=009688&logo=github" alt="Stars"></a>
-    <a href="https://github.com/bhargavatejagolla/Laminar/network/members"><img src="https://img.shields.io/github/forks/bhargavatejagolla/Laminar?style=for-the-badge&color=009688&logo=github" alt="Forks"></a>
-    <a href="https://github.com/bhargavatejagolla/Laminar/issues"><img src="https://img.shields.io/github/issues/bhargavatejagolla/Laminar?style=for-the-badge&color=009688&logo=github" alt="Issues"></a>
-    <a href="https://github.com/bhargavatejagolla/Laminar/blob/main/LICENSE"><img src="https://img.shields.io/github/license/bhargavatejagolla/Laminar?style=for-the-badge&color=009688&logo=mit" alt="License"></a>
-  </p>
 
   <p align="center">
     <img src="https://img.shields.io/badge/Python-3.11+-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python">
