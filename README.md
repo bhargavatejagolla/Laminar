@@ -1,10 +1,3 @@
-<div align="center">
-  
-  <img src="https://capsules-cdn.vercel.app/api?type=waving&color=009688&height=250&section=header&text=LAMINAR&fontSize=80&fontAlignY=35&animation=twinkling&fontColor=ffffff" alt="Laminar Header" />
-
-  <a href="https://github.com/bhargavatejagolla/Laminar">
-    <img src="https://readme-typing-svg.demolab.com?font=Inter&weight=600&size=22&pause=1000&color=009688&center=true&vCenter=true&width=800&lines=Next-Generation+AI-Powered+Analytics;Vision+Intelligence+Platform;Autonomous+Smart+City+Operating+System;Powered+by+FastAPI,+Next.js,+and+YOLOv8" alt="Typing SVG" />
-  </a>
 
   <br />
 
